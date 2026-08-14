@@ -86,7 +86,10 @@ class IngestarTelemetriaUseCase:
                     dispositivo.version_hw = dev_info.get("hw_model")
             return self.repo_dispositivos.guardar(dispositivo)
 
-    def _parse_fase(self, data: dict[str, Any], suffix: str = "") -> MedicionFase:
+    def _parse_fase(self, data: Any, suffix: str = "") -> MedicionFase:
+        if not isinstance(data, dict):
+            return MedicionFase()
+
         sfx_lower = suffix.lower()
         sfx_upper = suffix.upper()
         sfx_no_underscore = suffix.replace("_", "")
@@ -187,6 +190,9 @@ class IngestarTelemetriaUseCase:
         )
 
     def ejecutar(self, topico: str, payload: dict[str, Any]) -> None:
+        if not isinstance(payload, dict):
+            return
+
         if self.publicador:
             self.publicador.publicar_telemetria_en_vivo(topico, payload)
 
@@ -197,49 +203,106 @@ class IngestarTelemetriaUseCase:
         mac_raw = partes[2]
         subtopico = partes[3]
 
-        dev_info = payload.get("device_info") if isinstance(payload, dict) else None
+        dev_info = payload.get("device_info") if isinstance(payload.get("device_info"), dict) else None
         dispositivo = self._obtener_o_crear_dispositivo(mac_raw, dev_info)
         recorded_at = self._parse_timestamp(payload.get("timestamp") or payload.get("t") or payload.get("time"))
 
         if subtopico == "inst":
-            fase_r = self._parse_fase(payload.get("phase_r") or payload.get("r") or payload, suffix="_r")
-            fase_s = self._parse_fase(payload.get("phase_s") or payload.get("s") or payload, suffix="_s")
-            fase_t = self._parse_fase(payload.get("phase_t") or payload.get("t") or payload, suffix="_t")
-            total = payload.get("total") or payload.get("tot") or payload
+            # Extraer fases de estructura de arreglo 'f': [{"n":"R","v":223.4,...}, ...]
+            phases_dict: dict[str, dict[str, Any]] = {}
+            if isinstance(payload.get("f"), list):
+                for item in payload["f"]:
+                    if isinstance(item, dict) and "n" in item:
+                        phases_dict[str(item["n"]).strip().upper()] = item
+
+            data_r = (
+                phases_dict.get("R")
+                or phases_dict.get("1")
+                or payload.get("phase_r")
+                or payload.get("phase_1")
+                or payload.get("fase_r")
+                or (payload.get("r") if isinstance(payload.get("r"), dict) else None)
+                or payload
+            )
+            data_s = (
+                phases_dict.get("S")
+                or phases_dict.get("2")
+                or payload.get("phase_s")
+                or payload.get("phase_2")
+                or payload.get("fase_s")
+                or (payload.get("s") if isinstance(payload.get("s"), dict) else None)
+                or payload
+            )
+            data_t = (
+                phases_dict.get("T")
+                or phases_dict.get("3")
+                or payload.get("phase_t")
+                or payload.get("phase_3")
+                or payload.get("fase_t")
+                or (payload.get("t") if isinstance(payload.get("t"), dict) else None)
+                or payload
+            )
+
+            fase_r = self._parse_fase(data_r, suffix="_r")
+            fase_s = self._parse_fase(data_s, suffix="_s")
+            fase_t = self._parse_fase(data_t, suffix="_t")
+
+            total = payload.get("total") or payload.get("tot")
+            total_data = total if isinstance(total, dict) else payload
 
             p_tot = (
-                total.get("net_active_power_W")
-                or total.get("m_p_tot")
-                or total.get("total_active_power")
-                or total.get("p_tot")
-                or total.get("P_tot")
-                or total.get("p")
+                total_data.get("net_active_power_W")
+                or total_data.get("m_p_tot")
+                or total_data.get("total_active_power")
+                or total_data.get("p_tot")
+                or total_data.get("P_tot")
             )
+            if p_tot is None and not phases_dict:
+                p_tot = total_data.get("p")
+            if p_tot is None:
+                p_vals = [f.potencia_activa.vatios for f in (fase_r, fase_s, fase_t) if f.potencia_activa is not None]
+                if p_vals:
+                    p_tot = sum(p_vals)
+
             q_tot = (
-                total.get("net_reactive_power_VAR")
-                or total.get("m_q_tot")
-                or total.get("total_reactive_power")
-                or total.get("q_tot")
-                or total.get("Q_tot")
-                or total.get("q")
+                total_data.get("net_reactive_power_VAR")
+                or total_data.get("m_q_tot")
+                or total_data.get("total_reactive_power")
+                or total_data.get("q_tot")
+                or total_data.get("Q_tot")
             )
+            if q_tot is None and not phases_dict:
+                q_tot = total_data.get("q")
+            if q_tot is None:
+                q_vals = [f.potencia_reactiva.var for f in (fase_r, fase_s, fase_t) if f.potencia_reactiva is not None]
+                if q_vals:
+                    q_tot = sum(q_vals)
+
             s_tot = (
-                total.get("net_apparent_power_VA")
-                or total.get("m_s_tot")
-                or total.get("total_apparent_power")
-                or total.get("s_tot")
-                or total.get("S_tot")
-                or total.get("s")
+                total_data.get("net_apparent_power_VA")
+                or total_data.get("m_s_tot")
+                or total_data.get("total_apparent_power")
+                or total_data.get("s_tot")
+                or total_data.get("S_tot")
             )
+            if s_tot is None and not phases_dict:
+                s_tot = total_data.get("s")
+            if s_tot is None:
+                s_vals = [f.potencia_aparente.va for f in (fase_r, fase_s, fase_t) if f.potencia_aparente is not None]
+                if s_vals:
+                    s_tot = sum(s_vals)
+
             fp_tot = (
-                total.get("power_factor")
-                or total.get("m_pf_tot")
-                or total.get("total_power_factor")
-                or total.get("fp_tot")
-                or total.get("pf_tot")
-                or total.get("fp")
-                or total.get("pf")
+                total_data.get("power_factor")
+                or total_data.get("m_pf_tot")
+                or total_data.get("total_power_factor")
+                or total_data.get("fp_tot")
+                or total_data.get("pf_tot")
             )
+            if fp_tot is None and not phases_dict:
+                fp_tot = total_data.get("fp") or total_data.get("pf")
+            if fp_tot is None and p_tot is not None and s_tot is not None and float(s_tot) > 0:
+                fp_tot = round(float(p_tot) / float(s_tot), 2)
 
             lectura = LecturaInstantanea(
                 id=None,
@@ -276,7 +339,10 @@ class IngestarTelemetriaUseCase:
                     )
 
         elif subtopico in ("acc", "energyio"):
-            total = payload.get("total", payload)
+            total = payload.get("total") if isinstance(payload.get("total"), dict) else payload
+            if not isinstance(total, dict):
+                total = {}
+
             e_act_imp = (
                 total.get("imported_active_energy_KWH")
                 or total.get("ae_imp")
@@ -322,6 +388,27 @@ class IngestarTelemetriaUseCase:
                 )
             )
 
+            # Soporte para formato compacto de Powermeter con arreglo 'f': [{"n":"R","a":0.03,"r":0.01}, ...]
+            if isinstance(payload.get("f"), list):
+                phases_act = [
+                    float(item["a"])
+                    for item in payload["f"]
+                    if isinstance(item, dict) and item.get("a") is not None
+                ]
+                phases_react = [
+                    float(item["r"])
+                    for item in payload["f"]
+                    if isinstance(item, dict) and item.get("r") is not None
+                ]
+                if e_act is None and phases_act:
+                    e_act = sum(phases_act)
+                    if e_act_imp is None:
+                        e_act_imp = e_act
+                if e_react is None and phases_react:
+                    e_react = sum(phases_react)
+                    if e_react_imp is None:
+                        e_react_imp = e_react
+
             acumulado = AcumuladoEnergia(
                 id=None,
                 dispositivo_id=dispositivo.id,
@@ -346,7 +433,8 @@ class IngestarTelemetriaUseCase:
                 )
 
         elif subtopico == "status":
-            wifi_info = payload.get("wifi_sta", {})
+            wifi_info = payload.get("wifi_sta") if isinstance(payload.get("wifi_sta"), dict) else {}
+            device_info = payload.get("device_info") if isinstance(payload.get("device_info"), dict) else {}
             log = LogEstadoDispositivo(
                 id=None,
                 dispositivo_id=dispositivo.id,
@@ -354,7 +442,7 @@ class IngestarTelemetriaUseCase:
                 wifi_rssi_dbm=wifi_info.get("dbm"),
                 wifi_calidad=wifi_info.get("quality"),
                 direccion_ip=wifi_info.get("ip"),
-                tiempo_activo_segundos=payload.get("uptime") or payload.get("device_info", {}).get("uptime"),
+                tiempo_activo_segundos=payload.get("uptime") or device_info.get("uptime"),
                 payload_bruto=payload,
             )
             self.repo_telemetria.guardar_log_estado(log)

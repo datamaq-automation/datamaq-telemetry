@@ -123,3 +123,56 @@ def test_ingestar_telemetria_instantanea():
     assert res.instantanea is not None
     assert res.instantanea.fase_r.voltage_V == 226.9
     assert res.instantanea.potencia_activa_total_W == 2.4
+
+
+def test_ingestar_telemetria_compacta_inst():
+    repo_disp = MockDispositivosRepo()
+    repo_telem = MockTelemetriaRepo()
+    mock_logger = MockLogger()
+
+    use_case = IngestarTelemetriaUseCase(repo_disp, repo_telem, logger=mock_logger)
+
+    payload = {
+        "t": 1786737900,
+        "a": 0,
+        "f": [
+            {"n": "R", "v": 223.4, "i": 0.0, "p": 0, "q": 0},
+            {"n": "S", "v": 223.1, "i": 0.0, "p": 0, "q": 0},
+            {"n": "T", "v": 223.9, "i": 0.0, "p": 0, "q": 0},
+        ],
+    }
+
+    use_case.ejecutar("m/wifi/D48C49F03564/inst", payload)
+
+    assert len(repo_telem.instantaneas) == 1
+    inst = repo_telem.instantaneas[0]
+    assert inst.fase_r.tension is not None and inst.fase_r.tension.voltios == 223.4
+    assert inst.fase_s.tension is not None and inst.fase_s.tension.voltios == 223.1
+    assert inst.fase_t.tension is not None and inst.fase_t.tension.voltios == 223.9
+
+
+def test_ingestar_telemetria_compacta_acc():
+    repo_disp = MockDispositivosRepo()
+    repo_telem = MockTelemetriaRepo()
+    mock_logger = MockLogger()
+
+    use_case = IngestarTelemetriaUseCase(repo_disp, repo_telem, logger=mock_logger)
+
+    payload = {
+        "t": 1786737600,
+        "a": 0,
+        "f": [
+            {"n": "R", "a": 0.03, "r": 0.01},
+            {"n": "S", "a": 0.02, "r": 0.00},
+            {"n": "T", "a": 0.03, "r": 0.01},
+        ],
+    }
+
+    use_case.ejecutar("m/wifi/D48C49F03564/acc", payload)
+
+    assert len(repo_telem.energias) == 1
+    acc = repo_telem.energias[0]
+    assert acc.energia_activa_neta is not None
+    assert round(acc.energia_activa_neta.kwh, 2) == 0.08
+    assert acc.energia_reactiva_neta is not None
+    assert round(acc.energia_reactiva_neta.kvarh, 2) == 0.02
