@@ -1,19 +1,20 @@
-import sys
 import os
+import sys
 
-# Add parent directory to path
+# Add root directory to python path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pymysql
-from config import settings
-from database import engine, Base
-import models
+
+from src.infrastructure.pydantic.config import get_settings
+from src.infrastructure.sqlalchemy.database import get_engine
+from src.infrastructure.sqlalchemy.models import Base
 
 
 def init_database():
+    settings = get_settings()
     print(f"[*] Conectando a MySQL en {settings.DB_HOST}:{settings.DB_PORT}...")
     try:
-        # Step 1: Ensure database exists
         conn = pymysql.connect(
             host=settings.DB_HOST,
             port=settings.DB_PORT,
@@ -22,13 +23,15 @@ def init_database():
             charset="utf8mb4",
         )
         with conn.cursor() as cursor:
-            cursor.execute(f"CREATE DATABASE IF NOT EXISTS `{settings.DB_NAME}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;")
+            cursor.execute(
+                f"CREATE DATABASE IF NOT EXISTS `{settings.DB_NAME}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+            )
         conn.commit()
         conn.close()
         print(f"[+] Base de datos `{settings.DB_NAME}` verificada/creada exitosamente.")
 
-        # Step 2: Create all tables via SQLAlchemy
-        print("[*] Creando tablas del esquema de telemetría...")
+        print("[*] Creando tablas del esquema Clean Architecture...")
+        engine = get_engine()
         Base.metadata.create_all(bind=engine)
         print("[+] Todas las tablas creadas correctamente.")
 

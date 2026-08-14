@@ -35,7 +35,12 @@ logs/
 *.swp
 *.swo
 
-# Tests
+# Tests & Linters
 .coverage
 htmlcov/
 .pytest_cache/
+.ruff_cache/
+
+# Backups & Data
+backups/
+data/
