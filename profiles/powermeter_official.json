@@ -1,0 +1,21 @@
+{
+  "_description": "Perfil Original de Fábrica - Servidor Powermeter Oficial",
+  "mqtt_config": {
+    "enable_mqtt": true,
+    "enable_extended_topics": true,
+    "broker_host": "mqtt.powermeter.com.ar",
+    "broker_port": 8884,
+    "username": "",
+    "password": "",
+    "security": "TLS-SERVER-AUTH",
+    "clean_session": true,
+    "wifi_ack_timeout": 3000,
+    "wifi_keepalive": 30,
+    "mobile_ack_timeout": 30000,
+    "mobile_keepalive": 60,
+    "connection_preference": "wifi",
+    "psk_identity": "",
+    "psk_key": ""
+  },
+  "mqtt_ca_certificate": "-----BEGIN CERTIFICATE-----\nMIIDpzCCAo+gAwIBAgIUUerEmc7UY7N9Dw1N44x3xL4ArbowDQYJKoZIhvcNAQEL\nBQAwYjELMAkGA1UEBhMCQ0ExDjAMBgNVBAgMBUNBQ0JBMQswCQYDVQQHDAJDQTEV\nMBMGA1UECgwMQ0FQb3dlcm1ldGVyMR8wHQYDVQQDDBZtcXR0LnBvd2VybWV0ZXIu\nY29tLmFyMCAXDTIwMDIyMzEzMjM1M1oYDzIxMjAwMTMwMTMyMzUzWjBiMQswCQYD\nVQQGEwJDQTEOMAwGA1UECAwFQ0FDQkExCzAJBgNVBAcMAkNBMRUwEwYDVQQKDAxD\nQVBvd2VybWV0ZXIxHzAdBgNVBAMMFm1xdHQucG93ZXJtZXRlci5jb20uYXIwggEi\nMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDJeTG75ZVXanfQy/A4tBAPzIXy\nHUq8a99h/vV+uHZa1E1PVYtMRgv2KMLL0JggsnFJIyRjizyQxcWxH38+WmzO7HQF\nXlRDIPgDmmTi8Sxg6+Gz3rBvVGJrAg/7xlqjZ6ADCa+usVk8mo6cEFR6O9HZhQCO\n3PNLrH/6B9Mk6eCS3x6nEuWyZ6Lm3dmOVIlEqZ5BdhK/VgNYHFWbOCuc5fWWW39Y\nne1GSOktBe+xMwUuiAh4G4xlbquJ3z+xkCmePAy4oi07o5M78x0ZxTs75Rp5y0YS\nags1f94Y4aLBDYDiaDsePSVBGNPl9FiIlUzeZd08SQvcT3wvy+05ksD3cHQXAgMB\nAAGjUzBRMB0GA1UdDgQWBBTABS7/w1LsajVyUa7ymI/vcYcBdTAfBgNVHSMEGDAW\ngBTABS7/w1LsajVyUa7ymI/vcYcBdTAPBgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3\nDQEBCwUAA4IBAQAcMmMzUKFLoF3uF0jIC+fQ/q+4Y7TV5ygjooK1ihvmAj3iYIv2\noaYMip7tQEtKCMzg5St2tHutvDyyOQiL9ZqrjDfzt7ELLOU6ecvEuYU22Al75l63\notPgir6DNAuqqD1+xPIkappF/iMjk2OgXCCGq1aCdo1cJ9gjXS3nwUmMKYI1iAOT\nBSgzmJAiZ0OSELOQKzOnLYusbNOr4/zsWO8x4FEv+knqX7A61hNGjyd7tTlBap2n\njDtI1RjzcIwS3n6DpDpszXENnCTdIeFdLjTQByqcc4x2AabZr3br0wa9cb2s0uT/\nG7Vd7y+kFNdUzG6g+YEZ2DA+NwqarRGLzGQz\n-----END CERTIFICATE-----\n"
+}
