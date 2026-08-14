@@ -87,46 +87,94 @@ class IngestarTelemetriaUseCase:
             return self.repo_dispositivos.guardar(dispositivo)
 
     def _parse_fase(self, data: dict[str, Any], suffix: str = "") -> MedicionFase:
-        v = (
-            data.get(f"voltage_V{suffix}")
-            or data.get(f"m_v{suffix}")
-            or data.get(f"voltage{suffix}")
-            or data.get("voltage_V")
-            or data.get("voltage")
+        sfx_lower = suffix.lower()
+        sfx_upper = suffix.upper()
+        sfx_no_underscore = suffix.replace("_", "")
+
+        def _get(*keys: str) -> Any:
+            for k in keys:
+                val = data.get(k)
+                if val is not None:
+                    return val
+            return None
+
+        v = _get(
+            f"voltage_V{suffix}",
+            f"m_v{suffix}",
+            f"voltage{suffix}",
+            f"v{sfx_lower}",
+            f"V{sfx_upper}",
+            f"v{sfx_no_underscore}",
+            f"V{sfx_no_underscore}",
+            "voltage_V",
+            "voltage",
+            "v",
+            "V",
         )
-        i = (
-            data.get(f"current_A{suffix}")
-            or data.get(f"m_i{suffix}")
-            or data.get(f"current{suffix}")
-            or data.get("current_A")
-            or data.get("current")
+        i = _get(
+            f"current_A{suffix}",
+            f"m_i{suffix}",
+            f"current{suffix}",
+            f"i{sfx_lower}",
+            f"I{sfx_upper}",
+            f"i{sfx_no_underscore}",
+            f"I{sfx_no_underscore}",
+            "current_A",
+            "current",
+            "i",
+            "I",
         )
-        p = (
-            data.get(f"net_active_power_W{suffix}")
-            or data.get(f"m_p{suffix}")
-            or data.get(f"active_power{suffix}")
-            or data.get("net_active_power_W")
-            or data.get("active_power")
+        p = _get(
+            f"net_active_power_W{suffix}",
+            f"m_p{suffix}",
+            f"active_power{suffix}",
+            f"p{sfx_lower}",
+            f"P{sfx_upper}",
+            f"p{sfx_no_underscore}",
+            f"P{sfx_no_underscore}",
+            "net_active_power_W",
+            "active_power",
+            "p",
+            "P",
         )
-        q = (
-            data.get(f"net_reactive_power_VAR{suffix}")
-            or data.get(f"m_q{suffix}")
-            or data.get(f"reactive_power{suffix}")
-            or data.get("net_reactive_power_VAR")
-            or data.get("reactive_power")
+        q = _get(
+            f"net_reactive_power_VAR{suffix}",
+            f"m_q{suffix}",
+            f"reactive_power{suffix}",
+            f"q{sfx_lower}",
+            f"Q{sfx_upper}",
+            f"q{sfx_no_underscore}",
+            f"Q{sfx_no_underscore}",
+            "net_reactive_power_VAR",
+            "reactive_power",
+            "q",
+            "Q",
         )
-        s = (
-            data.get(f"net_apparent_power_VA{suffix}")
-            or data.get(f"m_s{suffix}")
-            or data.get(f"apparent_power{suffix}")
-            or data.get("net_apparent_power_VA")
-            or data.get("apparent_power")
+        s = _get(
+            f"net_apparent_power_VA{suffix}",
+            f"m_s{suffix}",
+            f"apparent_power{suffix}",
+            f"s{sfx_lower}",
+            f"S{sfx_upper}",
+            f"s{sfx_no_underscore}",
+            f"S{sfx_no_underscore}",
+            "net_apparent_power_VA",
+            "apparent_power",
+            "s",
+            "S",
         )
-        fp = (
-            data.get(f"power_factor{suffix}")
-            or data.get(f"m_pf{suffix}")
-            or data.get(f"pf{suffix}")
-            or data.get("power_factor")
+        fp = _get(
+            f"power_factor{suffix}",
+            f"m_pf{suffix}",
+            f"pf{suffix}",
+            f"fp{suffix}",
+            f"pf{sfx_lower}",
+            f"PF{sfx_upper}",
+            f"fp{sfx_lower}",
+            f"FP{sfx_upper}",
+            "power_factor",
+            "pf",
+            "fp",
         )
 
         return MedicionFase(
@@ -151,18 +199,47 @@ class IngestarTelemetriaUseCase:
 
         dev_info = payload.get("device_info") if isinstance(payload, dict) else None
         dispositivo = self._obtener_o_crear_dispositivo(mac_raw, dev_info)
-        recorded_at = self._parse_timestamp(payload.get("timestamp"))
+        recorded_at = self._parse_timestamp(payload.get("timestamp") or payload.get("t") or payload.get("time"))
 
         if subtopico == "inst":
-            fase_r = self._parse_fase(payload.get("phase_r", payload), suffix="_r")
-            fase_s = self._parse_fase(payload.get("phase_s", payload), suffix="_s")
-            fase_t = self._parse_fase(payload.get("phase_t", payload), suffix="_t")
-            total = payload.get("total", payload)
+            fase_r = self._parse_fase(payload.get("phase_r") or payload.get("r") or payload, suffix="_r")
+            fase_s = self._parse_fase(payload.get("phase_s") or payload.get("s") or payload, suffix="_s")
+            fase_t = self._parse_fase(payload.get("phase_t") or payload.get("t") or payload, suffix="_t")
+            total = payload.get("total") or payload.get("tot") or payload
 
-            p_tot = total.get("net_active_power_W") or total.get("m_p_tot") or total.get("total_active_power")
-            q_tot = total.get("net_reactive_power_VAR") or total.get("m_q_tot") or total.get("total_reactive_power")
-            s_tot = total.get("net_apparent_power_VA") or total.get("m_s_tot") or total.get("total_apparent_power")
-            fp_tot = total.get("power_factor") or total.get("m_pf_tot") or total.get("total_power_factor")
+            p_tot = (
+                total.get("net_active_power_W")
+                or total.get("m_p_tot")
+                or total.get("total_active_power")
+                or total.get("p_tot")
+                or total.get("P_tot")
+                or total.get("p")
+            )
+            q_tot = (
+                total.get("net_reactive_power_VAR")
+                or total.get("m_q_tot")
+                or total.get("total_reactive_power")
+                or total.get("q_tot")
+                or total.get("Q_tot")
+                or total.get("q")
+            )
+            s_tot = (
+                total.get("net_apparent_power_VA")
+                or total.get("m_s_tot")
+                or total.get("total_apparent_power")
+                or total.get("s_tot")
+                or total.get("S_tot")
+                or total.get("s")
+            )
+            fp_tot = (
+                total.get("power_factor")
+                or total.get("m_pf_tot")
+                or total.get("total_power_factor")
+                or total.get("fp_tot")
+                or total.get("pf_tot")
+                or total.get("fp")
+                or total.get("pf")
+            )
 
             lectura = LecturaInstantanea(
                 id=None,
@@ -200,12 +277,50 @@ class IngestarTelemetriaUseCase:
 
         elif subtopico in ("acc", "energyio"):
             total = payload.get("total", payload)
-            e_act = total.get("net_active_energy_KWH")
-            e_react = total.get("net_reactive_energy_KVARH")
-            e_act_imp = total.get("imported_active_energy_KWH")
-            e_act_exp = total.get("exported_active_energy_KWH")
-            e_react_imp = total.get("imported_reactive_energy_KVARH")
-            e_react_exp = total.get("exported_reactive_energy_KVARH")
+            e_act_imp = (
+                total.get("imported_active_energy_KWH")
+                or total.get("ae_imp")
+                or total.get("ae_imported")
+                or total.get("m_ae_imp")
+            )
+            e_act_exp = (
+                total.get("exported_active_energy_KWH")
+                or total.get("ae_exp")
+                or total.get("ae_exported")
+                or total.get("m_ae_exp")
+            )
+            e_react_imp = (
+                total.get("imported_reactive_energy_KVARH")
+                or total.get("re_imp")
+                or total.get("re_imported")
+                or total.get("m_re_imp")
+            )
+            e_react_exp = (
+                total.get("exported_reactive_energy_KVARH")
+                or total.get("re_exp")
+                or total.get("re_exported")
+                or total.get("m_re_exp")
+            )
+            e_act = (
+                total.get("net_active_energy_KWH")
+                or total.get("ae_net")
+                or total.get("ae_tot")
+                or (
+                    (float(e_act_imp) - float(e_act_exp))
+                    if e_act_imp is not None and e_act_exp is not None
+                    else (float(e_act_imp) if e_act_imp is not None else None)
+                )
+            )
+            e_react = (
+                total.get("net_reactive_energy_KVARH")
+                or total.get("re_net")
+                or total.get("re_tot")
+                or (
+                    (float(e_react_imp) - float(e_react_exp))
+                    if e_react_imp is not None and e_react_exp is not None
+                    else (float(e_react_imp) if e_react_imp is not None else None)
+                )
+            )
 
             acumulado = AcumuladoEnergia(
                 id=None,

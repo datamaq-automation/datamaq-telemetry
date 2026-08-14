@@ -52,13 +52,14 @@ class MQTTListener:
 
     def _on_message(self, client, userdata, msg):
         topic = msg.topic
-        logger.debug("mqtt_mensaje_recibido", topico=topic, tamano_bytes=len(msg.payload))
         try:
             raw_text = msg.payload.decode("utf-8")
             payload = json.loads(raw_text) if raw_text else {}
         except Exception as e:
             logger.error("mqtt_payload_invalido", topico=topic, error=str(e))
             return
+
+        logger.debug("mqtt_mensaje_recibido", topico=topic, tamano_bytes=len(msg.payload), payload=raw_text)
 
         db = self.session_factory()
         try:
