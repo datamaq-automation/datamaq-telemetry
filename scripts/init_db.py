@@ -6,7 +6,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pymysql
 
-from src.infrastructure.pydantic.config import get_settings
+from src.infrastructure.settings.config import get_settings
 from src.infrastructure.sqlalchemy.database import get_engine
 from src.infrastructure.sqlalchemy.models import Base
 

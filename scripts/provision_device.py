@@ -59,14 +59,25 @@ def show_status(host, user, password):
     print(f"• Firmware:         {dev.get('device_fw')}")
     print(f"• MAC / Client ID:  {wifi.get('mac')}")
     print(f"• Wi-Fi STA:        Conectado={wifi.get('connected')} | IP={wifi.get('ip')} | Señal={wifi.get('quality')}%")
-    print(f"• Broker MQTT:      {mqtt.get('broker_host')}:{mqtt.get('broker_port')} (Conectado={mqtt.get('connected')})")
+    print(
+        f"• Broker MQTT:      {mqtt.get('broker_host')}:{mqtt.get('broker_port')} (Conectado={mqtt.get('connected')})"
+    )
     print("=" * 55 + "\n")
 
 
-def apply_profile(host, profile_name, custom_host=None, custom_port=None, custom_security=None, user="admin", password="powermeter", reboot=False):
+def apply_profile(
+    host,
+    profile_name,
+    custom_host=None,
+    custom_port=None,
+    custom_security=None,
+    user="admin",
+    password="powermeter",
+    reboot=False,
+):
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.abspath(os.path.join(script_dir, ".."))
-    
+
     if profile_name == "datamaq":
         profile_file = os.path.join(project_root, "profiles", "datamaq_server.json")
     elif profile_name in ("powermeter-official", "powermeter_official", "official"):
@@ -98,7 +109,9 @@ def apply_profile(host, profile_name, custom_host=None, custom_port=None, custom
     print(f"    - Seguridad:   {mqtt_cfg.get('security')}")
 
     # 1. Enviar configuración MQTT
-    code, res = make_request(f"http://{host}/mqtt_config.json", method="POST", data=mqtt_cfg, user=user, password=password)
+    code, res = make_request(
+        f"http://{host}/mqtt_config.json", method="POST", data=mqtt_cfg, user=user, password=password
+    )
     if code not in (200, 204):
         print(f"[!] Error al enviar mqtt_config.json (HTTP {code}): {res}")
         return False
@@ -106,7 +119,9 @@ def apply_profile(host, profile_name, custom_host=None, custom_port=None, custom
 
     # 2. Enviar Certificado CA (si aplica)
     ca_payload = {"ca_certificate": ca_cert}
-    code_ca, _ = make_request(f"http://{host}/mqtt_ca_certificate_config.json", method="POST", data=ca_payload, user=user, password=password)
+    code_ca, _ = make_request(
+        f"http://{host}/mqtt_ca_certificate_config.json", method="POST", data=ca_payload, user=user, password=password
+    )
     if code_ca in (200, 204):
         print("  [+] Certificado CA MQTT actualizado.")
 

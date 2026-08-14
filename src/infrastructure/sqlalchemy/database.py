@@ -4,7 +4,7 @@ from functools import lru_cache
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from src.infrastructure.pydantic.config import get_settings
+from src.infrastructure.settings.config import get_settings
 from src.infrastructure.sqlalchemy.models import Base
 
 

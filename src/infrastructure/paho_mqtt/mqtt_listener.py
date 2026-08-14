@@ -1,23 +1,19 @@
 import json
-import logging
 
 import paho.mqtt.client as mqtt
 from paho.mqtt.enums import CallbackAPIVersion
 
 from src.application.use_cases.ingestar_telemetria import IngestarTelemetriaUseCase
 from src.domain.telemetria.ports import PublicadorEventosPort
-from src.infrastructure.pydantic.config import get_settings
+from src.infrastructure.settings.config import get_settings
+from src.infrastructure.settings.logger import get_logger
 from src.infrastructure.sqlalchemy.database import get_session_factory
 from src.infrastructure.sqlalchemy.mysql_repositories import (
     MySQLDispositivosRepository,
     MySQLTelemetriaRepository,
 )
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] (MQTT) %(message)s",
-)
-logger = logging.getLogger("mqtt_listener")
+logger = get_logger("mqtt_listener")
 
 
 class MQTTListener:
