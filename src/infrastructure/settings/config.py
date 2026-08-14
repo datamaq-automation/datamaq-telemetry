@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     API_SECRET_KEY: str = "dev-secret-key-datamaq"
     DEBUG: bool = True
 
+    # Logging
+    LOG_FORMAT: str = "console"  # "console" (clean CLI) o "json" (VPS production)
+    LOG_LEVEL: str = "INFO"
+
     model_config = SettingsConfigDict(
         env_file=os.path.join(
             os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))), ".env"

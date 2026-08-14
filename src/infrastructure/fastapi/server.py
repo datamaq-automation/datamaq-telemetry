@@ -18,7 +18,10 @@ from src.infrastructure.fastapi.routes.telemetria_router import (
     router as telemetria_router,
 )
 from src.infrastructure.paho_mqtt.mqtt_listener import MQTTListener
+from src.infrastructure.settings.logger import get_logger
 from src.infrastructure.sqlalchemy.database import create_tables_if_needed
+
+logger = get_logger("server")
 
 active_websockets: list[WebSocket] = []
 async_loop = None
@@ -41,6 +44,7 @@ async def lifespan(app: FastAPI):
     async_loop = asyncio.get_running_loop()
 
     create_tables_if_needed()
+    logger.info("tablas_db_verificadas")
 
     # Hook up live WebSocket broadcasts
     global_event_broadcaster.suscribir(websocket_broadcast_callback)
@@ -49,9 +53,12 @@ async def lifespan(app: FastAPI):
     mqtt_listener = MQTTListener(publicador_eventos=global_event_broadcaster)
     mqtt_listener.start()
 
+    logger.info("servidor_datamaq_listo", websockets_route="/ws/live", docs_route="/docs")
+
     yield
 
     # Clean shutdown
+    logger.info("deteniendo_servidor_datamaq")
     mqtt_listener.stop()
     global_event_broadcaster.desuscribir(websocket_broadcast_callback)
 

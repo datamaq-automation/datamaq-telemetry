@@ -38,17 +38,17 @@ class MQTTListener:
     def _on_connect(self, client, userdata, flags, reason_code, properties=None):
         if reason_code == 0:
             logger.info(
-                "Conectado exitosamente al Broker MQTT (%s:%s)",
-                self.settings.MQTT_BROKER_HOST,
-                self.settings.MQTT_BROKER_PORT,
+                "mqtt_conectado",
+                broker_host=self.settings.MQTT_BROKER_HOST,
+                broker_port=self.settings.MQTT_BROKER_PORT,
             )
             client.subscribe(self.settings.MQTT_TOPIC_PREFIX, qos=1)
-            logger.info("Suscrito a tópico: %s", self.settings.MQTT_TOPIC_PREFIX)
+            logger.info("mqtt_suscrito", topico=self.settings.MQTT_TOPIC_PREFIX)
         else:
-            logger.error("Fallo al conectar a MQTT con código: %s", reason_code)
+            logger.error("mqtt_error_conexion", codigo=str(reason_code))
 
     def _on_disconnect(self, client, userdata, flags, reason_code, properties=None):
-        logger.warning("Desconectado de Broker MQTT. Código: %s. Reintentando...", reason_code)
+        logger.warning("mqtt_desconectado", codigo=str(reason_code))
 
     def _on_message(self, client, userdata, msg):
         topic = msg.topic
@@ -56,7 +56,7 @@ class MQTTListener:
             raw_text = msg.payload.decode("utf-8")
             payload = json.loads(raw_text) if raw_text else {}
         except Exception as e:
-            logger.error("Error decodificando payload de %s: %s", topic, e)
+            logger.error("mqtt_payload_invalido", topico=topic, error=str(e))
             return
 
         db = self.session_factory()
@@ -66,7 +66,7 @@ class MQTTListener:
             use_case = IngestarTelemetriaUseCase(repo_disp, repo_telem, self.publicador)
             use_case.ejecutar(topic, payload)
         except Exception as e:
-            logger.error("Error procesando mensaje MQTT (%s): %s", topic, e, exc_info=True)
+            logger.error("mqtt_error_procesamiento", topico=topic, error=str(e), exc_info=True)
         finally:
             db.close()
 
