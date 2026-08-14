@@ -80,13 +80,48 @@ class IngestarTelemetriaUseCase:
                     dispositivo.version_hw = dev_info.get("hw_model")
             return self.repo_dispositivos.guardar(dispositivo)
 
-    def _parse_fase(self, data: dict[str, Any]) -> MedicionFase:
-        v = data.get("voltage_V")
-        i = data.get("current_A")
-        p = data.get("net_active_power_W")
-        q = data.get("net_reactive_power_VAR")
-        s = data.get("net_apparent_power_VA")
-        fp = data.get("power_factor")
+    def _parse_fase(self, data: dict[str, Any], suffix: str = "") -> MedicionFase:
+        v = (
+            data.get(f"voltage_V{suffix}")
+            or data.get(f"m_v{suffix}")
+            or data.get(f"voltage{suffix}")
+            or data.get("voltage_V")
+            or data.get("voltage")
+        )
+        i = (
+            data.get(f"current_A{suffix}")
+            or data.get(f"m_i{suffix}")
+            or data.get(f"current{suffix}")
+            or data.get("current_A")
+            or data.get("current")
+        )
+        p = (
+            data.get(f"net_active_power_W{suffix}")
+            or data.get(f"m_p{suffix}")
+            or data.get(f"active_power{suffix}")
+            or data.get("net_active_power_W")
+            or data.get("active_power")
+        )
+        q = (
+            data.get(f"net_reactive_power_VAR{suffix}")
+            or data.get(f"m_q{suffix}")
+            or data.get(f"reactive_power{suffix}")
+            or data.get("net_reactive_power_VAR")
+            or data.get("reactive_power")
+        )
+        s = (
+            data.get(f"net_apparent_power_VA{suffix}")
+            or data.get(f"m_s{suffix}")
+            or data.get(f"apparent_power{suffix}")
+            or data.get("net_apparent_power_VA")
+            or data.get("apparent_power")
+        )
+        fp = (
+            data.get(f"power_factor{suffix}")
+            or data.get(f"m_pf{suffix}")
+            or data.get(f"pf{suffix}")
+            or data.get("power_factor")
+        )
 
         return MedicionFase(
             tension=Tension(voltios=float(v)) if v is not None else None,
@@ -113,15 +148,15 @@ class IngestarTelemetriaUseCase:
         recorded_at = self._parse_timestamp(payload.get("timestamp"))
 
         if subtopico == "inst":
-            fase_r = self._parse_fase(payload.get("phase_r", {}))
-            fase_s = self._parse_fase(payload.get("phase_s", {}))
-            fase_t = self._parse_fase(payload.get("phase_t", {}))
-            total = payload.get("total", {})
+            fase_r = self._parse_fase(payload.get("phase_r", payload), suffix="_r")
+            fase_s = self._parse_fase(payload.get("phase_s", payload), suffix="_s")
+            fase_t = self._parse_fase(payload.get("phase_t", payload), suffix="_t")
+            total = payload.get("total", payload)
 
-            p_tot = total.get("net_active_power_W")
-            q_tot = total.get("net_reactive_power_VAR")
-            s_tot = total.get("net_apparent_power_VA")
-            fp_tot = total.get("power_factor")
+            p_tot = total.get("net_active_power_W") or total.get("m_p_tot") or total.get("total_active_power")
+            q_tot = total.get("net_reactive_power_VAR") or total.get("m_q_tot") or total.get("total_reactive_power")
+            s_tot = total.get("net_apparent_power_VA") or total.get("m_s_tot") or total.get("total_apparent_power")
+            fp_tot = total.get("power_factor") or total.get("m_pf_tot") or total.get("total_power_factor")
 
             lectura = LecturaInstantanea(
                 id=None,
