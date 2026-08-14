@@ -97,3 +97,21 @@ class PublicadorEventosPort(ABC):
     @abstractmethod
     def publicar_telemetria_en_vivo(self, topico: str, datos: dict) -> None:
         pass
+
+
+class LoggerPort(ABC):
+    @abstractmethod
+    def info(self, evento: str, **kwargs: object) -> None:
+        pass
+
+    @abstractmethod
+    def warning(self, evento: str, **kwargs: object) -> None:
+        pass
+
+    @abstractmethod
+    def error(self, evento: str, **kwargs: object) -> None:
+        pass
+
+    @abstractmethod
+    def debug(self, evento: str, **kwargs: object) -> None:
+        pass

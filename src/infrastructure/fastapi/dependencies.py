@@ -11,6 +11,7 @@ from src.application.use_cases.gestionar_dispositivos import (
     GestionarDispositivosUseCase,
 )
 from src.application.use_cases.ingestar_telemetria import IngestarTelemetriaUseCase
+from src.infrastructure.settings.logger import get_logger
 from src.infrastructure.sqlalchemy.database import get_db_session
 from src.infrastructure.sqlalchemy.mysql_repositories import (
     MySQLDispositivosRepository,
@@ -32,8 +33,9 @@ def get_telemetria_controller(
 ) -> TelemetriaController:
     repo_disp = MySQLDispositivosRepository(db)
     repo_telem = MySQLTelemetriaRepository(db)
+    logger = get_logger("telemetria_api")
     consultar_uc = ConsultarTelemetriaUseCase(repo_telem, repo_disp)
-    ingestar_uc = IngestarTelemetriaUseCase(repo_disp, repo_telem, broadcaster)
+    ingestar_uc = IngestarTelemetriaUseCase(repo_disp, repo_telem, broadcaster, logger=logger)
     return TelemetriaController(consultar_uc, ingestar_uc)
 
 

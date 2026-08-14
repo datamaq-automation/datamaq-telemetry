@@ -4,6 +4,7 @@ from typing import Any
 
 import structlog
 
+from src.domain.telemetria.ports import LoggerPort
 from src.infrastructure.settings.config import get_settings
 
 
@@ -66,5 +67,24 @@ def setup_logging() -> None:
     logging.getLogger("watchfiles").setLevel(logging.WARNING)
 
 
-def get_logger(name: str) -> structlog.stdlib.BoundLogger:
-    return structlog.get_logger(name)
+class StructlogAdapter(LoggerPort):
+    """Adaptador de infraestructura que implementa LoggerPort sobre structlog."""
+
+    def __init__(self, logger: structlog.stdlib.BoundLogger):
+        self._logger = logger
+
+    def info(self, evento: str, **kwargs: object) -> None:
+        self._logger.info(evento, **kwargs)
+
+    def warning(self, evento: str, **kwargs: object) -> None:
+        self._logger.warning(evento, **kwargs)
+
+    def error(self, evento: str, **kwargs: object) -> None:
+        self._logger.error(evento, **kwargs)
+
+    def debug(self, evento: str, **kwargs: object) -> None:
+        self._logger.debug(evento, **kwargs)
+
+
+def get_logger(name: str) -> LoggerPort:
+    return StructlogAdapter(structlog.get_logger(name))

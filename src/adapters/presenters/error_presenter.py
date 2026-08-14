@@ -20,4 +20,5 @@ class ErrorPresenter:
             return 400, {"error": "ValidationError", "mensaje": exc.mensaje}
         elif isinstance(exc, DominioTelemetriaException):
             return 422, {"error": "DomainError", "mensaje": exc.mensaje}
-        return 500, {"error": "InternalServerError", "mensaje": str(exc)}
+
+        return 500, {"error": "InternalServerError", "mensaje": "Ocurrió un error interno en el servidor"}

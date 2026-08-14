@@ -11,6 +11,7 @@ from src.domain.telemetria.entities import (
     MedicionFase,
 )
 from src.domain.telemetria.ports import (
+    LoggerPort,
     PublicadorEventosPort,
     RepositorioDispositivosPort,
     RepositorioTelemetriaPort,
@@ -37,10 +38,12 @@ class IngestarTelemetriaUseCase:
         repo_dispositivos: RepositorioDispositivosPort,
         repo_telemetria: RepositorioTelemetriaPort,
         publicador: PublicadorEventosPort | None = None,
+        logger: LoggerPort | None = None,
     ):
         self.repo_dispositivos = repo_dispositivos
         self.repo_telemetria = repo_telemetria
         self.publicador = publicador
+        self.logger = logger
 
     def _parse_timestamp(self, ts_val: Any) -> datetime:
         if ts_val:
@@ -68,7 +71,10 @@ class IngestarTelemetriaUseCase:
                 estado=EstadoDispositivo.ONLINE,
                 visto_por_ultima_vez=datetime.now(timezone.utc),
             )
-            return self.repo_dispositivos.guardar(nuevo)
+            saved = self.repo_dispositivos.guardar(nuevo)
+            if self.logger:
+                self.logger.info("nuevo_dispositivo_registrado", device_uid=mac_vo.valor, modelo=nuevo.modelo)
+            return saved
         else:
             dispositivo.marcar_online(datetime.now(timezone.utc))
             if dev_info:
@@ -176,6 +182,14 @@ class IngestarTelemetriaUseCase:
             alerta = AnalizadorCalidadEnergiaService.evaluar_alerta_tension(dispositivo.id, lectura)
             if alerta:
                 self.repo_telemetria.guardar_alerta(alerta)
+                if self.logger:
+                    self.logger.warning(
+                        "alerta_calidad_energia_detectada",
+                        dispositivo_id=dispositivo.id,
+                        tipo=alerta.tipo_alerta,
+                        severidad=alerta.severidad.value,
+                        mensaje=alerta.mensaje,
+                    )
 
         elif subtopico in ("acc", "energyio"):
             total = payload.get("total", payload)

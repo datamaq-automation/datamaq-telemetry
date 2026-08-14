@@ -10,6 +10,7 @@ from src.domain.telemetria.entities import (
     LogEstadoDispositivo,
 )
 from src.domain.telemetria.ports import (
+    LoggerPort,
     RepositorioDispositivosPort,
     RepositorioTelemetriaPort,
 )
@@ -79,11 +80,29 @@ class MockTelemetriaRepo(RepositorioTelemetriaPort):
         return [e for e in self.energias if e.dispositivo_id == dispositivo_id][:limite]
 
 
+class MockLogger(LoggerPort):
+    def __init__(self):
+        self.logs: list[tuple[str, str, dict]] = []
+
+    def info(self, evento: str, **kwargs: object) -> None:
+        self.logs.append(("INFO", evento, dict(kwargs)))
+
+    def warning(self, evento: str, **kwargs: object) -> None:
+        self.logs.append(("WARNING", evento, dict(kwargs)))
+
+    def error(self, evento: str, **kwargs: object) -> None:
+        self.logs.append(("ERROR", evento, dict(kwargs)))
+
+    def debug(self, evento: str, **kwargs: object) -> None:
+        self.logs.append(("DEBUG", evento, dict(kwargs)))
+
+
 def test_ingestar_telemetria_instantanea():
     repo_disp = MockDispositivosRepo()
     repo_telem = MockTelemetriaRepo()
+    mock_logger = MockLogger()
 
-    use_case = IngestarTelemetriaUseCase(repo_disp, repo_telem)
+    use_case = IngestarTelemetriaUseCase(repo_disp, repo_telem, logger=mock_logger)
 
     payload = {
         "timestamp": 1767377818,
@@ -97,6 +116,7 @@ def test_ingestar_telemetria_instantanea():
 
     assert len(repo_disp.dispositivos) == 1
     assert len(repo_telem.instantaneas) == 1
+    assert any(log[1] == "nuevo_dispositivo_registrado" for log in mock_logger.logs)
 
     consultar_uc = ConsultarTelemetriaUseCase(repo_telem, repo_disp)
     res = consultar_uc.obtener_ultima_telemetria("D48C49F03564")

@@ -63,7 +63,12 @@ class MQTTListener:
         try:
             repo_disp = MySQLDispositivosRepository(db)
             repo_telem = MySQLTelemetriaRepository(db)
-            use_case = IngestarTelemetriaUseCase(repo_disp, repo_telem, self.publicador)
+            use_case = IngestarTelemetriaUseCase(
+                repo_dispositivos=repo_disp,
+                repo_telemetria=repo_telem,
+                publicador=self.publicador,
+                logger=logger,
+            )
             use_case.ejecutar(topic, payload)
         except Exception as e:
             logger.error("mqtt_error_procesamiento", topico=topic, error=str(e), exc_info=True)
@@ -71,7 +76,7 @@ class MQTTListener:
             db.close()
 
     def start(self):
-        logger.info("Iniciando MQTTListener en segundo plano...")
+        logger.info("iniciando_mqtt_listener")
         self.is_running = True
         try:
             self.client.connect_async(
@@ -81,10 +86,10 @@ class MQTTListener:
             )
             self.client.loop_start()
         except Exception as e:
-            logger.warning("No se pudo iniciar conexión MQTT inmediata: %s", e)
+            logger.warning("mqtt_conexion_inmediata_fallida", error=str(e))
 
     def stop(self):
-        logger.info("Deteniendo MQTTListener...")
+        logger.info("deteniendo_mqtt_listener")
         self.is_running = False
         try:
             self.client.loop_stop()
