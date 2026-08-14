@@ -9,4 +9,25 @@ if [ -d "venv" ]; then
 fi
 
 export PYTHONPATH=.
-exec uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+
+LOG_LEVEL_ARG="info"
+EXTRA_ARGS=()
+
+for arg in "$@"; do
+    case $arg in
+        --debug|-d)
+            export LOG_LEVEL="DEBUG"
+            export DEBUG="True"
+            LOG_LEVEL_ARG="debug"
+            ;;
+        --log-level=*)
+            export LOG_LEVEL="${arg#*=}"
+            LOG_LEVEL_ARG="${arg#*=}"
+            ;;
+        *)
+            EXTRA_ARGS+=("$arg")
+            ;;
+    esac
+done
+
+exec uvicorn src.main:app --reload --host 0.0.0.0 --port 8000 --log-level "$LOG_LEVEL_ARG" "${EXTRA_ARGS[@]}"

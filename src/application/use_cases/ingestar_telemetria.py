@@ -177,6 +177,13 @@ class IngestarTelemetriaUseCase:
                 factor_potencia_total=FactorPotencia(valor=float(fp_tot)) if fp_tot is not None else None,
             )
             self.repo_telemetria.guardar_instantanea(lectura)
+            if self.logger:
+                self.logger.debug(
+                    "telemetria_instantanea_guardada",
+                    device_uid=dispositivo.device_uid.valor,
+                    p_activa_W=float(p_tot) if p_tot is not None else None,
+                    fp=float(fp_tot) if fp_tot is not None else None,
+                )
 
             # Evaluación de alertas de dominio
             alerta = AnalizadorCalidadEnergiaService.evaluar_alerta_tension(dispositivo.id, lectura)
@@ -216,6 +223,12 @@ class IngestarTelemetriaUseCase:
                 else None,
             )
             self.repo_telemetria.guardar_energia(acumulado)
+            if self.logger:
+                self.logger.debug(
+                    "telemetria_energia_guardada",
+                    device_uid=dispositivo.device_uid.valor,
+                    kwh=float(e_act) if e_act is not None else None,
+                )
 
         elif subtopico == "status":
             wifi_info = payload.get("wifi_sta", {})

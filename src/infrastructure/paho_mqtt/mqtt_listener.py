@@ -52,6 +52,7 @@ class MQTTListener:
 
     def _on_message(self, client, userdata, msg):
         topic = msg.topic
+        logger.debug("mqtt_mensaje_recibido", topico=topic, tamano_bytes=len(msg.payload))
         try:
             raw_text = msg.payload.decode("utf-8")
             payload = json.loads(raw_text) if raw_text else {}

@@ -1,4 +1,5 @@
 import logging
+import os
 import sys
 from typing import Any
 
@@ -61,7 +62,10 @@ def uvicorn_style_renderer(_: WrappedLogger, __: str, event_dict: EventDict) -> 
 
 def setup_logging() -> None:
     settings = get_settings()
-    log_level = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
+    log_level_name = os.environ.get("LOG_LEVEL", settings.LOG_LEVEL).upper()
+    if "--debug" in sys.argv or "-d" in sys.argv:
+        log_level_name = "DEBUG"
+    log_level = getattr(logging, log_level_name, logging.INFO)
 
     shared_processors: list[Any] = [
         structlog.contextvars.merge_contextvars,
