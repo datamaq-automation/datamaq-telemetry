@@ -3,9 +3,60 @@ import sys
 from typing import Any
 
 import structlog
+from structlog.types import EventDict, WrappedLogger
 
 from src.domain.telemetria.ports import LoggerPort
 from src.infrastructure.settings.config import get_settings
+
+# Colores ANSI estilo Uvicorn
+COLOR_RESET = "\033[0m"
+COLOR_GREEN = "\033[32m"
+COLOR_YELLOW = "\033[33m"
+COLOR_RED = "\033[31m"
+COLOR_BLUE = "\033[36m"
+COLOR_PURPLE = "\033[35m"
+COLOR_DIM = "\033[2m"
+
+LEVEL_STYLES: dict[str, tuple[str, str]] = {
+    "debug": ("DEBUG:   ", COLOR_BLUE),
+    "info": ("INFO:    ", COLOR_GREEN),
+    "warning": ("WARNING: ", COLOR_YELLOW),
+    "error": ("ERROR:   ", COLOR_RED),
+    "critical": ("CRITICAL:", COLOR_PURPLE),
+}
+
+
+def uvicorn_style_renderer(_: WrappedLogger, __: str, event_dict: EventDict) -> str:
+    """Renderizador para consola que replica exactamente la estética de Uvicorn."""
+    level = str(event_dict.pop("level", "info")).lower()
+    logger_name = event_dict.pop("logger", "") or event_dict.pop("logger_name", "")
+    event = event_dict.pop("event", "")
+    exc_info = event_dict.pop("exc_info", None)
+    stack_info = event_dict.pop("stack_info", None)
+
+    prefix_text, color = LEVEL_STYLES.get(level, (f"{level.upper()}:", COLOR_GREEN))
+
+    is_tty = sys.stdout.isatty()
+    level_prefix = f"{color}{prefix_text}{COLOR_RESET}" if is_tty else prefix_text
+    logger_tag = f"({logger_name.upper()}) " if logger_name else ""
+
+    # Formatear parámetros adicionales como key=val
+    kv_parts = []
+    for k, v in event_dict.items():
+        if k.startswith("_"):
+            continue
+        val_str = str(v)
+        kv_parts.append(f"{COLOR_DIM}{k}={COLOR_RESET}{val_str}" if is_tty else f"{k}={val_str}")
+
+    kv_string = (" " + " ".join(kv_parts)) if kv_parts else ""
+    line = f"{level_prefix} {logger_tag}{event}{kv_string}"
+
+    if exc_info:
+        line += f"\n{exc_info}"
+    if stack_info:
+        line += f"\n{stack_info}"
+
+    return line
 
 
 def setup_logging() -> None:
@@ -27,17 +78,17 @@ def setup_logging() -> None:
         renderer_processor = structlog.processors.JSONRenderer()
         timestamp_processor = structlog.processors.TimeStamper(fmt="iso", utc=True)
     else:
-        # Formato consola limpio y coloreado para desarrollo local (sin ruido)
-        renderer_processor = structlog.dev.ConsoleRenderer(
-            colors=sys.stdout.isatty(),
-            pad_event=28,
-        )
-        timestamp_processor = structlog.processors.TimeStamper(fmt="%Y-%m-%d %H:%M:%S", utc=False)
+        # Formato consola idéntico a Uvicorn para desarrollo local limpio
+        renderer_processor = uvicorn_style_renderer
+        timestamp_processor = None
+
+    proc_list = [p for p in shared_processors if p is not None]
+    if timestamp_processor:
+        proc_list.append(timestamp_processor)
 
     structlog.configure(
         processors=[
-            *shared_processors,
-            timestamp_processor,
+            *proc_list,
             structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
         ],
         logger_factory=structlog.stdlib.LoggerFactory(),
@@ -46,7 +97,7 @@ def setup_logging() -> None:
     )
 
     formatter = structlog.stdlib.ProcessorFormatter(
-        foreign_pre_chain=[*shared_processors, timestamp_processor],
+        foreign_pre_chain=proc_list,
         processors=[
             structlog.stdlib.ProcessorFormatter.remove_processors_meta,
             renderer_processor,
