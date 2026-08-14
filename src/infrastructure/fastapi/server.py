@@ -18,6 +18,7 @@ from src.infrastructure.fastapi.routes.telemetria_router import (
     router as telemetria_router,
 )
 from src.infrastructure.paho_mqtt.mqtt_listener import MQTTListener
+from src.infrastructure.settings.config import get_settings
 from src.infrastructure.settings.logger import get_logger
 from src.infrastructure.sqlalchemy.database import create_tables_if_needed
 
@@ -71,13 +72,24 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    settings = get_settings()
+    if settings.CORS_ORIGINS.strip() == "*":
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=False,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+    else:
+        origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=origins,
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
 
     # Register Routers
     app.include_router(system_router)

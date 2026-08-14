@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     API_PORT: int = 8000
     API_SECRET_KEY: str = "dev-secret-key-datamaq"
     DEBUG: bool = True
+    CORS_ORIGINS: str = "*"
 
     # Logging
     LOG_FORMAT: str = "console"  # "console" (clean CLI) o "json" (VPS production)
