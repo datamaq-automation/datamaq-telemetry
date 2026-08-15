@@ -133,3 +133,23 @@ El equipo dispone de dos perfiles según el entorno:
 
 1. **Perfil Oficial Powermeter:** Apunta a `mqtt.powermeter.com.ar:8884` con TLS y certificado CA oficial.
 2. **Perfil Datamaq Telemetry:** Apunta a tu servidor VPS (`broker_host`, puerto `1883` o `8883`) gestionado por tu plataforma.
+
+---
+
+## 5. Política de Ingesta, Downsampling y Persistencia
+
+Para optimizar el uso de la base de datos MySQL manteniendo alta fidelidad visual en los tableros de control:
+
+1. **Live Stream WebSocket (Tiempo Real):**
+   * Cada mensaje MQTT recibido en `m/wifi/{UID}/...` se retransmite de inmediato a los clientes conectados a `ws://localhost:8000/ws/live`.
+   * Cero latencia para visualización en vivo de tensión, corriente y potencia.
+
+2. **Downsampling a 5 Minutos (Base de Datos):**
+   * Las mediciones instantáneas (`/inst`) se persisten en la tabla `telemetry_instantaneous` cada 300 segundos por dispositivo.
+   * Si se detectan anomalías de calidad de energía (ej: tensión fuera de rango $\pm 10\%$), las alertas se persisten de inmediato independientemente del downsampling.
+
+3. **Throttling de Latidos (60s):**
+   * La fecha `last_seen_at` y el estado `ONLINE` del medidor en la tabla `devices` se actualizan en la base de datos a lo sumo 1 vez por minuto.
+
+4. **Acumulados de Energía (`/acc` / `/energyio`):**
+   * Se registran en la tabla `telemetry_energy` con valores acumulados monótonos crecientes de kWh y kVARh para cálculos de consumo y facturación.

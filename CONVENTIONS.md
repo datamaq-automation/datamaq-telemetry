@@ -19,27 +19,27 @@ src/
 ├── domain/                                      # 1. Capa de Dominio Pura (Solo stdlib + dataclasses)
 │   └── telemetria/                              # Bounded Context temático
 │       ├── __init__.py                          # (0 bytes)
-│       ├── entities.py                          # Dispositivo, MedicionFase, LecturaInstantanea
-│       ├── value_objects.py                     # MacAddress, Tension, Potencia, FactorPotencia
-│       ├── services.py                          # AnalizadorCalidadEnergiaService
-│       ├── ports.py                             # RepositorioTelemetriaPort, RepositorioDispositivosPort
-│       └── exceptions.py                        # Excepciones de negocio
+│       ├── entities.py                          # Dispositivo, Planta, Organizacion, PlanTelemetria, Lecturas
+│       ├── value_objects.py                     # MacAddress, Tension, Potencia, FactorPotencia, VisibilidadPlan
+│       ├── services.py                          # AnalizadorCalidadEnergiaService, PoliticaRetencionService
+│       ├── ports.py                             # RepositorioTelemetriaPort, RepositorioDispositivosPort, etc.
+│       └── exceptions.py                        # Excepciones de negocio de dominio
 │
-├── application/                                 # 2. Capa de Aplicación (Casos de Uso y DTOs)
-│   ├── use_cases/                               # IngestarTelemetriaUseCase, ConsultarTelemetriaUseCase
-│   ├── dtos/                                    # Data Transfer Objects Pydantic v2
-│   └── mappers/                                 # Mapeadores Entidad <-> DTO
+├── application/                                 # 2. Capa de Aplicación (Casos de Uso, DTOs y Mappers)
+│   ├── use_cases/                               # ingestar, consultar, gestionar_dispositivos, gestionar_planes, purgar
+│   ├── dtos/                                    # telemetria_dto, dispositivo_dto, organizacion_dto, plan_dto, purga_dto
+│   └── mappers/                                 # telemetria_mapper, dispositivo_mapper, plan_mapper
 │
 ├── adapters/                                    # 3. Capa de Adaptadores (Agnósticos del Framework Web)
-│   ├── controllers/                             # TelemetriaController, DispositivosController
-│   ├── gateways/                                # InMemoryEventBroadcaster
-│   └── presenters/                              # ErrorPresenter (Mapeo a códigos HTTP y errores)
+│   ├── controllers/                             # telemetria, dispositivos, planes, purga
+│   ├── gateways/                                # in_memory_event_broadcaster (PublicadorEventosPort)
+│   └── presenters/                              # error_presenter (Mapeo a códigos de error estándar)
 │
-├── infrastructure/                              # 4. Capa de Infraestructura (Librerías externas)
-│   ├── fastapi/                                 # Servidor FastAPI, routers HTTP, WebSockets
-│   ├── sqlalchemy/                              # Tablas ORM MySQL, database engine y repositorios
-│   ├── paho_mqtt/                               # Listener daemon MQTT
-│   └── pydantic/                                # Settings con pydantic-settings
+├── infrastructure/                              # 4. Capa de Infraestructura (Librerías externas y Frameworks)
+│   ├── fastapi/                                 # Servidor FastAPI, dependencias y routers (/api/..., /ws/live)
+│   ├── sqlalchemy/                              # Modelos DeclarativeBase MySQL, engine y repositorios
+│   ├── paho_mqtt/                               # Listener daemon MQTT con Paho
+│   └── settings/                                # Configuración con pydantic-settings y logger estructurado
 │
 └── main.py                                      # Entrypoint ASGI (app = create_app())
 ```
