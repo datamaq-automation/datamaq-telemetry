@@ -1,0 +1,11 @@
+[Unit]
+Description=Datamaq Telemetry Data Purge Service
+After=network.target mariadb.service mysql.service
+
+[Service]
+Type=oneshot
+User=agustin
+WorkingDirectory=/home/agustin/proyectos_software/datamaq-telemetry
+EnvironmentFile=/home/agustin/proyectos_software/datamaq-telemetry/.env
+ExecStart=/home/agustin/proyectos_software/datamaq-telemetry/venv/bin/python scripts/purge_telemetry.py
+TimeoutStartSec=1800

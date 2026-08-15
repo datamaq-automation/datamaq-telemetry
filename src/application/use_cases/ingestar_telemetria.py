@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, ClassVar
 
 from src.domain.telemetria.entities import (
     AcumuladoEnergia,
@@ -33,17 +33,22 @@ from src.domain.telemetria.value_objects import (
 
 
 class IngestarTelemetriaUseCase:
+    # Memoria estática de últimas persistencias por dispositivo para compartir entre invocaciones
+    _ultimas_persistencias: ClassVar[dict[str, datetime]] = {}
+
     def __init__(
         self,
         repo_dispositivos: RepositorioDispositivosPort,
         repo_telemetria: RepositorioTelemetriaPort,
         publicador: PublicadorEventosPort | None = None,
         logger: LoggerPort | None = None,
+        granularidad_segundos: int = 300,
     ):
         self.repo_dispositivos = repo_dispositivos
         self.repo_telemetria = repo_telemetria
         self.publicador = publicador
         self.logger = logger
+        self.granularidad_segundos = granularidad_segundos
 
     def _parse_timestamp(self, ts_val: Any) -> datetime:
         if ts_val:
@@ -316,16 +321,7 @@ class IngestarTelemetriaUseCase:
                 potencia_aparente_total=PotenciaAparente(va=float(s_tot)) if s_tot is not None else None,
                 factor_potencia_total=FactorPotencia(valor=float(fp_tot)) if fp_tot is not None else None,
             )
-            self.repo_telemetria.guardar_instantanea(lectura)
-            if self.logger:
-                self.logger.debug(
-                    "telemetria_instantanea_guardada",
-                    device_uid=dispositivo.device_uid.valor,
-                    p_activa_W=float(p_tot) if p_tot is not None else None,
-                    fp=float(fp_tot) if fp_tot is not None else None,
-                )
-
-            # Evaluación de alertas de dominio
+            # Evaluación de alertas de dominio (se evalúa siempre para cada paquete recibido)
             alerta = AnalizadorCalidadEnergiaService.evaluar_alerta_tension(dispositivo.id, lectura)
             if alerta:
                 self.repo_telemetria.guardar_alerta(alerta)
@@ -336,6 +332,24 @@ class IngestarTelemetriaUseCase:
                         tipo=alerta.tipo_alerta,
                         severidad=alerta.severidad.value,
                         mensaje=alerta.mensaje,
+                    )
+
+            # Persistencia con downsampling según granularidad configurada
+            debe_persistir = True
+            if self.granularidad_segundos > 0:
+                ultima = self._ultimas_persistencias.get(dispositivo.id)
+                if ultima is not None and (recorded_at - ultima).total_seconds() < self.granularidad_segundos:
+                    debe_persistir = False
+
+            if debe_persistir:
+                self.repo_telemetria.guardar_instantanea(lectura)
+                self._ultimas_persistencias[dispositivo.id] = recorded_at
+                if self.logger:
+                    self.logger.debug(
+                        "telemetria_instantanea_guardada",
+                        device_uid=dispositivo.device_uid.valor,
+                        p_activa_W=float(p_tot) if p_tot is not None else None,
+                        fp=float(fp_tot) if fp_tot is not None else None,
                     )
 
         elif subtopico in ("acc", "energyio"):

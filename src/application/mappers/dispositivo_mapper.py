@@ -53,6 +53,7 @@ class OrganizacionMapper:
         return OrganizacionResponseDTO(
             id=entity.id,
             nombre=entity.nombre,
+            plan_id=entity.plan_id,
             cuit=entity.cuit,
             email_contacto=entity.email_contacto,
             telefono_contacto=entity.telefono_contacto,

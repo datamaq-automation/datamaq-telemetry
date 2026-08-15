@@ -84,6 +84,14 @@ class MySQLDispositivosRepository(RepositorioDispositivosPort):
             query = query.filter(DeviceModel.facility_id == planta_id)
         return [self._to_entity(m) for m in query.all()]
 
+    def contar_por_organizacion(self, organizacion_id: str) -> int:
+        return (
+            self.db.query(DeviceModel)
+            .join(FacilityModel, DeviceModel.facility_id == FacilityModel.id)
+            .filter(FacilityModel.organization_id == organizacion_id)
+            .count()
+        )
+
     def guardar(self, dispositivo: Dispositivo) -> Dispositivo:
         model = self.db.query(DeviceModel).filter(DeviceModel.id == dispositivo.id).first()
         if not model:
@@ -302,10 +310,93 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
         items = q.order_by(desc(TelemetryEnergyModel.recorded_at)).limit(limite).all()
         return [self._energia_to_entity(m) for m in items]
 
+    def purgar_instantaneas_anteriores_a(self, fecha_limite: datetime, batch_size: int = 1000) -> int:
+        ids = [
+            row[0]
+            for row in self.db.query(TelemetryInstantaneousModel.id)
+            .filter(TelemetryInstantaneousModel.recorded_at < fecha_limite)
+            .limit(batch_size)
+            .all()
+        ]
+        if not ids:
+            return 0
+        deleted = (
+            self.db.query(TelemetryInstantaneousModel)
+            .filter(TelemetryInstantaneousModel.id.in_(ids))
+            .delete(synchronize_session=False)
+        )
+        self.db.commit()
+        return deleted
+
+    def purgar_energias_anteriores_a(self, fecha_limite: datetime, batch_size: int = 1000) -> int:
+        ids = [
+            row[0]
+            for row in self.db.query(TelemetryEnergyModel.id)
+            .filter(TelemetryEnergyModel.recorded_at < fecha_limite)
+            .limit(batch_size)
+            .all()
+        ]
+        if not ids:
+            return 0
+        deleted = (
+            self.db.query(TelemetryEnergyModel)
+            .filter(TelemetryEnergyModel.id.in_(ids))
+            .delete(synchronize_session=False)
+        )
+        self.db.commit()
+        return deleted
+
+    def purgar_status_logs_anteriores_a(self, fecha_limite: datetime, batch_size: int = 1000) -> int:
+        ids = [
+            row[0]
+            for row in self.db.query(DeviceStatusLogModel.id)
+            .filter(DeviceStatusLogModel.recorded_at < fecha_limite)
+            .limit(batch_size)
+            .all()
+        ]
+        if not ids:
+            return 0
+        deleted = (
+            self.db.query(DeviceStatusLogModel)
+            .filter(DeviceStatusLogModel.id.in_(ids))
+            .delete(synchronize_session=False)
+        )
+        self.db.commit()
+        return deleted
+
+    def purgar_alertas_resueltas_anteriores_a(self, fecha_limite: datetime, batch_size: int = 1000) -> int:
+        ids = [
+            row[0]
+            for row in self.db.query(DeviceAlertModel.id)
+            .filter(DeviceAlertModel.is_resolved.is_(True), DeviceAlertModel.resolved_at < fecha_limite)
+            .limit(batch_size)
+            .all()
+        ]
+        if not ids:
+            return 0
+        deleted = self.db.query(DeviceAlertModel).filter(DeviceAlertModel.id.in_(ids)).delete(synchronize_session=False)
+        self.db.commit()
+        return deleted
+
 
 class MySQLOrganizacionesRepository(RepositorioOrganizacionesPort):
     def __init__(self, db: Session):
         self.db = db
+
+    def obtener_por_id(self, organizacion_id: str) -> Organizacion | None:
+        m = self.db.query(OrganizationModel).filter(OrganizationModel.id == organizacion_id).first()
+        if not m:
+            return None
+        return Organizacion(
+            id=m.id,
+            nombre=m.name,
+            plan_id=m.plan_id,
+            cuit=m.tax_id,
+            email_contacto=m.contact_email,
+            telefono_contacto=m.contact_phone,
+            creado_en=m.created_at,
+            actualizado_en=m.updated_at,
+        )
 
     def listar_organizaciones(self) -> list[Organizacion]:
         models = self.db.query(OrganizationModel).all()
@@ -313,6 +404,7 @@ class MySQLOrganizacionesRepository(RepositorioOrganizacionesPort):
             Organizacion(
                 id=m.id,
                 nombre=m.name,
+                plan_id=m.plan_id,
                 cuit=m.tax_id,
                 email_contacto=m.contact_email,
                 telefono_contacto=m.contact_phone,
@@ -328,6 +420,7 @@ class MySQLOrganizacionesRepository(RepositorioOrganizacionesPort):
             model = OrganizationModel(
                 id=org.id,
                 name=org.nombre,
+                plan_id=org.plan_id,
                 tax_id=org.cuit,
                 contact_email=org.email_contacto,
                 contact_phone=org.telefono_contacto,
@@ -335,6 +428,7 @@ class MySQLOrganizacionesRepository(RepositorioOrganizacionesPort):
             self.db.add(model)
         else:
             model.name = org.nombre
+            model.plan_id = org.plan_id
             model.tax_id = org.cuit
             model.contact_email = org.email_contacto
             model.contact_phone = org.telefono_contacto
@@ -344,11 +438,27 @@ class MySQLOrganizacionesRepository(RepositorioOrganizacionesPort):
         return Organizacion(
             id=model.id,
             nombre=model.name,
+            plan_id=model.plan_id,
             cuit=model.tax_id,
             email_contacto=model.contact_email,
             telefono_contacto=model.contact_phone,
             creado_en=model.created_at,
             actualizado_en=model.updated_at,
+        )
+
+    def obtener_planta_por_id(self, planta_id: str) -> Planta | None:
+        m = self.db.query(FacilityModel).filter(FacilityModel.id == planta_id).first()
+        if not m:
+            return None
+        return Planta(
+            id=m.id,
+            organizacion_id=m.organization_id,
+            nombre=m.name,
+            direccion=m.address,
+            latitud=float(m.latitude) if m.latitude is not None else None,
+            longitud=float(m.longitude) if m.longitude is not None else None,
+            creado_en=m.created_at,
+            actualizado_en=m.updated_at,
         )
 
     def listar_plantas(self, organizacion_id: str | None = None) -> list[Planta]:

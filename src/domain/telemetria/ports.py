@@ -28,6 +28,10 @@ class RepositorioDispositivosPort(ABC):
         pass
 
     @abstractmethod
+    def contar_por_organizacion(self, organizacion_id: str) -> int:
+        pass
+
+    @abstractmethod
     def guardar(self, dispositivo: Dispositivo) -> Dispositivo:
         pass
 
@@ -75,14 +79,38 @@ class RepositorioTelemetriaPort(ABC):
     ) -> list[AcumuladoEnergia]:
         pass
 
+    @abstractmethod
+    def purgar_instantaneas_anteriores_a(self, fecha_limite: datetime, batch_size: int = 1000) -> int:
+        pass
+
+    @abstractmethod
+    def purgar_energias_anteriores_a(self, fecha_limite: datetime, batch_size: int = 1000) -> int:
+        pass
+
+    @abstractmethod
+    def purgar_status_logs_anteriores_a(self, fecha_limite: datetime, batch_size: int = 1000) -> int:
+        pass
+
+    @abstractmethod
+    def purgar_alertas_resueltas_anteriores_a(self, fecha_limite: datetime, batch_size: int = 1000) -> int:
+        pass
+
 
 class RepositorioOrganizacionesPort(ABC):
+    @abstractmethod
+    def obtener_por_id(self, organizacion_id: str) -> Organizacion | None:
+        pass
+
     @abstractmethod
     def listar_organizaciones(self) -> list[Organizacion]:
         pass
 
     @abstractmethod
     def guardar_organizacion(self, org: Organizacion) -> Organizacion:
+        pass
+
+    @abstractmethod
+    def obtener_planta_por_id(self, planta_id: str) -> Planta | None:
         pass
 
     @abstractmethod

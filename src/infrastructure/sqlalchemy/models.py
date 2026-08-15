@@ -9,6 +9,7 @@ from sqlalchemy import (
     DateTime,
     Enum,
     ForeignKey,
+    Index,
     Numeric,
     String,
     Text,
@@ -33,12 +34,14 @@ class OrganizationModel(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     name: Mapped[str] = mapped_column(String(150), nullable=False)
+    plan_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("plans.id", ondelete="SET NULL"), nullable=True)
     tax_id: Mapped[str | None] = mapped_column(String(50), nullable=True)
     contact_email: Mapped[str | None] = mapped_column(String(120), nullable=True)
     contact_phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, onupdate=ahora_utc, nullable=False)
 
+    plan: Mapped[Optional["PlanModel"]] = relationship()
     facilities: Mapped[list["FacilityModel"]] = relationship(
         back_populates="organization", cascade="all, delete-orphan"
     )
@@ -97,6 +100,10 @@ class DeviceModel(Base):
 
 class TelemetryInstantaneousModel(Base):
     __tablename__ = "telemetry_instantaneous"
+    __table_args__ = (
+        Index("idx_telemetry_inst_dev_time", "device_id", "recorded_at"),
+        Index("idx_telemetry_inst_time", "recorded_at"),
+    )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     device_id: Mapped[str] = mapped_column(
@@ -141,6 +148,10 @@ class TelemetryInstantaneousModel(Base):
 
 class TelemetryEnergyModel(Base):
     __tablename__ = "telemetry_energy"
+    __table_args__ = (
+        Index("idx_telemetry_energy_dev_time", "device_id", "recorded_at"),
+        Index("idx_telemetry_energy_time", "recorded_at"),
+    )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     device_id: Mapped[str] = mapped_column(
@@ -162,6 +173,10 @@ class TelemetryEnergyModel(Base):
 
 class DeviceStatusLogModel(Base):
     __tablename__ = "device_status_logs"
+    __table_args__ = (
+        Index("idx_device_status_dev_time", "device_id", "recorded_at"),
+        Index("idx_device_status_time", "recorded_at"),
+    )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     device_id: Mapped[str] = mapped_column(
@@ -180,6 +195,10 @@ class DeviceStatusLogModel(Base):
 
 class DeviceAlertModel(Base):
     __tablename__ = "device_alerts"
+    __table_args__ = (
+        Index("idx_alerts_dev_resolved", "device_id", "is_resolved"),
+        Index("idx_alerts_resolved_purge", "is_resolved", "resolved_at"),
+    )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     device_id: Mapped[str] = mapped_column(

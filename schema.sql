@@ -5,16 +5,34 @@ CREATE DATABASE IF NOT EXISTS `datamaq_telemetry`
 
 USE `datamaq_telemetry`;
 
+-- 0. Subscription Plans (Catálogo SaaS Freemium)
+CREATE TABLE IF NOT EXISTS `plans` (
+    `id` VARCHAR(36) NOT NULL,
+    `name` VARCHAR(100) NOT NULL,
+    `description` TEXT NOT NULL,
+    `monthly_price_ars` DECIMAL(12, 2) NOT NULL,
+    `visibility` VARCHAR(20) NOT NULL DEFAULT 'PUBLICO',
+    `retention_days` INT NOT NULL,
+    `granularity_minutes` INT NOT NULL,
+    `max_devices` INT NOT NULL,
+    `notification_channels` JSON NOT NULL,
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- 1. Organizations (Clientes / Empresas)
 CREATE TABLE IF NOT EXISTS `organizations` (
     `id` VARCHAR(36) NOT NULL,
     `name` VARCHAR(150) NOT NULL,
+    `plan_id` VARCHAR(36) DEFAULT NULL,
     `tax_id` VARCHAR(50) DEFAULT NULL,
     `contact_email` VARCHAR(120) DEFAULT NULL,
     `contact_phone` VARCHAR(50) DEFAULT NULL,
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`)
+    PRIMARY KEY (`id`),
+    CONSTRAINT `fk_organizations_plan` FOREIGN KEY (`plan_id`) REFERENCES `plans` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 2. Facilities (Plantas / Sedes / Establecimientos)
@@ -87,6 +105,7 @@ CREATE TABLE IF NOT EXISTS `telemetry_instantaneous` (
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     KEY `idx_telemetry_inst_dev_time` (`device_id`, `recorded_at`),
+    KEY `idx_telemetry_inst_time` (`recorded_at`),
     CONSTRAINT `fk_telemetry_inst_device` FOREIGN KEY (`device_id`) REFERENCES `devices` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -104,6 +123,7 @@ CREATE TABLE IF NOT EXISTS `telemetry_energy` (
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     KEY `idx_telemetry_energy_dev_time` (`device_id`, `recorded_at`),
+    KEY `idx_telemetry_energy_time` (`recorded_at`),
     CONSTRAINT `fk_telemetry_energy_device` FOREIGN KEY (`device_id`) REFERENCES `devices` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -120,6 +140,7 @@ CREATE TABLE IF NOT EXISTS `device_status_logs` (
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     KEY `idx_device_status_dev_time` (`device_id`, `recorded_at`),
+    KEY `idx_device_status_time` (`recorded_at`),
     CONSTRAINT `fk_device_status_device` FOREIGN KEY (`device_id`) REFERENCES `devices` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -135,5 +156,6 @@ CREATE TABLE IF NOT EXISTS `device_alerts` (
     `resolved_at` DATETIME(3) DEFAULT NULL,
     PRIMARY KEY (`id`),
     KEY `idx_alerts_dev_resolved` (`device_id`, `is_resolved`),
+    KEY `idx_alerts_resolved_purge` (`is_resolved`, `resolved_at`),
     CONSTRAINT `fk_alerts_device` FOREIGN KEY (`device_id`) REFERENCES `devices` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

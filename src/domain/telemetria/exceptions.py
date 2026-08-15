@@ -24,3 +24,7 @@ class FactorPotenciaInvalidoError(DominioTelemetriaException):
 
 class TensionInvalidaError(DominioTelemetriaException):
     """Lanzada cuando un valor de tensión es negativo o fuera de rango físico."""
+
+
+class LimiteDispositivosExcedidoError(DominioTelemetriaException):
+    """Lanzada cuando una organización intenta asociar más dispositivos que los permitidos por su plan."""

@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict
 
 class OrganizacionBaseDTO(BaseModel):
     nombre: str
+    plan_id: str | None = None
     cuit: str | None = None
     email_contacto: str | None = None
     telefono_contacto: str | None = None

@@ -51,3 +51,15 @@ class PoliticaRetencionService:
     @staticmethod
     def ventana_consulta(plan: PlanTelemetria, ahora: datetime) -> datetime:
         return ahora - timedelta(days=plan.retencion_dias)
+
+    @staticmethod
+    def fecha_corte_telemetria(plan: PlanTelemetria, ahora: datetime) -> datetime:
+        return ahora - timedelta(days=plan.retencion_dias)
+
+    @staticmethod
+    def fecha_corte_status_logs(ahora: datetime, dias: int = 7) -> datetime:
+        return ahora - timedelta(days=dias)
+
+    @staticmethod
+    def fecha_corte_alertas_resueltas(ahora: datetime, dias: int = 30) -> datetime:
+        return ahora - timedelta(days=dias)

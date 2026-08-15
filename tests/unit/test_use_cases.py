@@ -33,6 +33,9 @@ class MockDispositivosRepo(RepositorioDispositivosPort):
     def listar(self, planta_id: str | None = None) -> list[Dispositivo]:
         return list(self.dispositivos.values())
 
+    def contar_por_organizacion(self, organizacion_id: str) -> int:
+        return len(self.dispositivos)
+
     def guardar(self, dispositivo: Dispositivo) -> Dispositivo:
         self.dispositivos[dispositivo.id] = dispositivo
         return dispositivo
@@ -78,6 +81,28 @@ class MockTelemetriaRepo(RepositorioTelemetriaPort):
         self, dispositivo_id: str, limite: int, desde: datetime | None = None
     ) -> list[AcumuladoEnergia]:
         return [e for e in self.energias if e.dispositivo_id == dispositivo_id][:limite]
+
+    def purgar_instantaneas_anteriores_a(self, fecha_limite: datetime, batch_size: int = 1000) -> int:
+        prev = len(self.instantaneas)
+        self.instantaneas = [i for i in self.instantaneas if i.registrado_en >= fecha_limite]
+        return prev - len(self.instantaneas)
+
+    def purgar_energias_anteriores_a(self, fecha_limite: datetime, batch_size: int = 1000) -> int:
+        prev = len(self.energias)
+        self.energias = [e for e in self.energias if e.registrado_en >= fecha_limite]
+        return prev - len(self.energias)
+
+    def purgar_status_logs_anteriores_a(self, fecha_limite: datetime, batch_size: int = 1000) -> int:
+        prev = len(self.logs)
+        self.logs = [log_item for log_item in self.logs if log_item.registrado_en >= fecha_limite]
+        return prev - len(self.logs)
+
+    def purgar_alertas_resueltas_anteriores_a(self, fecha_limite: datetime, batch_size: int = 1000) -> int:
+        prev = len(self.alertas)
+        self.alertas = [
+            a for a in self.alertas if not (a.esta_resuelta and a.resuelta_en and a.resuelta_en < fecha_limite)
+        ]
+        return prev - len(self.alertas)
 
 
 class MockLogger(LoggerPort):
