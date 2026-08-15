@@ -1,4 +1,10 @@
-from src.domain.telemetria.entities import AlertaDispositivo, LecturaInstantanea
+from datetime import datetime, timedelta
+
+from src.domain.telemetria.entities import (
+    AlertaDispositivo,
+    LecturaInstantanea,
+    PlanTelemetria,
+)
 from src.domain.telemetria.value_objects import PotenciaActiva, SeveridadAlerta
 
 
@@ -39,3 +45,9 @@ class AnalizadorCalidadEnergiaService:
                         mensaje=f"Sobretensión detectada en Fase {nombre_fase}: {v}V (Máximo: {umbral_alta}V)",
                     )
         return None
+
+
+class PoliticaRetencionService:
+    @staticmethod
+    def ventana_consulta(plan: PlanTelemetria, ahora: datetime) -> datetime:
+        return ahora - timedelta(days=plan.retencion_dias)

@@ -14,7 +14,7 @@ class Settings(BaseSettings):
 
     # MQTT
     MQTT_BROKER_HOST: str = "127.0.0.1"
-    MQTT_BROKER_PORT: int = 1883
+    MQTT_BROKER_PORT: int = 8884
     MQTT_USERNAME: str = ""
     MQTT_PASSWORD: str = ""
     MQTT_CLIENT_ID: str = "datamaq-telemetry-backend"
@@ -22,7 +22,7 @@ class Settings(BaseSettings):
 
     # API
     API_HOST: str = "0.0.0.0"
-    API_PORT: int = 8000
+    API_PORT: int = 8885
     API_SECRET_KEY: str = "dev-secret-key-datamaq"
     DEBUG: bool = True
     CORS_ORIGINS: str = "*"

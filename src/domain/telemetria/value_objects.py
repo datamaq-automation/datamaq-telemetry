@@ -21,6 +21,11 @@ class SeveridadAlerta(str, Enum):
     CRITICAL = "CRITICAL"
 
 
+class VisibilidadPlan(str, Enum):
+    PUBLICO = "PUBLICO"
+    PRIVADO = "PRIVADO"
+
+
 @dataclass(frozen=True)
 class MacAddress:
     valor: str

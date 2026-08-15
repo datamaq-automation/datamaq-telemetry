@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from decimal import Decimal
 from typing import Any
 
 from src.domain.telemetria.value_objects import (
@@ -14,11 +15,27 @@ from src.domain.telemetria.value_objects import (
     PotenciaReactiva,
     SeveridadAlerta,
     Tension,
+    VisibilidadPlan,
 )
 
 
 def ahora_utc() -> datetime:
     return datetime.now(timezone.utc)
+
+
+@dataclass
+class PlanTelemetria:
+    id: str
+    nombre: str
+    descripcion: str
+    precio_mensual_ars: Decimal
+    visibilidad: VisibilidadPlan
+    retencion_dias: int
+    granularidad_minutos: int
+    max_dispositivos: int
+    canales_notificacion: list[str]
+    creado_en: datetime = field(default_factory=ahora_utc)
+    actualizado_en: datetime = field(default_factory=ahora_utc)
 
 
 @dataclass

@@ -9,6 +9,7 @@ from src.domain.telemetria.entities import (
     LogEstadoDispositivo,
     Organizacion,
     Planta,
+    PlanTelemetria,
 )
 from src.domain.telemetria.value_objects import MacAddress
 
@@ -90,6 +91,20 @@ class RepositorioOrganizacionesPort(ABC):
 
     @abstractmethod
     def guardar_planta(self, planta: Planta) -> Planta:
+        pass
+
+
+class RepositorioPlanesPort(ABC):
+    @abstractmethod
+    def listar_planes(self) -> list[PlanTelemetria]:
+        pass
+
+    @abstractmethod
+    def obtener_por_id(self, plan_id: str) -> PlanTelemetria | None:
+        pass
+
+    @abstractmethod
+    def guardar_plan(self, plan: PlanTelemetria) -> PlanTelemetria:
         pass
 
 
