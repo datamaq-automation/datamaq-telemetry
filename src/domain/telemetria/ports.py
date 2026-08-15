@@ -95,6 +95,19 @@ class RepositorioTelemetriaPort(ABC):
     def purgar_alertas_resueltas_anteriores_a(self, fecha_limite: datetime, batch_size: int = 1000) -> int:
         pass
 
+    @abstractmethod
+    def listar_alertas(
+        self,
+        dispositivo_id: str | None = None,
+        solo_abiertas: bool = False,
+        limite: int = 100,
+    ) -> list[AlertaDispositivo]:
+        pass
+
+    @abstractmethod
+    def obtener_alerta_por_id(self, alerta_id: int) -> AlertaDispositivo | None:
+        pass
+
 
 class RepositorioOrganizacionesPort(ABC):
     @abstractmethod

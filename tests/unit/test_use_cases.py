@@ -60,6 +60,25 @@ class MockTelemetriaRepo(RepositorioTelemetriaPort):
     def guardar_alerta(self, alerta: AlertaDispositivo) -> None:
         self.alertas.append(alerta)
 
+    def listar_alertas(
+        self,
+        dispositivo_id: str | None = None,
+        solo_abiertas: bool = False,
+        limite: int = 100,
+    ) -> list[AlertaDispositivo]:
+        q = list(self.alertas)
+        if dispositivo_id:
+            q = [a for a in q if a.dispositivo_id == dispositivo_id]
+        if solo_abiertas:
+            q = [a for a in q if not a.esta_resuelta]
+        return q[:limite]
+
+    def obtener_alerta_por_id(self, alerta_id: int) -> AlertaDispositivo | None:
+        for a in self.alertas:
+            if a.id == alerta_id:
+                return a
+        return None
+
     def obtener_ultima_instantanea(self, dispositivo_id: str) -> LecturaInstantanea | None:
         for inst in reversed(self.instantaneas):
             if inst.dispositivo_id == dispositivo_id:

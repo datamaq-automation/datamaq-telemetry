@@ -1,6 +1,7 @@
 from typing import Any
 
 from src.domain.telemetria.exceptions import (
+    AlertaNoEncontradaError,
     DispositivoNoEncontradoError,
     DominioTelemetriaException,
     FactorPotenciaInvalidoError,
@@ -14,7 +15,7 @@ class ErrorPresenter:
 
     @staticmethod
     def presentar_excepcion(exc: Exception) -> tuple[int, dict[str, Any]]:
-        if isinstance(exc, DispositivoNoEncontradoError):
+        if isinstance(exc, (DispositivoNoEncontradoError, AlertaNoEncontradaError)):
             return 404, {"error": "NotFound", "mensaje": exc.mensaje}
         elif isinstance(exc, (MacAddressInvalidaError, TensionInvalidaError, FactorPotenciaInvalidoError)):
             return 400, {"error": "ValidationError", "mensaje": exc.mensaje}

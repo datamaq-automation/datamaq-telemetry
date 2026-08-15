@@ -3,12 +3,14 @@ from typing import Annotated
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
+from src.adapters.controllers.alertas_controller import AlertasController
 from src.adapters.controllers.dispositivos_controller import DispositivosController
 from src.adapters.controllers.planes_controller import PlanesController
 from src.adapters.controllers.purga_controller import PurgaController
 from src.adapters.controllers.telemetria_controller import TelemetriaController
 from src.adapters.gateways.in_memory_event_broadcaster import InMemoryEventBroadcaster
 from src.application.use_cases.consultar_telemetria import ConsultarTelemetriaUseCase
+from src.application.use_cases.gestionar_alertas import GestionarAlertasUseCase
 from src.application.use_cases.gestionar_dispositivos import (
     GestionarDispositivosUseCase,
 )
@@ -71,3 +73,11 @@ def get_purga_controller(
     logger = get_logger("purga_telemetria")
     use_case = PurgarTelemetriaExpiradaUseCase(repo_telem, logger=logger)
     return PurgaController(use_case)
+
+
+def get_alertas_controller(
+    db: Annotated[Session, Depends(get_db_session)],
+) -> AlertasController:
+    repo_telem = MySQLTelemetriaRepository(db)
+    use_case = GestionarAlertasUseCase(repo_telem)
+    return AlertasController(use_case)

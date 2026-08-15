@@ -162,3 +162,63 @@ pytest
 ruff check .
 python scripts/verify_architecture.py
 ```
+
+---
+
+# Spec D: API de Consulta y Resolución de Alertas de Telemetría
+
+## 1. Objetivo y Contexto
+
+Exponer endpoints REST para que el frontend del dashboard y operadores de planta puedan:
+1. Consultar el listado de alarmas de medidores (`GET /api/alertas`), con filtros opcionales por `device_id` y `solo_abiertas` (alertas no resueltas).
+2. Marcar una alarma como resuelta (`POST /api/alertas/{alerta_id}/resolver`), registrando la fecha de resolución `resolved_at`.
+
+## 2. Dominio y Puertos
+
+### `src/domain/telemetria/exceptions.py`
+- `AlertaNoEncontradaError(Exception)` — lanzada cuando el ID de alerta no existe.
+
+### `src/domain/telemetria/ports.py`
+- `RepositorioTelemetriaPort`:
+  - `listar_alertas(dispositivo_id: str | None = None, solo_abiertas: bool = False, limite: int = 100) -> list[AlertaDispositivo]`
+  - `obtener_alerta_por_id(alerta_id: int) -> AlertaDispositivo | None`
+
+## 3. Casos de Uso, DTOs y Mappers
+
+### `src/application/dtos/alerta_dto.py`
+- `AlertaResponseDTO(BaseModel)`: `id: int`, `dispositivo_id: str`, `tipo_alerta: str`, `severidad: str`, `mensaje: str`, `esta_resuelta: bool`, `disparada_en: datetime`, `resuelta_en: datetime | None`.
+
+### `src/application/mappers/alerta_mapper.py`
+- `AlertaMapper.to_dto(entity: AlertaDispositivo) -> AlertaResponseDTO`.
+
+### `src/application/use_cases/gestionar_alertas.py`
+- `GestionarAlertasUseCase(repo_telemetria: RepositorioTelemetriaPort)`:
+  - `listar_alertas(dispositivo_id: str | None = None, solo_abiertas: bool = False, limite: int = 100) -> list[AlertaResponseDTO]`
+  - `resolver_alerta(alerta_id: int) -> AlertaResponseDTO`
+
+## 4. Adaptadores y Routers
+
+- `src/adapters/controllers/alertas_controller.py` — `AlertasController`.
+- `src/infrastructure/fastapi/routes/alertas_router.py`:
+  - `GET /api/alertas?device_id={str}&solo_abiertas={bool}&limite={int}`
+  - `POST /api/alertas/{alerta_id}/resolver`
+- `src/infrastructure/fastapi/dependencies.py` — `get_alertas_controller`.
+- `src/infrastructure/fastapi/server.py` — registrar `alertas_router`.
+
+## 5. Matriz de Pruebas (RED Suite)
+
+### `tests/unit/test_alertas.py`
+1. `test_listar_alertas_con_filtro_abiertas_y_device`
+2. `test_resolver_alerta_exitosa`
+3. `test_resolver_alerta_inexistente_lanza_error`
+
+### `tests/integration/test_alertas_api.py`
+1. `test_create_app_registra_router_alertas`
+
+## 6. Criterios del Gauntlet
+
+```bash
+pytest
+ruff check .
+python scripts/verify_architecture.py
+```

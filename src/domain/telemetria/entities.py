@@ -146,3 +146,7 @@ class AlertaDispositivo:
     esta_resuelta: bool = False
     disparada_en: datetime = field(default_factory=ahora_utc)
     resuelta_en: datetime | None = None
+
+    def marcar_resuelta(self, timestamp: datetime | None = None) -> None:
+        self.esta_resuelta = True
+        self.resuelta_en = timestamp or ahora_utc()

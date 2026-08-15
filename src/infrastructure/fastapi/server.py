@@ -7,6 +7,9 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.infrastructure.fastapi.dependencies import global_event_broadcaster
+from src.infrastructure.fastapi.routes.alertas_router import (
+    router as alertas_router,
+)
 from src.infrastructure.fastapi.routes.dispositivos_router import (
     router as dispositivos_router,
 )
@@ -100,6 +103,7 @@ def create_app() -> FastAPI:
     app.include_router(dispositivos_router)
     app.include_router(organizaciones_router)
     app.include_router(planes_router)
+    app.include_router(alertas_router)
 
     # WebSockets Live Telemetry Stream
     @app.websocket("/ws/live")

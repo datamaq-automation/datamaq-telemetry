@@ -104,6 +104,8 @@ venv/bin/python scripts/init_db.py
 | **Telemetría** | `GET /api/telemetria/latest/{id}` | Última instantánea y acumulado de energía |
 | | `GET /api/telemetria/instantaneas/{id}` | Historial de V, I, P, Q, S, FP con límite |
 | | `GET /api/telemetria/energias/{id}` | Historial de kWh y kVARh acumulados |
+| **Alertas** | `GET /api/alertas?device_id=...&solo_abiertas=true` | Consultar alarmas activas / historial |
+| | `POST /api/alertas/{id}/resolver` | Marcar alerta como atendida / resuelta |
 | **Sistema** | `POST /api/system/purga` | Ejecutar purga de telemetría expirada |
 
 ---

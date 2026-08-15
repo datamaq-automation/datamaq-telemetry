@@ -28,3 +28,7 @@ class TensionInvalidaError(DominioTelemetriaException):
 
 class LimiteDispositivosExcedidoError(DominioTelemetriaException):
     """Lanzada cuando una organización intenta asociar más dispositivos que los permitidos por su plan."""
+
+
+class AlertaNoEncontradaError(DominioTelemetriaException):
+    """Lanzada cuando se intenta operar con una alerta que no existe."""

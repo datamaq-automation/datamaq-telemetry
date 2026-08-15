@@ -31,6 +31,7 @@ from src.domain.telemetria.value_objects import (
     PotenciaActiva,
     PotenciaAparente,
     PotenciaReactiva,
+    SeveridadAlerta,
     Tension,
     VisibilidadPlan,
 )
@@ -261,7 +262,34 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
         self.db.add(model)
         self.db.commit()
 
+    def _alerta_to_entity(self, m: DeviceAlertModel) -> AlertaDispositivo:
+        return AlertaDispositivo(
+            id=m.id,
+            dispositivo_id=m.device_id,
+            tipo_alerta=m.alert_type,
+            severidad=SeveridadAlerta(m.severity)
+            if m.severity in SeveridadAlerta._value2member_map_
+            else SeveridadAlerta.WARNING,
+            mensaje=m.message,
+            esta_resuelta=m.is_resolved,
+            disparada_en=m.triggered_at,
+            resuelta_en=m.resolved_at,
+        )
+
     def guardar_alerta(self, alerta: AlertaDispositivo) -> None:
+        if alerta.id is not None:
+            model = self.db.query(DeviceAlertModel).filter(DeviceAlertModel.id == alerta.id).first()
+            if model:
+                model.device_id = alerta.dispositivo_id
+                model.alert_type = alerta.tipo_alerta
+                model.severity = alerta.severidad.value
+                model.message = alerta.mensaje
+                model.is_resolved = alerta.esta_resuelta
+                model.triggered_at = alerta.disparada_en
+                model.resolved_at = alerta.resuelta_en
+                self.db.commit()
+                return
+
         model = DeviceAlertModel(
             device_id=alerta.dispositivo_id,
             alert_type=alerta.tipo_alerta,
@@ -273,6 +301,26 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
         )
         self.db.add(model)
         self.db.commit()
+        if alerta.id is None:
+            alerta.id = model.id
+
+    def listar_alertas(
+        self,
+        dispositivo_id: str | None = None,
+        solo_abiertas: bool = False,
+        limite: int = 100,
+    ) -> list[AlertaDispositivo]:
+        q = self.db.query(DeviceAlertModel)
+        if dispositivo_id:
+            q = q.filter(DeviceAlertModel.device_id == dispositivo_id)
+        if solo_abiertas:
+            q = q.filter(DeviceAlertModel.is_resolved.is_(False))
+        items = q.order_by(desc(DeviceAlertModel.triggered_at)).limit(limite).all()
+        return [self._alerta_to_entity(m) for m in items]
+
+    def obtener_alerta_por_id(self, alerta_id: int) -> AlertaDispositivo | None:
+        m = self.db.query(DeviceAlertModel).filter(DeviceAlertModel.id == alerta_id).first()
+        return self._alerta_to_entity(m) if m else None
 
     def obtener_ultima_instantanea(self, dispositivo_id: str) -> LecturaInstantanea | None:
         m = (

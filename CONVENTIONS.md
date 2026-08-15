@@ -26,12 +26,12 @@ src/
 │       └── exceptions.py                        # Excepciones de negocio de dominio
 │
 ├── application/                                 # 2. Capa de Aplicación (Casos de Uso, DTOs y Mappers)
-│   ├── use_cases/                               # ingestar, consultar, gestionar_dispositivos, gestionar_planes, purgar
-│   ├── dtos/                                    # telemetria_dto, dispositivo_dto, organizacion_dto, plan_dto, purga_dto
-│   └── mappers/                                 # telemetria_mapper, dispositivo_mapper, plan_mapper
+│   ├── use_cases/                               # ingestar, consultar, gestionar_dispositivos, gestionar_planes, purgar, gestionar_alertas
+│   ├── dtos/                                    # telemetria_dto, dispositivo_dto, organizacion_dto, plan_dto, purga_dto, alerta_dto
+│   └── mappers/                                 # telemetria_mapper, dispositivo_mapper, plan_mapper, alerta_mapper
 │
 ├── adapters/                                    # 3. Capa de Adaptadores (Agnósticos del Framework Web)
-│   ├── controllers/                             # telemetria, dispositivos, planes, purga
+│   ├── controllers/                             # telemetria, dispositivos, planes, purga, alertas
 │   ├── gateways/                                # in_memory_event_broadcaster (PublicadorEventosPort)
 │   └── presenters/                              # error_presenter (Mapeo a códigos de error estándar)
 │
