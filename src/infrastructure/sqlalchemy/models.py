@@ -195,3 +195,20 @@ class DeviceAlertModel(Base):
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     device: Mapped["DeviceModel"] = relationship(back_populates="alerts")
+
+
+class PlanModel(Base):
+    __tablename__ = "plans"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    monthly_price_ars: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    visibility: Mapped[str] = mapped_column(String(20), default="PUBLICO", nullable=False)
+    retention_days: Mapped[int] = mapped_column(nullable=False)
+    granularity_minutes: Mapped[int] = mapped_column(nullable=False)
+    max_devices: Mapped[int] = mapped_column(nullable=False)
+    notification_channels: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, onupdate=ahora_utc, nullable=False)
+
