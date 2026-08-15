@@ -382,3 +382,105 @@ def test_ventana_retencion_consultas():
     resultado = consultar_uc.listar_instantaneas(dev.id, limite=100, desde=ahora - timedelta(days=30))
     assert len(resultado) == 1
     assert resultado[0].dispositivo_id == dev.id
+
+
+def test_indices_modelos_sin_duplicados_redundantes():
+    from src.infrastructure.sqlalchemy.models import (
+        DeviceStatusLogModel,
+        TelemetryEnergyModel,
+        TelemetryInstantaneousModel,
+    )
+
+    for model in (TelemetryInstantaneousModel, TelemetryEnergyModel, DeviceStatusLogModel):
+        # Verificar que device_id y recorded_at no tengan index=True propio duplicado
+        col_device_id = model.__table__.columns["device_id"]
+        col_recorded_at = model.__table__.columns["recorded_at"]
+        assert col_device_id.index is not True, f"{model.__name__}.device_id tiene index=True redundante"
+        assert col_recorded_at.index is not True, f"{model.__name__}.recorded_at tiene index=True redundante"
+
+
+def test_device_cache_resolucion_en_memoria():
+    # Limpiar estado estático
+    IngestarTelemetriaUseCase._ultimas_persistencias.clear()
+    IngestarTelemetriaUseCase._device_cache.clear()
+    IngestarTelemetriaUseCase._ultimos_heartbeats.clear()
+
+    class SpyDispositivosRepo(MockDispositivosRepo):
+        def __init__(self):
+            super().__init__()
+            self.obtener_por_uid_calls = 0
+
+        def obtener_por_uid(self, uid: MacAddress) -> Dispositivo | None:
+            self.obtener_por_uid_calls += 1
+            return super().obtener_por_uid(uid)
+
+    repo_disp = SpyDispositivosRepo()
+    repo_telem = MockTelemetriaRepo()
+    use_case = IngestarTelemetriaUseCase(repo_disp, repo_telem)
+
+    t0 = datetime(2026, 8, 14, 12, 0, 0, tzinfo=timezone.utc)
+
+    # 1. Primer mensaje: debe registrar el dispositivo y consultar DB
+    use_case.ejecutar(
+        "m/wifi/112233445566/inst",
+        {"timestamp": t0.isoformat(), "phase_r": {"voltage_V": 220.0}},
+    )
+    assert repo_disp.obtener_por_uid_calls == 1
+
+    # 2. Siguientes 5 mensajes del mismo dispositivo: deben resolverse por caché sin llamar a obtener_por_uid
+    for i in range(1, 6):
+        use_case.ejecutar(
+            "m/wifi/112233445566/inst",
+            {"timestamp": (t0 + timedelta(seconds=i)).isoformat(), "phase_r": {"voltage_V": 220.0}},
+        )
+
+    # La cuenta de llamadas a la base de datos debe seguir siendo 1 gracias a _device_cache
+    assert repo_disp.obtener_por_uid_calls == 1
+
+
+def test_heartbeat_throttling_60s():
+    # Limpiar estado estático
+    IngestarTelemetriaUseCase._ultimas_persistencias.clear()
+    IngestarTelemetriaUseCase._device_cache.clear()
+    IngestarTelemetriaUseCase._ultimos_heartbeats.clear()
+
+    class SpyDispositivosRepo(MockDispositivosRepo):
+        def __init__(self):
+            super().__init__()
+            self.guardar_calls = 0
+
+        def guardar(self, dispositivo: Dispositivo) -> Dispositivo:
+            self.guardar_calls += 1
+            return super().guardar(dispositivo)
+
+    repo_disp = SpyDispositivosRepo()
+    repo_telem = MockTelemetriaRepo()
+    use_case = IngestarTelemetriaUseCase(repo_disp, repo_telem)
+
+    t0 = datetime(2026, 8, 14, 12, 0, 0, tzinfo=timezone.utc)
+
+    # 1. Primer mensaje (crea el dispositivo en DB)
+    use_case.ejecutar(
+        "m/wifi/AABB11223344/inst",
+        {"timestamp": t0.isoformat(), "phase_r": {"voltage_V": 220.0}},
+    )
+    assert repo_disp.guardar_calls == 1
+
+    # 2. Enviar 10 mensajes seguidos en los primeros 30 segundos
+    for i in range(1, 11):
+        use_case.ejecutar(
+            "m/wifi/AABB11223344/inst",
+            {"timestamp": (t0 + timedelta(seconds=i * 2)).isoformat(), "phase_r": {"voltage_V": 220.0}},
+        )
+
+    # El guardado en la tabla devices NO debe repetirse en cada frame (se mantiene en 1)
+    assert repo_disp.guardar_calls == 1
+
+    # 3. Enviar un mensaje luego de 65 segundos (ventana vencida)
+    use_case.ejecutar(
+        "m/wifi/AABB11223344/inst",
+        {"timestamp": (t0 + timedelta(seconds=65)).isoformat(), "phase_r": {"voltage_V": 220.0}},
+    )
+
+    # Ahora sí debe haberse actualizado el heartbeat en DB
+    assert repo_disp.guardar_calls == 2

@@ -119,3 +119,46 @@ ruff format --check .
 ```
 
 Cobertura ≥ 85 %. Integridad: `__init__.py` de 0 bytes (sin re-exportaciones).
+
+---
+
+# Spec C: Optimización de Base de Datos y Caché de Ingesta (Lean / KISS)
+
+## 1. Objetivo y Contexto
+
+Optimizar el uso y rendimiento de la base de datos MySQL en la ingesta MQTT y en las definiciones de modelos, eliminando sobreescrituras innecesarias en disco y árboles de índices duplicados.
+
+**Decisiones de diseño:**
+- **Cero sobreingeniería:** No se aplica particionado de tablas ni tablas rollup para la Fase 1.
+- **Limpieza de índices redundantes:** Remover `index=True` en `device_id` y `recorded_at` de `models.py` (ya cubiertos por los índices compuestos).
+- **Caché de resolución de dispositivos:** `IngestarTelemetriaUseCase` mantiene un `_device_cache` en memoria (`MAC -> device_id`) para evitar `SELECT`s redundantes en cada mensaje.
+- **Throttling de latidos (`last_seen_at`):** `IngestarTelemetriaUseCase` mantiene un `_ultimos_heartbeats` en memoria para amortiguar actualizaciones de estado en la tabla `devices` a 1 vez cada 60 segundos.
+
+## 2. Casos de Uso y Modelos
+
+### `src/application/use_cases/ingestar_telemetria.py`
+- `_device_cache: ClassVar[dict[str, str]]`
+- `_ultimos_heartbeats: ClassVar[dict[str, datetime]]`
+- `_obtener_o_crear_dispositivo`:
+  - Si la MAC está en `_device_cache` y el latido fue hace menos de 60s, devuelve el dispositivo/ID sin ejecutar `obtener_por_uid` ni `guardar`.
+  - Si no está o venció la ventana de 60s, actualiza en DB y refresca la caché.
+
+### `src/infrastructure/sqlalchemy/models.py`
+- En `TelemetryInstantaneousModel`, `TelemetryEnergyModel`, `DeviceStatusLogModel`:
+  - `device_id: Mapped[str] = mapped_column(String(36), ForeignKey("devices.id", ondelete="CASCADE"), nullable=False)` (sin `index=True`).
+  - `recorded_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)` (sin `index=True`).
+
+## 3. Matriz de Pruebas (RED Suite)
+
+### `tests/unit/test_optimizacion_db.py`
+1. `test_indices_modelos_sin_duplicados_redundantes` — valida que las columnas `device_id` y `recorded_at` no tengan índices simples redundantes aparte del compuesto.
+2. `test_device_cache_resolucion_en_memoria` — valida que mensajes consecutivos de un medidor conocido no llamen a `obtener_por_uid` del repositorio.
+3. `test_heartbeat_throttling_60s` — valida que múltiples mensajes en menos de 60s no emitan llamadas a `guardar(dispositivo)`.
+
+## 4. Criterios del Gauntlet
+
+```bash
+pytest
+ruff check .
+python scripts/verify_architecture.py
+```

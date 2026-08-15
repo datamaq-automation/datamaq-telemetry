@@ -173,8 +173,6 @@ erDiagram
 **Índices:**
 - `idx_device_status_dev_time`: (`device_id`, `recorded_at`)
 - `idx_device_status_time`: (`recorded_at`)
-- `ix_device_status_logs_device_id`: (`device_id`)
-- `ix_device_status_logs_recorded_at`: (`recorded_at`)
 
 ### Tabla `devices`
 
@@ -258,8 +256,6 @@ erDiagram
 **Índices:**
 - `idx_telemetry_energy_dev_time`: (`device_id`, `recorded_at`)
 - `idx_telemetry_energy_time`: (`recorded_at`)
-- `ix_telemetry_energy_device_id`: (`device_id`)
-- `ix_telemetry_energy_recorded_at`: (`recorded_at`)
 
 ### Tabla `telemetry_instantaneous`
 
@@ -295,8 +291,6 @@ erDiagram
 **Índices:**
 - `idx_telemetry_inst_dev_time`: (`device_id`, `recorded_at`)
 - `idx_telemetry_inst_time`: (`recorded_at`)
-- `ix_telemetry_instantaneous_device_id`: (`device_id`)
-- `ix_telemetry_instantaneous_recorded_at`: (`recorded_at`)
 
 ## 3. Matriz de Políticas de Retención y Granularidad
 

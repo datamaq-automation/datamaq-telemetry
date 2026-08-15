@@ -35,6 +35,8 @@ from src.domain.telemetria.value_objects import (
 class IngestarTelemetriaUseCase:
     # Memoria estática de últimas persistencias por dispositivo para compartir entre invocaciones
     _ultimas_persistencias: ClassVar[dict[str, datetime]] = {}
+    _device_cache: ClassVar[dict[str, Dispositivo]] = {}
+    _ultimos_heartbeats: ClassVar[dict[str, datetime]] = {}
 
     def __init__(
         self,
@@ -61,8 +63,35 @@ class IngestarTelemetriaUseCase:
                 pass
         return datetime.now(timezone.utc)
 
-    def _obtener_o_crear_dispositivo(self, mac_raw: str, dev_info: dict[str, Any] | None = None) -> Dispositivo:
+    def _obtener_o_crear_dispositivo(
+        self, mac_raw: str, dev_info: dict[str, Any] | None = None, ahora: datetime | None = None
+    ) -> Dispositivo:
         mac_vo = MacAddress(mac_raw)
+        if ahora is None:
+            ahora = datetime.now(timezone.utc)
+
+        # 1. Búsqueda en caché en memoria
+        if mac_vo.valor in self._device_cache:
+            dispositivo = self._device_cache[mac_vo.valor]
+            ultimo_hb = self._ultimos_heartbeats.get(dispositivo.id)
+
+            # Si venció la ventana de amortiguación (60s), persistir estado en DB
+            if ultimo_hb is None or (ahora - ultimo_hb).total_seconds() >= 60:
+                dispositivo.marcar_online(ahora)
+                if dev_info:
+                    if dev_info.get("serial_number"):
+                        dispositivo.numero_serie = dev_info.get("serial_number")
+                    if dev_info.get("device_fw"):
+                        dispositivo.version_fw = dev_info.get("device_fw")
+                    if dev_info.get("hw_model"):
+                        dispositivo.version_hw = dev_info.get("hw_model")
+                dispositivo = self.repo_dispositivos.guardar(dispositivo)
+                self._device_cache[mac_vo.valor] = dispositivo
+                self._ultimos_heartbeats[dispositivo.id] = ahora
+
+            return dispositivo
+
+        # 2. Si no está en caché, consultar repositorio
         dispositivo = self.repo_dispositivos.obtener_por_uid(mac_vo)
         if not dispositivo:
             nuevo = Dispositivo(
@@ -74,14 +103,16 @@ class IngestarTelemetriaUseCase:
                 version_hw=dev_info.get("hw_model") if dev_info else None,
                 version_fw=dev_info.get("device_fw") if dev_info else None,
                 estado=EstadoDispositivo.ONLINE,
-                visto_por_ultima_vez=datetime.now(timezone.utc),
+                visto_por_ultima_vez=ahora,
             )
             saved = self.repo_dispositivos.guardar(nuevo)
+            self._device_cache[mac_vo.valor] = saved
+            self._ultimos_heartbeats[saved.id] = ahora
             if self.logger:
                 self.logger.info("nuevo_dispositivo_registrado", device_uid=mac_vo.valor, modelo=nuevo.modelo)
             return saved
         else:
-            dispositivo.marcar_online(datetime.now(timezone.utc))
+            dispositivo.marcar_online(ahora)
             if dev_info:
                 if dev_info.get("serial_number"):
                     dispositivo.numero_serie = dev_info.get("serial_number")
@@ -89,7 +120,10 @@ class IngestarTelemetriaUseCase:
                     dispositivo.version_fw = dev_info.get("device_fw")
                 if dev_info.get("hw_model"):
                     dispositivo.version_hw = dev_info.get("hw_model")
-            return self.repo_dispositivos.guardar(dispositivo)
+            saved = self.repo_dispositivos.guardar(dispositivo)
+            self._device_cache[mac_vo.valor] = saved
+            self._ultimos_heartbeats[saved.id] = ahora
+            return saved
 
     def _parse_fase(self, data: Any, suffix: str = "") -> MedicionFase:
         if not isinstance(data, dict):
@@ -209,8 +243,8 @@ class IngestarTelemetriaUseCase:
         subtopico = partes[3]
 
         dev_info = payload.get("device_info") if isinstance(payload.get("device_info"), dict) else None
-        dispositivo = self._obtener_o_crear_dispositivo(mac_raw, dev_info)
         recorded_at = self._parse_timestamp(payload.get("timestamp") or payload.get("t") or payload.get("time"))
+        dispositivo = self._obtener_o_crear_dispositivo(mac_raw, dev_info, ahora=recorded_at)
 
         if subtopico == "inst":
             # Extraer fases de estructura de arreglo 'f': [{"n":"R","v":223.4,...}, ...]

@@ -106,10 +106,8 @@ class TelemetryInstantaneousModel(Base):
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    device_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("devices.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    recorded_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
+    device_id: Mapped[str] = mapped_column(String(36), ForeignKey("devices.id", ondelete="CASCADE"), nullable=False)
+    recorded_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
     # Fase R
     voltage_r: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
@@ -154,10 +152,8 @@ class TelemetryEnergyModel(Base):
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    device_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("devices.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    recorded_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
+    device_id: Mapped[str] = mapped_column(String(36), ForeignKey("devices.id", ondelete="CASCADE"), nullable=False)
+    recorded_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
     net_active_energy_kwh: Mapped[Decimal | None] = mapped_column(Numeric(14, 3), nullable=True)
     net_reactive_energy_kvarh: Mapped[Decimal | None] = mapped_column(Numeric(14, 3), nullable=True)
@@ -179,10 +175,8 @@ class DeviceStatusLogModel(Base):
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    device_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("devices.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    recorded_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
+    device_id: Mapped[str] = mapped_column(String(36), ForeignKey("devices.id", ondelete="CASCADE"), nullable=False)
+    recorded_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     wifi_rssi_dbm: Mapped[int | None] = mapped_column(nullable=True)
     wifi_calidad: Mapped[int | None] = mapped_column(nullable=True)
     ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
