@@ -391,14 +391,10 @@ class IngestarTelemetriaUseCase:
             # Soporte para formato compacto de Powermeter con arreglo 'f': [{"n":"R","a":0.03,"r":0.01}, ...]
             if isinstance(payload.get("f"), list):
                 phases_act = [
-                    float(item["a"])
-                    for item in payload["f"]
-                    if isinstance(item, dict) and item.get("a") is not None
+                    float(item["a"]) for item in payload["f"] if isinstance(item, dict) and item.get("a") is not None
                 ]
                 phases_react = [
-                    float(item["r"])
-                    for item in payload["f"]
-                    if isinstance(item, dict) and item.get("r") is not None
+                    float(item["r"]) for item in payload["f"] if isinstance(item, dict) and item.get("r") is not None
                 ]
                 if e_act is None and phases_act:
                     e_act = sum(phases_act)
@@ -433,8 +429,10 @@ class IngestarTelemetriaUseCase:
                 )
 
         elif subtopico == "status":
-            wifi_info = payload.get("wifi_sta") if isinstance(payload.get("wifi_sta"), dict) else {}
-            device_info = payload.get("device_info") if isinstance(payload.get("device_info"), dict) else {}
+            wifi_raw = payload.get("wifi_sta")
+            wifi_info: dict[str, Any] = wifi_raw if isinstance(wifi_raw, dict) else {}
+            device_raw = payload.get("device_info")
+            device_info: dict[str, Any] = device_raw if isinstance(device_raw, dict) else {}
             log = LogEstadoDispositivo(
                 id=None,
                 dispositivo_id=dispositivo.id,

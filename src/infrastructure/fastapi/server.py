@@ -101,7 +101,6 @@ def create_app() -> FastAPI:
     app.include_router(organizaciones_router)
     app.include_router(planes_router)
 
-
     # WebSockets Live Telemetry Stream
     @app.websocket("/ws/live")
     async def websocket_stream(websocket: WebSocket):

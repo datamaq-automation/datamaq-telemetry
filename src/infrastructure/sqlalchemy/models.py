@@ -211,4 +211,3 @@ class PlanModel(Base):
     notification_channels: Mapped[list[str]] = mapped_column(JSON, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, onupdate=ahora_utc, nullable=False)
-

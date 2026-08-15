@@ -12,8 +12,8 @@ from src.domain.telemetria.entities import (
     LogEstadoDispositivo,
     MedicionFase,
     Organizacion,
-    PlanTelemetria,
     Planta,
+    PlanTelemetria,
 )
 from src.domain.telemetria.ports import (
     RepositorioDispositivosPort,
@@ -463,4 +463,3 @@ class MySQLPlanesRepository(RepositorioPlanesPort):
         self.db.commit()
         self.db.refresh(model)
         return self._to_entity(model)
-

@@ -17,4 +17,3 @@ def test_create_app_registra_router_planes():
     assert "/api/planes" in rutas
     assert "GET" in rutas["/api/planes"]
     assert "POST" in rutas["/api/planes"]
-

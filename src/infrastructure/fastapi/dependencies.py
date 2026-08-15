@@ -57,4 +57,3 @@ def get_planes_controller(
     repo_planes = MySQLPlanesRepository(db)
     use_case = GestionarPlanesUseCase(repo_planes)
     return PlanesController(use_case)
-
