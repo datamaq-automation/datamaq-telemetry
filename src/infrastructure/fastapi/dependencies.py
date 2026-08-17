@@ -1,6 +1,6 @@
 from typing import Annotated, Any
 
-from fastapi import Depends, Header, HTTPException
+from fastapi import Cookie, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 
 from src.adapters.controllers.alertas_controller import AlertasController
@@ -115,16 +115,34 @@ def get_auth_controller(
     return AuthController(use_case)
 
 
+def extraer_token(cookie_valor: str | None, authorization: str | None) -> str | None:
+    """Extrae el token desde la cookie HttpOnly o del header Bearer; None si no hay credenciales."""
+    if cookie_valor:
+        return cookie_valor
+    if authorization and authorization.startswith("Bearer "):
+        return authorization.removeprefix("Bearer ").strip()
+    return None
+
+
+def token_valido(cookie_valor: str | None, authorization: str | None, secreto: str) -> bool:
+    """Valida un token JWT desde cookie o header Bearer."""
+    token = extraer_token(cookie_valor, authorization)
+    if token is None:
+        return False
+    return JwtTokenService(secreto).verificar(token) is not None
+
+
 def get_usuario_actual(
     authorization: Annotated[str | None, Header()] = None,
+    datamaq_token: Annotated[str | None, Cookie()] = None,
 ) -> dict[str, Any]:
     settings = get_settings()
     if not settings.AUTH_REQUIRED:
         return {"sub": "anon", "rol": "admin"}
-    token_service = JwtTokenService(settings.API_SECRET_KEY)
-    if not authorization or not authorization.startswith("Bearer "):
+    token = extraer_token(datamaq_token, authorization)
+    if token is None:
         raise HTTPException(status_code=401, detail="credenciales_invalidas")
-    token = authorization.removeprefix("Bearer ").strip()
+    token_service = JwtTokenService(settings.API_SECRET_KEY)
     claims = token_service.verificar(token)
     if claims is None:
         raise HTTPException(status_code=401, detail="credenciales_invalidas")

@@ -106,6 +106,8 @@ venv/bin/python scripts/init_db.py
 | | `GET /api/telemetria/energias/{id}` | Historial de kWh y kVARh acumulados |
 | **Alertas** | `GET /api/alertas?device_id=...&solo_abiertas=true` | Consultar alarmas activas / historial |
 | | `POST /api/alertas/{id}/resolver` | Marcar alerta como atendida / resuelta |
+| **Autenticación** | `POST /api/auth/login` | Iniciar sesión (emite cookie `HttpOnly` + token JWT) |
+| | `POST /api/auth/logout` | Cerrar sesión (borra la cookie) |
 | **Sistema** | `POST /api/system/purga` | Ejecutar purga de telemetría expirada |
 
 ---
@@ -133,6 +135,7 @@ venv/bin/python scripts/init_db.py
 | MQTT sin cifrado / anónimo | `MQTT_TLS_ENABLED`, `MQTT_TLS_CA_CERTS` y credenciales de broker |
 | Payload MQTT malicioso o excesivo | Límite `MQTT_MAX_PAYLOAD_BYTES` y sanitización de campos de entrada |
 | Fuga de secretos en logs | Procesador `redactar_secretos` y logs sin payload bruto |
+| Robo de token vía XSS | Cookie `HttpOnly` (`datamaq_token`) no legible por JavaScript + `SameSite=strict` |
 | CORS abierto | `CORS_ORIGINS` vacío por defecto (sin `*`) |
 
 > En desarrollo local se puede desactivar la autenticación con `AUTH_REQUIRED=false` y `DEBUG=true`.

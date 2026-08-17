@@ -5,9 +5,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from src.adapters.controllers.alertas_controller import AlertasController
 from src.adapters.presenters.error_presenter import ErrorPresenter
 from src.application.dtos.alerta_dto import AlertaResponseDTO
-from src.infrastructure.fastapi.dependencies import get_alertas_controller
+from src.infrastructure.fastapi.dependencies import get_alertas_controller, get_usuario_actual
 
-router = APIRouter(prefix="/api/alertas", tags=["Alertas"])
+router = APIRouter(
+    prefix="/api/alertas",
+    tags=["Alertas"],
+    dependencies=[Depends(get_usuario_actual)],
+)
 
 
 @router.get("", response_model=list[AlertaResponseDTO])

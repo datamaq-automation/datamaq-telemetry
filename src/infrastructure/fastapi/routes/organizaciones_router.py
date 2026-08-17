@@ -10,9 +10,13 @@ from src.application.dtos.organizacion_dto import (
     PlantaCreateDTO,
     PlantaResponseDTO,
 )
-from src.infrastructure.fastapi.dependencies import get_dispositivos_controller
+from src.infrastructure.fastapi.dependencies import get_dispositivos_controller, get_usuario_actual
 
-router = APIRouter(prefix="/api", tags=["Organizaciones y Plantas"])
+router = APIRouter(
+    prefix="/api",
+    tags=["Organizaciones y Plantas"],
+    dependencies=[Depends(get_usuario_actual)],
+)
 
 
 @router.get("/organizaciones", response_model=list[OrganizacionResponseDTO])

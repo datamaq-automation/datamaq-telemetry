@@ -5,9 +5,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from src.adapters.controllers.planes_controller import PlanesController
 from src.adapters.presenters.error_presenter import ErrorPresenter
 from src.application.dtos.plan_dto import PlanCreateDTO, PlanResponseDTO
-from src.infrastructure.fastapi.dependencies import get_planes_controller
+from src.infrastructure.fastapi.dependencies import get_planes_controller, get_usuario_actual
 
-router = APIRouter(prefix="/api", tags=["Planes de Telemetría"])
+router = APIRouter(
+    prefix="/api",
+    tags=["Planes de Telemetría"],
+    dependencies=[Depends(get_usuario_actual)],
+)
 
 
 @router.get("/planes", response_model=list[PlanResponseDTO])

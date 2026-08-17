@@ -1,6 +1,7 @@
 import os
 import secrets
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -32,6 +33,9 @@ class Settings(BaseSettings):
     API_SECRET_KEY: str = ""
     AUTH_TOKEN_EXPIRA_MINUTOS: int = 120
     AUTH_REQUIRED: bool = True
+    AUTH_COOKIE_NOMBRE: str = "datamaq_token"
+    AUTH_COOKIE_HTTPONLY: bool = True
+    AUTH_COOKIE_SAMESITE: Literal["lax", "strict", "none"] = "strict"
     API_EXPOSE_DOCS: bool = True
     DEBUG: bool = False
     CORS_ORIGINS: str = ""
@@ -69,6 +73,14 @@ class Settings(BaseSettings):
     def database_url(self) -> str:
         pwd = f":{self.DB_PASSWORD}" if self.DB_PASSWORD else ""
         return f"mysql+pymysql://{self.DB_USER}{pwd}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}?charset=utf8mb4"
+
+    @property
+    def auth_cookie_secure(self) -> bool:
+        return not self.DEBUG
+
+    @property
+    def auth_cookie_max_age(self) -> int:
+        return self.AUTH_TOKEN_EXPIRA_MINUTOS * 60
 
 
 @lru_cache(maxsize=1)

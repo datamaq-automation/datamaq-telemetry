@@ -138,6 +138,7 @@ erDiagram
         string id PK
         string username UK
         string password_hash
+        string role
         boolean is_active
         datetime created_at
         datetime updated_at
@@ -308,6 +309,7 @@ erDiagram
 | `id` | `VARCHAR(36)` | **PRIMARY KEY** | No |
 | `username` | `VARCHAR(150)` | UNIQUE | No |
 | `password_hash` | `VARCHAR(255)` | - | No |
+| `role` | `VARCHAR(20)` | - | No |
 | `is_active` | `BOOLEAN` | - | No |
 | `created_at` | `DATETIME` | - | No |
 | `updated_at` | `DATETIME` | - | No |

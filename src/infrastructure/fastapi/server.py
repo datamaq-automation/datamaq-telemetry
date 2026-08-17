@@ -3,14 +3,10 @@ import json
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
-from fastapi import Depends, FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.infrastructure.auth.jwt_token_service import JwtTokenService
-from src.infrastructure.fastapi.dependencies import (
-    get_usuario_actual,
-    global_event_broadcaster,
-)
+from src.infrastructure.fastapi.dependencies import global_event_broadcaster, token_valido
 from src.infrastructure.fastapi.routes.alertas_router import (
     router as alertas_router,
 )
@@ -109,20 +105,20 @@ def create_app() -> FastAPI:
 
     # Register Routers
     app.include_router(system_router)
-    app.include_router(telemetria_router, dependencies=[Depends(get_usuario_actual)])
-    app.include_router(dispositivos_router, dependencies=[Depends(get_usuario_actual)])
-    app.include_router(organizaciones_router, dependencies=[Depends(get_usuario_actual)])
-    app.include_router(planes_router, dependencies=[Depends(get_usuario_actual)])
-    app.include_router(alertas_router, dependencies=[Depends(get_usuario_actual)])
+    app.include_router(telemetria_router)
+    app.include_router(dispositivos_router)
+    app.include_router(organizaciones_router)
+    app.include_router(planes_router)
+    app.include_router(alertas_router)
     app.include_router(auth_router)
 
     # WebSockets Live Telemetry Stream
     @app.websocket("/ws/live")
     async def websocket_stream(websocket: WebSocket):
         if settings.AUTH_REQUIRED:
-            auth_header = websocket.headers.get("authorization", "")
-            token = auth_header.removeprefix("Bearer ").strip()
-            if JwtTokenService(settings.API_SECRET_KEY).verificar(token) is None:
+            cookie_token = websocket.cookies.get(settings.AUTH_COOKIE_NOMBRE)
+            auth_header = websocket.headers.get("authorization")
+            if not token_valido(cookie_token, auth_header, settings.API_SECRET_KEY):
                 await websocket.close(code=1008)
                 return
         await websocket.accept()

@@ -9,9 +9,13 @@ from src.application.dtos.dispositivo_dto import (
     DispositivoResponseDTO,
     DispositivoUpdateDTO,
 )
-from src.infrastructure.fastapi.dependencies import get_dispositivos_controller
+from src.infrastructure.fastapi.dependencies import get_dispositivos_controller, get_usuario_actual
 
-router = APIRouter(prefix="/api/dispositivos", tags=["Dispositivos"])
+router = APIRouter(
+    prefix="/api/dispositivos",
+    tags=["Dispositivos"],
+    dependencies=[Depends(get_usuario_actual)],
+)
 
 
 @router.get("", response_model=list[DispositivoResponseDTO])

@@ -10,9 +10,13 @@ from src.application.dtos.telemetria_dto import (
     LecturaInstantaneaDTO,
     TelemetriaLatestResponseDTO,
 )
-from src.infrastructure.fastapi.dependencies import get_telemetria_controller
+from src.infrastructure.fastapi.dependencies import get_telemetria_controller, get_usuario_actual
 
-router = APIRouter(prefix="/api/telemetria", tags=["Telemetría"])
+router = APIRouter(
+    prefix="/api/telemetria",
+    tags=["Telemetría"],
+    dependencies=[Depends(get_usuario_actual)],
+)
 
 
 @router.get("/latest/{device_id}", response_model=TelemetriaLatestResponseDTO)

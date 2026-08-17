@@ -8,7 +8,7 @@ def _callables(dep) -> set:
     resultado = set()
     if getattr(dep, "call", None) is not None:
         resultado.add(dep.call)
-    for sub in (getattr(dep, "dependencies", None) or []):
+    for sub in getattr(dep, "dependencies", None) or []:
         resultado |= _callables(sub)
     return resultado
 
@@ -25,9 +25,7 @@ def _aplanar(rutas) -> list:
 
 def _rutas_api(app):
     return [
-        r
-        for r in _aplanar(app.routes)
-        if hasattr(r, "path") and hasattr(r, "methods") and r.path.startswith("/api")
+        r for r in _aplanar(app.routes) if hasattr(r, "path") and hasattr(r, "methods") and r.path.startswith("/api")
     ]
 
 
