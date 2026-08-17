@@ -8,7 +8,7 @@ from src.adapters.presenters.error_presenter import ErrorPresenter
 from src.application.dtos.auth_dto import LoginRequestDTO
 from src.application.use_cases.autenticar_usuario import AutenticarUsuarioUseCase
 from src.domain.auth.entities import UsuarioAuth
-from src.domain.auth.exceptions import DemasiadosIntentosError
+from src.domain.auth.exceptions import DemasiadosIntentosError, NombreUsuarioInvalidoError
 from src.domain.auth.ports import RepositorioUsuariosPort
 from src.domain.auth.services import HashContrasenaService, RateLimiterService
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
@@ -145,3 +145,70 @@ def test_error_presenter_mapea_429():
     code, err = ErrorPresenter.presentar_excepcion(DemasiadosIntentosError("bloqueado"))
     assert code == 429
     assert err["mensaje"] == "bloqueado"
+
+
+def test_error_presenter_mapea_422_nombre_usuario_invalido():
+    code, err = ErrorPresenter.presentar_excepcion(NombreUsuarioInvalidoError("vacio"))
+    assert code == 422
+    assert err["error"] == "ValidationError"
+    assert err["mensaje"] == "vacio"
+
+
+# --- Cookie HttpOnly ---
+
+
+def test_extraer_token_prioriza_cookie():
+    assert deps.extraer_token("cookie-token", "Bearer header-token") == "cookie-token"
+
+
+def test_extraer_token_fallback_header():
+    assert deps.extraer_token(None, "Bearer header-token") == "header-token"
+
+
+def test_extraer_token_sin_credenciales():
+    assert deps.extraer_token(None, None) is None
+
+
+def test_get_usuario_actual_lee_cookie_valida(monkeypatch):
+    settings = Settings(_env_file=None, AUTH_REQUIRED=True, DEBUG=True, API_SECRET_KEY="s3cr3t0")
+    monkeypatch.setattr(deps, "get_settings", lambda: settings)
+    service = JwtTokenService("s3cr3t0")
+    token = service.generar(
+        "usuario-1",
+        "operador@planta.local",
+        datetime.now(timezone.utc) + timedelta(minutes=30),
+    )
+
+    claims = deps.get_usuario_actual(None, token)
+
+    assert claims["sub"] == "usuario-1"
+
+
+def test_get_usuario_actual_sin_cookie_ni_header(monkeypatch):
+    settings = Settings(_env_file=None, AUTH_REQUIRED=True, DEBUG=True, API_SECRET_KEY="s3cr3t0")
+    monkeypatch.setattr(deps, "get_settings", lambda: settings)
+
+    try:
+        deps.get_usuario_actual(None, None)
+        raise AssertionError("Se esperaba HTTPException 401")
+    except HTTPException as e:
+        assert e.status_code == 401
+        assert e.detail == "credenciales_invalidas"
+
+
+def test_token_valido_con_cookie_valida():
+    service = JwtTokenService("s3cr3t0")
+    token = service.generar(
+        "usuario-1",
+        "operador@planta.local",
+        datetime.now(timezone.utc) + timedelta(minutes=30),
+    )
+    assert deps.token_valido(token, None, "s3cr3t0") is True
+
+
+def test_token_valido_rechaza_token_invalido():
+    assert deps.token_valido(None, "Bearer falso", "s3cr3t0") is False
+
+
+def test_token_valido_sin_credenciales():
+    assert deps.token_valido(None, None, "s3cr3t0") is False
