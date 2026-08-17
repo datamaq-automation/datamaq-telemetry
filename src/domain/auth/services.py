@@ -70,6 +70,8 @@ class PoliticaExpiracionService:
 class RateLimiterService:
     """Limita los intentos de inicio de sesión por clave dentro de una ventana deslizante."""
 
+    MAX_CLAVES: int = 10000
+
     def __init__(self, max_intentos: int, ventana_segundos: int):
         self.max_intentos = max_intentos
         self.ventana_segundos = ventana_segundos
@@ -86,6 +88,15 @@ class RateLimiterService:
 
     def registrar_intento(self, clave: str) -> None:
         ahora = datetime.now(timezone.utc)
+        es_nueva = clave not in self._intentos
+        if es_nueva and len(self._intentos) >= self.MAX_CLAVES:
+            clave_mas_antigua = min(
+                (k for k, v in self._intentos.items() if v),
+                key=lambda k: self._intentos[k][0],
+                default=None,
+            )
+            if clave_mas_antigua is not None:
+                self._intentos.pop(clave_mas_antigua)
         self._purgar(clave, ahora)
         self._intentos.setdefault(clave, []).append(ahora)
 

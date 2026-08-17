@@ -1,3 +1,4 @@
+from functools import lru_cache
 from typing import Annotated, Any
 
 from fastapi import Cookie, Depends, Header, HTTPException
@@ -38,6 +39,15 @@ global_event_broadcaster = InMemoryEventBroadcaster()
 
 def get_broadcaster() -> InMemoryEventBroadcaster:
     return global_event_broadcaster
+
+
+@lru_cache(maxsize=1)
+def get_rate_limiter() -> RateLimiterService:
+    settings = get_settings()
+    return RateLimiterService(
+        max_intentos=settings.LOGIN_MAX_INTENTOS,
+        ventana_segundos=settings.LOGIN_VENTANA_SEGUNDOS,
+    )
 
 
 def get_telemetria_controller(
@@ -101,10 +111,7 @@ def get_auth_controller(
 ) -> AuthController:
     repo_usuarios = MySQLUsuariosRepository(db)
     settings = get_settings()
-    rate_limiter = RateLimiterService(
-        max_intentos=settings.LOGIN_MAX_INTENTOS,
-        ventana_segundos=settings.LOGIN_VENTANA_SEGUNDOS,
-    )
+    rate_limiter = get_rate_limiter()
     use_case = AutenticarUsuarioUseCase(
         repo_usuarios=repo_usuarios,
         hash_service=HashContrasenaService(),
@@ -124,12 +131,18 @@ def extraer_token(cookie_valor: str | None, authorization: str | None) -> str | 
     return None
 
 
-def token_valido(cookie_valor: str | None, authorization: str | None, secreto: str) -> bool:
+def token_valido(
+    cookie_valor: str | None,
+    authorization: str | None,
+    secreto: str,
+    secreto_anterior: str = "",
+) -> bool:
     """Valida un token JWT desde cookie o header Bearer."""
     token = extraer_token(cookie_valor, authorization)
     if token is None:
         return False
-    return JwtTokenService(secreto).verificar(token) is not None
+    adicionales = [secreto_anterior] if secreto_anterior else None
+    return JwtTokenService(secreto).verificar(token, adicionales) is not None
 
 
 def get_usuario_actual(
@@ -143,7 +156,8 @@ def get_usuario_actual(
     if token is None:
         raise HTTPException(status_code=401, detail="credenciales_invalidas")
     token_service = JwtTokenService(settings.API_SECRET_KEY)
-    claims = token_service.verificar(token)
+    adicionales = [settings.API_SECRET_KEY_ANTERIOR] if settings.API_SECRET_KEY_ANTERIOR else None
+    claims = token_service.verificar(token, adicionales)
     if claims is None:
         raise HTTPException(status_code=401, detail="credenciales_invalidas")
     return claims

@@ -67,6 +67,10 @@ Públicas: `POST /api/auth/login`, `POST /api/auth/logout`, `GET /health`.
 
 Autenticación por cookie `datamaq_token` (o header `Authorization: Bearer`) en el handshake. Sin token válido → cierre con código `1008`.
 
+### WebSocket /ws/live — alcance
+
+**Decisión DEC-02:** el stream es **global** para cualquier usuario autenticado. En esta iteración no se filtra por organización ni por rol; el filtrado multi-tenant es trabajo futuro que requiere el claim `organizacion_id` en el JWT.
+
 ## Migración SPA (Fase 2 — `app-datamaq`)
 
 1. Dejar de leer `localStorage` (`datamaq.sesion`); la cookie viaja automáticamente en cada request.

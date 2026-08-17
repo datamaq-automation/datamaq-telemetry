@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     API_HOST: str = "127.0.0.1"
     API_PORT: int = 8885
     API_SECRET_KEY: str = ""
+    API_SECRET_KEY_ANTERIOR: str = ""
     AUTH_TOKEN_EXPIRA_MINUTOS: int = 120
     AUTH_REQUIRED: bool = True
     AUTH_COOKIE_NOMBRE: str = "datamaq_token"
@@ -39,6 +40,7 @@ class Settings(BaseSettings):
     API_EXPOSE_DOCS: bool = True
     DEBUG: bool = False
     CORS_ORIGINS: str = ""
+    CSP_HEADER: str = ""
 
     # Rate limiting de login
     LOGIN_MAX_INTENTOS: int = 5
@@ -59,6 +61,8 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def validar_postura_seguridad(self) -> "Settings":
         if not self.DEBUG:
+            if not self.AUTH_REQUIRED:
+                raise ValueError("AUTH_REQUIRED debe ser True en producción")
             if not self.API_SECRET_KEY or self.API_SECRET_KEY == "dev-secret-key-datamaq":
                 raise ValueError("API_SECRET_KEY debe ser una clave fuerte en producción")
             if len(self.API_SECRET_KEY) < 16:

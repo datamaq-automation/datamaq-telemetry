@@ -132,8 +132,9 @@ venv/bin/python scripts/init_db.py
 | Fuerza bruta en el login | Rate limiting por usuario (`LOGIN_MAX_INTENTOS`, `LOGIN_VENTANA_SEGUNDOS`) |
 | Secreto JWT débil o por defecto | Validación de `API_SECRET_KEY` en producción (mínimo 16 caracteres) |
 | Credenciales de BD expuestas | Validación de `DB_PASSWORD` en producción; sin contraseña en flags de CLI |
-| MQTT sin cifrado / anónimo | `MQTT_TLS_ENABLED`, `MQTT_TLS_CA_CERTS` y credenciales de broker |
+| MQTT sin cifrado / anónimo | `MQTT_TLS_ENABLED`, `MQTT_TLS_CA_CERTS` y credenciales de broker; listener 8883 TLS en `deploy/mosquitto/mosquitto.conf` con `allow_anonymous false` |
 | Payload MQTT malicioso o excesivo | Límite `MQTT_MAX_PAYLOAD_BYTES` y sanitización de campos de entrada |
+| Headers de seguridad ausentes | La app emite HSTS (solo producción), CSP, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` y `Referrer-Policy: no-referrer` |
 | Fuga de secretos en logs | Procesador `redactar_secretos` y logs sin payload bruto |
 | Robo de token vía XSS | Cookie `HttpOnly` (`datamaq_token`) no legible por JavaScript + `SameSite=strict` |
 | CORS abierto | `CORS_ORIGINS` vacío por defecto (sin `*`) |

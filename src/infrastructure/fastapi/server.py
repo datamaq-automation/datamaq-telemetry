@@ -3,8 +3,9 @@ import json
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from src.infrastructure.fastapi.dependencies import global_event_broadcaster, token_valido
 from src.infrastructure.fastapi.routes.alertas_router import (
@@ -26,6 +27,7 @@ from src.infrastructure.fastapi.routes.system_router import router as system_rou
 from src.infrastructure.fastapi.routes.telemetria_router import (
     router as telemetria_router,
 )
+from src.infrastructure.fastapi.security_headers import SecurityHeadersMiddleware
 from src.infrastructure.paho_mqtt.mqtt_listener import MQTTListener
 from src.infrastructure.settings.config import get_settings
 from src.infrastructure.settings.logger import get_logger
@@ -35,6 +37,17 @@ logger = get_logger("server")
 
 active_websockets: list[WebSocket] = []
 async_loop = None
+
+
+async def manejar_excepcion_no_mapeada(request: Request, exc: Exception) -> JSONResponse:
+    logger.error(
+        "excepcion_no_mapeada",
+        exc_info=True,
+        tipo=type(exc).__name__,
+        metodo=request.method,
+        ruta=request.url.path,
+    )
+    return JSONResponse(status_code=500, content={"detail": "error_interno"})
 
 
 def websocket_broadcast_callback(topico: str, datos: dict):
@@ -103,6 +116,9 @@ def create_app() -> FastAPI:
             allow_headers=["*"],
         )
 
+    app.add_middleware(SecurityHeadersMiddleware, settings=settings)
+    app.add_exception_handler(Exception, manejar_excepcion_no_mapeada)
+
     # Register Routers
     app.include_router(system_router)
     app.include_router(telemetria_router)
@@ -118,7 +134,7 @@ def create_app() -> FastAPI:
         if settings.AUTH_REQUIRED:
             cookie_token = websocket.cookies.get(settings.AUTH_COOKIE_NOMBRE)
             auth_header = websocket.headers.get("authorization")
-            if not token_valido(cookie_token, auth_header, settings.API_SECRET_KEY):
+            if not token_valido(cookie_token, auth_header, settings.API_SECRET_KEY, settings.API_SECRET_KEY_ANTERIOR):
                 await websocket.close(code=1008)
                 return
         await websocket.accept()

@@ -45,14 +45,23 @@ class JwtTokenService(GeneradorTokenPort):
         firma = _b64url(self._firmar(mensaje))
         return f"{encabezado}.{cuerpo}.{firma}"
 
-    def verificar(self, token: str) -> dict[str, Any] | None:
+    def _verificar_con_secreto(self, token: str, secreto: str) -> dict[str, Any] | None:
         try:
             encabezado, cuerpo, firma = token.split(".")
         except (ValueError, AttributeError):
             return None
 
+        try:
+            cabecera = json.loads(_b64url_decode(encabezado).decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            return None
+
+        if cabecera.get("alg") != self.ALGORITMO:
+            return None
+
         mensaje = f"{encabezado}.{cuerpo}".encode("ascii")
-        if not hmac.compare_digest(firma, _b64url(self._firmar(mensaje))):
+        firma_esperada = _b64url(hmac.new(secreto.encode("utf-8"), mensaje, hashlib.sha256).digest())
+        if not hmac.compare_digest(firma, firma_esperada):
             return None
 
         try:
@@ -65,3 +74,13 @@ class JwtTokenService(GeneradorTokenPort):
             return None
 
         return payload
+
+    def verificar(self, token: str, secretos_adicionales: list[str] | None = None) -> dict[str, Any] | None:
+        payload = self._verificar_con_secreto(token, self.secreto)
+        if payload is not None:
+            return payload
+        for secreto in secretos_adicionales or []:
+            payload = self._verificar_con_secreto(token, secreto)
+            if payload is not None:
+                return payload
+        return None
