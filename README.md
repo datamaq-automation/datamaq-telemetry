@@ -146,6 +146,16 @@ venv/bin/python scripts/init_db.py
 ## 🧪 Pruebas y Calidad de Código (Gauntlet)
 
 ```bash
+# Gauntlet completo (integridad, estilo, tipado, cobertura >=85%, integración)
+./scripts/ci.sh
+
+# Gauntlet pre-push (etapas 1-4, sin integración)
+./scripts/pre-push.sh
+```
+
+Verificación individual:
+
+```bash
 # Tests unitarios e integración
 venv/bin/pytest
 
