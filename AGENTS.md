@@ -23,4 +23,5 @@ API FastAPI y Worker MQTT para la ingesta y persistencia de telemetría de medid
 
 - **Imports absolutos `from src....` — nunca relativos.**
 - **Todos los `__init__.py` (`src/` y `tests/`) deben ser de 0 bytes.**
+- **El LSP del editor (Pylance) debe alinear su exclusión con `pyrightconfig.json` vía `.vscode/settings.json` (`python.analysis.exclude`). Los `tests/` están excluidos del análisis de tipos por diseño; prohibido "corregirlos" con `cast`/`# type: ignore`.**
 - Commits: Conventional Commits (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`).
