@@ -5,7 +5,7 @@
 * **Arquitectura:** Clean Architecture (Robert C. Martin / Ports & Adapters) + Domain-Driven Design (DDD).
 * **Framework Web:** FastAPI (asíncrono, OpenAPI autodocumentado).
 * **Broker & Ingesta:** Mosquitto MQTT + `paho-mqtt`.
-* **Base de Datos:** MySQL / MariaDB (relacional con índices de series temporales) + SQLAlchemy 2.0.
+* **Base de Datos:** MySQL  (relacional con índices de series temporales) + SQLAlchemy 2.0.
 * **Validación & Serialización:** Pydantic v2 (`BaseModel`, `Field`, `ConfigDict`).
 * **Configuración:** `pydantic-settings` (`BaseSettings`, `SettingsConfigDict`).
 * **Testing:** `pytest`.

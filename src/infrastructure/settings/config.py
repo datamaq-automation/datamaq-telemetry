@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     API_HOST: str = "0.0.0.0"
     API_PORT: int = 8885
     API_SECRET_KEY: str = "dev-secret-key-datamaq"
+    AUTH_TOKEN_EXPIRA_MINUTOS: int = 480
     DEBUG: bool = True
     CORS_ORIGINS: str = "*"
 

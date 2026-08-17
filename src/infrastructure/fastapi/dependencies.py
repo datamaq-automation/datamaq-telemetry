@@ -1,14 +1,16 @@
-from typing import Annotated
+from typing import Annotated, Any
 
-from fastapi import Depends
+from fastapi import Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 
 from src.adapters.controllers.alertas_controller import AlertasController
+from src.adapters.controllers.auth_controller import AuthController
 from src.adapters.controllers.dispositivos_controller import DispositivosController
 from src.adapters.controllers.planes_controller import PlanesController
 from src.adapters.controllers.purga_controller import PurgaController
 from src.adapters.controllers.telemetria_controller import TelemetriaController
 from src.adapters.gateways.in_memory_event_broadcaster import InMemoryEventBroadcaster
+from src.application.use_cases.autenticar_usuario import AutenticarUsuarioUseCase
 from src.application.use_cases.consultar_telemetria import ConsultarTelemetriaUseCase
 from src.application.use_cases.gestionar_alertas import GestionarAlertasUseCase
 from src.application.use_cases.gestionar_dispositivos import (
@@ -17,6 +19,9 @@ from src.application.use_cases.gestionar_dispositivos import (
 from src.application.use_cases.gestionar_planes import GestionarPlanesUseCase
 from src.application.use_cases.ingestar_telemetria import IngestarTelemetriaUseCase
 from src.application.use_cases.purgar_telemetria import PurgarTelemetriaExpiradaUseCase
+from src.domain.auth.services import HashContrasenaService
+from src.infrastructure.auth.jwt_token_service import JwtTokenService
+from src.infrastructure.settings.config import get_settings
 from src.infrastructure.settings.logger import get_logger
 from src.infrastructure.sqlalchemy.database import get_db_session
 from src.infrastructure.sqlalchemy.mysql_repositories import (
@@ -24,6 +29,7 @@ from src.infrastructure.sqlalchemy.mysql_repositories import (
     MySQLOrganizacionesRepository,
     MySQLPlanesRepository,
     MySQLTelemetriaRepository,
+    MySQLUsuariosRepository,
 )
 
 # Singleton in-memory broadcaster
@@ -81,3 +87,31 @@ def get_alertas_controller(
     repo_telem = MySQLTelemetriaRepository(db)
     use_case = GestionarAlertasUseCase(repo_telem)
     return AlertasController(use_case)
+
+
+def get_auth_controller(
+    db: Annotated[Session, Depends(get_db_session)],
+) -> AuthController:
+    repo_usuarios = MySQLUsuariosRepository(db)
+    settings = get_settings()
+    use_case = AutenticarUsuarioUseCase(
+        repo_usuarios=repo_usuarios,
+        hash_service=HashContrasenaService(),
+        token_service=JwtTokenService(settings.API_SECRET_KEY),
+        minutos_validez=settings.AUTH_TOKEN_EXPIRA_MINUTOS,
+    )
+    return AuthController(use_case)
+
+
+def get_usuario_actual(
+    authorization: Annotated[str | None, Header()] = None,
+) -> dict[str, Any]:
+    settings = get_settings()
+    token_service = JwtTokenService(settings.API_SECRET_KEY)
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="credenciales_invalidas")
+    token = authorization.removeprefix("Bearer ").strip()
+    claims = token_service.verificar(token)
+    if claims is None:
+        raise HTTPException(status_code=401, detail="credenciales_invalidas")
+    return claims
