@@ -2,7 +2,7 @@
 
 from datetime import datetime, timedelta, timezone
 
-from fastapi import HTTPException
+from fastapi import HTTPException, Response
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -18,6 +18,7 @@ from src.domain.auth.value_objects import NombreUsuario
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
 from src.infrastructure.fastapi.dependencies import get_usuario_actual
 from src.infrastructure.fastapi.routes.auth_router import login as login_handler
+from src.infrastructure.fastapi.routes.auth_router import logout as logout_handler
 from src.infrastructure.settings.config import get_settings
 from src.infrastructure.sqlalchemy.models import UserModel
 from src.infrastructure.sqlalchemy.mysql_repositories import MySQLUsuariosRepository
@@ -198,7 +199,7 @@ def test_crear_usuario_idempotente():
 
 def test_repositorio_usuarios_sqlite():
     engine = create_engine("sqlite://")
-    UserModel.__table__.create(engine)
+    UserModel.metadata.create_all(engine)
     session_local = sessionmaker(bind=engine)
     db: Session = session_local()
     try:
@@ -230,6 +231,8 @@ def test_login_handler_exitoso():
     response = login_handler(
         LoginRequestDTO(usuario="operador@planta.local", contrasena="secreto123"),
         controller,
+        Response(),
+        get_settings(),
     )
 
     assert response.token == "token-usuario-1"
@@ -241,7 +244,9 @@ def test_login_handler_credenciales_invalidas():
     controller = AuthController(use_case)
 
     try:
-        login_handler(LoginRequestDTO(usuario="nadie@planta.local", contrasena="x"), controller)
+        login_handler(
+            LoginRequestDTO(usuario="nadie@planta.local", contrasena="x"), controller, Response(), get_settings()
+        )
         raise AssertionError("Se esperaba HTTPException 401")
     except HTTPException as e:
         assert e.status_code == 401
@@ -254,11 +259,58 @@ def test_login_handler_usuario_inactivo():
     controller = AuthController(use_case)
 
     try:
-        login_handler(LoginRequestDTO(usuario="operador@planta.local", contrasena="secreto123"), controller)
+        login_handler(
+            LoginRequestDTO(usuario="operador@planta.local", contrasena="secreto123"),
+            controller,
+            Response(),
+            get_settings(),
+        )
         raise AssertionError("Se esperaba HTTPException 403")
     except HTTPException as e:
         assert e.status_code == 403
         assert e.detail == "usuario_inactivo"
+
+
+def test_login_handler_nombre_usuario_invalido():
+    repo = MockRepositorioUsuarios()
+    use_case = AutenticarUsuarioUseCase(repo, HashContrasenaService(), MockTokenService(), 480)
+    controller = AuthController(use_case)
+
+    try:
+        login_handler(LoginRequestDTO(usuario="   ", contrasena="x"), controller, Response(), get_settings())
+        raise AssertionError("Se esperaba HTTPException 422")
+    except HTTPException as e:
+        assert e.status_code == 422
+        assert e.detail == "El nombre de usuario no puede estar vacío."
+
+
+def test_login_handler_setea_cookie_httponly():
+    repo = MockRepositorioUsuarios([_usuario_activo()])
+    use_case = AutenticarUsuarioUseCase(repo, HashContrasenaService(), MockTokenService(), 480)
+    controller = AuthController(use_case)
+    response = Response()
+
+    login_handler(
+        LoginRequestDTO(usuario="operador@planta.local", contrasena="secreto123"),
+        controller,
+        response,
+        get_settings(),
+    )
+
+    set_cookie = response.headers.get("set-cookie", "")
+    assert "datamaq_token=token-usuario-1" in set_cookie
+    assert "HttpOnly" in set_cookie
+    assert "SameSite=strict" in set_cookie
+
+
+def test_logout_borra_cookie():
+    response = Response()
+
+    resultado = logout_handler(response, get_settings())
+
+    assert resultado == {"detail": "sesion_cerrada"}
+    set_cookie = response.headers.get("set-cookie", "")
+    assert "Max-Age=0" in set_cookie or "max-age=0" in set_cookie
 
 
 def test_get_usuario_actual_valido():

@@ -1,11 +1,11 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 
 from src.adapters.controllers.planes_controller import PlanesController
-from src.adapters.presenters.error_presenter import ErrorPresenter
 from src.application.dtos.plan_dto import PlanCreateDTO, PlanResponseDTO
 from src.infrastructure.fastapi.dependencies import get_planes_controller, get_usuario_actual
+from src.infrastructure.fastapi.error_handler import manejar_error_http
 
 router = APIRouter(
     prefix="/api",
@@ -30,5 +30,4 @@ def create_plan(
     try:
         return controller.crear_plan(dto)
     except Exception as e:
-        code, err = ErrorPresenter.presentar_excepcion(e)
-        raise HTTPException(status_code=code, detail=err["mensaje"]) from e
+        manejar_error_http(e)

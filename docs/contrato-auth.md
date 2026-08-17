@@ -25,7 +25,7 @@ Headers: `Set-Cookie: datamaq_token=<jwt>; HttpOnly; SameSite=strict; Max-Age=28
 
 ## POST /api/auth/logout
 
-Borra la cookie de sesión (`Set-Cookie` con `Max-Age=0`).
+Borra la cookie de sesión (`Set-Cookie` con `Max-Age=0`). No requiere autenticación.
 
 ### Response 200
 ```json

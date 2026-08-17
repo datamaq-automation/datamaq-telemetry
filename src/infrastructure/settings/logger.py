@@ -73,7 +73,7 @@ def uvicorn_style_renderer(_: WrappedLogger, __: str, event_dict: EventDict) -> 
 
 def setup_logging() -> None:
     settings = get_settings()
-    log_level_name = os.environ.get("LOG_LEVEL", settings.LOG_LEVEL).upper()
+    log_level_name = (os.environ.get("LOG_LEVEL") or settings.LOG_LEVEL or "INFO").upper()
     if "--debug" in sys.argv or "-d" in sys.argv:
         log_level_name = "DEBUG"
     log_level = getattr(logging, log_level_name, logging.INFO)
@@ -89,7 +89,7 @@ def setup_logging() -> None:
         structlog.processors.UnicodeDecoder(),
     ]
 
-    if settings.LOG_FORMAT.lower() == "json":
+    if (settings.LOG_FORMAT or "console").lower() == "json":
         # Formato JSON compacto para producción en VPS (Grafana Loki, Promtail, etc.)
         renderer_processor = structlog.processors.JSONRenderer()
         timestamp_processor = structlog.processors.TimeStamper(fmt="iso", utc=True)

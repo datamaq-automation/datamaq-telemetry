@@ -1,9 +1,8 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 
 from src.adapters.controllers.dispositivos_controller import DispositivosController
-from src.adapters.presenters.error_presenter import ErrorPresenter
 from src.application.dtos.organizacion_dto import (
     OrganizacionCreateDTO,
     OrganizacionResponseDTO,
@@ -11,6 +10,7 @@ from src.application.dtos.organizacion_dto import (
     PlantaResponseDTO,
 )
 from src.infrastructure.fastapi.dependencies import get_dispositivos_controller, get_usuario_actual
+from src.infrastructure.fastapi.error_handler import manejar_error_http
 
 router = APIRouter(
     prefix="/api",
@@ -34,8 +34,7 @@ def create_organizacion(
     try:
         return controller.crear_organizacion(dto)
     except Exception as e:
-        code, err = ErrorPresenter.presentar_excepcion(e)
-        raise HTTPException(status_code=code, detail=err["mensaje"]) from e
+        manejar_error_http(e)
 
 
 @router.get("/plantas", response_model=list[PlantaResponseDTO])
@@ -54,5 +53,4 @@ def create_planta(
     try:
         return controller.crear_planta(dto)
     except Exception as e:
-        code, err = ErrorPresenter.presentar_excepcion(e)
-        raise HTTPException(status_code=code, detail=err["mensaje"]) from e
+        manejar_error_http(e)

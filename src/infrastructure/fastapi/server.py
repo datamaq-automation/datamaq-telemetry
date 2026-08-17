@@ -12,6 +12,7 @@ from src.infrastructure.fastapi.dependencies import (
     registrar_mqtt_listener,
     token_valido,
 )
+from src.infrastructure.fastapi.middleware import RequestIdMiddleware
 from src.infrastructure.fastapi.routes.alertas_router import (
     router as alertas_router,
 )
@@ -33,7 +34,7 @@ from src.infrastructure.fastapi.routes.telemetria_router import (
 )
 from src.infrastructure.fastapi.security_headers import SecurityHeadersMiddleware
 from src.infrastructure.paho_mqtt.mqtt_listener import MQTTListener
-from src.infrastructure.settings.config import get_settings
+from src.infrastructure.settings.config import Settings, get_settings
 from src.infrastructure.settings.logger import get_logger
 from src.infrastructure.sqlalchemy.database import create_tables_if_needed
 
@@ -91,8 +92,8 @@ async def lifespan(app: FastAPI):
     global_event_broadcaster.desuscribir(websocket_broadcast_callback)
 
 
-def create_app() -> FastAPI:
-    settings = get_settings()
+def create_app(settings: Settings | None = None) -> FastAPI:
+    settings = settings or get_settings()
     app = FastAPI(
         title="Datamaq Telemetry Platform API",
         description="Clean Architecture Backend para telemetría de medidores Powermeter",
@@ -103,7 +104,7 @@ def create_app() -> FastAPI:
         openapi_url="/openapi.json" if settings.API_EXPOSE_DOCS else None,
     )
 
-    if settings.CORS_ORIGINS.strip() == "*":
+    if (settings.CORS_ORIGINS or "").strip() == "*":
         app.add_middleware(
             CORSMiddleware,
             allow_origins=["*"],
@@ -112,7 +113,7 @@ def create_app() -> FastAPI:
             allow_headers=["*"],
         )
     else:
-        origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
+        origins = [o.strip() for o in (settings.CORS_ORIGINS or "").split(",") if o.strip()]
         app.add_middleware(
             CORSMiddleware,
             allow_origins=origins,
@@ -122,6 +123,7 @@ def create_app() -> FastAPI:
         )
 
     app.add_middleware(SecurityHeadersMiddleware, settings=settings)
+    app.add_middleware(RequestIdMiddleware)
     app.add_exception_handler(Exception, manejar_excepcion_no_mapeada)
 
     # Register Routers

@@ -1,16 +1,16 @@
 from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 
 from src.adapters.controllers.purga_controller import PurgaController
-from src.adapters.presenters.error_presenter import ErrorPresenter
 from src.application.dtos.purga_dto import PurgaRequestDTO, PurgaResultadoDTO
 from src.infrastructure.fastapi.dependencies import (
     get_mqtt_listener,
     get_purga_controller,
     requiere_rol_admin,
 )
+from src.infrastructure.fastapi.error_handler import manejar_error_http
 
 router = APIRouter(tags=["Sistema"])
 
@@ -35,5 +35,4 @@ def trigger_purge(
         req = dto or PurgaRequestDTO()
         return controller.ejecutar_purga(req)
     except Exception as e:
-        code, err = ErrorPresenter.presentar_excepcion(e)
-        raise HTTPException(status_code=code, detail=err["mensaje"]) from e
+        manejar_error_http(e)

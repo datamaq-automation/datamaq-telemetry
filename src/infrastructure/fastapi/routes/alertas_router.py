@@ -1,11 +1,11 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 
 from src.adapters.controllers.alertas_controller import AlertasController
-from src.adapters.presenters.error_presenter import ErrorPresenter
 from src.application.dtos.alerta_dto import AlertaResponseDTO
 from src.infrastructure.fastapi.dependencies import get_alertas_controller, get_usuario_actual
+from src.infrastructure.fastapi.error_handler import manejar_error_http
 
 router = APIRouter(
     prefix="/api/alertas",
@@ -36,5 +36,4 @@ def resolve_alerta(
     try:
         return controller.resolver_alerta(alerta_id)
     except Exception as e:
-        code, err = ErrorPresenter.presentar_excepcion(e)
-        raise HTTPException(status_code=code, detail=err["mensaje"]) from e
+        manejar_error_http(e)

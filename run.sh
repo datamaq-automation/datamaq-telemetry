@@ -16,6 +16,7 @@ EXTRA_ARGS=()
 for arg in "$@"; do
     case $arg in
         --debug|-d)
+            export APP_ENV="development"
             export LOG_LEVEL="DEBUG"
             export DEBUG="True"
             LOG_LEVEL_ARG="debug"

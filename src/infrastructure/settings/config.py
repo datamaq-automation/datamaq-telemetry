@@ -47,9 +47,10 @@ class Settings(BaseSettings):
     AUTH_COOKIE_NOMBRE: str = "datamaq_token"
     AUTH_COOKIE_HTTPONLY: bool = True
     AUTH_COOKIE_SAMESITE: Literal["lax", "strict", "none"] = "strict"
-    API_EXPOSE_DOCS: bool = True
-    DEBUG: bool = False
-    CORS_ORIGINS: str = ""
+    APP_ENV: Literal["development", "production", "test"] = "production"
+    API_EXPOSE_DOCS: bool | None = None
+    DEBUG: bool | None = None
+    CORS_ORIGINS: str | None = None
     CSP_HEADER: str = ""
 
     # Rate limiting de login
@@ -57,8 +58,8 @@ class Settings(BaseSettings):
     LOGIN_VENTANA_SEGUNDOS: int = 300
 
     # Logging
-    LOG_FORMAT: str = "console"  # "console" (clean CLI) o "json" (VPS production)
-    LOG_LEVEL: str = "INFO"
+    LOG_FORMAT: str | None = None  # "console" (clean CLI) o "json" (VPS production)
+    LOG_LEVEL: str | None = None
 
     model_config = SettingsConfigDict(
         env_file=os.path.join(
@@ -87,7 +88,24 @@ class Settings(BaseSettings):
         return v
 
     @model_validator(mode="after")
-    def validar_postura_seguridad(self) -> "Settings":
+    def validar_modo_y_postura(self) -> "Settings":
+        # Derivación del perfil efectivo (solo campos no especificados, sentinel None)
+        if self.DEBUG is None:
+            object.__setattr__(self, "DEBUG", self.APP_ENV != "production")
+        if self.DEBUG and self.APP_ENV == "production":
+            object.__setattr__(self, "APP_ENV", "development")
+        es_produccion = self.APP_ENV == "production"
+
+        if self.API_EXPOSE_DOCS is None:
+            object.__setattr__(self, "API_EXPOSE_DOCS", not es_produccion)
+        if self.CORS_ORIGINS is None:
+            object.__setattr__(self, "CORS_ORIGINS", "" if es_produccion else "http://localhost:5173")
+        if self.LOG_FORMAT is None:
+            object.__setattr__(self, "LOG_FORMAT", "json" if es_produccion else "console")
+        if self.LOG_LEVEL is None:
+            object.__setattr__(self, "LOG_LEVEL", "INFO" if es_produccion else "DEBUG")
+
+        # Postura de seguridad (sobre DEBUG ya derivado)
         if not self.DEBUG:
             if not self.AUTH_REQUIRED:
                 raise ValueError("AUTH_REQUIRED debe ser True en producción")

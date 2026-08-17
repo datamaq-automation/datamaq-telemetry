@@ -1,15 +1,15 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 
 from src.adapters.controllers.dispositivos_controller import DispositivosController
-from src.adapters.presenters.error_presenter import ErrorPresenter
 from src.application.dtos.dispositivo_dto import (
     DispositivoCreateDTO,
     DispositivoResponseDTO,
     DispositivoUpdateDTO,
 )
 from src.infrastructure.fastapi.dependencies import get_dispositivos_controller, get_usuario_actual
+from src.infrastructure.fastapi.error_handler import manejar_error_http
 
 router = APIRouter(
     prefix="/api/dispositivos",
@@ -34,8 +34,7 @@ def get_dispositivo(
     try:
         return controller.obtener_dispositivo(device_id)
     except Exception as e:
-        code, err = ErrorPresenter.presentar_excepcion(e)
-        raise HTTPException(status_code=code, detail=err["mensaje"]) from e
+        manejar_error_http(e)
 
 
 @router.post("", response_model=DispositivoResponseDTO)
@@ -46,8 +45,7 @@ def register_dispositivo(
     try:
         return controller.registrar_dispositivo(dto)
     except Exception as e:
-        code, err = ErrorPresenter.presentar_excepcion(e)
-        raise HTTPException(status_code=code, detail=err["mensaje"]) from e
+        manejar_error_http(e)
 
 
 @router.put("/{device_id}", response_model=DispositivoResponseDTO)
@@ -59,5 +57,4 @@ def update_dispositivo(
     try:
         return controller.actualizar_dispositivo(device_id, dto)
     except Exception as e:
-        code, err = ErrorPresenter.presentar_excepcion(e)
-        raise HTTPException(status_code=code, detail=err["mensaje"]) from e
+        manejar_error_http(e)
