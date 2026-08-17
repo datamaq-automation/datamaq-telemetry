@@ -134,6 +134,15 @@ erDiagram
         datetime created_at
     }
 
+    USERS {
+        string id PK
+        string username UK
+        string password_hash
+        boolean is_active
+        datetime created_at
+        datetime updated_at
+    }
+
 ```
 
 ## 2. Detalle de Tablas e Índices
@@ -291,6 +300,20 @@ erDiagram
 **Índices:**
 - `idx_telemetry_inst_dev_time`: (`device_id`, `recorded_at`)
 - `idx_telemetry_inst_time`: (`recorded_at`)
+
+### Tabla `users`
+
+| Columna | Tipo SQL | Clave / Restricción | Nullable |
+| :--- | :--- | :--- | :--- |
+| `id` | `VARCHAR(36)` | **PRIMARY KEY** | No |
+| `username` | `VARCHAR(150)` | UNIQUE | No |
+| `password_hash` | `VARCHAR(255)` | - | No |
+| `is_active` | `BOOLEAN` | - | No |
+| `created_at` | `DATETIME` | - | No |
+| `updated_at` | `DATETIME` | - | No |
+
+**Índices:**
+- `ix_users_username` (UNIQUE): (`username`)
 
 ## 3. Matriz de Políticas de Retención y Granularidad
 

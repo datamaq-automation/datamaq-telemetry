@@ -2,9 +2,11 @@
 
 from datetime import datetime, timedelta, timezone
 
+from fastapi import HTTPException
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
+from src.adapters.controllers.auth_controller import AuthController
 from src.application.dtos.auth_dto import LoginRequestDTO
 from src.application.use_cases.autenticar_usuario import AutenticarUsuarioUseCase
 from src.application.use_cases.gestionar_usuarios import GestionarUsuariosUseCase
@@ -14,6 +16,9 @@ from src.domain.auth.ports import GeneradorTokenPort, RepositorioUsuariosPort
 from src.domain.auth.services import HashContrasenaService, PoliticaExpiracionService
 from src.domain.auth.value_objects import NombreUsuario
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
+from src.infrastructure.fastapi.dependencies import get_usuario_actual
+from src.infrastructure.fastapi.routes.auth_router import login as login_handler
+from src.infrastructure.settings.config import get_settings
 from src.infrastructure.sqlalchemy.models import UserModel
 from src.infrastructure.sqlalchemy.mysql_repositories import MySQLUsuariosRepository
 
@@ -215,3 +220,74 @@ def test_repositorio_usuarios_sqlite():
         assert repo.obtener_por_usuario("inexistente") is None
     finally:
         db.close()
+
+
+def test_login_handler_exitoso():
+    repo = MockRepositorioUsuarios([_usuario_activo()])
+    use_case = AutenticarUsuarioUseCase(repo, HashContrasenaService(), MockTokenService(), 480)
+    controller = AuthController(use_case)
+
+    response = login_handler(
+        LoginRequestDTO(usuario="operador@planta.local", contrasena="secreto123"),
+        controller,
+    )
+
+    assert response.token == "token-usuario-1"
+
+
+def test_login_handler_credenciales_invalidas():
+    repo = MockRepositorioUsuarios()
+    use_case = AutenticarUsuarioUseCase(repo, HashContrasenaService(), MockTokenService(), 480)
+    controller = AuthController(use_case)
+
+    try:
+        login_handler(LoginRequestDTO(usuario="nadie@planta.local", contrasena="x"), controller)
+        raise AssertionError("Se esperaba HTTPException 401")
+    except HTTPException as e:
+        assert e.status_code == 401
+        assert e.detail == "credenciales_invalidas"
+
+
+def test_login_handler_usuario_inactivo():
+    repo = MockRepositorioUsuarios([_usuario_activo(activo=False)])
+    use_case = AutenticarUsuarioUseCase(repo, HashContrasenaService(), MockTokenService(), 480)
+    controller = AuthController(use_case)
+
+    try:
+        login_handler(LoginRequestDTO(usuario="operador@planta.local", contrasena="secreto123"), controller)
+        raise AssertionError("Se esperaba HTTPException 403")
+    except HTTPException as e:
+        assert e.status_code == 403
+        assert e.detail == "usuario_inactivo"
+
+
+def test_get_usuario_actual_valido():
+    service = JwtTokenService(get_settings().API_SECRET_KEY)
+    token = service.generar(
+        "usuario-1",
+        "operador@planta.local",
+        datetime.now(timezone.utc) + timedelta(minutes=30),
+    )
+
+    claims = get_usuario_actual(f"Bearer {token}")
+
+    assert claims["sub"] == "usuario-1"
+    assert claims["usuario"] == "operador@planta.local"
+
+
+def test_get_usuario_actual_sin_header():
+    try:
+        get_usuario_actual(None)
+        raise AssertionError("Se esperaba HTTPException 401")
+    except HTTPException as e:
+        assert e.status_code == 401
+        assert e.detail == "credenciales_invalidas"
+
+
+def test_get_usuario_actual_token_invalido():
+    try:
+        get_usuario_actual("Bearer token-falso")
+        raise AssertionError("Se esperaba HTTPException 401")
+    except HTTPException as e:
+        assert e.status_code == 401
+        assert e.detail == "credenciales_invalidas"
