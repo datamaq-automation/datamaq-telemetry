@@ -22,6 +22,7 @@ from src.application.use_cases.ingestar_telemetria import IngestarTelemetriaUseC
 from src.application.use_cases.purgar_telemetria import PurgarTelemetriaExpiradaUseCase
 from src.domain.auth.services import HashContrasenaService, RateLimiterService
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
+from src.infrastructure.paho_mqtt.mqtt_listener import MQTTListener
 from src.infrastructure.settings.config import get_settings
 from src.infrastructure.settings.logger import get_logger
 from src.infrastructure.sqlalchemy.database import get_db_session
@@ -35,6 +36,20 @@ from src.infrastructure.sqlalchemy.mysql_repositories import (
 
 # Singleton in-memory broadcaster
 global_event_broadcaster = InMemoryEventBroadcaster()
+
+# Listener MQTT registrado en el lifespan del servidor (estado de conexión)
+_mqtt_listener_registrado: MQTTListener | None = None
+
+
+def registrar_mqtt_listener(listener: MQTTListener) -> None:
+    """Registra el listener MQTT activo para que /health consulte su estado."""
+    global _mqtt_listener_registrado
+    _mqtt_listener_registrado = listener
+
+
+def get_mqtt_listener() -> MQTTListener | None:
+    """Devuelve el listener MQTT registrado, o None si aún no se ha iniciado."""
+    return _mqtt_listener_registrado
 
 
 def get_broadcaster() -> InMemoryEventBroadcaster:

@@ -1,4 +1,5 @@
-from datetime import datetime, timedelta
+import threading
+from datetime import datetime, timedelta, timezone
 
 from src.domain.telemetria.entities import (
     AlertaDispositivo,
@@ -6,6 +7,43 @@ from src.domain.telemetria.entities import (
     PlanTelemetria,
 )
 from src.domain.telemetria.value_objects import PotenciaActiva, SeveridadAlerta
+
+
+class FiltroDeduplicacionService:
+    """Filtro de deduplicación de mensajes MQTT (at-least-once → exactly-once).
+
+    Registra las claves vistas y descarta las que se repiten dentro de la
+    ventana temporal configurada. Thread-safe vía un ``threading.Lock`` interno.
+    """
+
+    def __init__(self, ventana_segundos: int = 120):
+        self._ventana_segundos = ventana_segundos
+        self._vistos: dict[str, datetime] = {}
+        self._lock = threading.Lock()
+
+    def es_duplicado(self, clave: str, ahora: datetime | None = None) -> bool:
+        """Retorna ``True`` si ``clave`` ya fue vista dentro de la ventana.
+
+        En caso contrario, la registra y retorna ``False``. Poda las entradas
+        vencidas en cada invocación.
+        """
+        if ahora is None:
+            ahora = datetime.now(timezone.utc)
+        with self._lock:
+            self._podar(ahora)
+            if clave in self._vistos:
+                return True
+            self._vistos[clave] = ahora
+            return False
+
+    def limpiar(self) -> None:
+        """Vacía el registro de claves vistas."""
+        with self._lock:
+            self._vistos.clear()
+
+    def _podar(self, ahora: datetime) -> None:
+        limite = ahora - timedelta(seconds=self._ventana_segundos)
+        self._vistos = {k: v for k, v in self._vistos.items() if v > limite}
 
 
 class AnalizadorCalidadEnergiaService:

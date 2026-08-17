@@ -3,7 +3,7 @@ import secrets
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import model_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     DB_USER: str = "root"
     DB_PASSWORD: str = ""
     DB_NAME: str = "datamaq_telemetry"
+    DB_POOL_SIZE: int = 4
+    DB_MAX_OVERFLOW: int = 8
 
     # MQTT
     MQTT_BROKER_HOST: str = "127.0.0.1"
@@ -24,8 +26,16 @@ class Settings(BaseSettings):
     MQTT_TOPIC_PREFIX: str = "m/wifi/#"
     MQTT_TLS_ENABLED: bool = False
     MQTT_TLS_CA_CERTS: str = ""
+    MQTT_TLS_CERTFILE: str = ""
+    MQTT_TLS_KEYFILE: str = ""
     MQTT_MAX_PAYLOAD_BYTES: int = 65536
     MQTT_AUTO_REGISTER_DEVICES: bool = True
+    MQTT_CLEAN_SESSION: bool = False
+    MQTT_RECONNECT_MIN_DELAY_SEG: int = 1
+    MQTT_RECONNECT_MAX_DELAY_SEG: int = 60
+    MQTT_DEDUP_VENTANA_SEGUNDOS: int = 120
+    MQTT_WORKER_MAX_THREADS: int = 2
+    MQTT_LOG_LEVEL: str = "WARNING"
 
     # API
     API_HOST: str = "127.0.0.1"
@@ -57,6 +67,24 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    @field_validator("MQTT_TOPIC_PREFIX")
+    @classmethod
+    def validar_topic_prefix(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("MQTT_TOPIC_PREFIX no puede estar vacío")
+        if any(c.isspace() for c in v):
+            raise ValueError("MQTT_TOPIC_PREFIX no puede contener espacios")
+        niveles = v.split("/")
+        for i, nivel in enumerate(niveles):
+            if "#" in nivel:
+                if nivel != "#" or i != len(niveles) - 1:
+                    raise ValueError("'#' debe ser el último nivel completo del filtro MQTT")
+            elif "+" in nivel and nivel != "+":
+                raise ValueError("'+' debe ocupar un nivel completo del filtro MQTT")
+        if "#" not in v and "+" not in v:
+            raise ValueError("MQTT_TOPIC_PREFIX debe contener al menos un comodín (+ o #)")
+        return v
 
     @model_validator(mode="after")
     def validar_postura_seguridad(self) -> "Settings":

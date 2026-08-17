@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock
 
 from src.application.use_cases.ingestar_telemetria import IngestarTelemetriaUseCase
+from src.domain.telemetria.services import FiltroDeduplicacionService
 from src.infrastructure.paho_mqtt import mqtt_listener
 from src.infrastructure.paho_mqtt.mqtt_listener import MQTTListener
 from src.infrastructure.settings.config import Settings
@@ -38,6 +39,9 @@ class _FakeClient:
     def username_pw_set(self, usuario: str, contrasena: str) -> None:
         pass
 
+    def reconnect_delay_set(self, min_delay: int = 1, max_delay: int = 120) -> None:
+        pass
+
     def tls_set(self, *args, **kwargs) -> None:
         self.tls_called = True
 
@@ -47,12 +51,22 @@ class _DBSessionStub:
         pass
 
 
+class _FakeExecutor:
+    def submit(self, fn, *args, **kwargs):
+        return None
+
+    def shutdown(self, wait: bool = True, cancel_futures: bool = False) -> None:
+        pass
+
+
 def _listener(monkeypatch, settings: Settings, logger_fake: _LoggerFake) -> MQTTListener:
     monkeypatch.setattr(mqtt_listener, "logger", logger_fake)
     listener = MQTTListener.__new__(MQTTListener)
     listener.settings = settings
     listener.session_factory = lambda: _DBSessionStub()
     listener.publicador = None
+    listener._executor = _FakeExecutor()
+    listener._dedup = FiltroDeduplicacionService(settings.MQTT_DEDUP_VENTANA_SEGUNDOS)
     return listener
 
 

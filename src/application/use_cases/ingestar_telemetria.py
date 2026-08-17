@@ -1,4 +1,5 @@
 import ipaddress
+import threading
 import uuid
 from datetime import datetime, timezone
 from typing import Any, ClassVar
@@ -38,6 +39,7 @@ class IngestarTelemetriaUseCase:
     _ultimas_persistencias: ClassVar[dict[str, datetime]] = {}
     _device_cache: ClassVar[dict[str, Dispositivo]] = {}
     _ultimos_heartbeats: ClassVar[dict[str, datetime]] = {}
+    _lock: ClassVar[threading.Lock] = threading.Lock()
 
     def __init__(
         self,
@@ -73,13 +75,53 @@ class IngestarTelemetriaUseCase:
         if ahora is None:
             ahora = datetime.now(timezone.utc)
 
-        # 1. Búsqueda en caché en memoria
-        if mac_vo.valor in self._device_cache:
-            dispositivo = self._device_cache[mac_vo.valor]
-            ultimo_hb = self._ultimos_heartbeats.get(dispositivo.id)
+        with self._lock:
+            # 1. Búsqueda en caché en memoria
+            if mac_vo.valor in self._device_cache:
+                dispositivo = self._device_cache[mac_vo.valor]
+                ultimo_hb = self._ultimos_heartbeats.get(dispositivo.id)
 
-            # Si venció la ventana de amortiguación (60s), persistir estado en DB
-            if ultimo_hb is None or (ahora - ultimo_hb).total_seconds() >= 60:
+                # Si venció la ventana de amortiguación (60s), persistir estado en DB
+                if ultimo_hb is None or (ahora - ultimo_hb).total_seconds() >= 60:
+                    dispositivo.marcar_online(ahora)
+                    if dev_info:
+                        if dev_info.get("serial_number"):
+                            dispositivo.numero_serie = dev_info.get("serial_number")
+                        if dev_info.get("device_fw"):
+                            dispositivo.version_fw = dev_info.get("device_fw")
+                        if dev_info.get("hw_model"):
+                            dispositivo.version_hw = dev_info.get("hw_model")
+                    dispositivo = self.repo_dispositivos.guardar(dispositivo)
+                    self._device_cache[mac_vo.valor] = dispositivo
+                    self._ultimos_heartbeats[dispositivo.id] = ahora
+
+                return dispositivo
+
+            # 2. Si no está en caché, consultar repositorio
+            dispositivo = self.repo_dispositivos.obtener_por_uid(mac_vo)
+            if not dispositivo:
+                if not self.permitir_auto_registro:
+                    if self.logger:
+                        self.logger.info("dispositivo_no_registrado_descartado", device_uid=mac_vo.valor)
+                    return None
+                nuevo = Dispositivo(
+                    id=str(uuid.uuid4()),
+                    device_uid=mac_vo,
+                    nombre=f"Powermeter-{mac_vo.valor[-4:]}",
+                    modelo=dev_info.get("device_model", "SmartPlus") if dev_info else "SmartPlus",
+                    numero_serie=dev_info.get("serial_number") if dev_info else None,
+                    version_hw=dev_info.get("hw_model") if dev_info else None,
+                    version_fw=dev_info.get("device_fw") if dev_info else None,
+                    estado=EstadoDispositivo.ONLINE,
+                    visto_por_ultima_vez=ahora,
+                )
+                saved = self.repo_dispositivos.guardar(nuevo)
+                self._device_cache[mac_vo.valor] = saved
+                self._ultimos_heartbeats[saved.id] = ahora
+                if self.logger:
+                    self.logger.info("nuevo_dispositivo_registrado", device_uid=mac_vo.valor, modelo=nuevo.modelo)
+                return saved
+            else:
                 dispositivo.marcar_online(ahora)
                 if dev_info:
                     if dev_info.get("serial_number"):
@@ -88,49 +130,10 @@ class IngestarTelemetriaUseCase:
                         dispositivo.version_fw = dev_info.get("device_fw")
                     if dev_info.get("hw_model"):
                         dispositivo.version_hw = dev_info.get("hw_model")
-                dispositivo = self.repo_dispositivos.guardar(dispositivo)
-                self._device_cache[mac_vo.valor] = dispositivo
-                self._ultimos_heartbeats[dispositivo.id] = ahora
-
-            return dispositivo
-
-        # 2. Si no está en caché, consultar repositorio
-        dispositivo = self.repo_dispositivos.obtener_por_uid(mac_vo)
-        if not dispositivo:
-            if not self.permitir_auto_registro:
-                if self.logger:
-                    self.logger.info("dispositivo_no_registrado_descartado", device_uid=mac_vo.valor)
-                return None
-            nuevo = Dispositivo(
-                id=str(uuid.uuid4()),
-                device_uid=mac_vo,
-                nombre=f"Powermeter-{mac_vo.valor[-4:]}",
-                modelo=dev_info.get("device_model", "SmartPlus") if dev_info else "SmartPlus",
-                numero_serie=dev_info.get("serial_number") if dev_info else None,
-                version_hw=dev_info.get("hw_model") if dev_info else None,
-                version_fw=dev_info.get("device_fw") if dev_info else None,
-                estado=EstadoDispositivo.ONLINE,
-                visto_por_ultima_vez=ahora,
-            )
-            saved = self.repo_dispositivos.guardar(nuevo)
-            self._device_cache[mac_vo.valor] = saved
-            self._ultimos_heartbeats[saved.id] = ahora
-            if self.logger:
-                self.logger.info("nuevo_dispositivo_registrado", device_uid=mac_vo.valor, modelo=nuevo.modelo)
-            return saved
-        else:
-            dispositivo.marcar_online(ahora)
-            if dev_info:
-                if dev_info.get("serial_number"):
-                    dispositivo.numero_serie = dev_info.get("serial_number")
-                if dev_info.get("device_fw"):
-                    dispositivo.version_fw = dev_info.get("device_fw")
-                if dev_info.get("hw_model"):
-                    dispositivo.version_hw = dev_info.get("hw_model")
-            saved = self.repo_dispositivos.guardar(dispositivo)
-            self._device_cache[mac_vo.valor] = saved
-            self._ultimos_heartbeats[saved.id] = ahora
-            return saved
+                saved = self.repo_dispositivos.guardar(dispositivo)
+                self._device_cache[mac_vo.valor] = saved
+                self._ultimos_heartbeats[saved.id] = ahora
+                return saved
 
     def _parse_fase(self, data: Any, suffix: str = "") -> MedicionFase:
         if not isinstance(data, dict):
@@ -381,13 +384,15 @@ class IngestarTelemetriaUseCase:
             # Persistencia con downsampling según granularidad configurada
             debe_persistir = True
             if self.granularidad_segundos > 0:
-                ultima = self._ultimas_persistencias.get(dispositivo.id)
-                if ultima is not None and (recorded_at - ultima).total_seconds() < self.granularidad_segundos:
-                    debe_persistir = False
+                with self._lock:
+                    ultima = self._ultimas_persistencias.get(dispositivo.id)
+                    if ultima is not None and (recorded_at - ultima).total_seconds() < self.granularidad_segundos:
+                        debe_persistir = False
 
             if debe_persistir:
                 self.repo_telemetria.guardar_instantanea(lectura)
-                self._ultimas_persistencias[dispositivo.id] = recorded_at
+                with self._lock:
+                    self._ultimas_persistencias[dispositivo.id] = recorded_at
                 if self.logger:
                     self.logger.debug(
                         "telemetria_instantanea_guardada",

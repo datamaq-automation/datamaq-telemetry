@@ -6,16 +6,22 @@ from fastapi import APIRouter, Depends, HTTPException
 from src.adapters.controllers.purga_controller import PurgaController
 from src.adapters.presenters.error_presenter import ErrorPresenter
 from src.application.dtos.purga_dto import PurgaRequestDTO, PurgaResultadoDTO
-from src.infrastructure.fastapi.dependencies import get_purga_controller, requiere_rol_admin
+from src.infrastructure.fastapi.dependencies import (
+    get_mqtt_listener,
+    get_purga_controller,
+    requiere_rol_admin,
+)
 
 router = APIRouter(tags=["Sistema"])
 
 
 @router.get("/health")
 def health_check():
+    listener = get_mqtt_listener()
     return {
         "status": "healthy",
         "timestamp": datetime.now(timezone.utc).isoformat(),
+        "mqtt_conectado": listener.esta_conectado() if listener else False,
     }
 
 

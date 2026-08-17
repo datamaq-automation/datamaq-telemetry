@@ -1,10 +1,13 @@
+import hashlib
 import json
+from concurrent.futures import ThreadPoolExecutor
 
 import paho.mqtt.client as mqtt
 from paho.mqtt.enums import CallbackAPIVersion
 
 from src.application.use_cases.ingestar_telemetria import IngestarTelemetriaUseCase
 from src.domain.telemetria.ports import PublicadorEventosPort
+from src.domain.telemetria.services import FiltroDeduplicacionService
 from src.infrastructure.settings.config import get_settings
 from src.infrastructure.settings.logger import get_logger
 from src.infrastructure.sqlalchemy.database import get_session_factory
@@ -25,21 +28,40 @@ class MQTTListener:
         self.client = mqtt.Client(
             CallbackAPIVersion.VERSION2,
             client_id=self.settings.MQTT_CLIENT_ID,
-            clean_session=True,
+            clean_session=self.settings.MQTT_CLEAN_SESSION,
         )
         if self.settings.MQTT_USERNAME and self.settings.MQTT_PASSWORD:
             self.client.username_pw_set(self.settings.MQTT_USERNAME, self.settings.MQTT_PASSWORD)
 
+        self.client.reconnect_delay_set(
+            min_delay=self.settings.MQTT_RECONNECT_MIN_DELAY_SEG,
+            max_delay=self.settings.MQTT_RECONNECT_MAX_DELAY_SEG,
+        )
+
         if self.settings.MQTT_TLS_ENABLED:
-            self.client.tls_set(ca_certs=self.settings.MQTT_TLS_CA_CERTS)
+            if self.settings.MQTT_TLS_CERTFILE and self.settings.MQTT_TLS_KEYFILE:
+                self.client.tls_set(
+                    ca_certs=self.settings.MQTT_TLS_CA_CERTS,
+                    certfile=self.settings.MQTT_TLS_CERTFILE,
+                    keyfile=self.settings.MQTT_TLS_KEYFILE,
+                )
+            else:
+                self.client.tls_set(ca_certs=self.settings.MQTT_TLS_CA_CERTS)
 
         self.client.on_connect = self._on_connect
         self.client.on_disconnect = self._on_disconnect
         self.client.on_message = self._on_message
+        self.client.on_subscribe = self._on_subscribe
+        self.client.on_log = self._on_log
+
+        self._executor = ThreadPoolExecutor(max_workers=self.settings.MQTT_WORKER_MAX_THREADS)
+        self._dedup = FiltroDeduplicacionService(self.settings.MQTT_DEDUP_VENTANA_SEGUNDOS)
+        self._esta_conectado = False
         self.is_running = False
 
     def _on_connect(self, client, userdata, flags, reason_code, properties=None):
         if reason_code == 0:
+            self._esta_conectado = True
             logger.info(
                 "mqtt_conectado",
                 broker_host=self.settings.MQTT_BROKER_HOST,
@@ -48,26 +70,61 @@ class MQTTListener:
             client.subscribe(self.settings.MQTT_TOPIC_PREFIX, qos=1)
             logger.info("mqtt_suscrito", topico=self.settings.MQTT_TOPIC_PREFIX)
         else:
+            self._esta_conectado = False
             logger.error("mqtt_error_conexion", codigo=str(reason_code))
 
     def _on_disconnect(self, client, userdata, flags, reason_code, properties=None):
+        self._esta_conectado = False
         logger.warning("mqtt_desconectado", codigo=str(reason_code))
+        if reason_code != 0 and self.is_running:
+            try:
+                client.reconnect()
+            except Exception as e:
+                logger.warning("mqtt_reconexion_fallida", error=str(e))
+
+    def _on_subscribe(self, client, userdata, mid, granted_qos, properties=None):
+        logger.info("mqtt_suscripcion_confirmada", mid=mid, granted_qos=list(granted_qos))
+        if any(q == 128 for q in granted_qos):
+            logger.error("mqtt_suscripcion_rechazada", mid=mid, granted_qos=list(granted_qos))
+
+    def _on_log(self, client, userdata, level, buf):
+        if level == mqtt.MQTT_LOG_ERR:
+            logger.error("mqtt_paho_log", mensaje=buf)
+        elif level == mqtt.MQTT_LOG_WARNING:
+            logger.warning("mqtt_paho_log", mensaje=buf)
+        elif level == mqtt.MQTT_LOG_DEBUG:
+            logger.debug("mqtt_paho_log", mensaje=buf)
+        else:
+            logger.info("mqtt_paho_log", mensaje=buf)
 
     def _on_message(self, client, userdata, msg):
         topic = msg.topic
-        if len(msg.payload) > self.settings.MQTT_MAX_PAYLOAD_BYTES:
-            logger.warning("mqtt_payload_descartado", topico=topic, tamano_bytes=len(msg.payload))
+        payload_bytes = msg.payload
+        if len(payload_bytes) > self.settings.MQTT_MAX_PAYLOAD_BYTES:
+            logger.warning("mqtt_payload_descartado", topico=topic, tamano_bytes=len(payload_bytes))
             return
 
         try:
-            raw_text = msg.payload.decode("utf-8")
+            raw_text = payload_bytes.decode("utf-8")
             payload = json.loads(raw_text) if raw_text else {}
         except Exception as e:
             logger.error("mqtt_payload_invalido", topico=topic, error=str(e))
             return
 
-        logger.debug("mqtt_mensaje_recibido", topico=topic, tamano_bytes=len(msg.payload))
+        if not isinstance(payload, dict):
+            logger.warning("mqtt_payload_no_dict", topico=topic)
+            return
 
+        logger.debug("mqtt_mensaje_recibido", topico=topic, tamano_bytes=len(payload_bytes))
+
+        clave_dedup = f"{topic}:{hashlib.sha256(payload_bytes).hexdigest()}"
+        if self._dedup.es_duplicado(clave_dedup):
+            logger.debug("mqtt_mensaje_duplicado", topico=topic)
+            return
+
+        self._executor.submit(self._procesar_mensaje, topic, payload)
+
+    def _procesar_mensaje(self, topic, payload):
         db = self.session_factory()
         try:
             repo_disp = MySQLDispositivosRepository(db)
@@ -84,6 +141,9 @@ class MQTTListener:
             logger.error("mqtt_error_procesamiento", topico=topic, error=str(e), exc_info=True)
         finally:
             db.close()
+
+    def esta_conectado(self) -> bool:
+        return self._esta_conectado
 
     def start(self):
         logger.info("iniciando_mqtt_listener")
@@ -106,3 +166,4 @@ class MQTTListener:
             self.client.disconnect()
         except Exception:
             pass
+        self._executor.shutdown(wait=True)

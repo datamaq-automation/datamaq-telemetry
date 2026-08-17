@@ -7,7 +7,11 @@ from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from src.infrastructure.fastapi.dependencies import global_event_broadcaster, token_valido
+from src.infrastructure.fastapi.dependencies import (
+    global_event_broadcaster,
+    registrar_mqtt_listener,
+    token_valido,
+)
 from src.infrastructure.fastapi.routes.alertas_router import (
     router as alertas_router,
 )
@@ -74,6 +78,7 @@ async def lifespan(app: FastAPI):
 
     # Start MQTT background listener
     mqtt_listener = MQTTListener(publicador_eventos=global_event_broadcaster)
+    registrar_mqtt_listener(mqtt_listener)
     mqtt_listener.start()
 
     logger.info("servidor_datamaq_listo", websockets_route="/ws/live", docs_route="/docs")
