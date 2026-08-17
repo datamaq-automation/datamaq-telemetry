@@ -257,7 +257,7 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
             device_id=log.dispositivo_id,
             recorded_at=log.registrado_en,
             wifi_rssi_dbm=log.wifi_rssi_dbm,
-            wifi_quality=log.wifi_calidad,
+            wifi_calidad=log.wifi_calidad,
             ip_address=log.direccion_ip,
             uptime_seconds=log.tiempo_activo_segundos,
             raw_payload=log.payload_bruto,
