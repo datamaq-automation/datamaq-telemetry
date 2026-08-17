@@ -30,6 +30,9 @@ class MQTTListener:
         if self.settings.MQTT_USERNAME and self.settings.MQTT_PASSWORD:
             self.client.username_pw_set(self.settings.MQTT_USERNAME, self.settings.MQTT_PASSWORD)
 
+        if self.settings.MQTT_TLS_ENABLED:
+            self.client.tls_set(ca_certs=self.settings.MQTT_TLS_CA_CERTS)
+
         self.client.on_connect = self._on_connect
         self.client.on_disconnect = self._on_disconnect
         self.client.on_message = self._on_message
@@ -52,6 +55,10 @@ class MQTTListener:
 
     def _on_message(self, client, userdata, msg):
         topic = msg.topic
+        if len(msg.payload) > self.settings.MQTT_MAX_PAYLOAD_BYTES:
+            logger.warning("mqtt_payload_descartado", topico=topic, tamano_bytes=len(msg.payload))
+            return
+
         try:
             raw_text = msg.payload.decode("utf-8")
             payload = json.loads(raw_text) if raw_text else {}
@@ -59,7 +66,7 @@ class MQTTListener:
             logger.error("mqtt_payload_invalido", topico=topic, error=str(e))
             return
 
-        logger.debug("mqtt_mensaje_recibido", topico=topic, tamano_bytes=len(msg.payload), payload=raw_text)
+        logger.debug("mqtt_mensaje_recibido", topico=topic, tamano_bytes=len(msg.payload))
 
         db = self.session_factory()
         try:
@@ -70,6 +77,7 @@ class MQTTListener:
                 repo_telemetria=repo_telem,
                 publicador=self.publicador,
                 logger=logger,
+                permitir_auto_registro=self.settings.MQTT_AUTO_REGISTER_DEVICES,
             )
             use_case.ejecutar(topic, payload)
         except Exception as e:

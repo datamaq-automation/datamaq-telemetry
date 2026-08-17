@@ -120,6 +120,25 @@ venv/bin/python scripts/init_db.py
 
 ---
 
+## 🔒 Seguridad
+
+### Modelo de amenazas
+
+| Amenaza | Mitigación |
+|---|---|
+| Acceso no autenticado a la API | Autenticación obligatoria por defecto (`AUTH_REQUIRED=true`) vía JWT |
+| Fuerza bruta en el login | Rate limiting por usuario (`LOGIN_MAX_INTENTOS`, `LOGIN_VENTANA_SEGUNDOS`) |
+| Secreto JWT débil o por defecto | Validación de `API_SECRET_KEY` en producción (mínimo 16 caracteres) |
+| Credenciales de BD expuestas | Validación de `DB_PASSWORD` en producción; sin contraseña en flags de CLI |
+| MQTT sin cifrado / anónimo | `MQTT_TLS_ENABLED`, `MQTT_TLS_CA_CERTS` y credenciales de broker |
+| Payload MQTT malicioso o excesivo | Límite `MQTT_MAX_PAYLOAD_BYTES` y sanitización de campos de entrada |
+| Fuga de secretos en logs | Procesador `redactar_secretos` y logs sin payload bruto |
+| CORS abierto | `CORS_ORIGINS` vacío por defecto (sin `*`) |
+
+> En desarrollo local se puede desactivar la autenticación con `AUTH_REQUIRED=false` y `DEBUG=true`.
+
+---
+
 ## 🧪 Pruebas y Calidad de Código (Gauntlet)
 
 ```bash

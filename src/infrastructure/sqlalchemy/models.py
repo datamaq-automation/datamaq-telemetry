@@ -232,6 +232,7 @@ class UserModel(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     username: Mapped[str] = mapped_column(String(150), unique=True, nullable=False, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    role: Mapped[str] = mapped_column(String(20), default="operador", nullable=False)
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, onupdate=ahora_utc, nullable=False)

@@ -1,3 +1,4 @@
+import ipaddress
 import uuid
 from datetime import datetime, timezone
 from typing import Any, ClassVar
@@ -45,12 +46,14 @@ class IngestarTelemetriaUseCase:
         publicador: PublicadorEventosPort | None = None,
         logger: LoggerPort | None = None,
         granularidad_segundos: int = 300,
+        permitir_auto_registro: bool = True,
     ):
         self.repo_dispositivos = repo_dispositivos
         self.repo_telemetria = repo_telemetria
         self.publicador = publicador
         self.logger = logger
         self.granularidad_segundos = granularidad_segundos
+        self.permitir_auto_registro = permitir_auto_registro
 
     def _parse_timestamp(self, ts_val: Any) -> datetime:
         if ts_val:
@@ -65,7 +68,7 @@ class IngestarTelemetriaUseCase:
 
     def _obtener_o_crear_dispositivo(
         self, mac_raw: str, dev_info: dict[str, Any] | None = None, ahora: datetime | None = None
-    ) -> Dispositivo:
+    ) -> Dispositivo | None:
         mac_vo = MacAddress(mac_raw)
         if ahora is None:
             ahora = datetime.now(timezone.utc)
@@ -94,6 +97,10 @@ class IngestarTelemetriaUseCase:
         # 2. Si no está en caché, consultar repositorio
         dispositivo = self.repo_dispositivos.obtener_por_uid(mac_vo)
         if not dispositivo:
+            if not self.permitir_auto_registro:
+                if self.logger:
+                    self.logger.info("dispositivo_no_registrado_descartado", device_uid=mac_vo.valor)
+                return None
             nuevo = Dispositivo(
                 id=str(uuid.uuid4()),
                 device_uid=mac_vo,
@@ -245,6 +252,9 @@ class IngestarTelemetriaUseCase:
         dev_info = payload.get("device_info") if isinstance(payload.get("device_info"), dict) else None
         recorded_at = self._parse_timestamp(payload.get("timestamp") or payload.get("t") or payload.get("time"))
         dispositivo = self._obtener_o_crear_dispositivo(mac_raw, dev_info, ahora=recorded_at)
+
+        if dispositivo is None:
+            return
 
         if subtopico == "inst":
             # Extraer fases de estructura de arreglo 'f': [{"n":"R","v":223.4,...}, ...]
@@ -485,11 +495,11 @@ class IngestarTelemetriaUseCase:
                 id=None,
                 dispositivo_id=dispositivo.id,
                 registrado_en=recorded_at,
-                wifi_rssi_dbm=wifi_info.get("dbm"),
-                wifi_calidad=wifi_info.get("quality"),
-                direccion_ip=wifi_info.get("ip"),
-                tiempo_activo_segundos=payload.get("uptime") or device_info.get("uptime"),
-                payload_bruto=payload,
+                wifi_rssi_dbm=sanear_entero(wifi_info.get("dbm")),
+                wifi_calidad=sanear_entero(wifi_info.get("quality")),
+                direccion_ip=sanear_ip(wifi_info.get("ip")),
+                tiempo_activo_segundos=sanear_entero(payload.get("uptime") or device_info.get("uptime")),
+                payload_bruto=acotar_payload_bruto(payload),
             )
             self.repo_telemetria.guardar_log_estado(log)
 
@@ -502,3 +512,33 @@ class IngestarTelemetriaUseCase:
                 mensaje=str(payload.get("event") or payload),
             )
             self.repo_telemetria.guardar_alerta(alerta)
+
+
+def sanear_entero(valor: Any) -> int | None:
+    """Convierte un valor a entero; retorna None si no es un número entero válido."""
+    if isinstance(valor, bool):
+        return None
+    try:
+        return int(valor)
+    except (TypeError, ValueError):
+        return None
+
+
+def sanear_ip(valor: Any) -> str | None:
+    """Valida y normaliza una dirección IP; retorna None si es inválida."""
+    if not isinstance(valor, str):
+        return None
+    try:
+        return str(ipaddress.ip_address(valor))
+    except ValueError:
+        return None
+
+
+def acotar_payload_bruto(payload: dict[str, Any]) -> dict[str, Any]:
+    """Reduce el payload bruto persistido a los campos de interés conocidos."""
+    wifi = payload.get("wifi_sta")
+    device = payload.get("device_info")
+    return {
+        "wifi_sta": wifi if isinstance(wifi, dict) else {},
+        "device_info": device if isinstance(device, dict) else {},
+    }

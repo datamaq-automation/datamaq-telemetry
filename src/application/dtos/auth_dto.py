@@ -1,11 +1,11 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class LoginRequestDTO(BaseModel):
-    usuario: str
-    contrasena: str
+    usuario: str = Field(min_length=1, max_length=128)
+    contrasena: str = Field(min_length=1, max_length=128)
 
 
 class LoginResponseDTO(BaseModel):

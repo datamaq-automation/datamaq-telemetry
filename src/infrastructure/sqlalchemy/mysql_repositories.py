@@ -636,6 +636,7 @@ class MySQLUsuariosRepository(RepositorioUsuariosPort):
             usuario=model.username,
             hash_contrasena=model.password_hash,
             esta_activo=model.is_active,
+            rol=model.role,
             creado_en=model.created_at,
             actualizado_en=model.updated_at,
         )
@@ -651,12 +652,14 @@ class MySQLUsuariosRepository(RepositorioUsuariosPort):
                 id=usuario.id,
                 username=usuario.usuario,
                 password_hash=usuario.hash_contrasena,
+                role=usuario.rol,
                 is_active=usuario.esta_activo,
             )
             self.db.add(model)
         else:
             model.username = usuario.usuario
             model.password_hash = usuario.hash_contrasena
+            model.role = usuario.rol
             model.is_active = usuario.esta_activo
 
         self.db.commit()

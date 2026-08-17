@@ -16,3 +16,7 @@ class CredencialesInvalidasError(DominioAuthException):
 
 class UsuarioInactivoError(DominioAuthException):
     """Lanzada cuando la cuenta del usuario está deshabilitada."""
+
+
+class DemasiadosIntentosError(DominioAuthException):
+    """Lanzada cuando se excede el límite de intentos de inicio de sesión."""

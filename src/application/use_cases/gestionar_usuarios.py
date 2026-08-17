@@ -20,6 +20,7 @@ class GestionarUsuariosUseCase:
         usuario: str,
         contrasena: str,
         esta_activo: bool = True,
+        rol: str = "operador",
     ) -> UsuarioAuth:
         nombre = NombreUsuario(usuario).valor
         existente = self.repo_usuarios.obtener_por_usuario(nombre)
@@ -31,5 +32,6 @@ class GestionarUsuariosUseCase:
             usuario=nombre,
             hash_contrasena=self.hash_service.generar_hash(contrasena),
             esta_activo=esta_activo,
+            rol=rol,
         )
         return self.repo_usuarios.guardar(entidad)

@@ -26,6 +26,17 @@ LEVEL_STYLES: dict[str, tuple[str, str]] = {
     "critical": ("CRITICAL:", COLOR_PURPLE),
 }
 
+_CLAVES_SENSIBLES = ("password", "contrasena", "secret", "token", "authorization", "api_key", "clave")
+
+
+def redactar_secretos(_: WrappedLogger, __: str, event_dict: EventDict) -> EventDict:
+    """Redacta los valores de campos sensibles para evitar fugas de credenciales en los logs."""
+    for clave in list(event_dict.keys()):
+        clave_lower = clave.lower()
+        if any(fragmento in clave_lower for fragmento in _CLAVES_SENSIBLES):
+            event_dict[clave] = "***"
+    return event_dict
+
 
 def uvicorn_style_renderer(_: WrappedLogger, __: str, event_dict: EventDict) -> str:
     """Renderizador para consola que replica exactamente la estética de Uvicorn."""
@@ -71,6 +82,7 @@ def setup_logging() -> None:
         structlog.contextvars.merge_contextvars,
         structlog.stdlib.add_logger_name,
         structlog.stdlib.add_log_level,
+        redactar_secretos,
         structlog.stdlib.PositionalArgumentsFormatter(),
         structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,

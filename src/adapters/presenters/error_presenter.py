@@ -1,6 +1,10 @@
 from typing import Any
 
-from src.domain.auth.exceptions import CredencialesInvalidasError, UsuarioInactivoError
+from src.domain.auth.exceptions import (
+    CredencialesInvalidasError,
+    DemasiadosIntentosError,
+    UsuarioInactivoError,
+)
 from src.domain.telemetria.exceptions import (
     AlertaNoEncontradaError,
     DispositivoNoEncontradoError,
@@ -26,5 +30,7 @@ class ErrorPresenter:
             return 401, {"error": "Unauthorized", "mensaje": "credenciales_invalidas"}
         elif isinstance(exc, UsuarioInactivoError):
             return 403, {"error": "Forbidden", "mensaje": "usuario_inactivo"}
+        elif isinstance(exc, DemasiadosIntentosError):
+            return 429, {"error": "TooManyRequests", "mensaje": exc.mensaje}
 
         return 500, {"error": "InternalServerError", "mensaje": "Ocurrió un error interno en el servidor"}

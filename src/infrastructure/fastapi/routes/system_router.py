@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from src.adapters.controllers.purga_controller import PurgaController
 from src.adapters.presenters.error_presenter import ErrorPresenter
 from src.application.dtos.purga_dto import PurgaRequestDTO, PurgaResultadoDTO
-from src.infrastructure.fastapi.dependencies import get_purga_controller
+from src.infrastructure.fastapi.dependencies import get_purga_controller, requiere_rol_admin
 
 router = APIRouter(tags=["Sistema"])
 
@@ -21,6 +21,7 @@ def health_check():
 
 @router.post("/api/system/purge", response_model=PurgaResultadoDTO)
 def trigger_purge(
+    claims: Annotated[dict, Depends(requiere_rol_admin)],
     controller: Annotated[PurgaController, Depends(get_purga_controller)],
     dto: PurgaRequestDTO | None = None,
 ):

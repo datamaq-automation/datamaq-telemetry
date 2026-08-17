@@ -26,11 +26,18 @@ class JwtTokenService(GeneradorTokenPort):
     def _firmar(self, mensaje: bytes) -> bytes:
         return hmac.new(self.secreto.encode("utf-8"), mensaje, hashlib.sha256).digest()
 
-    def generar(self, usuario_id: str, usuario: str, expira_en: datetime) -> str:
+    def generar(self, usuario_id: str, usuario: str, expira_en: datetime, rol: str = "operador") -> str:
         encabezado = _b64url(json.dumps({"alg": self.ALGORITMO, "typ": "JWT"}, separators=(",", ":")).encode("utf-8"))
+        ahora = datetime.now(timezone.utc)
         cuerpo = _b64url(
             json.dumps(
-                {"sub": usuario_id, "usuario": usuario, "exp": int(expira_en.timestamp())},
+                {
+                    "sub": usuario_id,
+                    "usuario": usuario,
+                    "exp": int(expira_en.timestamp()),
+                    "rol": rol,
+                    "iat": int(ahora.timestamp()),
+                },
                 separators=(",", ":"),
             ).encode("utf-8")
         )

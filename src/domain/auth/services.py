@@ -2,7 +2,7 @@ import base64
 import hashlib
 import hmac
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 
 class HashContrasenaService:
@@ -65,3 +65,29 @@ class PoliticaExpiracionService:
     @staticmethod
     def calcular_expiracion(ahora: datetime, minutos_validez: int) -> datetime:
         return ahora + timedelta(minutes=minutos_validez)
+
+
+class RateLimiterService:
+    """Limita los intentos de inicio de sesión por clave dentro de una ventana deslizante."""
+
+    def __init__(self, max_intentos: int, ventana_segundos: int):
+        self.max_intentos = max_intentos
+        self.ventana_segundos = ventana_segundos
+        self._intentos: dict[str, list[datetime]] = {}
+
+    def _purgar(self, clave: str, ahora: datetime) -> None:
+        limite = ahora - timedelta(seconds=self.ventana_segundos)
+        self._intentos[clave] = [t for t in self._intentos.get(clave, []) if t > limite]
+
+    def permitir(self, clave: str) -> bool:
+        ahora = datetime.now(timezone.utc)
+        self._purgar(clave, ahora)
+        return len(self._intentos.get(clave, [])) < self.max_intentos
+
+    def registrar_intento(self, clave: str) -> None:
+        ahora = datetime.now(timezone.utc)
+        self._purgar(clave, ahora)
+        self._intentos.setdefault(clave, []).append(ahora)
+
+    def resetear(self, clave: str) -> None:
+        self._intentos.pop(clave, None)
