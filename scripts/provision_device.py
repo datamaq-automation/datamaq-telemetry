@@ -71,6 +71,9 @@ def apply_profile(
     custom_host=None,
     custom_port=None,
     custom_security=None,
+    custom_username=None,
+    custom_password=None,
+    custom_ca_file=None,
     user="admin",
     password="powermeter",
     reboot=False,
@@ -102,6 +105,13 @@ def apply_profile(
         mqtt_cfg["broker_port"] = int(custom_port)
     if custom_security:
         mqtt_cfg["security"] = custom_security
+    if custom_username:
+        mqtt_cfg["username"] = custom_username
+    if custom_password:
+        mqtt_cfg["password"] = custom_password
+    if custom_ca_file:
+        with open(custom_ca_file, encoding="utf-8") as f:
+            ca_cert = f.read().strip()
 
     print(f"[*] Aplicando perfil '{profile.get('_description', profile_name)}' a http://{host}/ ...")
     print(f"    - Broker Host: {mqtt_cfg.get('broker_host')}")
@@ -147,6 +157,9 @@ if __name__ == "__main__":
     parser.add_argument("--broker-host", help="Sobrescribir Host del Broker (ej: IP o dominio de tu VPS)")
     parser.add_argument("--broker-port", type=int, help="Sobrescribir Puerto del Broker (ej: 1883 o 8883)")
     parser.add_argument("--security", help="Sobrescribir modo de seguridad (NO-SECURITY o TLS-SERVER-AUTH)")
+    parser.add_argument("--mqtt-username", help="Usuario MQTT a enviar al medidor (sobrescribe el perfil)")
+    parser.add_argument("--mqtt-password", help="Contraseña MQTT a enviar al medidor (sobrescribe el perfil)")
+    parser.add_argument("--mqtt-ca-file", help="Archivo PEM del certificado CA (raíz) para TLS-SERVER-AUTH")
     parser.add_argument("--reboot", action="store_true", help="Reiniciar el equipo tras aplicar la configuración")
 
     args = parser.parse_args()
@@ -160,6 +173,9 @@ if __name__ == "__main__":
             custom_host=args.broker_host,
             custom_port=args.broker_port,
             custom_security=args.security,
+            custom_username=args.mqtt_username,
+            custom_password=args.mqtt_password,
+            custom_ca_file=args.mqtt_ca_file,
             user=args.user,
             password=args.password,
             reboot=args.reboot,

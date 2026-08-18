@@ -9,7 +9,7 @@ Esta guía explica cómo configurar los medidores de energía **Powermeter** que
 Se incluyen dos perfiles predefinidos en la carpeta [`profiles/`](file:///home/agustin/proyectos_software/datamaq-telemetry/profiles):
 
 1. **`profiles/datamaq_server.json` (Producción Datamaq):**
-   * **Broker Host:** IP pública o dominio de tu VPS (ej. `telemetria.datamaq.com.ar`).
+   * **Broker Host:** IP pública o dominio de tu VPS (ej. `mqtt.datamaq.com.ar`).
    * **Broker Port:** `1883` (Sin TLS) o `8883` (Con TLS).
    * **Seguridad:** `NO-SECURITY` (o `TLS-SERVER-AUTH`).
    * **Ingesta:** Los datos se registran automáticamente en tu base de datos MySQL y se muestran en tus dashboards / WebSockets.
