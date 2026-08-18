@@ -4,7 +4,11 @@ from fastapi import APIRouter, Depends
 
 from src.adapters.controllers.planes_controller import PlanesController
 from src.application.dtos.plan_dto import PlanCreateDTO, PlanResponseDTO
-from src.infrastructure.fastapi.dependencies import get_planes_controller, get_usuario_actual
+from src.infrastructure.fastapi.dependencies import (
+    get_planes_controller,
+    get_usuario_actual,
+    requiere_rol_escritura,
+)
 from src.infrastructure.fastapi.error_handler import manejar_error_http
 
 router = APIRouter(
@@ -22,7 +26,7 @@ def list_planes(
     return controller.listar_planes(solo_publicos=solo_publicos)
 
 
-@router.post("/planes", response_model=PlanResponseDTO)
+@router.post("/planes", response_model=PlanResponseDTO, dependencies=[Depends(requiere_rol_escritura)])
 def create_plan(
     dto: PlanCreateDTO,
     controller: Annotated[PlanesController, Depends(get_planes_controller)],

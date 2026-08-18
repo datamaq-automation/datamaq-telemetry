@@ -4,7 +4,11 @@ from fastapi import APIRouter, Depends, Query
 
 from src.adapters.controllers.alertas_controller import AlertasController
 from src.application.dtos.alerta_dto import AlertaResponseDTO
-from src.infrastructure.fastapi.dependencies import get_alertas_controller, get_usuario_actual
+from src.infrastructure.fastapi.dependencies import (
+    get_alertas_controller,
+    get_usuario_actual,
+    requiere_rol_escritura,
+)
 from src.infrastructure.fastapi.error_handler import manejar_error_http
 
 router = APIRouter(
@@ -28,7 +32,7 @@ def list_alertas(
     )
 
 
-@router.post("/{alerta_id}/resolver", response_model=AlertaResponseDTO)
+@router.post("/{alerta_id}/resolver", response_model=AlertaResponseDTO, dependencies=[Depends(requiere_rol_escritura)])
 def resolve_alerta(
     alerta_id: int,
     controller: Annotated[AlertasController, Depends(get_alertas_controller)],

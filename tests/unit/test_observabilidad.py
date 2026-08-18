@@ -124,9 +124,10 @@ def test_error_negocio_sin_usuario():
 def test_demasiados_intentos_con_usuario():
     with capture_logs() as logs:
         with pytest.raises(HTTPException) as e:
-            manejar_error_http(DemasiadosIntentosError("Demasiados intentos.", usuario="operador"))
+            manejar_error_http(DemasiadosIntentosError("Demasiados intentos.", usuario="operador", retry_after_seg=37))
 
     assert e.value.status_code == 429
+    assert e.value.headers["Retry-After"] == "37"
     negocios = [ev for ev in logs if ev.get("event") == "error_negocio"]
     assert negocios, "No se registró el evento error_negocio"
     assert negocios[0]["usuario"] == "operador"

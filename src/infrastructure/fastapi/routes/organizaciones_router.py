@@ -9,7 +9,11 @@ from src.application.dtos.organizacion_dto import (
     PlantaCreateDTO,
     PlantaResponseDTO,
 )
-from src.infrastructure.fastapi.dependencies import get_dispositivos_controller, get_usuario_actual
+from src.infrastructure.fastapi.dependencies import (
+    get_dispositivos_controller,
+    get_usuario_actual,
+    requiere_rol_escritura,
+)
 from src.infrastructure.fastapi.error_handler import manejar_error_http
 
 router = APIRouter(
@@ -26,7 +30,7 @@ def list_organizaciones(
     return controller.listar_organizaciones()
 
 
-@router.post("/organizaciones", response_model=OrganizacionResponseDTO)
+@router.post("/organizaciones", response_model=OrganizacionResponseDTO, dependencies=[Depends(requiere_rol_escritura)])
 def create_organizacion(
     dto: OrganizacionCreateDTO,
     controller: Annotated[DispositivosController, Depends(get_dispositivos_controller)],
@@ -45,7 +49,7 @@ def list_plantas(
     return controller.listar_plantas(organizacion_id)
 
 
-@router.post("/plantas", response_model=PlantaResponseDTO)
+@router.post("/plantas", response_model=PlantaResponseDTO, dependencies=[Depends(requiere_rol_escritura)])
 def create_planta(
     dto: PlantaCreateDTO,
     controller: Annotated[DispositivosController, Depends(get_dispositivos_controller)],

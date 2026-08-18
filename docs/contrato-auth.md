@@ -1,6 +1,6 @@
 # Contrato de Autenticación — datamaq-telemetry
 
-> **Versión:** 1.1.0 · **Estado:** vigente · **Fuente de verdad:** `src/infrastructure/fastapi/routes/auth_router.py`, `src/infrastructure/settings/config.py`, `specs/auth.md`, `specs/auth-me.md`, `specs/usuario-invitado.md`.
+> **Versión:** 1.2.0 · **Estado:** vigente · **Fuente de verdad:** `src/infrastructure/fastapi/routes/auth_router.py`, `src/infrastructure/settings/config.py`, `specs/auth.md`, `specs/auth-me.md`, `specs/usuario-invitado.md`, `specs/guest-endpoint.md`, `specs/roles-permisos.md`.
 
 Contrato HTTP de autenticación para la SPA (`app-datamaq`). El frontend consume este contrato tal cual lo emite el backend; no se aplican workarounds en el cliente.
 
@@ -62,19 +62,27 @@ El backend cortocircuita la verificación y responde `200 {"usuario": "anon", "r
 
 ## Acceso invitado
 
-> **DEC-03:** **`POST /api/auth/guest` NO existe.** No implementar rutas inventadas en el cliente; ante un `404`, revisar este contrato.
+> **DEC-04:** el botón "Entrar como invitado" usa **`POST /api/auth/guest`** (público, sin body). Reemplaza a DEC-03 (que reutilizaba el login con credenciales del seed).
 
-El acceso rápido como invitado reutiliza el login normal con el usuario fijo `invitado`:
+### POST /api/auth/guest
+
+Emite un JWT `HS256` con claims `sub="invitado"`, `usuario="invitado"`, `rol="invitado"` **sin consultar la base de datos** y fija la cookie `datamaq_token`.
+
+- **Request:** sin body.
+- **Response 200:** igual que login:
+```json
+{ "token": "<jwt>", "expira_en": "2026-08-17T12:00:00Z" }
+```
+- **Rate limiting:** por IP (clave `ip:<host>`), reutilizando `LOGIN_MAX_INTENTOS` (5) y `LOGIN_VENTANA_SEGUNDOS` (300). Al excederse → `429` con cabecera `Retry-After`.
+- **Permisos:** rol `invitado` = solo lectura (ver "Rutas protegidas"); las escrituras devuelven `403 forbidden`.
+
+### Alternativa compatible (DEC-03 histórico)
+
+El login estándar con el usuario fijo `invitado` sigue disponible para pruebas o scripts:
 
 1. Seed manual (idempotente, no sobrescribe): `python scripts/seed_invitado.py`.
    - La contraseña se lee de la variable `GUEST_PASSWORD`; si no está definida, usa `invitado` emitiendo un warning a `stderr`.
-2. Login estándar:
-```json
-POST /api/auth/login
-{ "usuario": "invitado", "contrasena": "<GUEST_PASSWORD o 'invitado'>" }
-```
-
-El JWT resultante lleva el claim `rol: "invitado"`, disponible para restricciones futuras. Mientras el seed no se ejecute, el login con `invitado` devuelve `401 credenciales_invalidas`.
+2. `POST /api/auth/login` con `{"usuario": "invitado", "contrasena": "<GUEST_PASSWORD o 'invitado'>"}`.
 
 ## Errores
 
@@ -83,9 +91,9 @@ El JWT resultante lleva el claim `rol: "invitado"`, disponible para restriccione
 |---|---|---|
 | 401 | `credenciales_invalidas` | Credenciales incorrectas o token ausente/inválido |
 | 403 | `usuario_inactivo` | Cuenta deshabilitada |
-| 403 | `forbidden` | Sin rol `admin` en ruta protegida |
+| 403 | `forbidden` | Sin rol `admin` en ruta protegida, o rol `invitado` en escritura |
 | 422 | `El nombre de usuario no puede estar vacío.` | Usuario vacío tras normalizar |
-| 429 | `Demasiados intentos...` | Rate limiting de login |
+| 429 | `Demasiados intentos...` | Rate limiting de login/guest (con cabecera `Retry-After: <segundos>`) |
 | 404 | `{"detail": "Not Found"}` | Endpoint inexistente (p. ej. `/api/auth/guest`) — revisar este contrato, no inventar rutas |
 
 ### Errores de validación de request (FastAPI → `detail` array)
@@ -99,15 +107,23 @@ El JWT resultante lleva el claim `rol: "invitado"`, disponible para restriccione
 
 Sin cookie ni header válido → `401 {"detail": "credenciales_invalidas"}`.
 
-- Telemetría: `GET /api/telemetria/{latest,instantaneous,energy}/*`
-- Dispositivos: `GET /api/dispositivos`, `GET /api/dispositivos/{id}`, `POST`, `PUT`
-- Organizaciones y plantas: `GET/POST /api/organizaciones`, `GET/POST /api/plantas`
-- Planes: `GET/POST /api/planes`
-- Alertas: `GET /api/alertas`, `POST /api/alertas/{id}/resolver`
-- Sistema: `POST /api/system/purge` (requiere rol `admin`)
-- Autenticación: `GET /api/auth/me`
+Matriz por rol (DEC-04b): `invitado` = solo lectura; `admin`/`operador` = acceso completo.
 
-Públicas: `POST /api/auth/login`, `POST /api/auth/logout`, `GET /health`.
+| Endpoint | invitado | operador | admin |
+|---|---|---|---|
+| `GET /api/telemetria/{latest,instantaneous,energy}/*` | ✅ | ✅ | ✅ |
+| `GET /api/dispositivos`, `GET /api/dispositivos/{id}` | ✅ | ✅ | ✅ |
+| `POST /api/dispositivos`, `PUT /api/dispositivos/{id}` | ❌ 403 | ✅ | ✅ |
+| `GET /api/organizaciones`, `GET /api/plantas` | ✅ | ✅ | ✅ |
+| `POST /api/organizaciones`, `POST /api/plantas` | ❌ 403 | ✅ | ✅ |
+| `GET /api/planes` | ✅ | ✅ | ✅ |
+| `POST /api/planes` | ❌ 403 | ✅ | ✅ |
+| `GET /api/alertas` | ✅ | ✅ | ✅ |
+| `POST /api/alertas/{id}/resolver` | ❌ 403 | ✅ | ✅ |
+| `POST /api/system/purge` | ❌ 403 | ❌ 403 | ✅ |
+| `GET /api/auth/me` | ✅ | ✅ | ✅ |
+
+Públicas: `POST /api/auth/login`, `POST /api/auth/guest`, `POST /api/auth/logout`, `GET /health`.
 
 ## WebSocket `/ws/live`
 
@@ -124,4 +140,4 @@ Autenticación por cookie `datamaq_token` (o header `Authorization: Bearer`) en 
 3. Logout: llamar `POST /api/auth/logout` (borra la cookie `HttpOnly`, que JS no puede borrar).
 4. Sesión expirada: depender de la respuesta `401` (la cookie `HttpOnly` no expone el claim `exp` a JavaScript).
 5. Restauración de sesión al recargar: llamar `GET /api/auth/me` (reemplaza el sondeo/sessionStorage por la identidad real del JWT).
-6. Acceso invitado: usar `POST /api/auth/login` con `invitado`/`GUEST_PASSWORD` (ver sección "Acceso invitado"); no existe `/api/auth/guest`.
+6. Acceso invitado: usar `POST /api/auth/guest` (ver sección "Acceso invitado"). No se envían credenciales.

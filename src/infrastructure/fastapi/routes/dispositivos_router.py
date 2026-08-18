@@ -8,7 +8,11 @@ from src.application.dtos.dispositivo_dto import (
     DispositivoResponseDTO,
     DispositivoUpdateDTO,
 )
-from src.infrastructure.fastapi.dependencies import get_dispositivos_controller, get_usuario_actual
+from src.infrastructure.fastapi.dependencies import (
+    get_dispositivos_controller,
+    get_usuario_actual,
+    requiere_rol_escritura,
+)
 from src.infrastructure.fastapi.error_handler import manejar_error_http
 
 router = APIRouter(
@@ -37,7 +41,7 @@ def get_dispositivo(
         manejar_error_http(e)
 
 
-@router.post("", response_model=DispositivoResponseDTO)
+@router.post("", response_model=DispositivoResponseDTO, dependencies=[Depends(requiere_rol_escritura)])
 def register_dispositivo(
     dto: DispositivoCreateDTO,
     controller: Annotated[DispositivosController, Depends(get_dispositivos_controller)],
@@ -48,7 +52,7 @@ def register_dispositivo(
         manejar_error_http(e)
 
 
-@router.put("/{device_id}", response_model=DispositivoResponseDTO)
+@router.put("/{device_id}", response_model=DispositivoResponseDTO, dependencies=[Depends(requiere_rol_escritura)])
 def update_dispositivo(
     device_id: str,
     dto: DispositivoUpdateDTO,

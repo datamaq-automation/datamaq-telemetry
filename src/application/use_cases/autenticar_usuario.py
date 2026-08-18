@@ -21,27 +21,46 @@ class AutenticarUsuarioUseCase:
         self.minutos_validez = minutos_validez
         self.rate_limiter = rate_limiter
 
-    def _registrar_intento(self, nombre: str) -> None:
+    def _registrar_intento(self, clave: str) -> None:
         if self.rate_limiter is not None:
-            self.rate_limiter.registrar_intento(nombre)
+            self.rate_limiter.registrar_intento(clave)
 
-    def login(self, dto: LoginRequestDTO) -> LoginResponseDTO:
+    def login(self, dto: LoginRequestDTO, clave_limite: str | None = None) -> LoginResponseDTO:
         nombre = NombreUsuario(dto.usuario).valor
-        if self.rate_limiter is not None and not self.rate_limiter.permitir(nombre):
-            raise DemasiadosIntentosError("Demasiados intentos de inicio de sesión. Intente más tarde.", usuario=nombre)
+        clave = clave_limite if clave_limite is not None else nombre
+        if self.rate_limiter is not None and not self.rate_limiter.permitir(clave):
+            raise DemasiadosIntentosError(
+                "Demasiados intentos de inicio de sesión. Intente más tarde.",
+                usuario=nombre,
+                retry_after_seg=self.rate_limiter.segundos_restantes(clave),
+            )
         usuario = self.repo_usuarios.obtener_por_usuario(nombre)
         if usuario is None:
-            self._registrar_intento(nombre)
+            self._registrar_intento(clave)
             raise CredencialesInvalidasError("Credenciales inválidas.", usuario=nombre)
         if not self.hash_service.verificar(dto.contrasena, usuario.hash_contrasena):
-            self._registrar_intento(nombre)
+            self._registrar_intento(clave)
             raise CredencialesInvalidasError("Credenciales inválidas.", usuario=nombre)
         if not usuario.esta_activo:
             raise UsuarioInactivoError("El usuario se encuentra inactivo.", usuario=nombre)
 
         if self.rate_limiter is not None:
-            self.rate_limiter.resetear(nombre)
+            self.rate_limiter.resetear(clave)
 
         expira_en = PoliticaExpiracionService.calcular_expiracion(ahora_utc(), self.minutos_validez)
         token = self.token_service.generar(usuario.id, usuario.usuario, expira_en, rol=usuario.rol)
+        return LoginResponseDTO(token=token, expira_en=expira_en)
+
+    def guest(self, clave_limite: str) -> LoginResponseDTO:
+        if self.rate_limiter is not None:
+            if not self.rate_limiter.permitir(clave_limite):
+                raise DemasiadosIntentosError(
+                    "Demasiados intentos de inicio de sesión. Intente más tarde.",
+                    usuario="invitado",
+                    retry_after_seg=self.rate_limiter.segundos_restantes(clave_limite),
+                )
+            self.rate_limiter.registrar_intento(clave_limite)
+
+        expira_en = PoliticaExpiracionService.calcular_expiracion(ahora_utc(), self.minutos_validez)
+        token = self.token_service.generar("invitado", "invitado", expira_en, rol="invitado")
         return LoginResponseDTO(token=token, expira_en=expira_en)

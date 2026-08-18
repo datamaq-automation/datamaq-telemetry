@@ -31,7 +31,11 @@ def manejar_error_http(exc: Exception) -> NoReturn:
         logger.error("error_interno", exc_info=True, **contexto)
     else:
         logger.warning("error_negocio", codigo=code, **contexto)
-    raise HTTPException(status_code=code, detail=err["mensaje"]) from exc
+    headers: dict[str, str] | None = None
+    retry_after = getattr(exc, "retry_after_seg", None)
+    if code == 429 and isinstance(retry_after, int):
+        headers = {"Retry-After": str(retry_after)}
+    raise HTTPException(status_code=code, detail=err["mensaje"], headers=headers) from exc
 
 
 def manejar_404(request: Request, exc: Exception) -> JSONResponse:

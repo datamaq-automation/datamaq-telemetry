@@ -21,3 +21,7 @@ class UsuarioInactivoError(DominioAuthException):
 
 class DemasiadosIntentosError(DominioAuthException):
     """Lanzada cuando se excede el límite de intentos de inicio de sesión."""
+
+    def __init__(self, mensaje: str, usuario: str | None = None, retry_after_seg: int | None = None):
+        super().__init__(mensaje, usuario)
+        self.retry_after_seg = retry_after_seg

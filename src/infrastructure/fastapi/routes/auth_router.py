@@ -1,7 +1,7 @@
 from typing import Annotated, Any
 
 import structlog
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Request, Response
 
 from src.adapters.controllers.auth_controller import AuthController
 from src.application.dtos.auth_dto import LoginRequestDTO, LoginResponseDTO, MeResponseDTO
@@ -12,6 +12,17 @@ from src.infrastructure.settings.config import Settings
 router = APIRouter(prefix="/api/auth", tags=["Autenticación"])
 
 logger = structlog.get_logger("auth")
+
+
+def _fijar_cookie(response: Response, settings: Settings, token: str) -> None:
+    response.set_cookie(
+        key=settings.AUTH_COOKIE_NOMBRE,
+        value=token,
+        max_age=settings.auth_cookie_max_age,
+        httponly=settings.AUTH_COOKIE_HTTPONLY,
+        samesite=settings.AUTH_COOKIE_SAMESITE,
+        secure=settings.auth_cookie_secure,
+    )
 
 
 @router.post("/login", response_model=LoginResponseDTO)
@@ -28,14 +39,28 @@ def login(
             usuario=dto.usuario,
             request_id=structlog.contextvars.get_contextvars().get("request_id"),
         )
-        response.set_cookie(
-            key=settings.AUTH_COOKIE_NOMBRE,
-            value=resultado.token,
-            max_age=settings.auth_cookie_max_age,
-            httponly=settings.AUTH_COOKIE_HTTPONLY,
-            samesite=settings.AUTH_COOKIE_SAMESITE,
-            secure=settings.auth_cookie_secure,
+        _fijar_cookie(response, settings, resultado.token)
+        return resultado
+    except Exception as e:
+        manejar_error_http(e)
+
+
+@router.post("/guest", response_model=LoginResponseDTO)
+def guest(
+    request: Request,
+    response: Response,
+    controller: Annotated[AuthController, Depends(get_auth_controller)],
+    settings: Annotated[Settings, Depends(get_settings_dep)],
+) -> LoginResponseDTO:
+    try:
+        ip = request.client.host if request.client else "desconocida"
+        resultado = controller.guest(clave_limite=f"ip:{ip}")
+        logger.info(
+            "login_exitoso",
+            usuario="invitado",
+            request_id=structlog.contextvars.get_contextvars().get("request_id"),
         )
+        _fijar_cookie(response, settings, resultado.token)
         return resultado
     except Exception as e:
         manejar_error_http(e)

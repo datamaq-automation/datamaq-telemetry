@@ -1,6 +1,7 @@
 import base64
 import hashlib
 import hmac
+import math
 import secrets
 from datetime import datetime, timedelta, timezone
 
@@ -102,3 +103,14 @@ class RateLimiterService:
 
     def resetear(self, clave: str) -> None:
         self._intentos.pop(clave, None)
+
+    def segundos_restantes(self, clave: str) -> int:
+        """Segundos restantes de bloqueo; 0 si la clave aún está permitida."""
+        ahora = datetime.now(timezone.utc)
+        self._purgar(clave, ahora)
+        intentos = self._intentos.get(clave, [])
+        if len(intentos) < self.max_intentos:
+            return 0
+        mas_antiguo = min(intentos)
+        edad = (ahora - mas_antiguo).total_seconds()
+        return max(1, math.ceil(self.ventana_segundos - edad))

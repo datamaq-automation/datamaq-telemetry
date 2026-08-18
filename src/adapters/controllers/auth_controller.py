@@ -14,6 +14,9 @@ class AuthController:
     def login(self, dto: LoginRequestDTO) -> LoginResponseDTO:
         return self.use_case.login(dto)
 
+    def guest(self, clave_limite: str) -> LoginResponseDTO:
+        return self.use_case.guest(clave_limite)
+
     def me(self, claims: dict[str, Any]) -> MeResponseDTO:
         rol = claims.get("rol")
         if rol not in ROLES_VALIDOS:
