@@ -62,12 +62,26 @@ cp .env.example .env
 nano .env
 ```
 
-### 3. Crear la base de datos y tablas
-Ejecuta el script de inicialización:
+### 3. Crear la base de datos y aplicar migraciones
+Ejecuta el script de inicialización (crea la BD y aplica `alembic upgrade head`):
 ```bash
 venv/bin/python scripts/init_db.py
 ```
-*(Opcionalmente puedes importar directamente `schema.sql` desde tu cliente MySQL/phpMyAdmin)*
+
+### 4. Migraciones de esquema (Alembic)
+El esquema se gestiona con **Alembic** (fuente de verdad: `src/infrastructure/sqlalchemy/models.py`).
+
+- **BD nueva:** `venv/bin/alembic upgrade head` (o `scripts/init_db.py`).
+- **BD legacy con drift** (tablas existentes sin `alembic_version`): marcar el baseline y reconciliar:
+  ```bash
+  venv/bin/alembic stamp 209ce0774d59
+  venv/bin/alembic upgrade head
+  ```
+- **Generar una migración nueva** (diff metadata↔BD contra una BD temporal):
+  ```bash
+  DATABASE_URL=mysql+pymysql://usuario:pass@127.0.0.1:3306/db_temp venv/bin/alembic revision --autogenerate -m "descripcion"
+  ```
+- **Revertir la última revisión:** `venv/bin/alembic downgrade -1`
 
 ---
 
