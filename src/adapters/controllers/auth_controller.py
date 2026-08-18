@@ -1,5 +1,10 @@
-from src.application.dtos.auth_dto import LoginRequestDTO, LoginResponseDTO
+from typing import Any
+
+from src.application.dtos.auth_dto import LoginRequestDTO, LoginResponseDTO, MeResponseDTO
 from src.application.use_cases.autenticar_usuario import AutenticarUsuarioUseCase
+from src.domain.auth.exceptions import CredencialesInvalidasError
+
+ROLES_VALIDOS = frozenset({"admin", "operador", "invitado"})
 
 
 class AuthController:
@@ -8,3 +13,10 @@ class AuthController:
 
     def login(self, dto: LoginRequestDTO) -> LoginResponseDTO:
         return self.use_case.login(dto)
+
+    def me(self, claims: dict[str, Any]) -> MeResponseDTO:
+        rol = claims.get("rol")
+        if rol not in ROLES_VALIDOS:
+            raise CredencialesInvalidasError("Rol inválido en los claims del token.")
+        usuario = str(claims.get("usuario") or claims.get("sub") or "anon")
+        return MeResponseDTO(usuario=usuario, rol=rol)

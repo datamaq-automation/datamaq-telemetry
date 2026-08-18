@@ -1,10 +1,10 @@
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Response
 
 from src.adapters.controllers.auth_controller import AuthController
-from src.application.dtos.auth_dto import LoginRequestDTO, LoginResponseDTO
-from src.infrastructure.fastapi.dependencies import get_auth_controller, get_settings_dep
+from src.application.dtos.auth_dto import LoginRequestDTO, LoginResponseDTO, MeResponseDTO
+from src.infrastructure.fastapi.dependencies import get_auth_controller, get_settings_dep, get_usuario_actual
 from src.infrastructure.fastapi.error_handler import manejar_error_http
 from src.infrastructure.settings.config import Settings
 
@@ -37,3 +37,14 @@ def login(
 def logout(response: Response, settings: Annotated[Settings, Depends(get_settings_dep)]) -> dict[str, str]:
     response.delete_cookie(key=settings.AUTH_COOKIE_NOMBRE)
     return {"detail": "sesion_cerrada"}
+
+
+@router.get("/me", response_model=MeResponseDTO)
+def me(
+    claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
+    controller: Annotated[AuthController, Depends(get_auth_controller)],
+) -> MeResponseDTO:
+    try:
+        return controller.me(claims)
+    except Exception as e:
+        manejar_error_http(e)

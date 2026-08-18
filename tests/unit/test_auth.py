@@ -7,7 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from src.adapters.controllers.auth_controller import AuthController
-from src.application.dtos.auth_dto import LoginRequestDTO
+from src.application.dtos.auth_dto import LoginRequestDTO, MeResponseDTO
 from src.application.use_cases.autenticar_usuario import AutenticarUsuarioUseCase
 from src.application.use_cases.gestionar_usuarios import GestionarUsuariosUseCase
 from src.domain.auth.entities import UsuarioAuth
@@ -19,6 +19,7 @@ from src.infrastructure.auth.jwt_token_service import JwtTokenService
 from src.infrastructure.fastapi.dependencies import get_usuario_actual
 from src.infrastructure.fastapi.routes.auth_router import login as login_handler
 from src.infrastructure.fastapi.routes.auth_router import logout as logout_handler
+from src.infrastructure.fastapi.routes.auth_router import me as me_handler
 from src.infrastructure.settings.config import get_settings
 from src.infrastructure.sqlalchemy.models import UserModel
 from src.infrastructure.sqlalchemy.mysql_repositories import MySQLUsuariosRepository
@@ -339,6 +340,63 @@ def test_get_usuario_actual_sin_header():
 def test_get_usuario_actual_token_invalido():
     try:
         get_usuario_actual("Bearer token-falso")
+        raise AssertionError("Se esperaba HTTPException 401")
+    except HTTPException as e:
+        assert e.status_code == 401
+        assert e.detail == "credenciales_invalidas"
+
+
+def _controller_me() -> AuthController:
+    use_case = AutenticarUsuarioUseCase(MockRepositorioUsuarios(), HashContrasenaService(), MockTokenService(), 480)
+    return AuthController(use_case)
+
+
+def test_me_rol_admin():
+    dto = _controller_me().me({"usuario": "operador@planta.local", "rol": "admin"})
+    assert isinstance(dto, MeResponseDTO)
+    assert dto.usuario == "operador@planta.local"
+    assert dto.rol == "admin"
+
+
+def test_me_roles_operador_e_invitado():
+    controller = _controller_me()
+    assert controller.me({"usuario": "u1", "rol": "operador"}).rol == "operador"
+    assert controller.me({"usuario": "u1", "rol": "invitado"}).rol == "invitado"
+
+
+def test_me_rol_ausente_o_invalido():
+    controller = _controller_me()
+    for claims in ({"usuario": "u1"}, {"usuario": "u1", "rol": "superadmin"}):
+        try:
+            controller.me(claims)
+            raise AssertionError("Se esperaba CredencialesInvalidasError")
+        except CredencialesInvalidasError:
+            pass
+
+
+def test_me_sin_usuario_usa_sub():
+    dto = _controller_me().me({"sub": "anon", "rol": "admin"})
+    assert dto.usuario == "anon"
+    assert dto.rol == "admin"
+
+
+def test_me_sin_usuario_ni_sub():
+    dto = _controller_me().me({"rol": "admin"})
+    assert dto.usuario == "anon"
+    assert dto.rol == "admin"
+
+
+def test_me_handler_exitoso():
+    controller = _controller_me()
+    dto = me_handler({"usuario": "u1", "rol": "admin"}, controller)
+    assert dto.usuario == "u1"
+    assert dto.rol == "admin"
+
+
+def test_me_handler_rol_invalido():
+    controller = _controller_me()
+    try:
+        me_handler({"usuario": "u1", "rol": "superadmin"}, controller)
         raise AssertionError("Se esperaba HTTPException 401")
     except HTTPException as e:
         assert e.status_code == 401

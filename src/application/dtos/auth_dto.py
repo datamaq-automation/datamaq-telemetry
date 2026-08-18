@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -11,3 +12,8 @@ class LoginRequestDTO(BaseModel):
 class LoginResponseDTO(BaseModel):
     token: str
     expira_en: datetime
+
+
+class MeResponseDTO(BaseModel):
+    usuario: str
+    rol: Literal["admin", "operador", "invitado"]

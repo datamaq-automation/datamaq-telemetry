@@ -1,6 +1,26 @@
 """Verifica que create_app() registra el router de autenticación sin conexión a DB."""
 
+from src.infrastructure.fastapi.dependencies import get_usuario_actual
 from src.infrastructure.fastapi.server import create_app
+
+
+def _rutas(app) -> list:
+    resultado = []
+    for ruta in app.routes:
+        if hasattr(ruta, "original_router"):
+            resultado.extend(ruta.original_router.routes)
+        else:
+            resultado.append(ruta)
+    return resultado
+
+
+def _callables(dep) -> set:
+    resultado = set()
+    if getattr(dep, "call", None) is not None:
+        resultado.add(dep.call)
+    for sub in getattr(dep, "dependencies", None) or []:
+        resultado |= _callables(sub)
+    return resultado
 
 
 def test_create_app_registra_router_auth():
@@ -16,3 +36,16 @@ def test_create_app_registra_router_auth():
 
     assert "/api/auth/login" in rutas
     assert "POST" in rutas["/api/auth/login"]
+
+
+def test_create_app_registra_ruta_me():
+    app = create_app()
+    ruta_me = [r for r in _rutas(app) if r.path == "/api/auth/me" and "GET" in (r.methods or set())]
+    assert len(ruta_me) == 1
+
+
+def test_me_protegido_por_get_usuario_actual():
+    app = create_app()
+    ruta_me = [r for r in _rutas(app) if r.path == "/api/auth/me"]
+    assert len(ruta_me) == 1
+    assert get_usuario_actual in _callables(ruta_me[0].dependant)
