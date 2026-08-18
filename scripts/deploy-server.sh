@@ -21,6 +21,17 @@ if [ "$DEPLOY_SSH_USER" = "root" ]; then
     exit 1
 fi
 
+# Guard: prohibido ejecutar el deploy desde el propio VPS.
+LOCAL_NAMES="$(hostname 2>/dev/null || true) $(hostname -f 2>/dev/null || true) $(hostname -I 2>/dev/null || true)"
+case " $LOCAL_NAMES " in
+    *" $DEPLOY_SSH_HOST "*)
+        echo "Error: no ejecutar deploy-server.sh dentro del VPS."
+        echo "El host destino ($DEPLOY_SSH_HOST) coincide con este equipo."
+        echo "Usá el workflow 'CD Deploy' de GitHub Actions."
+        exit 1
+        ;;
+esac
+
 HEALTH_URL="${DEPLOY_HEALTH_URL:-http://localhost:8000/}"
 
 log() { echo "[$(date +"%Y-%m-%dT%H:%M:%S")] $1"; }
