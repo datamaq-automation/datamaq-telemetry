@@ -1,9 +1,11 @@
 name: CD Deploy
 
-# Despliegue manual del backend datamaq-telemetry al VPS.
+# Despliegue automático del backend datamaq-telemetry al VPS en cada push a main.
 # Requiere bootstrap previo en el VPS (clon, .venv, systemd, BD, mosquitto, .env).
-# Activar el trigger automático en push a main cuando el bootstrap esté completo.
+# También disponible de forma manual vía workflow_dispatch.
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 jobs:
