@@ -9,6 +9,8 @@ jobs:
   gauntlet:
     name: Gauntlet (integridad, ruff, pyright, unit, cobertura, integración)
     runs-on: ubuntu-latest
+    env:
+      APP_ENV: test
     steps:
       - name: Checkout
         uses: actions/checkout@v4
