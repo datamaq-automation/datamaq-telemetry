@@ -3,9 +3,9 @@ from typing import Annotated, Any
 import structlog
 from fastapi import APIRouter, Depends, Request, Response
 
-from src.adapters.controllers.auth_controller import AuthController
 from src.application.dtos.auth_dto import LoginRequestDTO, LoginResponseDTO, MeResponseDTO
-from src.infrastructure.fastapi.dependencies import get_auth_controller, get_settings_dep, get_usuario_actual
+from src.application.use_cases.autenticar_usuario import AutenticarUsuarioUseCase
+from src.infrastructure.fastapi.dependencies import get_auth_use_case, get_settings_dep, get_usuario_actual
 from src.infrastructure.fastapi.error_handler import manejar_error_http
 from src.infrastructure.settings.config import Settings
 
@@ -28,12 +28,12 @@ def _fijar_cookie(response: Response, settings: Settings, token: str) -> None:
 @router.post("/login", response_model=LoginResponseDTO)
 def login(
     dto: LoginRequestDTO,
-    controller: Annotated[AuthController, Depends(get_auth_controller)],
+    use_case: Annotated[AutenticarUsuarioUseCase, Depends(get_auth_use_case)],
     response: Response,
     settings: Annotated[Settings, Depends(get_settings_dep)],
 ):
     try:
-        resultado = controller.login(dto)
+        resultado = use_case.login(dto)
         logger.info(
             "login_exitoso",
             usuario=dto.usuario,
@@ -49,12 +49,12 @@ def login(
 def guest(
     request: Request,
     response: Response,
-    controller: Annotated[AuthController, Depends(get_auth_controller)],
+    use_case: Annotated[AutenticarUsuarioUseCase, Depends(get_auth_use_case)],
     settings: Annotated[Settings, Depends(get_settings_dep)],
 ) -> LoginResponseDTO:
     try:
         ip = request.client.host if request.client else "desconocida"
-        resultado = controller.guest(clave_limite=f"ip:{ip}")
+        resultado = use_case.guest(clave_limite=f"ip:{ip}")
         logger.info(
             "login_exitoso",
             usuario="invitado",
@@ -75,9 +75,9 @@ def logout(response: Response, settings: Annotated[Settings, Depends(get_setting
 @router.get("/me", response_model=MeResponseDTO)
 def me(
     claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
-    controller: Annotated[AuthController, Depends(get_auth_controller)],
+    use_case: Annotated[AutenticarUsuarioUseCase, Depends(get_auth_use_case)],
 ) -> MeResponseDTO:
     try:
-        return controller.me(claims)
+        return use_case.me(claims)
     except Exception as e:
         manejar_error_http(e)

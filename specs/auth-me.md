@@ -56,10 +56,10 @@ credenciales_invalidas`. No se modifica el dominio: se reutiliza `CredencialesIn
 
 - `MeResponseDTO(BaseModel)`: `usuario: str`, `rol: Literal["admin", "operador", "invitado"]`.
 
-### `src/adapters/controllers/auth_controller.py`
+### `src/application/use_cases/autenticar_usuario.py`
 
-- `AuthController.me(claims: dict[str, Any]) -> MeResponseDTO`:
-  - Extrae `rol = claims.get("rol")`; si no está en el conjunto válido → `CredencialesInvalidasError`.
+- `AutenticarUsuarioUseCase.me(claims: dict[str, Any]) -> MeResponseDTO`:
+  - Extrae `rol = claims.get("rol")`; si no está en el conjunto válido (`ROLES_VALIDOS`) → `CredencialesInvalidasError`.
   - Extrae `usuario = claims.get("usuario") or claims.get("sub") or "anon"`.
   - Devuelve `MeResponseDTO(usuario=usuario, rol=rol)`.
   - Agnóstico de framework web (sin imports de FastAPI).
@@ -67,7 +67,7 @@ credenciales_invalidas`. No se modifica el dominio: se reutiliza `CredencialesIn
 ### `src/infrastructure/fastapi/routes/auth_router.py`
 
 - `@router.get("/me", response_model=MeResponseDTO)`:
-  - `def me(claims: Annotated[dict[str, Any], Depends(get_usuario_actual)], controller: Annotated[AuthController, Depends(get_auth_controller)]) -> MeResponseDTO`
+  - `def me(claims: Annotated[dict[str, Any], Depends(get_usuario_actual)], use_case: Annotated[AutenticarUsuarioUseCase, Depends(get_auth_use_case)]) -> MeResponseDTO`
   - `try/except Exception → manejar_error_http(e)`.
 
 ---

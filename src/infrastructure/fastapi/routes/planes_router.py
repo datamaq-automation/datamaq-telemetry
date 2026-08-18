@@ -2,10 +2,10 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
-from src.adapters.controllers.planes_controller import PlanesController
 from src.application.dtos.plan_dto import PlanCreateDTO, PlanResponseDTO
+from src.application.use_cases.gestionar_planes import GestionarPlanesUseCase
 from src.infrastructure.fastapi.dependencies import (
-    get_planes_controller,
+    get_planes_use_case,
     get_usuario_actual,
     requiere_rol_escritura,
 )
@@ -20,18 +20,18 @@ router = APIRouter(
 
 @router.get("/planes", response_model=list[PlanResponseDTO])
 def list_planes(
-    controller: Annotated[PlanesController, Depends(get_planes_controller)],
+    use_case: Annotated[GestionarPlanesUseCase, Depends(get_planes_use_case)],
     solo_publicos: bool = False,
 ):
-    return controller.listar_planes(solo_publicos=solo_publicos)
+    return use_case.listar_catalogo(solo_publicos=solo_publicos)
 
 
 @router.post("/planes", response_model=PlanResponseDTO, dependencies=[Depends(requiere_rol_escritura)])
 def create_plan(
     dto: PlanCreateDTO,
-    controller: Annotated[PlanesController, Depends(get_planes_controller)],
+    use_case: Annotated[GestionarPlanesUseCase, Depends(get_planes_use_case)],
 ):
     try:
-        return controller.crear_plan(dto)
+        return use_case.crear_plan(dto)
     except Exception as e:
         manejar_error_http(e)

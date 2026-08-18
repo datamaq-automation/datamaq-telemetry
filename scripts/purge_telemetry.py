@@ -5,7 +5,6 @@ import sys
 # Add root directory to python path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.adapters.controllers.purga_controller import PurgaController
 from src.application.dtos.purga_dto import PurgaRequestDTO
 from src.application.use_cases.purgar_telemetria import PurgarTelemetriaExpiradaUseCase
 from src.infrastructure.settings.logger import get_logger
@@ -39,13 +38,12 @@ def main():
     try:
         repo_telem = MySQLTelemetriaRepository(db)
         use_case = PurgarTelemetriaExpiradaUseCase(repo_telem, logger=logger)
-        controller = PurgaController(use_case)
 
         req_dto = PurgaRequestDTO(
             dias_retencion_override=args.days,
             batch_size=args.batch_size,
         )
-        res = controller.ejecutar_purga(req_dto)
+        res = use_case.ejecutar(req_dto)
 
         print("[+] Proceso de purga finalizado exitosamente:")
         print(f"    - Instantáneas eliminadas: {res.instantaneas_eliminadas}")

@@ -2,14 +2,14 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
-from src.adapters.controllers.dispositivos_controller import DispositivosController
 from src.application.dtos.dispositivo_dto import (
     DispositivoCreateDTO,
     DispositivoResponseDTO,
     DispositivoUpdateDTO,
 )
+from src.application.use_cases.gestionar_dispositivos import GestionarDispositivosUseCase
 from src.infrastructure.fastapi.dependencies import (
-    get_dispositivos_controller,
+    get_dispositivos_use_case,
     get_usuario_actual,
     requiere_rol_escritura,
 )
@@ -24,19 +24,19 @@ router = APIRouter(
 
 @router.get("", response_model=list[DispositivoResponseDTO])
 def list_dispositivos(
-    controller: Annotated[DispositivosController, Depends(get_dispositivos_controller)],
+    use_case: Annotated[GestionarDispositivosUseCase, Depends(get_dispositivos_use_case)],
     planta_id: str | None = None,
 ):
-    return controller.listar_dispositivos(planta_id)
+    return use_case.listar_dispositivos(planta_id)
 
 
 @router.get("/{device_id}", response_model=DispositivoResponseDTO)
 def get_dispositivo(
     device_id: str,
-    controller: Annotated[DispositivosController, Depends(get_dispositivos_controller)],
+    use_case: Annotated[GestionarDispositivosUseCase, Depends(get_dispositivos_use_case)],
 ):
     try:
-        return controller.obtener_dispositivo(device_id)
+        return use_case.obtener_dispositivo(device_id)
     except Exception as e:
         manejar_error_http(e)
 
@@ -44,10 +44,10 @@ def get_dispositivo(
 @router.post("", response_model=DispositivoResponseDTO, dependencies=[Depends(requiere_rol_escritura)])
 def register_dispositivo(
     dto: DispositivoCreateDTO,
-    controller: Annotated[DispositivosController, Depends(get_dispositivos_controller)],
+    use_case: Annotated[GestionarDispositivosUseCase, Depends(get_dispositivos_use_case)],
 ):
     try:
-        return controller.registrar_dispositivo(dto)
+        return use_case.registrar_dispositivo(dto)
     except Exception as e:
         manejar_error_http(e)
 
@@ -56,9 +56,9 @@ def register_dispositivo(
 def update_dispositivo(
     device_id: str,
     dto: DispositivoUpdateDTO,
-    controller: Annotated[DispositivosController, Depends(get_dispositivos_controller)],
+    use_case: Annotated[GestionarDispositivosUseCase, Depends(get_dispositivos_use_case)],
 ):
     try:
-        return controller.actualizar_dispositivo(device_id, dto)
+        return use_case.actualizar_dispositivo(device_id, dto)
     except Exception as e:
         manejar_error_http(e)

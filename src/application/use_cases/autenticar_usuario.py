@@ -1,9 +1,13 @@
-from src.application.dtos.auth_dto import LoginRequestDTO, LoginResponseDTO
+from typing import Any
+
+from src.application.dtos.auth_dto import LoginRequestDTO, LoginResponseDTO, MeResponseDTO
 from src.domain.auth.entities import ahora_utc
 from src.domain.auth.exceptions import CredencialesInvalidasError, DemasiadosIntentosError, UsuarioInactivoError
 from src.domain.auth.ports import GeneradorTokenPort, RepositorioUsuariosPort
 from src.domain.auth.services import HashContrasenaService, PoliticaExpiracionService, RateLimiterService
 from src.domain.auth.value_objects import NombreUsuario
+
+ROLES_VALIDOS = frozenset({"admin", "operador", "invitado"})
 
 
 class AutenticarUsuarioUseCase:
@@ -64,3 +68,10 @@ class AutenticarUsuarioUseCase:
         expira_en = PoliticaExpiracionService.calcular_expiracion(ahora_utc(), self.minutos_validez)
         token = self.token_service.generar("invitado", "invitado", expira_en, rol="invitado")
         return LoginResponseDTO(token=token, expira_en=expira_en)
+
+    def me(self, claims: dict[str, Any]) -> MeResponseDTO:
+        rol = claims.get("rol")
+        if rol not in ROLES_VALIDOS:
+            raise CredencialesInvalidasError("Rol inválido en los claims del token.")
+        usuario = str(claims.get("usuario") or claims.get("sub") or "anon")
+        return MeResponseDTO(usuario=usuario, rol=rol)

@@ -31,7 +31,6 @@ src/
 │   └── mappers/                                 # telemetria_mapper, dispositivo_mapper, plan_mapper, alerta_mapper
 │
 ├── adapters/                                    # 3. Capa de Adaptadores (Agnósticos del Framework Web)
-│   ├── controllers/                             # telemetria, dispositivos, planes, purga, alertas
 │   ├── gateways/                                # in_memory_event_broadcaster (PublicadorEventosPort)
 │   └── presenters/                              # error_presenter (Mapeo a códigos de error estándar)
 │

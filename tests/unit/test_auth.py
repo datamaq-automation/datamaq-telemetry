@@ -7,7 +7,6 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from structlog.testing import capture_logs
 
-from src.adapters.controllers.auth_controller import AuthController
 from src.application.dtos.auth_dto import LoginRequestDTO, MeResponseDTO
 from src.application.use_cases.autenticar_usuario import AutenticarUsuarioUseCase
 from src.application.use_cases.gestionar_usuarios import GestionarUsuariosUseCase
@@ -240,11 +239,10 @@ def test_repositorio_usuarios_sqlite():
 def test_login_handler_exitoso():
     repo = MockRepositorioUsuarios([_usuario_activo()])
     use_case = AutenticarUsuarioUseCase(repo, HashContrasenaService(), MockTokenService(), 480)
-    controller = AuthController(use_case)
 
     response = login_handler(
         LoginRequestDTO(usuario="operador@planta.local", contrasena="secreto123"),
-        controller,
+        use_case,
         Response(),
         get_settings(),
     )
@@ -255,11 +253,10 @@ def test_login_handler_exitoso():
 def test_login_handler_credenciales_invalidas():
     repo = MockRepositorioUsuarios()
     use_case = AutenticarUsuarioUseCase(repo, HashContrasenaService(), MockTokenService(), 480)
-    controller = AuthController(use_case)
 
     try:
         login_handler(
-            LoginRequestDTO(usuario="nadie@planta.local", contrasena="x"), controller, Response(), get_settings()
+            LoginRequestDTO(usuario="nadie@planta.local", contrasena="x"), use_case, Response(), get_settings()
         )
         raise AssertionError("Se esperaba HTTPException 401")
     except HTTPException as e:
@@ -270,12 +267,11 @@ def test_login_handler_credenciales_invalidas():
 def test_login_handler_usuario_inactivo():
     repo = MockRepositorioUsuarios([_usuario_activo(activo=False)])
     use_case = AutenticarUsuarioUseCase(repo, HashContrasenaService(), MockTokenService(), 480)
-    controller = AuthController(use_case)
 
     try:
         login_handler(
             LoginRequestDTO(usuario="operador@planta.local", contrasena="secreto123"),
-            controller,
+            use_case,
             Response(),
             get_settings(),
         )
@@ -288,10 +284,9 @@ def test_login_handler_usuario_inactivo():
 def test_login_handler_nombre_usuario_invalido():
     repo = MockRepositorioUsuarios()
     use_case = AutenticarUsuarioUseCase(repo, HashContrasenaService(), MockTokenService(), 480)
-    controller = AuthController(use_case)
 
     try:
-        login_handler(LoginRequestDTO(usuario="   ", contrasena="x"), controller, Response(), get_settings())
+        login_handler(LoginRequestDTO(usuario="   ", contrasena="x"), use_case, Response(), get_settings())
         raise AssertionError("Se esperaba HTTPException 422")
     except HTTPException as e:
         assert e.status_code == 422
@@ -301,12 +296,11 @@ def test_login_handler_nombre_usuario_invalido():
 def test_login_handler_setea_cookie_httponly():
     repo = MockRepositorioUsuarios([_usuario_activo()])
     use_case = AutenticarUsuarioUseCase(repo, HashContrasenaService(), MockTokenService(), 480)
-    controller = AuthController(use_case)
     response = Response()
 
     login_handler(
         LoginRequestDTO(usuario="operador@planta.local", contrasena="secreto123"),
-        controller,
+        use_case,
         response,
         get_settings(),
     )
@@ -321,12 +315,11 @@ def test_login_handler_setea_cookie_httponly():
 def test_login_handler_exitoso_loguea_login_exitoso():
     repo = MockRepositorioUsuarios([_usuario_activo()])
     use_case = AutenticarUsuarioUseCase(repo, HashContrasenaService(), MockTokenService(), 480)
-    controller = AuthController(use_case)
 
     with capture_logs() as logs:
         login_handler(
             LoginRequestDTO(usuario="operador@planta.local", contrasena="secreto123"),
-            controller,
+            use_case,
             Response(),
             get_settings(),
         )
@@ -379,57 +372,56 @@ def test_get_usuario_actual_token_invalido():
         assert e.detail == "credenciales_invalidas"
 
 
-def _controller_me() -> AuthController:
-    use_case = AutenticarUsuarioUseCase(MockRepositorioUsuarios(), HashContrasenaService(), MockTokenService(), 480)
-    return AuthController(use_case)
+def _use_case_me() -> AutenticarUsuarioUseCase:
+    return AutenticarUsuarioUseCase(MockRepositorioUsuarios(), HashContrasenaService(), MockTokenService(), 480)
 
 
 def test_me_rol_admin():
-    dto = _controller_me().me({"usuario": "operador@planta.local", "rol": "admin"})
+    dto = _use_case_me().me({"usuario": "operador@planta.local", "rol": "admin"})
     assert isinstance(dto, MeResponseDTO)
     assert dto.usuario == "operador@planta.local"
     assert dto.rol == "admin"
 
 
 def test_me_roles_operador_e_invitado():
-    controller = _controller_me()
-    assert controller.me({"usuario": "u1", "rol": "operador"}).rol == "operador"
-    assert controller.me({"usuario": "u1", "rol": "invitado"}).rol == "invitado"
+    use_case = _use_case_me()
+    assert use_case.me({"usuario": "u1", "rol": "operador"}).rol == "operador"
+    assert use_case.me({"usuario": "u1", "rol": "invitado"}).rol == "invitado"
 
 
 def test_me_rol_ausente_o_invalido():
-    controller = _controller_me()
+    use_case = _use_case_me()
     for claims in ({"usuario": "u1"}, {"usuario": "u1", "rol": "superadmin"}):
         try:
-            controller.me(claims)
+            use_case.me(claims)
             raise AssertionError("Se esperaba CredencialesInvalidasError")
         except CredencialesInvalidasError:
             pass
 
 
 def test_me_sin_usuario_usa_sub():
-    dto = _controller_me().me({"sub": "anon", "rol": "admin"})
+    dto = _use_case_me().me({"sub": "anon", "rol": "admin"})
     assert dto.usuario == "anon"
     assert dto.rol == "admin"
 
 
 def test_me_sin_usuario_ni_sub():
-    dto = _controller_me().me({"rol": "admin"})
+    dto = _use_case_me().me({"rol": "admin"})
     assert dto.usuario == "anon"
     assert dto.rol == "admin"
 
 
 def test_me_handler_exitoso():
-    controller = _controller_me()
-    dto = me_handler({"usuario": "u1", "rol": "admin"}, controller)
+    use_case = _use_case_me()
+    dto = me_handler({"usuario": "u1", "rol": "admin"}, use_case)
     assert dto.usuario == "u1"
     assert dto.rol == "admin"
 
 
 def test_me_handler_rol_invalido():
-    controller = _controller_me()
+    use_case = _use_case_me()
     try:
-        me_handler({"usuario": "u1", "rol": "superadmin"}, controller)
+        me_handler({"usuario": "u1", "rol": "superadmin"}, use_case)
         raise AssertionError("Se esperaba HTTPException 401")
     except HTTPException as e:
         assert e.status_code == 401

@@ -59,14 +59,14 @@ Sin DTO de request nuevo: `POST /api/auth/guest` no recibe body. Respuesta =
 
 ## 4. Adaptadores e Infraestructura
 
-- `src/adapters/controllers/auth_controller.py` — `AuthController.guest(clave_limite) -> LoginResponseDTO`.
+- `src/application/use_cases/autenticar_usuario.py` — `AutenticarUsuarioUseCase.guest(clave_limite) -> LoginResponseDTO`.
 - `src/infrastructure/fastapi/error_handler.py` — `manejar_error_http`: si
   `code == 429` y `getattr(exc, "retry_after_seg", None)` es `int`, emite
   `HTTPException(429, detail, headers={"Retry-After": str(retry_after_seg)})`.
 - `src/infrastructure/fastapi/routes/auth_router.py`:
   - helper `_fijar_cookie(response, settings, token)` (refactor del login).
   - `POST /guest`: `ip = request.client.host if request.client else "desconocida"`,
-    `controller.guest(clave_limite=f"ip:{ip}")`, fija cookie, evento
+    `use_case.guest(clave_limite=f"ip:{ip}")`, fija cookie, evento
     `login_exitoso` con `usuario="invitado"`.
 
 Sin cambios en `Settings` (reutiliza `LOGIN_*`).
@@ -80,7 +80,7 @@ Sin cambios en `Settings` (reutiliza `LOGIN_*`).
 2. `test_guest_handler_fija_cookie` — handler guest con `Response()` fija cookie
    `datamaq_token` HttpOnly/SameSite.
 3. `test_me_con_token_guest` — `get_usuario_actual` decodifica token guest y
-   `AuthController.me` devuelve `MeResponseDTO(usuario="invitado", rol="invitado")`.
+   `AutenticarUsuarioUseCase.me` devuelve `MeResponseDTO(usuario="invitado", rol="invitado")`.
 4. `test_guest_rate_limit_por_ip` — 5 sesiones OK por IP; la 6ª →
    `DemasiadosIntentosError`; otra IP → OK.
 5. `test_rate_limiter_segundos_restantes` — permitido → `0`; bloqueado → `1..ventana`.

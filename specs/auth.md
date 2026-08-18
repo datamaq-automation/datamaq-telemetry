@@ -23,7 +23,7 @@ local de su Fase 1.
 
 **Alcance de esta iteración:** dominio `auth`, repositorio de usuarios, hash y
 política de expiración, generación/verificación JWT, caso de uso de login, DTOs,
-controller, router `POST /api/auth/login`, dependencia de verificación inactiva y
+router `POST /api/auth/login`, dependencia de verificación inactiva y
 seed admin. Nota KISS: no se crea `usuario_mapper.py` porque no existe
 transformación entidad→DTO en este alcance (login devuelve `token` + `expira_en`,
 no la entidad).
@@ -98,7 +98,6 @@ Sin dependencias externas en `domain/auth/` (solo stdlib):
 
 ## 4. Adaptadores e Infraestructura
 
-- `src/adapters/controllers/auth_controller.py` — `AuthController`.
 - `src/infrastructure/auth/jwt_token_service.py` — `JwtTokenService(secreto)`
   que implementa `GeneradorTokenPort`: header `{"alg":"HS256","typ":"JWT"}`,
   payload `{"sub","usuario","exp"}`, base64url sin padding, firma
@@ -112,7 +111,7 @@ Sin dependencias externas en `domain/auth/` (solo stdlib):
 - `src/infrastructure/fastapi/routes/auth_router.py` — `APIRouter(prefix="/api/auth")`:
   - `POST /login` → `login`.
 - `src/infrastructure/fastapi/dependencies.py`:
-  - `get_auth_controller` (ensambla repo + hash + JWT + use case).
+  - `get_auth_use_case` (ensambla repo + hash + JWT + use case).
   - `get_usuario_actual` (dependencia Bearer que verifica el JWT; **no aplicada
     a rutas existentes**).
 - `src/infrastructure/fastapi/server.py` — registrar `auth_router`.

@@ -3,11 +3,11 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
-from src.adapters.controllers.purga_controller import PurgaController
 from src.application.dtos.purga_dto import PurgaRequestDTO, PurgaResultadoDTO
+from src.application.use_cases.purgar_telemetria import PurgarTelemetriaExpiradaUseCase
 from src.infrastructure.fastapi.dependencies import (
     get_mqtt_listener,
-    get_purga_controller,
+    get_purga_use_case,
     requiere_rol_admin,
 )
 from src.infrastructure.fastapi.error_handler import manejar_error_http
@@ -28,11 +28,11 @@ def health_check():
 @router.post("/api/system/purge", response_model=PurgaResultadoDTO)
 def trigger_purge(
     claims: Annotated[dict, Depends(requiere_rol_admin)],
-    controller: Annotated[PurgaController, Depends(get_purga_controller)],
+    use_case: Annotated[PurgarTelemetriaExpiradaUseCase, Depends(get_purga_use_case)],
     dto: PurgaRequestDTO | None = None,
 ):
     try:
         req = dto or PurgaRequestDTO()
-        return controller.ejecutar_purga(req)
+        return use_case.ejecutar(req)
     except Exception as e:
         manejar_error_http(e)

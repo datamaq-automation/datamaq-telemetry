@@ -87,11 +87,10 @@ Sin dependencias externas en `domain/`. Se agregan a los módulos existentes:
 
 ### Controller y Router
 
-- `src/adapters/controllers/planes_controller.py` — `PlanesController`.
 - `src/infrastructure/fastapi/routes/planes_router.py` — `APIRouter(prefix="/api")`:
   - `GET /planes?solo_publicos={bool}` → `list_planes`.
   - `POST /planes` → `create_plan`.
-- `src/infrastructure/fastapi/dependencies.py` — `get_planes_controller`.
+- `src/infrastructure/fastapi/dependencies.py` — `get_planes_use_case`.
 - `src/infrastructure/fastapi/server.py` — registrar `planes_router`.
 
 ## 4. Matriz de Pruebas (RED Suite)
@@ -198,11 +197,10 @@ Exponer endpoints REST para que el frontend del dashboard y operadores de planta
 
 ## 4. Adaptadores y Routers
 
-- `src/adapters/controllers/alertas_controller.py` — `AlertasController`.
 - `src/infrastructure/fastapi/routes/alertas_router.py`:
   - `GET /api/alertas?device_id={str}&solo_abiertas={bool}&limite={int}`
   - `POST /api/alertas/{alerta_id}/resolver`
-- `src/infrastructure/fastapi/dependencies.py` — `get_alertas_controller`.
+- `src/infrastructure/fastapi/dependencies.py` — `get_alertas_use_case`.
 - `src/infrastructure/fastapi/server.py` — registrar `alertas_router`.
 
 ## 5. Matriz de Pruebas (RED Suite)

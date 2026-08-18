@@ -2,15 +2,15 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
-from src.adapters.controllers.dispositivos_controller import DispositivosController
 from src.application.dtos.organizacion_dto import (
     OrganizacionCreateDTO,
     OrganizacionResponseDTO,
     PlantaCreateDTO,
     PlantaResponseDTO,
 )
+from src.application.use_cases.gestionar_dispositivos import GestionarDispositivosUseCase
 from src.infrastructure.fastapi.dependencies import (
-    get_dispositivos_controller,
+    get_dispositivos_use_case,
     get_usuario_actual,
     requiere_rol_escritura,
 )
@@ -25,36 +25,36 @@ router = APIRouter(
 
 @router.get("/organizaciones", response_model=list[OrganizacionResponseDTO])
 def list_organizaciones(
-    controller: Annotated[DispositivosController, Depends(get_dispositivos_controller)],
+    use_case: Annotated[GestionarDispositivosUseCase, Depends(get_dispositivos_use_case)],
 ):
-    return controller.listar_organizaciones()
+    return use_case.listar_organizaciones()
 
 
 @router.post("/organizaciones", response_model=OrganizacionResponseDTO, dependencies=[Depends(requiere_rol_escritura)])
 def create_organizacion(
     dto: OrganizacionCreateDTO,
-    controller: Annotated[DispositivosController, Depends(get_dispositivos_controller)],
+    use_case: Annotated[GestionarDispositivosUseCase, Depends(get_dispositivos_use_case)],
 ):
     try:
-        return controller.crear_organizacion(dto)
+        return use_case.crear_organizacion(dto)
     except Exception as e:
         manejar_error_http(e)
 
 
 @router.get("/plantas", response_model=list[PlantaResponseDTO])
 def list_plantas(
-    controller: Annotated[DispositivosController, Depends(get_dispositivos_controller)],
+    use_case: Annotated[GestionarDispositivosUseCase, Depends(get_dispositivos_use_case)],
     organizacion_id: str | None = None,
 ):
-    return controller.listar_plantas(organizacion_id)
+    return use_case.listar_plantas(organizacion_id)
 
 
 @router.post("/plantas", response_model=PlantaResponseDTO, dependencies=[Depends(requiere_rol_escritura)])
 def create_planta(
     dto: PlantaCreateDTO,
-    controller: Annotated[DispositivosController, Depends(get_dispositivos_controller)],
+    use_case: Annotated[GestionarDispositivosUseCase, Depends(get_dispositivos_use_case)],
 ):
     try:
-        return controller.crear_planta(dto)
+        return use_case.crear_planta(dto)
     except Exception as e:
         manejar_error_http(e)

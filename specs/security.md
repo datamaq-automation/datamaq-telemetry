@@ -117,7 +117,7 @@ Nuevos campos: `AUTH_REQUIRED=True`, `API_EXPOSE_DOCS=True`,
 - `get_usuario_actual`: si `not AUTH_REQUIRED` → claims `{"sub":"anon",
   "rol":"admin", "usuario":"anon"}`; si no, valida Bearer (401).
 - `requiere_rol_admin`: dependencia que exige `claims["rol"] == "admin"` (403).
-- `get_auth_controller`: inyecta `RateLimiterService` singleton.
+- `get_auth_use_case`: inyecta `RateLimiterService` singleton.
 
 ### `src/infrastructure/fastapi/server.py`
 

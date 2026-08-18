@@ -5,7 +5,6 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from fastapi import HTTPException, Response
 
-from src.adapters.controllers.auth_controller import AuthController
 from src.application.dtos.auth_dto import LoginRequestDTO
 from src.application.use_cases.autenticar_usuario import AutenticarUsuarioUseCase
 from src.domain.auth.entities import UsuarioAuth
@@ -47,10 +46,6 @@ def _use_case_guest(rate_limiter: RateLimiterService | None = None) -> Autentica
     )
 
 
-def _controller() -> AuthController:
-    return AuthController(_use_case_guest())
-
-
 # G1 — token guest autosuficiente, sin base de datos
 def test_guest_genera_token_sin_bd():
     token_service = JwtTokenService("clave-secreta")
@@ -73,11 +68,11 @@ def test_guest_genera_token_sin_bd():
 
 # G2 — handler guest fija la cookie HttpOnly
 def test_guest_handler_fija_cookie():
-    controller = _controller()
+    use_case = _use_case_guest()
     response = Response()
     settings = Settings(_env_file=None, DEBUG=True)
 
-    resultado = guest_handler(_RequestFake("1.2.3.4"), response, controller, settings)
+    resultado = guest_handler(_RequestFake("1.2.3.4"), response, use_case, settings)
 
     assert resultado.token
     set_cookie = response.headers.get("set-cookie", "")
@@ -99,7 +94,7 @@ def test_me_con_token_guest(monkeypatch):
     )
 
     claims = deps.get_usuario_actual(None, token)
-    dto = _controller().me(claims)
+    dto = _use_case_guest().me(claims)
 
     assert dto.usuario == "invitado"
     assert dto.rol == "invitado"

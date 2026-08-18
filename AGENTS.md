@@ -17,9 +17,9 @@ API FastAPI y Worker MQTT para la ingesta y persistencia de telemetría de medid
 
 - `src/domain/{tematica}/` — `entities.py`, `value_objects.py`, `services.py`, `ports.py`, `exceptions.py`. Dominio 100% puro: solo stdlib + `@dataclass(frozen=True)`; **prohibido importar librerías de terceros**.
 - `src/application/` — `dtos/` (Pydantic v2), `mappers/`, `use_cases/`. Solo importa de `domain/`.
-- `src/adapters/` — `controllers/`, `gateways/`, `presenters/`.
+- `src/adapters/` — `gateways/`, `presenters/`.
   - **Inversión de Dependencias:** Nunca importa `src/infrastructure/`.
-  - **Agnosticismo Web:** Controladores y presenters son clases puras de Python agnósticas de frameworks web.
+  - **Agnosticismo Web:** Presenters y gateways son clases puras de Python agnósticas de frameworks web. La lógica de entrada vive en los casos de uso de `application/`; los routers de `infrastructure/fastapi/` los inyectan directamente (sin capa de controllers).
 - `src/infrastructure/` — organizado por librería: `fastapi/`, `sqlalchemy/`, `paho_mqtt/`, `pydantic/`.
 - `src/main.py` — Entrypoint ASGI (`app = create_app()`).
 
