@@ -1,0 +1,43 @@
+name: CD Deploy
+
+# Despliegue manual del backend datamaq-telemetry al VPS.
+# Requiere bootstrap previo en el VPS (clon, .venv, systemd, BD, mosquitto, .env).
+# Activar el trigger automático en push a main cuando el bootstrap esté completo.
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Desplegar al VPS
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: deploy-telemetry
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+          log-public-key: false
+
+      - name: Agregar known hosts
+        env:
+          DEPLOY_SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+          DEPLOY_SSH_PORT: ${{ secrets.DEPLOY_SSH_PORT }}
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p "$DEPLOY_SSH_PORT" -H "$DEPLOY_SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Deploy (pull + deps + restart + health check + rollback)
+        env:
+          DEPLOY_SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+          DEPLOY_SSH_PORT: ${{ secrets.DEPLOY_SSH_PORT }}
+          DEPLOY_SSH_USER: ${{ secrets.DEPLOY_SSH_USER }}
+          DEPLOY_REMOTE_DIR: ${{ vars.DEPLOY_REMOTE_DIR || '/var/www/datamaq-telemetry' }}
+          DEPLOY_SERVICE_NAME: ${{ vars.DEPLOY_SERVICE_NAME || 'datamaq-telemetry.service' }}
+          DEPLOY_HEALTH_URL: ${{ vars.DEPLOY_HEALTH_URL || 'http://localhost:8000/' }}
+        run: ./scripts/deploy-server.sh

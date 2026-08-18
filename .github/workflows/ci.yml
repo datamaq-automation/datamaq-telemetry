@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  gauntlet:
+    name: Gauntlet (integridad, ruff, pyright, unit, cobertura, integración)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Integridad (__init__.py de 0 bytes)
+        run: pytest tests/test_empty_inits.py -q
+
+      - name: Estilo (ruff check)
+        run: ruff check .
+
+      - name: Formato (ruff format)
+        run: ruff format --check .
+
+      - name: Tipado (pyright)
+        run: pyright
+
+      - name: Tests unitarios (cobertura >= 85%)
+        run: pytest tests/unit --cov=src --cov-report=term-missing --cov-fail-under=85
+
+      - name: Tests de integración
+        run: pytest tests/integration -q
