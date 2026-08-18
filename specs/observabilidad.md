@@ -21,6 +21,34 @@ Sin cambios.
 - `auth_router` recibe settings vía `Depends(get_settings_dep)` en lugar de llamar `get_settings()` dentro del handler.
 - `docs/contrato-auth.md`: documenta la emisión de `X-Request-ID` (D-03).
 
+### Contexto de negocio en `error_negocio` (sujeto del error)
+
+- `DominioAuthException` (`src/domain/auth/exceptions.py`) gana un atributo opcional
+  `usuario: str | None = None` (retrocompatible): las excepciones de negocio pueden
+  transportar el sujeto afectado sin acoplar el dominio al logging.
+- `AutenticarUsuarioUseCase.login` adjunta el nombre **normalizado** (`NombreUsuario`)
+  al lanzar `DemasiadosIntentosError`, `CredencialesInvalidasError` (usuario
+  inexistente y contraseña incorrecta) y `UsuarioInactivoError`.
+- `manejar_error_http` lee `getattr(exc, "usuario", None)`; si no es `None`, añade
+  `usuario` al evento (`error_negocio` y `error_interno`). Si es `None`, la clave
+  **no** se emite (no contamina errores sin contexto). `redactar_secretos`
+  (`logger.py`) ya redacta `contrasena`/`password`/`token`/`secret`/`clave` como
+  doble barrera; la clave `usuario` no es sensible y se emite tal cual.
+
+### Log de rutas inexistentes (`404`)
+
+- `manejar_404(request, exc)` (`src/infrastructure/fastapi/error_handler.py`):
+  handler de `StarletteHTTPException` registrado en `create_app`. Loguea
+  `ruta_no_encontrada` (warning, con `metodo`, `path`, `request_id`) **solo** si
+  `status_code == 404 and detail == "Not Found"`. Los `404` de negocio (p. ej.
+  `DispositivoNoEncontradoError`, ya logueados como `error_negocio`) no duplican.
+  Reconstruye la respuesta estándar de Starlette (`JSONResponse` + `headers`).
+
+### Auditoría de login exitoso
+
+- `auth_router.login` loguea `login_exitoso` (info) con `usuario=dto.usuario` y
+  `request_id` tras el login correcto. Nunca se loguea `contrasena`.
+
 ## 5. Matriz de Pruebas (RED Suite)
 
 | # | Escenario | Assert |
@@ -29,6 +57,13 @@ Sin cambios.
 | E2 | dos requests con error | `X-Request-ID` distintos |
 | E3 | excepción de negocio (credenciales inválidas) | 401; log `error_negocio` warning sin `exc_info`/`exception` ni campo `contrasena` |
 | E4 | mapeo de errores independiente del modo | `manejar_error_http` mapea `CredencialesInvalidasError`→401, `DemasiadosIntentosError`→429, `Exception`→500 (sin settings) |
+| E5 | error de negocio con `usuario` | 401; log `error_negocio` incluye `usuario=<valor>` y no incluye `contrasena` |
+| E6 | error de negocio sin `usuario` | log `error_negocio` **sin** la clave `usuario` |
+| E7 | `DemasiadosIntentosError` con `usuario` | 429; log `error_negocio` incluye `usuario` |
+| E8 | login fallido (usuario inexistente) | `CredencialesInvalidasError` con `usuario` normalizado (`" Operador "` → `"operador"`) |
+| E9 | ruta inexistente | 404; log `ruta_no_encontrada` con `metodo`, `path` y `request_id` |
+| E10 | 404 de negocio (`DispositivoNoEncontradoError`) | log `error_negocio` presente; `ruta_no_encontrada` ausente |
+| E11 | login exitoso | log `login_exitoso` con `usuario` y sin `contrasena` |
 
 ## 6. Criterios del Gauntlet
 

@@ -1,5 +1,6 @@
 from typing import Annotated, Any
 
+import structlog
 from fastapi import APIRouter, Depends, Response
 
 from src.adapters.controllers.auth_controller import AuthController
@@ -9,6 +10,8 @@ from src.infrastructure.fastapi.error_handler import manejar_error_http
 from src.infrastructure.settings.config import Settings
 
 router = APIRouter(prefix="/api/auth", tags=["Autenticación"])
+
+logger = structlog.get_logger("auth")
 
 
 @router.post("/login", response_model=LoginResponseDTO)
@@ -20,6 +23,11 @@ def login(
 ):
     try:
         resultado = controller.login(dto)
+        logger.info(
+            "login_exitoso",
+            usuario=dto.usuario,
+            request_id=structlog.contextvars.get_contextvars().get("request_id"),
+        )
         response.set_cookie(
             key=settings.AUTH_COOKIE_NOMBRE,
             value=resultado.token,

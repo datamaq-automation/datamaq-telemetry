@@ -28,16 +28,16 @@ class AutenticarUsuarioUseCase:
     def login(self, dto: LoginRequestDTO) -> LoginResponseDTO:
         nombre = NombreUsuario(dto.usuario).valor
         if self.rate_limiter is not None and not self.rate_limiter.permitir(nombre):
-            raise DemasiadosIntentosError("Demasiados intentos de inicio de sesión. Intente más tarde.")
+            raise DemasiadosIntentosError("Demasiados intentos de inicio de sesión. Intente más tarde.", usuario=nombre)
         usuario = self.repo_usuarios.obtener_por_usuario(nombre)
         if usuario is None:
             self._registrar_intento(nombre)
-            raise CredencialesInvalidasError("Credenciales inválidas.")
+            raise CredencialesInvalidasError("Credenciales inválidas.", usuario=nombre)
         if not self.hash_service.verificar(dto.contrasena, usuario.hash_contrasena):
             self._registrar_intento(nombre)
-            raise CredencialesInvalidasError("Credenciales inválidas.")
+            raise CredencialesInvalidasError("Credenciales inválidas.", usuario=nombre)
         if not usuario.esta_activo:
-            raise UsuarioInactivoError("El usuario se encuentra inactivo.")
+            raise UsuarioInactivoError("El usuario se encuentra inactivo.", usuario=nombre)
 
         if self.rate_limiter is not None:
             self.rate_limiter.resetear(nombre)

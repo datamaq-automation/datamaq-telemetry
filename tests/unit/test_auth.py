@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException, Response
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
+from structlog.testing import capture_logs
 
 from src.adapters.controllers.auth_controller import AuthController
 from src.application.dtos.auth_dto import LoginRequestDTO, MeResponseDTO
@@ -145,6 +146,18 @@ def test_login_usuario_inactivo():
         raise AssertionError("Se esperaba UsuarioInactivoError")
     except UsuarioInactivoError:
         pass
+
+
+# E8 — login fallido adjunta el usuario normalizado a la excepción
+def test_login_fallido_lleva_usuario_normalizado():
+    repo = MockRepositorioUsuarios()
+    use_case, _ = _use_case_login(repo)
+
+    try:
+        use_case.login(LoginRequestDTO(usuario="  Operador@Planta.Local  ", contrasena="x"))
+        raise AssertionError("Se esperaba CredencialesInvalidasError")
+    except CredencialesInvalidasError as e:
+        assert e.usuario == "operador@planta.local"
 
 
 def test_jwt_generar_y_verificar():
@@ -302,6 +315,26 @@ def test_login_handler_setea_cookie_httponly():
     assert "datamaq_token=token-usuario-1" in set_cookie
     assert "HttpOnly" in set_cookie
     assert "SameSite=strict" in set_cookie
+
+
+# E11 — login exitoso emite el evento login_exitoso sin contrasena
+def test_login_handler_exitoso_loguea_login_exitoso():
+    repo = MockRepositorioUsuarios([_usuario_activo()])
+    use_case = AutenticarUsuarioUseCase(repo, HashContrasenaService(), MockTokenService(), 480)
+    controller = AuthController(use_case)
+
+    with capture_logs() as logs:
+        login_handler(
+            LoginRequestDTO(usuario="operador@planta.local", contrasena="secreto123"),
+            controller,
+            Response(),
+            get_settings(),
+        )
+
+    exitosos = [ev for ev in logs if ev.get("event") == "login_exitoso"]
+    assert exitosos, "No se registró el evento login_exitoso"
+    assert exitosos[0]["usuario"] == "operador@planta.local"
+    assert "contrasena" not in exitosos[0]
 
 
 def test_logout_borra_cookie():

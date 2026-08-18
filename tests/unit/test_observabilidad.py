@@ -1,17 +1,21 @@
 """Observabilidad de errores HTTP: request_id, logging de errores y mapeo consistente."""
 
-from fastapi import FastAPI
+import pytest
+from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from structlog.testing import capture_logs
 
 from src.domain.auth.exceptions import CredencialesInvalidasError, DemasiadosIntentosError
-from src.infrastructure.fastapi.error_handler import manejar_error_http
+from src.domain.telemetria.exceptions import DispositivoNoEncontradoError
+from src.infrastructure.fastapi.error_handler import manejar_404, manejar_error_http
 from src.infrastructure.fastapi.middleware import RequestIdMiddleware
 
 
 def _app_con_middleware() -> FastAPI:
     app = FastAPI()
     app.add_middleware(RequestIdMiddleware)
+    app.add_exception_handler(StarletteHTTPException, manejar_404)
 
     @app.get("/boom")
     def boom():
@@ -24,6 +28,13 @@ def _app_con_middleware() -> FastAPI:
     def login_invalido():
         try:
             raise CredencialesInvalidasError("Credenciales inválidas.")
+        except Exception as e:
+            manejar_error_http(e)
+
+    @app.get("/recurso-no-encontrado")
+    def recurso_no_encontrado():
+        try:
+            raise DispositivoNoEncontradoError("Dispositivo 'xyz' no encontrado.")
         except Exception as e:
             manejar_error_http(e)
 
@@ -83,3 +94,67 @@ def test_mapeo_errores_independiente_del_modo():
     with _pytest.raises(HTTPException) as e_generico:
         manejar_error_http(Exception("inesperado"))
     assert e_generico.value.status_code == 500
+
+
+# E5 — error de negocio con usuario: incluye la clave usuario y no contrasena
+def test_error_negocio_con_usuario():
+    with capture_logs() as logs:
+        with pytest.raises(HTTPException) as e:
+            manejar_error_http(CredencialesInvalidasError("Credenciales inválidas.", usuario="operador"))
+
+    assert e.value.status_code == 401
+    negocios = [ev for ev in logs if ev.get("event") == "error_negocio"]
+    assert negocios, "No se registró el evento error_negocio"
+    assert negocios[0]["usuario"] == "operador"
+    assert "contrasena" not in negocios[0]
+
+
+# E6 — error de negocio sin usuario: la clave usuario no se emite
+def test_error_negocio_sin_usuario():
+    with capture_logs() as logs:
+        with pytest.raises(HTTPException):
+            manejar_error_http(CredencialesInvalidasError("Credenciales inválidas."))
+
+    negocios = [ev for ev in logs if ev.get("event") == "error_negocio"]
+    assert negocios, "No se registró el evento error_negocio"
+    assert "usuario" not in negocios[0]
+
+
+# E7 — DemasiadosIntentosError con usuario: 429 + usuario en log
+def test_demasiados_intentos_con_usuario():
+    with capture_logs() as logs:
+        with pytest.raises(HTTPException) as e:
+            manejar_error_http(DemasiadosIntentosError("Demasiados intentos.", usuario="operador"))
+
+    assert e.value.status_code == 429
+    negocios = [ev for ev in logs if ev.get("event") == "error_negocio"]
+    assert negocios, "No se registró el evento error_negocio"
+    assert negocios[0]["usuario"] == "operador"
+
+
+# E9 — ruta inexistente: 404 + log ruta_no_encontrada correlacionado
+def test_ruta_inexistente_loguea_ruta_no_encontrada():
+    client = TestClient(_app_con_middleware(), raise_server_exceptions=False)
+    with capture_logs() as logs:
+        respuesta = client.get("/ruta-inexistente")
+
+    assert respuesta.status_code == 404
+    request_id = respuesta.headers["X-Request-ID"]
+    rutas = [ev for ev in logs if ev.get("event") == "ruta_no_encontrada"]
+    assert rutas, "No se registró el evento ruta_no_encontrada"
+    assert rutas[0]["metodo"] == "GET"
+    assert rutas[0]["path"] == "/ruta-inexistente"
+    assert rutas[0]["request_id"] == request_id
+
+
+# E10 — 404 de negocio no duplica el log de ruta_no_encontrada
+def test_404_negocio_no_loguea_ruta_no_encontrada():
+    client = TestClient(_app_con_middleware(), raise_server_exceptions=False)
+    with capture_logs() as logs:
+        respuesta = client.get("/recurso-no-encontrado")
+
+    assert respuesta.status_code == 404
+    negocios = [ev for ev in logs if ev.get("event") == "error_negocio"]
+    assert negocios, "Se esperaba el evento error_negocio"
+    rutas = [ev for ev in logs if ev.get("event") == "ruta_no_encontrada"]
+    assert not rutas, "No se debe loguear ruta_no_encontrada para un 404 de negocio"

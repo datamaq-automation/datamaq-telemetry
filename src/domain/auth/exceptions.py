@@ -1,9 +1,10 @@
 class DominioAuthException(Exception):
     """Excepción base del dominio de autenticación."""
 
-    def __init__(self, mensaje: str):
+    def __init__(self, mensaje: str, usuario: str | None = None):
         super().__init__(mensaje)
         self.mensaje = mensaje
+        self.usuario = usuario
 
 
 class NombreUsuarioInvalidoError(DominioAuthException):
