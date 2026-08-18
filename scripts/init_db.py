@@ -5,10 +5,17 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pymysql
+from alembic.config import Config
 
+from alembic import command
 from src.infrastructure.settings.config import get_settings
-from src.infrastructure.sqlalchemy.database import get_engine
-from src.infrastructure.sqlalchemy.models import Base
+
+RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _config_alembic() -> Config:
+    """Config de Alembic apuntando al alembic.ini del repo (la URL la resuelve env.py)."""
+    return Config(os.path.join(RAIZ, "alembic.ini"))
 
 
 def init_database():
@@ -30,10 +37,12 @@ def init_database():
         conn.close()
         print(f"[+] Base de datos `{settings.DB_NAME}` verificada/creada exitosamente.")
 
-        print("[*] Creando tablas del esquema Clean Architecture...")
-        engine = get_engine()
-        Base.metadata.create_all(bind=engine)
-        print("[+] Todas las tablas creadas correctamente.")
+        print("[*] Aplicando migraciones de esquema (alembic upgrade head)...")
+        print(
+            "[i] Si la BD ya tenía tablas legacy, use: venv/bin/alembic stamp 209ce0774d59 && venv/bin/alembic upgrade head"
+        )
+        command.upgrade(_config_alembic(), "head")
+        print("[+] Migraciones aplicadas correctamente.")
 
     except Exception as e:
         print(f"[!] Error inicializando la base de datos: {e}")
