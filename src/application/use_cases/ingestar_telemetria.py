@@ -365,6 +365,14 @@ class IngestarTelemetriaUseCase:
             vt = fase_t.tension.voltios if fase_t.tension else None
             desbalance_v = AnalizadorCalidadEnergiaService.calcular_desbalance_tension(vr, vs, vt)
 
+            # Calcular tensión línea-línea (L-L) asumiendo sistema balanceado
+            # V_LL = sqrt(3) * V_FN (promedio de las tres fases)
+            tensiones_fase = [v for v in (vr, vs, vt) if v is not None]
+            voltage_linea_V = None
+            if tensiones_fase:
+                promedio_fase = sum(tensiones_fase) / len(tensiones_fase)
+                voltage_linea_V = round(promedio_fase * 1.7320508075688772, 2)  # sqrt(3)
+
             ir_val = fase_r.corriente.amperios if fase_r.corriente else None
             is_val = fase_s.corriente.amperios if fase_s.corriente else None
             it_val = fase_t.corriente.amperios if fase_t.corriente else None
@@ -392,6 +400,7 @@ class IngestarTelemetriaUseCase:
                 factor_potencia_total=FactorPotencia(valor=float(fp_tot)) if fp_tot is not None else None,
                 desbalance_tension_porcentaje=desbalance_v,
                 corriente_neutro_estimada=i_neutro,
+                voltage_linea_V=voltage_linea_V,
             )
             # Evaluación de alertas de dominio (se evalúa siempre para cada paquete recibido)
             # 1. Tensión con filtro de persistencia temporal (anti-falsos positivos)
