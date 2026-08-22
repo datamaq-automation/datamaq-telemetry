@@ -167,6 +167,8 @@ def test_ingestar_telemetria_instantanea():
     assert res.instantanea is not None
     assert res.instantanea.fase_r.voltage_V == 226.9
     assert res.instantanea.potencia_activa_total_W == 2.4
+    assert res.instantanea.voltage_linea_V is not None
+    assert res.instantanea.voltage_linea_V > 0
 
 
 def test_ingestar_telemetria_compacta_inst():
@@ -193,6 +195,8 @@ def test_ingestar_telemetria_compacta_inst():
     assert inst.fase_r.tension is not None and inst.fase_r.tension.voltios == 223.4
     assert inst.fase_s.tension is not None and inst.fase_s.tension.voltios == 223.1
     assert inst.fase_t.tension is not None and inst.fase_t.tension.voltios == 223.9
+    assert inst.voltage_linea_V is not None
+    assert inst.voltage_linea_V > 0
 
 
 def test_ingestar_telemetria_compacta_acc():
@@ -245,12 +249,16 @@ def test_ingestar_telemetria_calcula_y_persiste_desbalance_vur():
     assert len(repo_telem.instantaneas) == 1
     inst = repo_telem.instantaneas[0]
     assert inst.desbalance_tension_porcentaje == 4.55
+    assert inst.voltage_linea_V is not None
+    assert inst.voltage_linea_V > 0
 
     # Comprobar consulta DTO
     consultar_uc = ConsultarTelemetriaUseCase(repo_telem, repo_disp)
     res = consultar_uc.obtener_ultima_telemetria("D48C49F03564")
     assert res.instantanea is not None
     assert res.instantanea.desbalance_tension_porcentaje == 4.55
+    assert res.instantanea.voltage_linea_V is not None
+    assert res.instantanea.voltage_linea_V > 0
 
     # Lectura 2: persistencia de desbalance continuo confirma la anomalía
     payload_2 = {
@@ -322,3 +330,7 @@ def test_ingestar_telemetria_filtro_persistencia_transitorio():
     alertas_tension = [a for a in repo_telem.listar_alertas() if a.tipo_alerta == "BAJA_TENSION"]
     assert len(alertas_tension) == 1
     assert alertas_tension[0].severidad.value == "WARNING"
+    # Verificar que voltage_linea_V se calcula correctamente en el último episodio
+    ultima_inst = repo_telem.instantaneas[-1]
+    assert ultima_inst.voltage_linea_V is not None
+    assert ultima_inst.voltage_linea_V > 0
