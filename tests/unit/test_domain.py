@@ -383,3 +383,95 @@ def test_evaluar_alerta_ti_invertido():
         "dev-solar", lectura_invertida, tipo_instalacion="GENERACION_FV"
     )
     assert len(alertas_fv) == 0
+
+
+def test_agregar_lecturas_en_intervalo():
+    from datetime import datetime, timedelta, timezone
+
+    from src.domain.telemetria.entities import LecturaInstantanea, MedicionFase
+    from src.domain.telemetria.value_objects import Corriente, PotenciaActiva, Tension
+
+    t0 = datetime(2026, 8, 22, 12, 0, 0, tzinfo=timezone.utc)
+
+    # 3 lecturas dentro del mismo bucket de 60 segundos (t=0s, t=20s, t=40s)
+    l1 = LecturaInstantanea(
+        id=None,
+        dispositivo_id="dev-1",
+        registrado_en=t0,
+        fase_r=MedicionFase(tension=Tension(220.0), corriente=Corriente(10.0), potencia_activa=PotenciaActiva(2200.0)),
+        fase_s=MedicionFase(tension=Tension(220.0), corriente=Corriente(10.0), potencia_activa=PotenciaActiva(2200.0)),
+        fase_t=MedicionFase(tension=Tension(220.0), corriente=Corriente(10.0), potencia_activa=PotenciaActiva(2200.0)),
+        potencia_activa_total=PotenciaActiva(6600.0),
+    )
+    l2 = LecturaInstantanea(
+        id=None,
+        dispositivo_id="dev-1",
+        registrado_en=t0 + timedelta(seconds=20),
+        fase_r=MedicionFase(tension=Tension(230.0), corriente=Corriente(12.0), potencia_activa=PotenciaActiva(2760.0)),
+        fase_s=MedicionFase(tension=Tension(220.0), corriente=Corriente(10.0), potencia_activa=PotenciaActiva(2200.0)),
+        fase_t=MedicionFase(tension=Tension(210.0), corriente=Corriente(8.0), potencia_activa=PotenciaActiva(1680.0)),
+        potencia_activa_total=PotenciaActiva(6640.0),
+    )
+    # 1 lectura en el siguiente bucket de 60 segundos (t=70s)
+    l3 = LecturaInstantanea(
+        id=None,
+        dispositivo_id="dev-1",
+        registrado_en=t0 + timedelta(seconds=70),
+        fase_r=MedicionFase(tension=Tension(225.0), corriente=Corriente(10.0), potencia_activa=PotenciaActiva(2250.0)),
+        fase_s=MedicionFase(tension=Tension(225.0), corriente=Corriente(10.0), potencia_activa=PotenciaActiva(2250.0)),
+        fase_t=MedicionFase(tension=Tension(225.0), corriente=Corriente(10.0), potencia_activa=PotenciaActiva(2250.0)),
+        potencia_activa_total=PotenciaActiva(6750.0),
+    )
+
+    agregadas = AnalizadorCalidadEnergiaService.agregar_lecturas_en_intervalo([l1, l2, l3], intervalo_segundos=60)
+    assert len(agregadas) == 2
+
+    # El bucket más reciente primero (t0 + 60s)
+    b_reciente = agregadas[0]
+    assert b_reciente.registrado_en == t0 + timedelta(seconds=60)
+    assert b_reciente.fase_r.tension is not None
+    assert b_reciente.fase_r.tension.voltios == 225.0
+
+    # El bucket anterior (t0)
+    b_anterior = agregadas[1]
+    assert b_anterior.registrado_en == t0
+    # VR promedio entre 220 y 230 -> 225
+    assert b_anterior.fase_r.tension is not None
+    assert b_anterior.fase_r.tension.voltios == 225.0
+    # IR promedio entre 10 y 12 -> 11
+    assert b_anterior.fase_r.corriente is not None
+    assert b_anterior.fase_r.corriente.amperios == 11.0
+    # P_tot promedio entre 6600 y 6640 -> 6620
+    assert b_anterior.potencia_activa_total is not None
+    assert b_anterior.potencia_activa_total.vatios == 6620.0
+
+
+def test_politica_suscripcion_enterprise_freemium():
+    from datetime import datetime, timedelta, timezone
+
+    from src.domain.telemetria.services import PoliticaSuscripcionService
+
+    t_instalacion = datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+
+    # 1. Instalación inicial: 12 meses (365 días) de Enterprise
+    venc_inicial = PoliticaSuscripcionService.calcular_vencimiento_inicial(t_instalacion)
+    assert venc_inicial == t_instalacion + timedelta(days=365)
+
+    # Durante los 12 meses: Enterprise vigente
+    assert PoliticaSuscripcionService.es_enterprise_vigente(venc_inicial, t_instalacion + timedelta(days=100)) is True
+
+    # 2. Consultoría antes del vencimiento (día 200) -> añade +1 mes (+30 días) al vencimiento original
+    venc_extendido = PoliticaSuscripcionService.extender_por_consultoria(
+        venc_inicial, t_instalacion + timedelta(days=200)
+    )
+    assert venc_extendido == venc_inicial + timedelta(days=30)
+    assert venc_extendido == t_instalacion + timedelta(days=395)
+
+    # 3. Consultoría después de que expiró (día 400) -> extiende 30 días a partir de la fecha de la consultoría
+    venc_reanudado = PoliticaSuscripcionService.extender_por_consultoria(
+        venc_inicial, t_instalacion + timedelta(days=400)
+    )
+    assert venc_reanudado == t_instalacion + timedelta(days=430)
+
+    # 4. Sin consultoría y fecha posterior al vencimiento -> no vigente (pasa a Freemium)
+    assert PoliticaSuscripcionService.es_enterprise_vigente(venc_inicial, t_instalacion + timedelta(days=366)) is False

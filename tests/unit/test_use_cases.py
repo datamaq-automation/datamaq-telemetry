@@ -338,3 +338,90 @@ def test_ingestar_telemetria_filtro_persistencia_transitorio():
     ultima_inst = repo_telem.instantaneas[-1]
     assert ultima_inst.voltage_linea_V is not None
     assert ultima_inst.voltage_linea_V > 0
+
+
+def test_consultar_telemetria_granularidad_y_bucketing():
+    from datetime import datetime, timedelta, timezone
+
+    from src.domain.telemetria.entities import Dispositivo, LecturaInstantanea, MedicionFase
+    from src.domain.telemetria.value_objects import Corriente, MacAddress, PotenciaActiva, Tension
+
+    repo_disp = MockDispositivosRepo()
+    repo_telem = MockTelemetriaRepo()
+
+    dev = Dispositivo(
+        id="dev-bucket",
+        device_uid=MacAddress("D48C49F03564"),
+        nombre="Medidor Bucket",
+    )
+    repo_disp.guardar(dev)
+
+    ahora = datetime(2026, 8, 22, 12, 0, 0, tzinfo=timezone.utc)
+
+    # 4 lecturas en dos buckets de 5 minutos:
+    # Bucket 1 (11:50 - 11:55): t=11:51 y t=11:53
+    l1 = LecturaInstantanea(
+        id=None,
+        dispositivo_id=dev.id,
+        registrado_en=ahora - timedelta(minutes=9),
+        fase_r=MedicionFase(tension=Tension(220.0), corriente=Corriente(10.0), potencia_activa=PotenciaActiva(2200.0)),
+        fase_s=MedicionFase(tension=Tension(220.0), corriente=Corriente(10.0), potencia_activa=PotenciaActiva(2200.0)),
+        fase_t=MedicionFase(tension=Tension(220.0), corriente=Corriente(10.0), potencia_activa=PotenciaActiva(2200.0)),
+        potencia_activa_total=PotenciaActiva(6600.0),
+    )
+    l2 = LecturaInstantanea(
+        id=None,
+        dispositivo_id=dev.id,
+        registrado_en=ahora - timedelta(minutes=7),
+        fase_r=MedicionFase(tension=Tension(230.0), corriente=Corriente(12.0), potencia_activa=PotenciaActiva(2760.0)),
+        fase_s=MedicionFase(tension=Tension(220.0), corriente=Corriente(10.0), potencia_activa=PotenciaActiva(2200.0)),
+        fase_t=MedicionFase(tension=Tension(210.0), corriente=Corriente(8.0), potencia_activa=PotenciaActiva(1680.0)),
+        potencia_activa_total=PotenciaActiva(6640.0),
+    )
+    # Bucket 2 (11:55 - 12:00): t=11:56 y t=11:58
+    l3 = LecturaInstantanea(
+        id=None,
+        dispositivo_id=dev.id,
+        registrado_en=ahora - timedelta(minutes=4),
+        fase_r=MedicionFase(tension=Tension(224.0), corriente=Corriente(10.0), potencia_activa=PotenciaActiva(2240.0)),
+        fase_s=MedicionFase(tension=Tension(224.0), corriente=Corriente(10.0), potencia_activa=PotenciaActiva(2240.0)),
+        fase_t=MedicionFase(tension=Tension(224.0), corriente=Corriente(10.0), potencia_activa=PotenciaActiva(2240.0)),
+        potencia_activa_total=PotenciaActiva(6720.0),
+    )
+    l4 = LecturaInstantanea(
+        id=None,
+        dispositivo_id=dev.id,
+        registrado_en=ahora - timedelta(minutes=2),
+        fase_r=MedicionFase(tension=Tension(226.0), corriente=Corriente(10.0), potencia_activa=PotenciaActiva(2260.0)),
+        fase_s=MedicionFase(tension=Tension(226.0), corriente=Corriente(10.0), potencia_activa=PotenciaActiva(2260.0)),
+        fase_t=MedicionFase(tension=Tension(226.0), corriente=Corriente(10.0), potencia_activa=PotenciaActiva(2260.0)),
+        potencia_activa_total=PotenciaActiva(6780.0),
+    )
+
+    repo_telem.guardar_instantanea(l1)
+    repo_telem.guardar_instantanea(l2)
+    repo_telem.guardar_instantanea(l3)
+    repo_telem.guardar_instantanea(l4)
+
+    consultar_uc = ConsultarTelemetriaUseCase(repo_telem, repo_disp)
+
+    # 1. Consulta 'raw' -> retorna las 4 lecturas
+    res_raw = consultar_uc.listar_instantaneas(dev.id, limite=100, granularidad="raw")
+    assert len(res_raw) == 4
+
+    # 2. Consulta '5m' -> remuestrea en 2 buckets
+    res_5m = consultar_uc.listar_instantaneas(dev.id, limite=100, granularidad="5m")
+    assert len(res_5m) == 2
+    # El más reciente (11:55) primero: promedio de 6720 y 6780 -> 6750
+    assert res_5m[0].potencia_activa_total_W == 6750.0
+    # El anterior (11:50): promedio de 6600 y 6640 -> 6620
+    assert res_5m[1].potencia_activa_total_W == 6620.0
+
+    # 3. Consulta 'auto' con hours=2 (<=2) -> usa '1m'
+    res_auto_2h = consultar_uc.listar_instantaneas(dev.id, limite=100, granularidad="auto", horas=2)
+    # En 1m, cada lectura cayó en un minuto distinto -> 4 buckets de 1m
+    assert len(res_auto_2h) == 4
+
+    # 4. Consulta 'auto' con hours=24 (2 < hours <= 24) -> usa '5m'
+    res_auto_24h = consultar_uc.listar_instantaneas(dev.id, limite=100, granularidad="auto", horas=24)
+    assert len(res_auto_24h) == 2

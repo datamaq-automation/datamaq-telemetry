@@ -34,12 +34,19 @@ def get_latest_telemetry(
 def get_instantaneous_history(
     device_id: str,
     use_case: Annotated[ConsultarTelemetriaUseCase, Depends(get_telemetria_use_case)],
-    limit: int = Query(100, le=1000),
-    hours: int | None = Query(None, description="Últimas N horas"),
+    limit: int = Query(500, ge=1, le=5000, description="Límite máximo de registros a retornar"),
+    hours: int | None = Query(None, ge=1, le=720, description="Últimas N horas"),
+    granularity: str = Query("auto", description="Granularidad temporal: auto, raw, 1m, 5m, 15m, 1h"),
 ):
     try:
         desde = datetime.now(timezone.utc) - timedelta(hours=hours) if hours else None
-        return use_case.listar_instantaneas(device_id, limit, desde)
+        return use_case.listar_instantaneas(
+            id_o_uid=device_id,
+            limite=limit,
+            desde=desde,
+            granularidad=granularity,
+            horas=hours,
+        )
     except Exception as e:
         manejar_error_http(e)
 

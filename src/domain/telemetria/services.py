@@ -7,9 +7,18 @@ from typing import Any
 from src.domain.telemetria.entities import (
     AlertaDispositivo,
     LecturaInstantanea,
+    MedicionFase,
     PlanTelemetria,
 )
-from src.domain.telemetria.value_objects import Corriente, PotenciaActiva, SeveridadAlerta
+from src.domain.telemetria.value_objects import (
+    Corriente,
+    FactorPotencia,
+    PotenciaActiva,
+    PotenciaAparente,
+    PotenciaReactiva,
+    SeveridadAlerta,
+    Tension,
+)
 
 
 class FiltroDeduplicacionService:
@@ -261,6 +270,138 @@ class AnalizadorCalidadEnergiaService:
         vn_rms = round(abs(v_n), 2)
         return vn_rms
 
+    @classmethod
+    def _agregar_grupo_lecturas(
+        cls,
+        items: list[LecturaInstantanea],
+        bucket_dt: datetime,
+    ) -> LecturaInstantanea:
+        dispositivo_id = items[0].dispositivo_id
+
+        def _avg(vals: list[float | None]) -> float | None:
+            non_none = [v for v in vals if v is not None]
+            if not non_none:
+                return None
+            return round(sum(non_none) / len(non_none), 2)
+
+        def _fase_agregada(fases: list[MedicionFase]) -> MedicionFase:
+            v = _avg([f.tension.voltios for f in fases if f.tension])
+            i = _avg([f.corriente.amperios for f in fases if f.corriente])
+            p = _avg([f.potencia_activa.vatios for f in fases if f.potencia_activa])
+            q = _avg([f.potencia_reactiva.var for f in fases if f.potencia_reactiva])
+            s = _avg([f.potencia_aparente.va for f in fases if f.potencia_aparente])
+            if s is None and p is not None and q is not None:
+                s = round(math.hypot(p, q), 2)
+            fp: float | None = None
+            if p is not None and s is not None and s > 0:
+                fp = round(p / s, 2)
+            else:
+                fp = _avg([f.factor_potencia.valor for f in fases if f.factor_potencia])
+            return MedicionFase(
+                tension=Tension(voltios=v) if v is not None else None,
+                corriente=Corriente(amperios=i) if i is not None else None,
+                potencia_activa=PotenciaActiva(vatios=p) if p is not None else None,
+                potencia_reactiva=PotenciaReactiva(var=q) if q is not None else None,
+                potencia_aparente=PotenciaAparente(va=s) if s is not None else None,
+                factor_potencia=FactorPotencia(valor=fp) if fp is not None else None,
+            )
+
+        fase_r = _fase_agregada([it.fase_r for it in items])
+        fase_s = _fase_agregada([it.fase_s for it in items])
+        fase_t = _fase_agregada([it.fase_t for it in items])
+
+        p_tot = _avg([it.potencia_activa_total.vatios for it in items if it.potencia_activa_total])
+        if p_tot is None:
+            p_sub = [f.potencia_activa.vatios for f in (fase_r, fase_s, fase_t) if f.potencia_activa]
+            if p_sub:
+                p_tot = round(sum(p_sub), 2)
+
+        q_tot = _avg([it.potencia_reactiva_total.var for it in items if it.potencia_reactiva_total])
+        if q_tot is None:
+            q_sub = [f.potencia_reactiva.var for f in (fase_r, fase_s, fase_t) if f.potencia_reactiva]
+            if q_sub:
+                q_tot = round(sum(q_sub), 2)
+
+        s_tot = _avg([it.potencia_aparente_total.va for it in items if it.potencia_aparente_total])
+        if s_tot is None and p_tot is not None and q_tot is not None:
+            s_tot = round(math.hypot(p_tot, q_tot), 2)
+
+        fp_tot: float | None = None
+        if p_tot is not None and s_tot is not None and s_tot > 0:
+            fp_tot = round(p_tot / s_tot, 2)
+        else:
+            fp_tot = _avg([it.factor_potencia_total.valor for it in items if it.factor_potencia_total])
+
+        vr = fase_r.tension.voltios if fase_r.tension else None
+        vs = fase_s.tension.voltios if fase_s.tension else None
+        vt = fase_t.tension.voltios if fase_t.tension else None
+        desbalance_v = cls.calcular_desbalance_tension(vr, vs, vt)
+
+        tensiones_fase = [v for v in (vr, vs, vt) if v is not None]
+        voltage_linea_V = None
+        if tensiones_fase:
+            promedio_fase = sum(tensiones_fase) / len(tensiones_fase)
+            voltage_linea_V = round(promedio_fase * 1.7320508075688772, 2)
+
+        ir_val = fase_r.corriente.amperios if fase_r.corriente else None
+        is_val = fase_s.corriente.amperios if fase_s.corriente else None
+        it_val = fase_t.corriente.amperios if fase_t.corriente else None
+        pr_val = fase_r.potencia_activa.vatios if fase_r.potencia_activa else None
+        ps_val = fase_s.potencia_activa.vatios if fase_s.potencia_activa else None
+        pt_val = fase_t.potencia_activa.vatios if fase_t.potencia_activa else None
+        qr_val = fase_r.potencia_reactiva.var if fase_r.potencia_reactiva else None
+        qs_val = fase_s.potencia_reactiva.var if fase_s.potencia_reactiva else None
+        qt_val = fase_t.potencia_reactiva.var if fase_t.potencia_reactiva else None
+
+        i_neutro = cls.calcular_corriente_neutro(ir_val, is_val, it_val, pr_val, ps_val, pt_val, qr_val, qs_val, qt_val)
+        v_neutro = cls.calcular_tension_neutro(
+            vr, vs, vt, ir_val, is_val, it_val, pr_val, ps_val, pt_val, qr_val, qs_val, qt_val
+        )
+
+        return LecturaInstantanea(
+            id=None,
+            dispositivo_id=dispositivo_id,
+            registrado_en=bucket_dt,
+            fase_r=fase_r,
+            fase_s=fase_s,
+            fase_t=fase_t,
+            potencia_activa_total=PotenciaActiva(vatios=p_tot) if p_tot is not None else None,
+            potencia_reactiva_total=PotenciaReactiva(var=q_tot) if q_tot is not None else None,
+            potencia_aparente_total=PotenciaAparente(va=s_tot) if s_tot is not None else None,
+            factor_potencia_total=FactorPotencia(valor=fp_tot) if fp_tot is not None else None,
+            desbalance_tension_porcentaje=desbalance_v,
+            corriente_neutro_estimada=i_neutro,
+            voltage_linea_V=voltage_linea_V,
+            tension_neutro_estimada=v_neutro,
+        )
+
+    @classmethod
+    def agregar_lecturas_en_intervalo(
+        cls,
+        lecturas: list[LecturaInstantanea],
+        intervalo_segundos: int,
+    ) -> list[LecturaInstantanea]:
+        """Agrupa y remuestrea una lista de LecturaInstantanea en buckets de tiempo fijos."""
+        if intervalo_segundos <= 0 or not lecturas:
+            return lecturas
+
+        buckets: dict[int, list[LecturaInstantanea]] = {}
+        for item in lecturas:
+            ts = item.registrado_en.timestamp()
+            bucket_ts = int(ts // intervalo_segundos) * intervalo_segundos
+            if bucket_ts not in buckets:
+                buckets[bucket_ts] = []
+            buckets[bucket_ts].append(item)
+
+        resultado = []
+        for bucket_ts in sorted(buckets.keys(), reverse=True):
+            bucket_items = buckets[bucket_ts]
+            bucket_dt = datetime.fromtimestamp(bucket_ts, tz=timezone.utc)
+            agregada = cls._agregar_grupo_lecturas(bucket_items, bucket_dt)
+            resultado.append(agregada)
+
+        return resultado
+
     @staticmethod
     def evaluar_alerta_desbalance(
         dispositivo_id: str,
@@ -427,3 +568,28 @@ class PoliticaRetencionService:
     @staticmethod
     def fecha_corte_alertas_resueltas(ahora: datetime, dias: int = 30) -> datetime:
         return ahora - timedelta(days=dias)
+
+
+class PoliticaSuscripcionService:
+    """Reglas de ciclo de vida del Plan Enterprise y transición a Freemium.
+
+    - Toda nueva instalación incluye 12 meses (365 días) de Plan Enterprise.
+    - Cada consultoría de eficiencia energética añade +1 mes (30 días) de Plan Enterprise.
+    - Vencido el plazo sin consultoría, la organización pasa al Plan 0 (Freemium).
+    """
+
+    DURACION_INSTALACION_INICIAL_DIAS: int = 365
+    DURACION_CONSULTORIA_DIAS: int = 30
+
+    @staticmethod
+    def calcular_vencimiento_inicial(fecha_instalacion: datetime) -> datetime:
+        return fecha_instalacion + timedelta(days=365)
+
+    @staticmethod
+    def extender_por_consultoria(vencimiento_actual: datetime, fecha_consultoria: datetime) -> datetime:
+        base = max(vencimiento_actual, fecha_consultoria)
+        return base + timedelta(days=30)
+
+    @staticmethod
+    def es_enterprise_vigente(vencimiento: datetime, ahora: datetime) -> bool:
+        return ahora <= vencimiento
