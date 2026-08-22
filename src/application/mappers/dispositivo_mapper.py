@@ -30,6 +30,7 @@ class DispositivoMapper:
             visto_por_ultima_vez=entity.visto_por_ultima_vez,
             creado_en=entity.creado_en,
             actualizado_en=entity.actualizado_en,
+            voltage_linea_V=getattr(entity, "voltage_linea_V", None),
         )
 
     @staticmethod

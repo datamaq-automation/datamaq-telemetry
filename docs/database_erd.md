@@ -135,6 +135,7 @@ erDiagram
         decimal total_power_factor
         decimal desbalance_tension_porcentaje
         decimal current_n
+        decimal voltage_linea_V
         datetime created_at
     }
 
@@ -304,6 +305,7 @@ erDiagram
 | `total_power_factor` | `NUMERIC(4, 2)` | - | Sí |
 | `desbalance_tension_porcentaje` | `NUMERIC(5, 2)` | - | Sí |
 | `current_n` | `NUMERIC(6, 2)` | - | Sí |
+| `voltage_linea_V` | `NUMERIC(6, 2)` | - | Sí |
 | `created_at` | `DATETIME` | - | No |
 
 **Índices:**
