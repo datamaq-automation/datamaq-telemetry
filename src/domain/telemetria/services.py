@@ -199,7 +199,7 @@ class AnalizadorCalidadEnergiaService:
         # Ángulos de tensión de referencia para secuencia positiva R-S-T
         th_vr = 0.0
         th_vs = -2.0 * math.pi / 3.0  # -120°
-        th_vt = 2.0 * math.pi / 3.0   # +120°
+        th_vt = 2.0 * math.pi / 3.0  # +120°
 
         # Desfase corriente-tensión phi = atan2(Q, P)
         def _calc_phi(p: float | None, q: float | None) -> float:

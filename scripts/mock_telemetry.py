@@ -88,38 +88,42 @@ class CSVProfileExtractor:
         # Perfil sintético de respaldo en caso de no encontrar CSV
         for h in range(288):  # 1 día en pasos de 5 min
             factor = 0.5 + 0.5 * math.sin((h / 288) * 2 * math.pi)
-            self.series_dev1.append({
-                "ir": 200.0 + 150.0 * factor,
-                "is": 190.0 + 140.0 * factor,
-                "it": 195.0 + 145.0 * factor,
-                "vr": 224.0,
-                "vs": 226.0,
-                "vt": 224.0,
-                "pr": 45000.0 * factor,
-                "ps": 43000.0 * factor,
-                "pt": 44000.0 * factor,
-                "ptot": 132000.0 * factor,
-                "qr": 12000.0 * factor,
-                "qs": 11000.0 * factor,
-                "qt": 11500.0 * factor,
-                "qtot": 34500.0 * factor,
-            })
-            self.series_dev2.append({
-                "ir": 1.5,
-                "is": 60.0 + 80.0 * factor,
-                "it": 70.0 + 90.0 * factor,
-                "vr": 222.0,
-                "vs": 223.0,
-                "vt": 223.0,
-                "pr": 50.0,
-                "ps": 13000.0 * factor,
-                "pt": 15000.0 * factor,
-                "ptot": 28050.0 * factor,
-                "qr": 10.0,
-                "qs": 3500.0 * factor,
-                "qt": 4000.0 * factor,
-                "qtot": 7510.0 * factor,
-            })
+            self.series_dev1.append(
+                {
+                    "ir": 200.0 + 150.0 * factor,
+                    "is": 190.0 + 140.0 * factor,
+                    "it": 195.0 + 145.0 * factor,
+                    "vr": 224.0,
+                    "vs": 226.0,
+                    "vt": 224.0,
+                    "pr": 45000.0 * factor,
+                    "ps": 43000.0 * factor,
+                    "pt": 44000.0 * factor,
+                    "ptot": 132000.0 * factor,
+                    "qr": 12000.0 * factor,
+                    "qs": 11000.0 * factor,
+                    "qt": 11500.0 * factor,
+                    "qtot": 34500.0 * factor,
+                }
+            )
+            self.series_dev2.append(
+                {
+                    "ir": 1.5,
+                    "is": 60.0 + 80.0 * factor,
+                    "it": 70.0 + 90.0 * factor,
+                    "vr": 222.0,
+                    "vs": 223.0,
+                    "vt": 223.0,
+                    "pr": 50.0,
+                    "ps": 13000.0 * factor,
+                    "pt": 15000.0 * factor,
+                    "ptot": 28050.0 * factor,
+                    "qr": 10.0,
+                    "qs": 3500.0 * factor,
+                    "qt": 4000.0 * factor,
+                    "qtot": 7510.0 * factor,
+                }
+            )
 
 
 def generar_lectura_sintetica(
@@ -177,9 +181,7 @@ def generar_lectura_sintetica(
     desbalance_v = AnalizadorCalidadEnergiaService.calcular_desbalance_tension(vr, vs, vt)
 
     # Corriente de neutro estimada
-    in_val = AnalizadorCalidadEnergiaService.calcular_corriente_neutro(
-        ir, is_, it, pr, ps, pt, qr, qs, qt
-    )
+    in_val = AnalizadorCalidadEnergiaService.calcular_corriente_neutro(ir, is_, it, pr, ps, pt, qr, qs, qt)
     current_n = in_val.amperios if in_val else None
 
     return {
@@ -322,15 +324,15 @@ def ejecutar_seed(
             db.query(TelemetryInstantaneousModel).filter(
                 TelemetryInstantaneousModel.device_id.in_([dev1.id, dev2.id])
             ).delete(synchronize_session=False)
-            db.query(TelemetryEnergyModel).filter(
-                TelemetryEnergyModel.device_id.in_([dev1.id, dev2.id])
-            ).delete(synchronize_session=False)
-            db.query(DeviceStatusLogModel).filter(
-                DeviceStatusLogModel.device_id.in_([dev1.id, dev2.id])
-            ).delete(synchronize_session=False)
-            db.query(DeviceAlertModel).filter(
-                DeviceAlertModel.device_id.in_([dev1.id, dev2.id])
-            ).delete(synchronize_session=False)
+            db.query(TelemetryEnergyModel).filter(TelemetryEnergyModel.device_id.in_([dev1.id, dev2.id])).delete(
+                synchronize_session=False
+            )
+            db.query(DeviceStatusLogModel).filter(DeviceStatusLogModel.device_id.in_([dev1.id, dev2.id])).delete(
+                synchronize_session=False
+            )
+            db.query(DeviceAlertModel).filter(DeviceAlertModel.device_id.in_([dev1.id, dev2.id])).delete(
+                synchronize_session=False
+            )
             db.commit()
 
         # Generar timestamps
@@ -398,9 +400,7 @@ def ejecutar_seed(
                     desbalance_tension_porcentaje=Decimal(str(d1_data["desbalance_v"]))
                     if d1_data["desbalance_v"] is not None
                     else None,
-                    current_n=Decimal(str(d1_data["current_n"]))
-                    if d1_data["current_n"] is not None
-                    else None,
+                    current_n=Decimal(str(d1_data["current_n"])) if d1_data["current_n"] is not None else None,
                 )
             )
 
@@ -434,9 +434,7 @@ def ejecutar_seed(
                     desbalance_tension_porcentaje=Decimal(str(d2_data["desbalance_v"]))
                     if d2_data["desbalance_v"] is not None
                     else None,
-                    current_n=Decimal(str(d2_data["current_n"]))
-                    if d2_data["current_n"] is not None
-                    else None,
+                    current_n=Decimal(str(d2_data["current_n"])) if d2_data["current_n"] is not None else None,
                 )
             )
 
@@ -519,7 +517,9 @@ def ejecutar_seed(
         print("          ✓ SEED DE TELEMETRÍA FINALIZADO CON ÉXITO")
         print("=" * 65)
         print(f"• Total Puntos Insertados:  {total_puntos * 2} instantáneas + {total_puntos * 2} energías")
-        print(f"• Rango Temporal:           {inicio.strftime('%Y-%m-%d %H:%M')} a {ahora.strftime('%Y-%m-%d %H:%M')} (UTC)")
+        print(
+            f"• Rango Temporal:           {inicio.strftime('%Y-%m-%d %H:%M')} a {ahora.strftime('%Y-%m-%d %H:%M')} (UTC)"
+        )
         print(f"• Dispositivo 1 (3 TIs):    MAC={dev1.device_uid} | ID={dev1.id}")
         print(f"• Dispositivo 2 (2 TIs):    MAC={dev2.device_uid} | ID={dev2.id}")
         print("\n• URLs para probar en tu Frontend o REST Client:")
@@ -610,9 +610,33 @@ def ejecutar_live_replay(
                     "uptime": step * int(interval),
                 },
                 "f": [
-                    {"n": "R", "v": d1["vr"], "i": d1["ir"], "p": d1["pr"], "q": d1["qr"], "s": d1["sr"], "pf": d1["fpr"]},
-                    {"n": "S", "v": d1["vs"], "i": d1["is"], "p": d1["ps"], "q": d1["qs"], "s": d1["ss"], "pf": d1["fps"]},
-                    {"n": "T", "v": d1["vt"], "i": d1["it"], "p": d1["pt"], "q": d1["qt"], "s": d1["st"], "pf": d1["fpt"]},
+                    {
+                        "n": "R",
+                        "v": d1["vr"],
+                        "i": d1["ir"],
+                        "p": d1["pr"],
+                        "q": d1["qr"],
+                        "s": d1["sr"],
+                        "pf": d1["fpr"],
+                    },
+                    {
+                        "n": "S",
+                        "v": d1["vs"],
+                        "i": d1["is"],
+                        "p": d1["ps"],
+                        "q": d1["qs"],
+                        "s": d1["ss"],
+                        "pf": d1["fps"],
+                    },
+                    {
+                        "n": "T",
+                        "v": d1["vt"],
+                        "i": d1["it"],
+                        "p": d1["pt"],
+                        "q": d1["qt"],
+                        "s": d1["st"],
+                        "pf": d1["fpt"],
+                    },
                 ],
                 "total": {
                     "p": d1["p_tot"],
@@ -633,9 +657,33 @@ def ejecutar_live_replay(
                     "uptime": step * int(interval),
                 },
                 "f": [
-                    {"n": "R", "v": d2["vr"], "i": d2["ir"], "p": d2["pr"], "q": d2["qr"], "s": d2["sr"], "pf": d2["fpr"]},
-                    {"n": "S", "v": d2["vs"], "i": d2["is"], "p": d2["ps"], "q": d2["qs"], "s": d2["ss"], "pf": d2["fps"]},
-                    {"n": "T", "v": d2["vt"], "i": d2["it"], "p": d2["pt"], "q": d2["qt"], "s": d2["st"], "pf": d2["fpt"]},
+                    {
+                        "n": "R",
+                        "v": d2["vr"],
+                        "i": d2["ir"],
+                        "p": d2["pr"],
+                        "q": d2["qr"],
+                        "s": d2["sr"],
+                        "pf": d2["fpr"],
+                    },
+                    {
+                        "n": "S",
+                        "v": d2["vs"],
+                        "i": d2["is"],
+                        "p": d2["ps"],
+                        "q": d2["qs"],
+                        "s": d2["ss"],
+                        "pf": d2["fps"],
+                    },
+                    {
+                        "n": "T",
+                        "v": d2["vt"],
+                        "i": d2["it"],
+                        "p": d2["pt"],
+                        "q": d2["qt"],
+                        "s": d2["st"],
+                        "pf": d2["fpt"],
+                    },
                 ],
                 "total": {
                     "p": d2["p_tot"],
@@ -660,8 +708,8 @@ def ejecutar_live_replay(
 
             print(
                 f"\r[⚡ LIVE {datetime.now().strftime('%H:%M:%S')}] "
-                f"Dev1 (3-TI): {d1['p_tot']/1000.0:.1f} kW, {d1['ir']}A/{d1['is']}A/{d1['it']}A, VUR={d1['desbalance_v']}% | "
-                f"Dev2 (2-TI): {d2['p_tot']/1000.0:.1f} kW, {d2['ir']}A/{d2['is']}A/{d2['it']}A, VUR={d2['desbalance_v']}%",
+                f"Dev1 (3-TI): {d1['p_tot'] / 1000.0:.1f} kW, {d1['ir']}A/{d1['is']}A/{d1['it']}A, VUR={d1['desbalance_v']}% | "
+                f"Dev2 (2-TI): {d2['p_tot'] / 1000.0:.1f} kW, {d2['ir']}A/{d2['is']}A/{d2['it']}A, VUR={d2['desbalance_v']}%",
                 end="",
                 flush=True,
             )

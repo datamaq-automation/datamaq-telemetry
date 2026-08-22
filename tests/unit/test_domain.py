@@ -363,5 +363,3 @@ def test_evaluar_alerta_ti_invertido():
         "dev-solar", lectura_invertida, tipo_instalacion="GENERACION_FV"
     )
     assert len(alertas_fv) == 0
-
-

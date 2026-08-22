@@ -68,7 +68,7 @@ def formatear_estado(status: str, conclusion: str | None) -> tuple[str, str]:
         if conclusion == "success":
             return "✓", "\033[92mSUCCESS\033[0m"  # Verde
         elif conclusion == "failure":
-            return "✗", "\033[91mFAILED\033[0m"   # Rojo
+            return "✗", "\033[91mFAILED\033[0m"  # Rojo
         elif conclusion == "cancelled":
             return "⊘", "\033[90mCANCELLED\033[0m"
         else:
@@ -76,7 +76,7 @@ def formatear_estado(status: str, conclusion: str | None) -> tuple[str, str]:
     elif status == "in_progress":
         return "⟳", "\033[93mIN_PROGRESS\033[0m"  # Amarillo
     elif status == "queued":
-        return "⏳", "\033[94mQUEUED\033[0m"       # Azul
+        return "⏳", "\033[94mQUEUED\033[0m"  # Azul
     return "•", status
 
 
@@ -176,9 +176,7 @@ def monitorear_workflows(commit_sha: str, timeout_seconds: int = 600, poll_inter
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Monitorea el progreso de CI/CD en GitHub Actions tras un git push."
-    )
+    parser = argparse.ArgumentParser(description="Monitorea el progreso de CI/CD en GitHub Actions tras un git push.")
     parser.add_argument(
         "--commit",
         default=None,
