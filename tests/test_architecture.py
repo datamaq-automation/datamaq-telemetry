@@ -33,10 +33,9 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import List, Optional, Tuple
 
 
-def find_project_root(start_path: Optional[Path] = None) -> Path:
+def find_project_root(start_path: Path | None = None) -> Path:
     """Encuentra la raíz del proyecto buscando el directorio 'src' hacia arriba."""
     current = (start_path or Path.cwd()).resolve()
     for parent in [current, *current.parents]:
@@ -45,7 +44,7 @@ def find_project_root(start_path: Optional[Path] = None) -> Path:
     return Path.cwd().resolve()
 
 
-def parse_ast_safely(file_path: Path) -> Optional[ast.AST]:
+def parse_ast_safely(file_path: Path) -> ast.AST | None:
     """Parsea un archivo Python a AST de forma segura."""
     try:
         content = file_path.read_text(encoding="utf-8")
@@ -55,12 +54,12 @@ def parse_ast_safely(file_path: Path) -> Optional[ast.AST]:
         return None
 
 
-def extract_imports(tree: ast.AST) -> List[Tuple[str, int, bool]]:
+def extract_imports(tree: ast.AST) -> list[tuple[str, int, bool]]:
     """Extrae todos los módulos importados en un árbol AST.
 
     Retorna lista de tuplas: (nombre_modulo, linea, es_relativo)
     """
-    imports: List[Tuple[str, int, bool]] = []
+    imports: list[tuple[str, int, bool]] = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
@@ -77,10 +76,11 @@ def extract_imports(tree: ast.AST) -> List[Tuple[str, int, bool]]:
 # 1. Verificación de Archivos __init__.py (0 bytes)
 # ==============================================================================
 
-def verify_init_files_empty(root_dir: Optional[Path] = None) -> List[str]:
+
+def verify_init_files_empty(root_dir: Path | None = None) -> list[str]:
     """Verifica que todos los archivos __init__.py en src/ y tests/ tengan exactamente 0 bytes."""
     root = root_dir or find_project_root()
-    errors: List[str] = []
+    errors: list[str] = []
 
     for target_dir in [root / "src", root / "tests"]:
         if not target_dir.exists() or not target_dir.is_dir():
@@ -104,30 +104,64 @@ def verify_init_files_empty(root_dir: Optional[Path] = None) -> List[str]:
 # 2. Verificación de Reglas de Capas Clean Architecture
 # ==============================================================================
 
-def verify_architecture_layers(root_dir: Optional[Path] = None) -> List[str]:
+
+def verify_architecture_layers(root_dir: Path | None = None) -> list[str]:
     """Verifica el cumplimiento de la regla de dependencias entre capas."""
     root = root_dir or find_project_root()
     src_dir = root / "src"
-    errors: List[str] = []
+    errors: list[str] = []
 
     if not src_dir.exists():
         return [f"[ERROR] No se encontró el directorio de código fuente: {src_dir}"]
 
     domain_forbidden = (
-        "fastapi", "starlette", "sqlalchemy", "sqlmodel", "tortoise",
-        "httpx", "requests", "aiohttp", "pymysql", "psycopg", "psycopg2",
-        "asyncpg", "paho", "aiokafka", "kafka", "redis", "celery",
-        "src.application", "src.adapters", "src.infrastructure", "src.main",
+        "fastapi",
+        "starlette",
+        "sqlalchemy",
+        "sqlmodel",
+        "tortoise",
+        "httpx",
+        "requests",
+        "aiohttp",
+        "pymysql",
+        "psycopg",
+        "psycopg2",
+        "asyncpg",
+        "paho",
+        "aiokafka",
+        "kafka",
+        "redis",
+        "celery",
+        "src.application",
+        "src.adapters",
+        "src.infrastructure",
+        "src.main",
     )
 
     application_forbidden = (
-        "fastapi", "starlette", "sqlalchemy", "sqlmodel", "tortoise",
-        "pymysql", "psycopg", "psycopg2", "asyncpg", "paho", "aiokafka",
-        "kafka", "redis", "src.adapters", "src.infrastructure", "src.main",
+        "fastapi",
+        "starlette",
+        "sqlalchemy",
+        "sqlmodel",
+        "tortoise",
+        "pymysql",
+        "psycopg",
+        "psycopg2",
+        "asyncpg",
+        "paho",
+        "aiokafka",
+        "kafka",
+        "redis",
+        "src.adapters",
+        "src.infrastructure",
+        "src.main",
     )
 
     adapters_forbidden = (
-        "fastapi", "starlette", "src.infrastructure", "src.main",
+        "fastapi",
+        "starlette",
+        "src.infrastructure",
+        "src.main",
     )
 
     for current_root, _, files in os.walk(src_dir):
@@ -146,13 +180,19 @@ def verify_architecture_layers(root_dir: Optional[Path] = None) -> List[str]:
                 if "src/domain" in rel_path and any(module_name.startswith(pkg) for pkg in domain_forbidden):
                     errors.append(f"[DOMINIO VIOLADO] {rel_path}:{lineno} importa módulo prohibido '{module_name}'.")
 
-                elif "src/application" in rel_path and any(module_name.startswith(pkg) for pkg in application_forbidden):
+                elif "src/application" in rel_path and any(
+                    module_name.startswith(pkg) for pkg in application_forbidden
+                ):
                     errors.append(f"[APLICACIÓN VIOLADA] {rel_path}:{lineno} importa módulo prohibido '{module_name}'.")
 
                 elif "src/adapters" in rel_path and any(module_name.startswith(pkg) for pkg in adapters_forbidden):
-                    errors.append(f"[ADAPTADORES VIOLADO] {rel_path}:{lineno} importa módulo prohibido '{module_name}'.")
+                    errors.append(
+                        f"[ADAPTADORES VIOLADO] {rel_path}:{lineno} importa módulo prohibido '{module_name}'."
+                    )
 
-                elif ("src/infrastructure/fastapi/routers" in rel_path or "src/infrastructure/fastapi/routes" in rel_path):
+                elif (
+                    "src/infrastructure/fastapi/routers" in rel_path or "src/infrastructure/fastapi/routes" in rel_path
+                ):
                     if any(module_name.startswith(pkg) for pkg in ("sqlalchemy", "sqlmodel")):
                         errors.append(
                             f"[THIN CONTROLLER VIOLADO] {rel_path}:{lineno} importa '{module_name}' directamente (debe delegar en use cases)."
@@ -165,11 +205,12 @@ def verify_architecture_layers(root_dir: Optional[Path] = None) -> List[str]:
 # 3. Verificación de Imports Absolutos
 # ==============================================================================
 
-def verify_no_relative_imports(root_dir: Optional[Path] = None) -> List[str]:
+
+def verify_no_relative_imports(root_dir: Path | None = None) -> list[str]:
     """Verifica que ningún módulo en src/ contenga imports relativos."""
     root = root_dir or find_project_root()
     src_dir = root / "src"
-    errors: List[str] = []
+    errors: list[str] = []
 
     if not src_dir.exists():
         return []
@@ -198,11 +239,12 @@ def verify_no_relative_imports(root_dir: Optional[Path] = None) -> List[str]:
 # 4. Verificación de Tipado Estricto en Funciones de Dominio y Aplicación
 # ==============================================================================
 
-def verify_type_annotations(root_dir: Optional[Path] = None) -> List[str]:
+
+def verify_type_annotations(root_dir: Path | None = None) -> list[str]:
     """Verifica que todas las funciones en domain y application tengan Type Hints explícitos."""
     root = root_dir or find_project_root()
     src_dir = root / "src"
-    errors: List[str] = []
+    errors: list[str] = []
 
     if not src_dir.exists():
         return []
@@ -253,19 +295,29 @@ def verify_type_annotations(root_dir: Optional[Path] = None) -> List[str]:
 # 5. Verificación de Secretos y Parámetros Críticos Hardcodeados
 # ==============================================================================
 
-def verify_no_hardcoded_secrets(root_dir: Optional[Path] = None) -> List[str]:
+
+def verify_no_hardcoded_secrets(root_dir: Path | None = None) -> list[str]:
     """Detecta contraseñas, connection strings o tokens secretos quemados en el código."""
     root = root_dir or find_project_root()
     src_dir = root / "src"
-    errors: List[str] = []
+    errors: list[str] = []
 
     if not src_dir.exists():
         return []
 
     suspicious_patterns = [
-        (re.compile(r"""(?:password|secret_key|api_key|token)\s*=\s*['"][a-zA-Z0-9_\-]{8,}['"]""", re.IGNORECASE), "Posible credencial/token quemado en código"),
-        (re.compile(r"""(?:postgres|mysql|mariadb|mongodb):\/\/[^:]+:[^@]+@""", re.IGNORECASE), "Connection string con contraseña en código fuente"),
-        (re.compile(r"""['"]eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}""", re.IGNORECASE), "Token JWT quemado en código fuente"),
+        (
+            re.compile(r"""(?:password|secret_key|api_key|token)\s*=\s*['"][a-zA-Z0-9_\-]{8,}['"]""", re.IGNORECASE),
+            "Posible credencial/token quemado en código",
+        ),
+        (
+            re.compile(r"""(?:postgres|mysql|mariadb|mongodb):\/\/[^:]+:[^@]+@""", re.IGNORECASE),
+            "Connection string con contraseña en código fuente",
+        ),
+        (
+            re.compile(r"""['"]eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}""", re.IGNORECASE),
+            "Token JWT quemado en código fuente",
+        ),
     ]
 
     for current_root, _, files in os.walk(src_dir):
@@ -275,7 +327,7 @@ def verify_no_hardcoded_secrets(root_dir: Optional[Path] = None) -> List[str]:
 
             full_path = Path(current_root) / file
             rel_path = full_path.relative_to(root).as_posix()
-            
+
             # Excluir archivos de configuración donde se definan defaults de desarrollo seguros
             if "src/infrastructure/settings/config.py" in rel_path:
                 continue
@@ -300,54 +352,51 @@ def verify_no_hardcoded_secrets(root_dir: Optional[Path] = None) -> List[str]:
 # Suite de Pruebas Pytest ("The Constraint Gauntlet")
 # ==============================================================================
 
+
 def test_init_files_must_be_empty():
     """Restricción 1: El 100% de los archivos __init__.py deben tener exactamente 0 bytes."""
     errors = verify_init_files_empty()
-    assert not errors, (
-        f"\n❌ Se detectaron {len(errors)} archivos __init__.py no vacíos:\n\n"
-        + "\n".join(f"  • {err}" for err in errors)
+    assert not errors, f"\n❌ Se detectaron {len(errors)} archivos __init__.py no vacíos:\n\n" + "\n".join(
+        f"  • {err}" for err in errors
     )
 
 
 def test_clean_architecture_compliance():
     """Restricción 2: Las dependencias entre capas deben respetar Clean Architecture y DDD."""
     errors = verify_architecture_layers()
-    assert not errors, (
-        f"\n❌ Se detectaron {len(errors)} violaciones de Clean Architecture:\n\n"
-        + "\n".join(f"  • {err}" for err in errors)
+    assert not errors, f"\n❌ Se detectaron {len(errors)} violaciones de Clean Architecture:\n\n" + "\n".join(
+        f"  • {err}" for err in errors
     )
 
 
 def test_no_relative_imports():
     """Restricción 3: Todos los imports en src/ deben ser absolutos ('from src...')."""
     errors = verify_no_relative_imports()
-    assert not errors, (
-        f"\n❌ Se detectaron {len(errors)} imports relativos prohibidos:\n\n"
-        + "\n".join(f"  • {err}" for err in errors)
+    assert not errors, f"\n❌ Se detectaron {len(errors)} imports relativos prohibidos:\n\n" + "\n".join(
+        f"  • {err}" for err in errors
     )
 
 
 def test_all_functions_have_type_annotations():
     """Restricción 4: 100% de funciones en domain y application deben tener Type Hints."""
     errors = verify_type_annotations()
-    assert not errors, (
-        f"\n❌ Se detectaron {len(errors)} funciones sin tipado estricto:\n\n"
-        + "\n".join(f"  • {err}" for err in errors)
+    assert not errors, f"\n❌ Se detectaron {len(errors)} funciones sin tipado estricto:\n\n" + "\n".join(
+        f"  • {err}" for err in errors
     )
 
 
 def test_no_hardcoded_secrets():
     """Restricción 5: Prohibido hardcodear contraseñas, tokens y connection strings en código."""
     errors = verify_no_hardcoded_secrets()
-    assert not errors, (
-        f"\n❌ Se detectaron {len(errors)} secretos hardcodeados:\n\n"
-        + "\n".join(f"  • {err}" for err in errors)
+    assert not errors, f"\n❌ Se detectaron {len(errors)} secretos hardcodeados:\n\n" + "\n".join(
+        f"  • {err}" for err in errors
     )
 
 
 # ==============================================================================
 # CLI Runner Independiente
 # ==============================================================================
+
 
 def main() -> None:
     """Ejecuta el Guantelete Completo de Restricciones desde línea de comandos."""
@@ -363,7 +412,7 @@ def main() -> None:
         ("5. Seguridad & Secretos (Cero hardcoded)", verify_no_hardcoded_secrets()),
     ]
 
-    total_errors: List[str] = []
+    total_errors: list[str] = []
 
     for name, errors in suites:
         if errors:
