@@ -43,6 +43,7 @@ class TelemetriaMapper:
             corriente_neutro_estimada_A=lectura.corriente_neutro_estimada.amperios
             if lectura.corriente_neutro_estimada
             else None,
+            voltage_linea_V=lectura.voltage_linea_V,
         )
 
     @staticmethod

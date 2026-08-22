@@ -26,6 +26,7 @@ class LecturaInstantaneaDTO(BaseModel):
     factor_potencia_total: float | None = None
     desbalance_tension_porcentaje: float | None = None
     corriente_neutro_estimada_A: float | None = None
+    voltage_linea_V: float | None = None
     model_config = ConfigDict(from_attributes=True)
 
 
