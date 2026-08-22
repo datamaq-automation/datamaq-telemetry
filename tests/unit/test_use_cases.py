@@ -220,3 +220,105 @@ def test_ingestar_telemetria_compacta_acc():
     assert round(acc.energia_activa_neta.kwh, 2) == 0.08
     assert acc.energia_reactiva_neta is not None
     assert round(acc.energia_reactiva_neta.kvarh, 2) == 0.02
+
+
+def test_ingestar_telemetria_calcula_y_persiste_desbalance_vur():
+    IngestarTelemetriaUseCase._device_cache.clear()
+    IngestarTelemetriaUseCase._filtro_persistencia.limpiar()
+    repo_disp = MockDispositivosRepo()
+    repo_telem = MockTelemetriaRepo()
+    mock_logger = MockLogger()
+
+    use_case = IngestarTelemetriaUseCase(repo_disp, repo_telem, logger=mock_logger)
+
+    # V_prom = 220V, V_R=230, V_S=220, V_T=210 -> VUR = 4.55% (>3% -> CRITICAL)
+    payload_1 = {
+        "timestamp": 1767377820,
+        "phase_r": {"voltage_V": 230.0, "current_A": 1.0, "net_active_power_W": 230.0},
+        "phase_s": {"voltage_V": 220.0, "current_A": 1.0, "net_active_power_W": 220.0},
+        "phase_t": {"voltage_V": 210.0, "current_A": 1.0, "net_active_power_W": 210.0},
+        "total": {"net_active_power_W": 660.0},
+    }
+    # Lectura 1: se calcula y persiste desbalance, el filtro espera confirmación
+    use_case.ejecutar("m/wifi/D48C49F03564/inst", payload_1)
+
+    assert len(repo_telem.instantaneas) == 1
+    inst = repo_telem.instantaneas[0]
+    assert inst.desbalance_tension_porcentaje == 4.55
+
+    # Comprobar consulta DTO
+    consultar_uc = ConsultarTelemetriaUseCase(repo_telem, repo_disp)
+    res = consultar_uc.obtener_ultima_telemetria("D48C49F03564")
+    assert res.instantanea is not None
+    assert res.instantanea.desbalance_tension_porcentaje == 4.55
+
+    # Lectura 2: persistencia de desbalance continuo confirma la anomalía
+    payload_2 = {
+        "timestamp": 1767377821,
+        "phase_r": {"voltage_V": 230.0, "current_A": 1.0, "net_active_power_W": 230.0},
+        "phase_s": {"voltage_V": 220.0, "current_A": 1.0, "net_active_power_W": 220.0},
+        "phase_t": {"voltage_V": 210.0, "current_A": 1.0, "net_active_power_W": 210.0},
+        "total": {"net_active_power_W": 660.0},
+    }
+    use_case.ejecutar("m/wifi/D48C49F03564/inst", payload_2)
+
+    # Comprobar generación de alerta de desbalance crítico
+    alertas = repo_telem.listar_alertas()
+    desbalance_alerts = [a for a in alertas if a.tipo_alerta == "DESBALANCE_TENSION"]
+    assert len(desbalance_alerts) == 1
+    assert desbalance_alerts[0].severidad.value == "CRITICAL"
+    assert "4.55%" in desbalance_alerts[0].mensaje
+
+
+def test_ingestar_telemetria_filtro_persistencia_transitorio():
+    IngestarTelemetriaUseCase._device_cache.clear()
+    IngestarTelemetriaUseCase._filtro_persistencia.limpiar()
+    repo_disp = MockDispositivosRepo()
+    repo_telem = MockTelemetriaRepo()
+
+    use_case = IngestarTelemetriaUseCase(repo_disp, repo_telem)
+
+    # Paquete 1 (t=0s): Subtensión simétrica transitoria por arranque de motor trifásico (V_R,S,T = 195V)
+    payload_transitorio = {
+        "timestamp": 1767377800,
+        "phase_r": {"voltage_V": 195.0, "current_A": 10.0, "net_active_power_W": 1950.0},
+        "phase_s": {"voltage_V": 195.0, "current_A": 10.0, "net_active_power_W": 1950.0},
+        "phase_t": {"voltage_V": 195.0, "current_A": 10.0, "net_active_power_W": 1950.0},
+    }
+    use_case.ejecutar("m/wifi/D48C49F03564/inst", payload_transitorio)
+
+    # 1 sola lectura: el filtro anti-falsos positivos bloquea la alerta
+    assert len(repo_telem.listar_alertas()) == 0
+
+    # Paquete 2 (t=1s): Tensión se normaliza a 220V
+    payload_normal = {
+        "timestamp": 1767377801,
+        "phase_r": {"voltage_V": 220.0, "current_A": 1.0, "net_active_power_W": 220.0},
+        "phase_s": {"voltage_V": 220.0, "current_A": 1.0, "net_active_power_W": 220.0},
+        "phase_t": {"voltage_V": 220.0, "current_A": 1.0, "net_active_power_W": 220.0},
+    }
+    use_case.ejecutar("m/wifi/D48C49F03564/inst", payload_normal)
+    assert len(repo_telem.listar_alertas()) == 0
+
+    # Paquete 3 (t=10s): Nueva subtensión (lectura 1 del nuevo episodio)
+    payload_sub_1 = {
+        "timestamp": 1767377810,
+        "phase_r": {"voltage_V": 194.0, "current_A": 1.0, "net_active_power_W": 194.0},
+        "phase_s": {"voltage_V": 194.0, "current_A": 1.0, "net_active_power_W": 194.0},
+        "phase_t": {"voltage_V": 194.0, "current_A": 1.0, "net_active_power_W": 194.0},
+    }
+    use_case.ejecutar("m/wifi/D48C49F03564/inst", payload_sub_1)
+    assert len(repo_telem.listar_alertas()) == 0
+
+    # Paquete 4 (t=11s): Subtensión continua (lectura 2 consecutiva) -> DISPARA alerta
+    payload_sub_2 = {
+        "timestamp": 1767377811,
+        "phase_r": {"voltage_V": 194.0, "current_A": 1.0, "net_active_power_W": 194.0},
+        "phase_s": {"voltage_V": 194.0, "current_A": 1.0, "net_active_power_W": 194.0},
+        "phase_t": {"voltage_V": 194.0, "current_A": 1.0, "net_active_power_W": 194.0},
+    }
+    use_case.ejecutar("m/wifi/D48C49F03564/inst", payload_sub_2)
+
+    alertas_tension = [a for a in repo_telem.listar_alertas() if a.tipo_alerta == "BAJA_TENSION"]
+    assert len(alertas_tension) == 1
+    assert alertas_tension[0].severidad.value == "WARNING"

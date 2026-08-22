@@ -109,6 +109,7 @@ class LecturaInstantanea:
     potencia_reactiva_total: PotenciaReactiva | None = None
     potencia_aparente_total: PotenciaAparente | None = None
     factor_potencia_total: FactorPotencia | None = None
+    desbalance_tension_porcentaje: float | None = None
 
 
 @dataclass(frozen=True)

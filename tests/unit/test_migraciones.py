@@ -15,7 +15,7 @@ RAIZ = Path(__file__).resolve().parents[2]
 ALEMBIC_INI = RAIZ / "alembic.ini"
 ENV_PY = RAIZ / "alembic" / "env.py"
 REVISION_INICIAL = "209ce0774d59"
-REVISION_HEAD = "2e6e9c693368"
+REVISION_HEAD = "f5a9b2c3d4e6"
 
 TABLAS_MODELO = {
     "plans",
@@ -232,7 +232,7 @@ def test_downgrade_revierte_reconciliacion(tmp_path, monkeypatch):
 
     command.stamp(cfg, REVISION_INICIAL)
     command.upgrade(cfg, "head")
-    command.downgrade(cfg, "-1")
+    command.downgrade(cfg, REVISION_INICIAL)
 
     with engine.connect() as conn:
         version = conn.execute(text("SELECT version_num FROM alembic_version")).scalar()
@@ -247,3 +247,16 @@ def test_downgrade_revierte_reconciliacion(tmp_path, monkeypatch):
     assert "wifi_calidad" not in columnas_status
     indices = {i["name"] for i in inspector.get_indexes("telemetry_instantaneous")}
     assert "idx_telemetry_inst_dev_time" not in indices
+
+
+def test_upgrade_agrega_desbalance_tension(tmp_path, monkeypatch):
+    db = tmp_path / "test_desbalance.db"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db}")
+    cfg = _config()
+
+    command.upgrade(cfg, "head")
+
+    engine = create_engine(f"sqlite:///{db}")
+    inspector = inspect(engine)
+    columnas = {c["name"] for c in inspector.get_columns("telemetry_instantaneous")}
+    assert "desbalance_tension_porcentaje" in columnas

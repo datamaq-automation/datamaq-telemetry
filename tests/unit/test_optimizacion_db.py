@@ -247,6 +247,8 @@ def test_downsampling_ingesta_5min():
 
 def test_evaluacion_alerta_a_pesar_de_downsampling():
     IngestarTelemetriaUseCase._ultimas_persistencias.clear()
+    IngestarTelemetriaUseCase._device_cache.clear()
+    IngestarTelemetriaUseCase._filtro_persistencia.limpiar()
 
     repo_disp = MockDispositivosRepo()
     repo_telem = MockTelemetriaRepo()
@@ -262,14 +264,19 @@ def test_evaluacion_alerta_a_pesar_de_downsampling():
     assert len(repo_telem.instantaneas) == 1
     assert len(repo_telem.alertas) == 0
 
-    # Segundo mensaje a los 10 segundos con baja tensión (180V)
+    # Segundo mensaje a los 10 segundos con baja tensión (180V) - 1ra lectura de anomalía
     use_case.ejecutar(
         "m/wifi/AABBCCDDEEFF/inst",
         {"timestamp": (t0 + timedelta(seconds=10)).isoformat(), "phase_r": {"voltage_V": 180.0}},
     )
+    # Tercer mensaje a los 11 segundos con baja tensión (180V) - 2da lectura confirma persistencia
+    use_case.ejecutar(
+        "m/wifi/AABBCCDDEEFF/inst",
+        {"timestamp": (t0 + timedelta(seconds=11)).isoformat(), "phase_r": {"voltage_V": 180.0}},
+    )
     # No se persiste en instantáneas por downsampling
     assert len(repo_telem.instantaneas) == 1
-    # Pero la alerta crítica se detecta y persiste inmediatamente
+    # Pero la alerta crítica se detecta y persiste tras confirmar persistencia temporal
     assert len(repo_telem.alertas) == 1
     assert repo_telem.alertas[0].tipo_alerta == "BAJA_TENSION"
 

@@ -24,6 +24,7 @@ class LecturaInstantaneaDTO(BaseModel):
     potencia_reactiva_total_VAR: float | None = None
     potencia_aparente_total_VA: float | None = None
     factor_potencia_total: float | None = None
+    desbalance_tension_porcentaje: float | None = None
     model_config = ConfigDict(from_attributes=True)
 
 

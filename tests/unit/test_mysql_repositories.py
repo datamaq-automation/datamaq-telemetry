@@ -205,6 +205,7 @@ def test_instantanea_guardar_y_obtener_ultima(db: Session) -> None:
         fase_s=_fase(tension=219.0, corriente=None, activa=None, reactiva=None, aparente=None, fp=None),
         fase_t=_fase(tension=None, corriente=None, activa=None, reactiva=None, aparente=None, fp=None),
         potencia_activa_total=PotenciaActiva(vatios=220.0),
+        desbalance_tension_porcentaje=3.45,
     )
     repo.guardar_instantanea(lectura)
 
@@ -219,6 +220,7 @@ def test_instantanea_guardar_y_obtener_ultima(db: Session) -> None:
     assert ultima.potencia_activa_total is not None
     assert ultima.potencia_activa_total.vatios == 220.0
     assert ultima.potencia_reactiva_total is None
+    assert ultima.desbalance_tension_porcentaje == 3.45
     assert repo.obtener_ultima_instantanea("otro") is None
 
 

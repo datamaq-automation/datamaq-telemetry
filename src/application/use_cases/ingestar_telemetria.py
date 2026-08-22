@@ -18,7 +18,10 @@ from src.domain.telemetria.ports import (
     RepositorioDispositivosPort,
     RepositorioTelemetriaPort,
 )
-from src.domain.telemetria.services import AnalizadorCalidadEnergiaService
+from src.domain.telemetria.services import (
+    AnalizadorCalidadEnergiaService,
+    FiltroPersistenciaTemporalService,
+)
 from src.domain.telemetria.value_objects import (
     Corriente,
     EnergiaActiva,
@@ -39,6 +42,7 @@ class IngestarTelemetriaUseCase:
     _ultimas_persistencias: ClassVar[dict[str, datetime]] = {}
     _device_cache: ClassVar[dict[str, Dispositivo]] = {}
     _ultimos_heartbeats: ClassVar[dict[str, datetime]] = {}
+    _filtro_persistencia: ClassVar[FiltroPersistenciaTemporalService] = FiltroPersistenciaTemporalService()
     _lock: ClassVar[threading.Lock] = threading.Lock()
 
     def __init__(
@@ -356,6 +360,11 @@ class IngestarTelemetriaUseCase:
             if fp_tot is None and p_tot is not None and s_tot is not None and float(s_tot) > 0:
                 fp_tot = round(float(p_tot) / float(s_tot), 2)
 
+            vr = fase_r.tension.voltios if fase_r.tension else None
+            vs = fase_s.tension.voltios if fase_s.tension else None
+            vt = fase_t.tension.voltios if fase_t.tension else None
+            desbalance_v = AnalizadorCalidadEnergiaService.calcular_desbalance_tension(vr, vs, vt)
+
             lectura = LecturaInstantanea(
                 id=None,
                 dispositivo_id=dispositivo.id,
@@ -367,18 +376,39 @@ class IngestarTelemetriaUseCase:
                 potencia_reactiva_total=PotenciaReactiva(var=float(q_tot)) if q_tot is not None else None,
                 potencia_aparente_total=PotenciaAparente(va=float(s_tot)) if s_tot is not None else None,
                 factor_potencia_total=FactorPotencia(valor=float(fp_tot)) if fp_tot is not None else None,
+                desbalance_tension_porcentaje=desbalance_v,
             )
             # Evaluación de alertas de dominio (se evalúa siempre para cada paquete recibido)
-            alerta = AnalizadorCalidadEnergiaService.evaluar_alerta_tension(dispositivo.id, lectura)
-            if alerta:
-                self.repo_telemetria.guardar_alerta(alerta)
+            # 1. Tensión con filtro de persistencia temporal (anti-falsos positivos)
+            alerta_tension_raw = AnalizadorCalidadEnergiaService.evaluar_alerta_tension(dispositivo.id, lectura)
+            alerta_tension = self._filtro_persistencia.procesar_alerta(
+                dispositivo.id, alerta_tension_raw, categoria="TENSION", ahora=recorded_at
+            )
+            if alerta_tension:
+                self.repo_telemetria.guardar_alerta(alerta_tension)
                 if self.logger:
                     self.logger.warning(
                         "alerta_calidad_energia_detectada",
                         dispositivo_id=dispositivo.id,
-                        tipo=alerta.tipo_alerta,
-                        severidad=alerta.severidad.value,
-                        mensaje=alerta.mensaje,
+                        tipo=alerta_tension.tipo_alerta,
+                        severidad=alerta_tension.severidad.value,
+                        mensaje=alerta_tension.mensaje,
+                    )
+
+            # 2. Desbalance trifásico (VUR)
+            alerta_desbalance_raw = AnalizadorCalidadEnergiaService.evaluar_alerta_desbalance(dispositivo.id, lectura)
+            alerta_desbalance = self._filtro_persistencia.procesar_alerta(
+                dispositivo.id, alerta_desbalance_raw, categoria="DESBALANCE_TENSION", ahora=recorded_at
+            )
+            if alerta_desbalance:
+                self.repo_telemetria.guardar_alerta(alerta_desbalance)
+                if self.logger:
+                    self.logger.warning(
+                        "alerta_calidad_energia_detectada",
+                        dispositivo_id=dispositivo.id,
+                        tipo=alerta_desbalance.tipo_alerta,
+                        severidad=alerta_desbalance.severidad.value,
+                        mensaje=alerta_desbalance.mensaje,
                     )
 
             # Persistencia con downsampling según granularidad configurada

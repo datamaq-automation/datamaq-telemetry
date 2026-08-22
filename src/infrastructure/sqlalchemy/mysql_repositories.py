@@ -171,6 +171,9 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
             factor_potencia_total=FactorPotencia(valor=float(m.total_power_factor))
             if m.total_power_factor is not None
             else None,
+            desbalance_tension_porcentaje=float(m.desbalance_tension_porcentaje)
+            if m.desbalance_tension_porcentaje is not None
+            else None,
         )
 
     def _energia_to_entity(self, m: TelemetryEnergyModel) -> AcumuladoEnergia:
@@ -224,6 +227,7 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
             total_reactive_power=lectura.potencia_reactiva_total.var if lectura.potencia_reactiva_total else None,
             total_apparent_power=lectura.potencia_aparente_total.va if lectura.potencia_aparente_total else None,
             total_power_factor=lectura.factor_potencia_total.valor if lectura.factor_potencia_total else None,
+            desbalance_tension_porcentaje=lectura.desbalance_tension_porcentaje,
         )
         self.db.add(model)
         self.db.commit()
