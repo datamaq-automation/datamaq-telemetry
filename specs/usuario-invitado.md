@@ -1,5 +1,7 @@
 # Spec F: Usuario invitado (`invitado` / `invitado`)
 
+> **Estado:** Implementado (DEC-03) · **Nota de vigencia:** La SPA utiliza preferentemente el endpoint sin credenciales `POST /api/auth/guest` (DEC-04, ver `specs/guest-endpoint.md`, `specs/roles-permisos.md` y `docs/contrato-auth.md`). El seed de este documento se mantiene activo para scripts de prueba y retrocompatibilidad.
+
 ## 1. Objetivo y Contexto
 
 Proveer un usuario de acceso rápido `invitado` con rol `invitado`, creado de forma

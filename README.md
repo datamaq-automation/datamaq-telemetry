@@ -115,14 +115,16 @@ El esquema se gestiona con **Alembic** (fuente de verdad: `src/infrastructure/sq
 | **Dispositivos** | `GET /api/dispositivos?planta_id=...` | Listar medidores Powermeter |
 | | `POST /api/dispositivos` | Provisionar / registrar medidor |
 | | `GET /api/dispositivos/{id}` | Obtener detalle de medidor por UUID o MAC |
-| **Telemetría** | `GET /api/telemetria/latest/{id}` | Última instantánea y acumulado de energía |
-| | `GET /api/telemetria/instantaneas/{id}` | Historial de V, I, P, Q, S, FP con límite |
-| | `GET /api/telemetria/energias/{id}` | Historial de kWh y kVARh acumulados |
+| **Telemetría** | `GET /api/telemetria/latest/{device_id}` | Última instantánea y acumulado de energía (UUID o MAC) |
+| | `GET /api/telemetria/instantaneous/{device_id}` | Historial de V, I, P, Q, S, FP y VUR (`limit`, `hours`) |
+| | `GET /api/telemetria/energy/{device_id}` | Historial de kWh y kVARh acumulados (`limit`, `hours`) |
 | **Alertas** | `GET /api/alertas?device_id=...&solo_abiertas=true` | Consultar alarmas activas / historial |
 | | `POST /api/alertas/{id}/resolver` | Marcar alerta como atendida / resuelta |
 | **Autenticación** | `POST /api/auth/login` | Iniciar sesión (emite cookie `HttpOnly` + token JWT) |
+| | `POST /api/auth/guest` | Acceso rápido como invitado (cookie `HttpOnly`, solo lectura) |
 | | `POST /api/auth/logout` | Cerrar sesión (borra la cookie) |
-| **Sistema** | `POST /api/system/purga` | Ejecutar purga de telemetría expirada |
+| | `GET /api/auth/me` | Obtener identidad y rol de la sesión actual |
+| **Sistema** | `POST /api/system/purge` | Ejecutar purga de telemetría expirada (solo admin) |
 
 ---
 

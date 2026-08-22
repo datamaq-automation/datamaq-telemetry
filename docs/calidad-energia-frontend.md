@@ -53,7 +53,8 @@ export interface LecturaInstantaneaDTO {
 
 ### 2.2 Endpoints Afectados
 
-1. **`GET /api/v1/telemetria/dispositivos/{id_o_uid}/latest`**
+1. **`GET /api/telemetria/latest/{device_id}`**
+   *(El parámetro `{device_id}` acepta UUID o MAC address)*
    ```json
    {
      "device_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
@@ -74,14 +75,14 @@ export interface LecturaInstantaneaDTO {
    }
    ```
 
-2. **`GET /api/v1/telemetria/dispositivos/{id_o_uid}/instantaneas?limite=100`**
+2. **`GET /api/telemetria/instantaneous/{device_id}?limit=100`**
    * Retorna una lista `LecturaInstantaneaDTO[]` ordenada descendentemente por `registrado_en`, apta para graficar series temporales de desbalance.
 
 ---
 
 ## 3. Esquema de Alertas de Calidad de Energía
 
-Las alertas se consultan vía `GET /api/v1/alertas` (con filtros `dispositivo_id` y `solo_abiertas=true|false`).
+Las alertas se consultan vía `GET /api/alertas` (con filtros `device_id`, `solo_abiertas=true|false` y `limit=100`).
 
 ### 3.1 Tipos de Alerta y Severidades
 
@@ -105,7 +106,7 @@ Las alertas se consultan vía `GET /api/v1/alertas` (con filtros `dispositivo_id
 
 ### 4.2 Panel de Alertas (`AlertsPanel.vue`)
 * Mapear `tipo_alerta === 'DESBALANCE_TENSION'` con ícono de advertencia trifásica (ej. `heroicons/exclamation-triangle` o `bolt-slash`).
-* Soporte para resolver alertas mediante `POST /api/v1/alertas/{id}/resolver`.
+* Soporte para resolver alertas mediante `POST /api/alertas/{id}/resolver`.
 
 ### 4.3 Gráficos Históricos de Tendencia
 * En las vistas de telemetría histórica, se puede proyectar una curva para `desbalance_tension_porcentaje` con dos líneas de referencia horizontales:

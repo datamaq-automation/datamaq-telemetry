@@ -68,12 +68,12 @@ La aplicación web consume dos tipos de flujos de datos según lo que necesita m
 
 ## 3. Contratos de la API REST para Desarrolladores Web
 
-La URL base de la API es `/api/v1/telemetria`.
+La URL base de la API de telemetría es `/api/telemetria`. Todos los endpoints que reciben `{device_id}` aceptan de forma polimórfica tanto el UUID interno (ej. `7d32ab0f-...`) como la dirección MAC del equipo (ej. `001122334401` o `00:11:22:33:44:01`).
 
-### 3.1 Obtener la Última Foto del Medidor (`GET /latest`)
+### 3.1 Obtener la Última Foto del Medidor (`GET /latest/{device_id}`)
 Devuelve la lectura instantánea más reciente (con el desbalance ya calculado) y la energía acumulada.
 
-* **Endpoint:** `GET /api/v1/telemetria/dispositivos/{id_o_mac}/latest`
+* **Endpoint:** `GET /api/telemetria/latest/{device_id}`
 * **Respuesta Exitosa (200 OK):**
 ```json
 {
@@ -119,37 +119,34 @@ Devuelve la lectura instantánea más reciente (con el desbalance ya calculado) 
 
 ---
 
-### 3.2 Listar Curvas Históricas para Gráficos (`GET /instantaneas`)
+### 3.2 Listar Curvas Históricas para Gráficos (`GET /instantaneous/{device_id}`)
 Devuelve un arreglo de lecturas para dibujar gráficos de series temporales (ej. Chart.js, Apache ECharts o ApexCharts).
 
-* **Endpoint:** `GET /api/v1/telemetria/dispositivos/{id_o_mac}/instantaneas?limite=100&desde=2026-08-21T00:00:00Z`
+* **Endpoint:** `GET /api/telemetria/instantaneous/{device_id}?limit=100&hours=24`
+* **Parámetros Query:**
+  * `limit` (opcional, entero, default: 100, max: 1000): Cantidad máxima de registros.
+  * `hours` (opcional, entero): Filtrar solo las últimas N horas.
 * **Respuesta (200 OK):**
 ```json
 [
   {
+    "id": 10842,
+    "dispositivo_id": "7d32ab0f-bc81-4b4a-a401-a0600c105e7f",
     "registrado_en": "2026-08-22T10:45:00Z",
-    "fase_r": { "voltage_V": 226.5 },
-    "fase_s": { "voltage_V": 221.0 },
-    "fase_t": { "voltage_V": 218.0 },
+    "fase_r": { "voltage_V": 226.5, "current_A": 8.4, "net_active_power_W": 1850.0, "power_factor": 0.97 },
+    "fase_s": { "voltage_V": 221.0, "current_A": 8.1, "net_active_power_W": 1740.0, "power_factor": 0.97 },
+    "fase_t": { "voltage_V": 218.0, "current_A": 8.3, "net_active_power_W": 1760.0, "power_factor": 0.97 },
     "potencia_activa_total_W": 5350.0,
     "desbalance_tension_porcentaje": 2.11
-  },
-  {
-    "registrado_en": "2026-08-22T10:40:00Z",
-    "fase_r": { "voltage_V": 224.0 },
-    "fase_s": { "voltage_V": 222.0 },
-    "fase_t": { "voltage_V": 221.0 },
-    "potencia_activa_total_W": 5210.0,
-    "desbalance_tension_porcentaje": 0.75
   }
 ]
 ```
 
 ---
 
-### 3.3 Consultar y Gestionar Alertas (`GET /api/v1/alertas`)
+### 3.3 Consultar y Gestionar Alertas (`GET /api/alertas`)
 
-* **Listar Alertas:** `GET /api/v1/alertas?dispositivo_id={id}&solo_abiertas=true`
+* **Listar Alertas:** `GET /api/alertas?device_id={device_id}&solo_abiertas=true&limit=100`
 * **Estructura de una Alerta:**
 ```json
 {
@@ -163,7 +160,7 @@ Devuelve un arreglo de lecturas para dibujar gráficos de series temporales (ej.
   "resuelta_en": null
 }
 ```
-* **Resolver una Alerta:** `POST /api/v1/alertas/{id}/resolver`
+* **Resolver una Alerta:** `POST /api/alertas/{alerta_id}/resolver` (requiere rol de escritura)
 
 ---
 
