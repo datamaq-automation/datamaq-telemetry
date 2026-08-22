@@ -110,6 +110,7 @@ class LecturaInstantanea:
     potencia_aparente_total: PotenciaAparente | None = None
     factor_potencia_total: FactorPotencia | None = None
     desbalance_tension_porcentaje: float | None = None
+    corriente_neutro_estimada: Corriente | None = None
 
 
 @dataclass(frozen=True)

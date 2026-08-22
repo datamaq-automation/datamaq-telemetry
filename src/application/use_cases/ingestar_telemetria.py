@@ -365,6 +365,20 @@ class IngestarTelemetriaUseCase:
             vt = fase_t.tension.voltios if fase_t.tension else None
             desbalance_v = AnalizadorCalidadEnergiaService.calcular_desbalance_tension(vr, vs, vt)
 
+            ir_val = fase_r.corriente.amperios if fase_r.corriente else None
+            is_val = fase_s.corriente.amperios if fase_s.corriente else None
+            it_val = fase_t.corriente.amperios if fase_t.corriente else None
+            pr_val = fase_r.potencia_activa.vatios if fase_r.potencia_activa else None
+            ps_val = fase_s.potencia_activa.vatios if fase_s.potencia_activa else None
+            pt_val = fase_t.potencia_activa.vatios if fase_t.potencia_activa else None
+            qr_val = fase_r.potencia_reactiva.var if fase_r.potencia_reactiva else None
+            qs_val = fase_s.potencia_reactiva.var if fase_s.potencia_reactiva else None
+            qt_val = fase_t.potencia_reactiva.var if fase_t.potencia_reactiva else None
+
+            i_neutro = AnalizadorCalidadEnergiaService.calcular_corriente_neutro(
+                ir_val, is_val, it_val, pr_val, ps_val, pt_val, qr_val, qs_val, qt_val
+            )
+
             lectura = LecturaInstantanea(
                 id=None,
                 dispositivo_id=dispositivo.id,
@@ -377,6 +391,7 @@ class IngestarTelemetriaUseCase:
                 potencia_aparente_total=PotenciaAparente(va=float(s_tot)) if s_tot is not None else None,
                 factor_potencia_total=FactorPotencia(valor=float(fp_tot)) if fp_tot is not None else None,
                 desbalance_tension_porcentaje=desbalance_v,
+                corriente_neutro_estimada=i_neutro,
             )
             # Evaluación de alertas de dominio (se evalúa siempre para cada paquete recibido)
             # 1. Tensión con filtro de persistencia temporal (anti-falsos positivos)

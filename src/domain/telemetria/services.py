@@ -1,3 +1,5 @@
+import cmath
+import math
 import threading
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -7,7 +9,7 @@ from src.domain.telemetria.entities import (
     LecturaInstantanea,
     PlanTelemetria,
 )
-from src.domain.telemetria.value_objects import PotenciaActiva, SeveridadAlerta
+from src.domain.telemetria.value_objects import Corriente, PotenciaActiva, SeveridadAlerta
 
 
 class FiltroDeduplicacionService:
@@ -173,6 +175,52 @@ class AnalizadorCalidadEnergiaService:
             return None
         desv_max = max(abs(vr - v_prom), abs(vs - v_prom), abs(vt - v_prom))
         return round((desv_max / v_prom) * 100.0, 2)
+
+    @staticmethod
+    def calcular_corriente_neutro(
+        ir: float | None,
+        is_: float | None,
+        it: float | None,
+        pr: float | None = None,
+        ps: float | None = None,
+        pt: float | None = None,
+        qr: float | None = None,
+        qs: float | None = None,
+        qt: float | None = None,
+    ) -> Corriente | None:
+        """Calcula la corriente de neutro estimada (RMS) mediante suma fasorial de Kirchhoff.
+
+        I_N = - (I_R + I_S + I_T)
+        Con desfase angular de 120° entre fases y ángulo de carga phi = atan2(Q, P).
+        """
+        if ir is None or is_ is None or it is None:
+            return None
+
+        # Ángulos de tensión de referencia para secuencia positiva R-S-T
+        th_vr = 0.0
+        th_vs = -2.0 * math.pi / 3.0  # -120°
+        th_vt = 2.0 * math.pi / 3.0   # +120°
+
+        # Desfase corriente-tensión phi = atan2(Q, P)
+        def _calc_phi(p: float | None, q: float | None) -> float:
+            if p is None or q is None:
+                return 0.0
+            if p == 0.0 and q == 0.0:
+                return 0.0
+            return math.atan2(q, p)
+
+        phi_r = _calc_phi(pr, qr)
+        phi_s = _calc_phi(ps, qs)
+        phi_t = _calc_phi(pt, qt)
+
+        # Fasores de corriente
+        i_r = cmath.rect(ir, th_vr - phi_r)
+        i_s = cmath.rect(is_, th_vs - phi_s)
+        i_t = cmath.rect(it, th_vt - phi_t)
+
+        i_n = -(i_r + i_s + i_t)
+        in_rms = round(abs(i_n), 2)
+        return Corriente(amperios=in_rms)
 
     @staticmethod
     def evaluar_alerta_desbalance(

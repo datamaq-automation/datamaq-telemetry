@@ -132,6 +132,7 @@ erDiagram
         decimal total_apparent_power
         decimal total_power_factor
         decimal desbalance_tension_porcentaje
+        decimal current_n
         datetime created_at
     }
 
@@ -298,6 +299,7 @@ erDiagram
 | `total_apparent_power` | `NUMERIC(12, 2)` | - | Sí |
 | `total_power_factor` | `NUMERIC(4, 2)` | - | Sí |
 | `desbalance_tension_porcentaje` | `NUMERIC(5, 2)` | - | Sí |
+| `current_n` | `NUMERIC(6, 2)` | - | Sí |
 | `created_at` | `DATETIME` | - | No |
 
 **Índices:**

@@ -15,7 +15,7 @@ RAIZ = Path(__file__).resolve().parents[2]
 ALEMBIC_INI = RAIZ / "alembic.ini"
 ENV_PY = RAIZ / "alembic" / "env.py"
 REVISION_INICIAL = "209ce0774d59"
-REVISION_HEAD = "f5a9b2c3d4e6"
+REVISION_HEAD = "a1b2c3d4e5f6"
 
 TABLAS_MODELO = {
     "plans",
@@ -260,3 +260,4 @@ def test_upgrade_agrega_desbalance_tension(tmp_path, monkeypatch):
     inspector = inspect(engine)
     columnas = {c["name"] for c in inspector.get_columns("telemetry_instantaneous")}
     assert "desbalance_tension_porcentaje" in columnas
+    assert "current_n" in columnas

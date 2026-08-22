@@ -176,6 +176,12 @@ def generar_lectura_sintetica(
     # Desbalance de tensión (VUR)
     desbalance_v = AnalizadorCalidadEnergiaService.calcular_desbalance_tension(vr, vs, vt)
 
+    # Corriente de neutro estimada
+    in_val = AnalizadorCalidadEnergiaService.calcular_corriente_neutro(
+        ir, is_, it, pr, ps, pt, qr, qs, qt
+    )
+    current_n = in_val.amperios if in_val else None
+
     return {
         "vr": vr,
         "vs": vs,
@@ -200,6 +206,7 @@ def generar_lectura_sintetica(
         "s_tot": s_tot,
         "fp_tot": min(1.0, max(0.0, fp_tot)),
         "desbalance_v": desbalance_v,
+        "current_n": current_n,
     }
 
 
@@ -383,6 +390,9 @@ def ejecutar_seed(
                     desbalance_tension_porcentaje=Decimal(str(d1_data["desbalance_v"]))
                     if d1_data["desbalance_v"] is not None
                     else None,
+                    current_n=Decimal(str(d1_data["current_n"]))
+                    if d1_data["current_n"] is not None
+                    else None,
                 )
             )
 
@@ -415,6 +425,9 @@ def ejecutar_seed(
                     total_power_factor=Decimal(str(d2_data["fp_tot"])),
                     desbalance_tension_porcentaje=Decimal(str(d2_data["desbalance_v"]))
                     if d2_data["desbalance_v"] is not None
+                    else None,
+                    current_n=Decimal(str(d2_data["current_n"]))
+                    if d2_data["current_n"] is not None
                     else None,
                 )
             )

@@ -271,3 +271,30 @@ def test_filtro_persistencia_temporal():
     filtro.limpiar()
     res_post_limpieza = filtro.procesar_alerta("dev-1", alerta_w, ahora=t0 + timedelta(seconds=10))
     assert res_post_limpieza is None
+
+
+def test_calcular_corriente_neutro_fasorial():
+    # 1. Sistema perfectamente equilibrado (I_R=I_S=I_T=100A, FP=1.0) -> I_N = 0
+    in_eq = AnalizadorCalidadEnergiaService.calcular_corriente_neutro(
+        ir=100.0, is_=100.0, it=100.0, pr=22000.0, ps=22000.0, pt=22000.0, qr=0.0, qs=0.0, qt=0.0
+    )
+    assert in_eq is not None
+    assert in_eq.amperios == 0.0
+
+    # 2. Carga puramente monofásica en Fase R (100A) -> I_N = 100A
+    in_mono = AnalizadorCalidadEnergiaService.calcular_corriente_neutro(
+        ir=100.0, is_=0.0, it=0.0, pr=22000.0, ps=0.0, pt=0.0, qr=0.0, qs=0.0, qt=0.0
+    )
+    assert in_mono is not None
+    assert in_mono.amperios == 100.0
+
+    # 3. Dos fases activas desfasadas 120° (80A y 90A) -> I_N ~ 85.44A
+    in_dos_fases = AnalizadorCalidadEnergiaService.calcular_corriente_neutro(
+        ir=0.0, is_=80.0, it=90.0, pr=0.0, ps=17600.0, pt=19800.0, qr=0.0, qs=0.0, qt=0.0
+    )
+    assert in_dos_fases is not None
+    assert 85.0 <= in_dos_fases.amperios <= 86.0
+
+    # 4. Datos nulos o incompletos -> retorna None
+    assert AnalizadorCalidadEnergiaService.calcular_corriente_neutro(None, 10.0, 10.0) is None
+

@@ -23,6 +23,7 @@ from src.domain.telemetria.ports import (
     RepositorioPlanesPort,
     RepositorioTelemetriaPort,
 )
+from src.domain.telemetria.services import AnalizadorCalidadEnergiaService
 from src.domain.telemetria.value_objects import (
     Corriente,
     EnergiaActiva,
@@ -146,19 +147,39 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
         )
 
     def _instantanea_to_entity(self, m: TelemetryInstantaneousModel) -> LecturaInstantanea:
+        fase_r = self._to_fase(
+            m.voltage_r, m.current_r, m.active_power_r, m.reactive_power_r, m.apparent_power_r, m.power_factor_r
+        )
+        fase_s = self._to_fase(
+            m.voltage_s, m.current_s, m.active_power_s, m.reactive_power_s, m.apparent_power_s, m.power_factor_s
+        )
+        fase_t = self._to_fase(
+            m.voltage_t, m.current_t, m.active_power_t, m.reactive_power_t, m.apparent_power_t, m.power_factor_t
+        )
+
+        in_obj = None
+        if hasattr(m, "current_n") and m.current_n is not None:
+            in_obj = Corriente(amperios=float(m.current_n))
+        else:
+            in_obj = AnalizadorCalidadEnergiaService.calcular_corriente_neutro(
+                ir=fase_r.corriente.amperios if fase_r.corriente else None,
+                is_=fase_s.corriente.amperios if fase_s.corriente else None,
+                it=fase_t.corriente.amperios if fase_t.corriente else None,
+                pr=fase_r.potencia_activa.vatios if fase_r.potencia_activa else None,
+                ps=fase_s.potencia_activa.vatios if fase_s.potencia_activa else None,
+                pt=fase_t.potencia_activa.vatios if fase_t.potencia_activa else None,
+                qr=fase_r.potencia_reactiva.var if fase_r.potencia_reactiva else None,
+                qs=fase_s.potencia_reactiva.var if fase_s.potencia_reactiva else None,
+                qt=fase_t.potencia_reactiva.var if fase_t.potencia_reactiva else None,
+            )
+
         return LecturaInstantanea(
             id=m.id,
             dispositivo_id=m.device_id,
             registrado_en=m.recorded_at,
-            fase_r=self._to_fase(
-                m.voltage_r, m.current_r, m.active_power_r, m.reactive_power_r, m.apparent_power_r, m.power_factor_r
-            ),
-            fase_s=self._to_fase(
-                m.voltage_s, m.current_s, m.active_power_s, m.reactive_power_s, m.apparent_power_s, m.power_factor_s
-            ),
-            fase_t=self._to_fase(
-                m.voltage_t, m.current_t, m.active_power_t, m.reactive_power_t, m.apparent_power_t, m.power_factor_t
-            ),
+            fase_r=fase_r,
+            fase_s=fase_s,
+            fase_t=fase_t,
             potencia_activa_total=PotenciaActiva(vatios=float(m.total_active_power))
             if m.total_active_power is not None
             else None,
@@ -174,6 +195,7 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
             desbalance_tension_porcentaje=float(m.desbalance_tension_porcentaje)
             if m.desbalance_tension_porcentaje is not None
             else None,
+            corriente_neutro_estimada=in_obj,
         )
 
     def _energia_to_entity(self, m: TelemetryEnergyModel) -> AcumuladoEnergia:
@@ -228,6 +250,7 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
             total_apparent_power=lectura.potencia_aparente_total.va if lectura.potencia_aparente_total else None,
             total_power_factor=lectura.factor_potencia_total.valor if lectura.factor_potencia_total else None,
             desbalance_tension_porcentaje=lectura.desbalance_tension_porcentaje,
+            current_n=lectura.corriente_neutro_estimada.amperios if lectura.corriente_neutro_estimada else None,
         )
         self.db.add(model)
         self.db.commit()

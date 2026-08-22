@@ -40,6 +40,9 @@ class TelemetriaMapper:
             potencia_aparente_total_VA=lectura.potencia_aparente_total.va if lectura.potencia_aparente_total else None,
             factor_potencia_total=lectura.factor_potencia_total.valor if lectura.factor_potencia_total else None,
             desbalance_tension_porcentaje=lectura.desbalance_tension_porcentaje,
+            corriente_neutro_estimada_A=lectura.corriente_neutro_estimada.amperios
+            if lectura.corriente_neutro_estimada
+            else None,
         )
 
     @staticmethod
