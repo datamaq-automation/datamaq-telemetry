@@ -267,11 +267,6 @@ class AnalizadorCalidadEnergiaService:
         v_s = cmath.rect(vs, th_vs)
         v_t = cmath.rect(vt, th_vt)
 
-        # Fasores de corriente (para considerar caída de tensión en el neutro)
-        i_r = cmath.rect(ir, th_vr - phi_r) if ir is not None else 0j
-        i_s = cmath.rect(is_, th_vs - phi_s) if is_ is not None else 0j
-        i_t = cmath.rect(it, th_vt - phi_t) if it is not None else 0j
-
         # Tensión de neutro estimada: V_N = - (V_R + V_S + V_T) / 3 + Z_N * I_N
         # Asumiendo Z_N despreciable, simplificamos a V_N = - (V_R + V_S + V_T) / 3
         v_n = -(v_r + v_s + v_t) / 3.0
