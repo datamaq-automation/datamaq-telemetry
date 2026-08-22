@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 
 from src.application.dtos.purga_dto import PurgaRequestDTO, PurgaResultadoDTO
 from src.application.use_cases.purgar_telemetria import PurgarTelemetriaExpiradaUseCase
@@ -13,6 +13,11 @@ from src.infrastructure.fastapi.dependencies import (
 from src.infrastructure.fastapi.error_handler import manejar_error_http
 
 router = APIRouter(tags=["Sistema"])
+
+
+@router.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    return Response(status_code=204)
 
 
 @router.get("/health")

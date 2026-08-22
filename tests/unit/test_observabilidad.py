@@ -159,3 +159,14 @@ def test_404_negocio_no_loguea_ruta_no_encontrada():
     assert negocios, "Se esperaba el evento error_negocio"
     rutas = [ev for ev in logs if ev.get("event") == "ruta_no_encontrada"]
     assert not rutas, "No se debe loguear ruta_no_encontrada para un 404 de negocio"
+
+
+# E11 — /favicon.ico responde 204 No Content sin error
+def test_favicon_endpoint_retorna_204():
+    from src.infrastructure.fastapi.routes.system_router import router as system_router
+
+    app = FastAPI()
+    app.include_router(system_router)
+    client = TestClient(app)
+    respuesta = client.get("/favicon.ico")
+    assert respuesta.status_code == 204

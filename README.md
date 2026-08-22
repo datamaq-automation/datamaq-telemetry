@@ -167,6 +167,9 @@ El esquema se gestiona con **Alembic** (fuente de verdad: `src/infrastructure/sq
 
 # Gauntlet pre-push (etapas 1-4, sin integración)
 ./scripts/pre-push.sh
+
+# Push y Despliegue con Feedback en Vivo (CI & CD Deploy en VPS)
+./push.sh               # o bien: git push-watch
 ```
 
 Verificación individual:

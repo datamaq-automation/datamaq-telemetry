@@ -5,6 +5,7 @@ API FastAPI y Worker MQTT para la ingesta y persistencia de telemetría de medid
 ## Comandos (siempre desde la raíz del repo)
 
 - Servidor dev: `./run.sh` — activa `venv/`, setea `PYTHONPATH=.`, corre `uvicorn src.main:app --reload` en `:8000`.
+- Push y Deploy con feedback en vivo: `./push.sh` o `git push-watch` — ejecuta Gauntlet local, hace push y transmite el estado en vivo de CI y CD Deploy en GitHub Actions.
 - Gauntlet completo (CI): `./scripts/ci.sh` — integridad, ruff, pyright, tests unitarios con cobertura >=85%, integración.
 - Gauntlet pre-push (local): `./scripts/pre-push.sh` — etapas 1-4 (sin integración).
 - Hook de git: `git config core.hooksPath .githooks` (una vez por clonado; invoca `scripts/pre-push.sh` en cada push).
