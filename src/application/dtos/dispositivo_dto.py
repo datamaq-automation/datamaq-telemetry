@@ -36,4 +36,5 @@ class DispositivoResponseDTO(DispositivoBaseDTO):
     visto_por_ultima_vez: datetime | None = None
     creado_en: datetime
     actualizado_en: datetime
+    voltage_linea_V: float | None = None
     model_config = ConfigDict(from_attributes=True)
