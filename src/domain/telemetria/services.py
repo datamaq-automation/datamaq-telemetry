@@ -258,10 +258,6 @@ class AnalizadorCalidadEnergiaService:
                 return 0.0
             return math.atan2(q, p)
 
-        phi_r = _calc_phi(pr, qr)
-        phi_s = _calc_phi(ps, qs)
-        phi_t = _calc_phi(pt, qt)
-
         # Fasores de tensión
         v_r = cmath.rect(vr, th_vr)
         v_s = cmath.rect(vs, th_vs)
