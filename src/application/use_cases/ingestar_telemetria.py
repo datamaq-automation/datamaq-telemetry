@@ -387,6 +387,10 @@ class IngestarTelemetriaUseCase:
                 ir_val, is_val, it_val, pr_val, ps_val, pt_val, qr_val, qs_val, qt_val
             )
 
+            v_neutro = AnalizadorCalidadEnergiaService.calcular_tension_neutro(
+                vr, vs, vt, ir_val, is_val, it_val, pr_val, ps_val, pt_val, qr_val, qs_val, qt_val
+            )
+
             lectura = LecturaInstantanea(
                 id=None,
                 dispositivo_id=dispositivo.id,
@@ -401,6 +405,7 @@ class IngestarTelemetriaUseCase:
                 desbalance_tension_porcentaje=desbalance_v,
                 corriente_neutro_estimada=i_neutro,
                 voltage_linea_V=voltage_linea_V,
+                tension_neutro_estimada=v_neutro,
             )
             # Evaluación de alertas de dominio (se evalúa siempre para cada paquete recibido)
             # 1. Tensión con filtro de persistencia temporal (anti-falsos positivos)

@@ -223,6 +223,62 @@ class AnalizadorCalidadEnergiaService:
         return Corriente(amperios=in_rms)
 
     @staticmethod
+    def calcular_tension_neutro(
+        vr: float | None,
+        vs: float | None,
+        vt: float | None,
+        ir: float | None,
+        is_: float | None,
+        it: float | None,
+        pr: float | None = None,
+        ps: float | None = None,
+        pt: float | None = None,
+        qr: float | None = None,
+        qs: float | None = None,
+        qt: float | None = None,
+    ) -> float | None:
+        """Calcula la tensión de neutro estimada (RMS) mediante suma fasorial de Kirchhoff.
+
+        V_N = - (V_R + V_S + V_T) / 3
+        Considerando desfase angular de 120° entre fases y ángulo de carga phi = atan2(Q, P).
+        """
+        if vr is None or vs is None or vt is None:
+            return None
+
+        # Ángulos de tensión de referencia para secuencia positiva R-S-T
+        th_vr = 0.0
+        th_vs = -2.0 * math.pi / 3.0  # -120°
+        th_vt = 2.0 * math.pi / 3.0  # +120°
+
+        # Desfase corriente-tensión phi = atan2(Q, P)
+        def _calc_phi(p: float | None, q: float | None) -> float:
+            if p is None or q is None:
+                return 0.0
+            if p == 0.0 and q == 0.0:
+                return 0.0
+            return math.atan2(q, p)
+
+        phi_r = _calc_phi(pr, qr)
+        phi_s = _calc_phi(ps, qs)
+        phi_t = _calc_phi(pt, qt)
+
+        # Fasores de tensión
+        v_r = cmath.rect(vr, th_vr)
+        v_s = cmath.rect(vs, th_vs)
+        v_t = cmath.rect(vt, th_vt)
+
+        # Fasores de corriente (para considerar caída de tensión en el neutro)
+        i_r = cmath.rect(ir, th_vr - phi_r) if ir is not None else 0j
+        i_s = cmath.rect(is_, th_vs - phi_s) if is_ is not None else 0j
+        i_t = cmath.rect(it, th_vt - phi_t) if it is not None else 0j
+
+        # Tensión de neutro estimada: V_N = - (V_R + V_S + V_T) / 3 + Z_N * I_N
+        # Asumiendo Z_N despreciable, simplificamos a V_N = - (V_R + V_S + V_T) / 3
+        v_n = -(v_r + v_s + v_t) / 3.0
+        vn_rms = round(abs(v_n), 2)
+        return vn_rms
+
+    @staticmethod
     def evaluar_alerta_desbalance(
         dispositivo_id: str,
         lectura: LecturaInstantanea,

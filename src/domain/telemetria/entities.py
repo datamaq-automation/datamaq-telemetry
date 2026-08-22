@@ -114,6 +114,7 @@ class LecturaInstantanea:
     desbalance_tension_porcentaje: float | None = None
     corriente_neutro_estimada: Corriente | None = None
     voltage_linea_V: float | None = None
+    tension_neutro_estimada: float | None = None
 
 
 @dataclass(frozen=True)
