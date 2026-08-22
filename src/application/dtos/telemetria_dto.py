@@ -27,6 +27,7 @@ class LecturaInstantaneaDTO(BaseModel):
     desbalance_tension_porcentaje: float | None = None
     corriente_neutro_estimada_A: float | None = None
     voltage_linea_V: float | None = None
+    tension_neutro_estimada_V: float | None = None
     model_config = ConfigDict(from_attributes=True)
 
 

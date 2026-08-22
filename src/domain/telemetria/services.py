@@ -250,14 +250,6 @@ class AnalizadorCalidadEnergiaService:
         th_vs = -2.0 * math.pi / 3.0  # -120°
         th_vt = 2.0 * math.pi / 3.0  # +120°
 
-        # Desfase corriente-tensión phi = atan2(Q, P)
-        def _calc_phi(p: float | None, q: float | None) -> float:
-            if p is None or q is None:
-                return 0.0
-            if p == 0.0 and q == 0.0:
-                return 0.0
-            return math.atan2(q, p)
-
         # Fasores de tensión
         v_r = cmath.rect(vr, th_vr)
         v_s = cmath.rect(vs, th_vs)

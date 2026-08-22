@@ -179,6 +179,27 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
                 qt=fase_t.potencia_reactiva.var if fase_t.potencia_reactiva else None,
             )
 
+        vl_val = float(m.voltage_linea_V) if hasattr(m, "voltage_linea_V") and m.voltage_linea_V is not None else None
+
+        vn_val = None
+        if hasattr(m, "tension_neutro_estimada") and m.tension_neutro_estimada is not None:
+            vn_val = float(m.tension_neutro_estimada)
+        else:
+            vn_val = AnalizadorCalidadEnergiaService.calcular_tension_neutro(
+                vr=fase_r.tension.voltios if fase_r.tension else None,
+                vs=fase_s.tension.voltios if fase_s.tension else None,
+                vt=fase_t.tension.voltios if fase_t.tension else None,
+                ir=fase_r.corriente.amperios if fase_r.corriente else None,
+                is_=fase_s.corriente.amperios if fase_s.corriente else None,
+                it=fase_t.corriente.amperios if fase_t.corriente else None,
+                pr=fase_r.potencia_activa.vatios if fase_r.potencia_activa else None,
+                ps=fase_s.potencia_activa.vatios if fase_s.potencia_activa else None,
+                pt=fase_t.potencia_activa.vatios if fase_t.potencia_activa else None,
+                qr=fase_r.potencia_reactiva.var if fase_r.potencia_reactiva else None,
+                qs=fase_s.potencia_reactiva.var if fase_s.potencia_reactiva else None,
+                qt=fase_t.potencia_reactiva.var if fase_t.potencia_reactiva else None,
+            )
+
         return LecturaInstantanea(
             id=m.id,
             dispositivo_id=m.device_id,
@@ -202,6 +223,8 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
             if m.desbalance_tension_porcentaje is not None
             else None,
             corriente_neutro_estimada=in_obj,
+            voltage_linea_V=vl_val,
+            tension_neutro_estimada=vn_val,
         )
 
     def _energia_to_entity(self, m: TelemetryEnergyModel) -> AcumuladoEnergia:
@@ -257,6 +280,8 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
             total_power_factor=lectura.factor_potencia_total.valor if lectura.factor_potencia_total else None,
             desbalance_tension_porcentaje=lectura.desbalance_tension_porcentaje,
             current_n=lectura.corriente_neutro_estimada.amperios if lectura.corriente_neutro_estimada else None,
+            voltage_linea_V=lectura.voltage_linea_V,
+            tension_neutro_estimada=lectura.tension_neutro_estimada,
         )
         self.db.add(model)
         self.db.commit()

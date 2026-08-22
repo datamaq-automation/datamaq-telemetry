@@ -169,6 +169,7 @@ def test_ingestar_telemetria_instantanea():
     assert res.instantanea.potencia_activa_total_W == 2.4
     assert res.instantanea.voltage_linea_V is not None
     assert res.instantanea.voltage_linea_V > 0
+    assert res.instantanea.tension_neutro_estimada_V is not None
 
 
 def test_ingestar_telemetria_compacta_inst():
@@ -197,6 +198,7 @@ def test_ingestar_telemetria_compacta_inst():
     assert inst.fase_t.tension is not None and inst.fase_t.tension.voltios == 223.9
     assert inst.voltage_linea_V is not None
     assert inst.voltage_linea_V > 0
+    assert inst.tension_neutro_estimada is not None
 
 
 def test_ingestar_telemetria_compacta_acc():
@@ -251,6 +253,7 @@ def test_ingestar_telemetria_calcula_y_persiste_desbalance_vur():
     assert inst.desbalance_tension_porcentaje == 4.55
     assert inst.voltage_linea_V is not None
     assert inst.voltage_linea_V > 0
+    assert inst.tension_neutro_estimada == 5.77
 
     # Comprobar consulta DTO
     consultar_uc = ConsultarTelemetriaUseCase(repo_telem, repo_disp)
@@ -259,6 +262,7 @@ def test_ingestar_telemetria_calcula_y_persiste_desbalance_vur():
     assert res.instantanea.desbalance_tension_porcentaje == 4.55
     assert res.instantanea.voltage_linea_V is not None
     assert res.instantanea.voltage_linea_V > 0
+    assert res.instantanea.tension_neutro_estimada_V == 5.77
 
     # Lectura 2: persistencia de desbalance continuo confirma la anomalía
     payload_2 = {

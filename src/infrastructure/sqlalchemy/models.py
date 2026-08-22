@@ -143,6 +143,7 @@ class TelemetryInstantaneousModel(Base):
     desbalance_tension_porcentaje: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     current_n: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
     voltage_linea_V: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
+    tension_neutro_estimada: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, nullable=False)
 

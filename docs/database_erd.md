@@ -136,6 +136,7 @@ erDiagram
         decimal desbalance_tension_porcentaje
         decimal current_n
         decimal voltage_linea_V
+        decimal tension_neutro_estimada
         datetime created_at
     }
 
@@ -306,6 +307,7 @@ erDiagram
 | `desbalance_tension_porcentaje` | `NUMERIC(5, 2)` | - | Sí |
 | `current_n` | `NUMERIC(6, 2)` | - | Sí |
 | `voltage_linea_V` | `NUMERIC(6, 2)` | - | Sí |
+| `tension_neutro_estimada` | `NUMERIC(6, 2)` | - | Sí |
 | `created_at` | `DATETIME` | - | No |
 
 **Índices:**

@@ -44,6 +44,7 @@ class TelemetriaMapper:
             if lectura.corriente_neutro_estimada
             else None,
             voltage_linea_V=lectura.voltage_linea_V,
+            tension_neutro_estimada_V=lectura.tension_neutro_estimada,
         )
 
     @staticmethod

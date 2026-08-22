@@ -308,6 +308,26 @@ def test_calcular_corriente_neutro_fasorial():
     assert AnalizadorCalidadEnergiaService.calcular_corriente_neutro(None, 10.0, 10.0) is None
 
 
+def test_calcular_tension_neutro():
+    # 1. Sistema perfectamente equilibrado (VR=VS=VT=220V) -> V_N = 0.0
+    vn_eq = AnalizadorCalidadEnergiaService.calcular_tension_neutro(
+        vr=220.0, vs=220.0, vt=220.0, ir=1.0, is_=1.0, it=1.0
+    )
+    assert vn_eq == 0.0
+
+    # 2. Desbalance de tensiones (VR=230V, VS=220V, VT=210V) -> V_N ~ 5.77V
+    vn_desbal = AnalizadorCalidadEnergiaService.calcular_tension_neutro(
+        vr=230.0, vs=220.0, vt=210.0, ir=1.0, is_=1.0, it=1.0
+    )
+    assert vn_desbal is not None
+    assert vn_desbal == 5.77
+
+    # 3. Faltan datos de fase -> retorna None
+    assert AnalizadorCalidadEnergiaService.calcular_tension_neutro(None, 220.0, 220.0, 1.0, 1.0, 1.0) is None
+    assert AnalizadorCalidadEnergiaService.calcular_tension_neutro(220.0, None, 220.0, 1.0, 1.0, 1.0) is None
+    assert AnalizadorCalidadEnergiaService.calcular_tension_neutro(220.0, 220.0, None, 1.0, 1.0, 1.0) is None
+
+
 def test_evaluar_alerta_ti_invertido():
     ahora = datetime.now(timezone.utc)
 
