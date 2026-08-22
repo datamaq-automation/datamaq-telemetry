@@ -82,6 +82,8 @@ class DeviceModel(Base):
     esta_activo: Mapped[bool] = mapped_column("is_active", default=True, nullable=False)
     estado: Mapped[str] = mapped_column("status", String(20), default="OFFLINE", nullable=False)
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    installation_type: Mapped[str] = mapped_column(String(30), default="CONSUMO", nullable=False)
+    phases_with_ct: Mapped[str] = mapped_column(String(20), default="R,S,T", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, onupdate=ahora_utc, nullable=False)
 

@@ -426,6 +426,29 @@ class IngestarTelemetriaUseCase:
                         mensaje=alerta_desbalance.mensaje,
                     )
 
+            # 3. Detección de Polaridad de Transformador de Corriente (TI Invertido)
+            fases_ti_list = [f.strip().upper() for f in getattr(dispositivo, "fases_con_ti", "R,S,T").split(",")]
+            alertas_ti_raw = AnalizadorCalidadEnergiaService.evaluar_alerta_ti_invertido(
+                dispositivo_id=dispositivo.id,
+                lectura=lectura,
+                tipo_instalacion=getattr(dispositivo, "tipo_instalacion", "CONSUMO"),
+                fases_con_ti=fases_ti_list,
+            )
+            for a_ti in alertas_ti_raw:
+                a_ti_filtrada = self._filtro_persistencia.procesar_alerta(
+                    dispositivo.id, a_ti, categoria=f"TI_INVERTIDO_{a_ti.mensaje[:50]}", ahora=recorded_at
+                )
+                if a_ti_filtrada:
+                    self.repo_telemetria.guardar_alerta(a_ti_filtrada)
+                    if self.logger:
+                        self.logger.warning(
+                            "alerta_calidad_energia_detectada",
+                            dispositivo_id=dispositivo.id,
+                            tipo=a_ti_filtrada.tipo_alerta,
+                            severidad=a_ti_filtrada.severidad.value,
+                            mensaje=a_ti_filtrada.mensaje,
+                        )
+
             # Persistencia con downsampling según granularidad configurada
             debe_persistir = True
             if self.granularidad_segundos > 0:

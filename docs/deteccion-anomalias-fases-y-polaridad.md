@@ -92,11 +92,14 @@ donde $a = e^{j 120^\circ} = -\frac{1}{2} + j \frac{\sqrt{3}}{2}$.
 
 ---
 
-## 4. Hoja de Ruta de Implementación
+## 4. Hoja de Ruta y Estado de Implementación
 
 | Fase | Feature | Capa | Estado |
 | :--- | :--- | :--- | :---: |
-| **1** | Cálculo de Corriente de Neutro Estimada ($I_N$) | Dominio + API | ✅ **Implementado** |
-| **2** | Detección de TI Invertido ($P_k < 0$) con Alerta de Dominio | `AnalizadorCalidadEnergiaService` | 📋 *Especificado* |
-| **3** | Reporte de Secuencia de Fases en Tópico MQTT `status` | Firmware Powermeter + Worker | 📋 *Especificado* |
-| **4** | Panel de Diagnóstico de Instalación en Frontend | SPA (`app-datamaq`) | 📋 *Especificado* |
+| **1** | Cálculo de Corriente de Neutro Estimada ($I_N$) | Dominio + DB + API | ✅ **Implementado** |
+| **2** | Categorización de Instalación (`CONSUMO`, `GENERACION_FV`, `MIXTO`) | Dominio + DB + API | ✅ **Implementado** |
+| **3** | Ausencia física de TIs (`fases_con_ti`: `"R,S,T"`, `"S,T"`, etc.) | Dominio + DB + API | ✅ **Implementado** |
+| **4** | Detección de TI Invertido ($P_k \le -500\text{W}, I_k \ge 5\text{A}$) con Alerta de Dominio | `AnalizadorCalidadEnergiaService` | ✅ **Implementado** |
+| **5** | Corrección por Software de Polaridad de TIs | Web UI ESP32 (`192.168.4.1`) | 💡 *Operativo en Hardware* |
+| **6** | Reporte Nativo de Secuencia de Fases en Tópico MQTT `status` | Firmware Powermeter + Worker | 📋 *Especificado* |
+| **7** | Panel de Diagnóstico de Instalación en Frontend | SPA (`app-datamaq`) | 📋 *Especificado* |

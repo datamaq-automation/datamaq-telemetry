@@ -254,12 +254,16 @@ def asegurar_organizacion_y_dispositivos(
             tag_location="Tablero General de Entrada (TGBT)",
             estado="ONLINE",
             last_seen_at=datetime.now(timezone.utc),
+            installation_type="CONSUMO",
+            phases_with_ct="R,S,T",
         )
         db.add(dev1)
     else:
         dev1.name = name1
         dev1.estado = "ONLINE"
         dev1.last_seen_at = datetime.now(timezone.utc)
+        dev1.installation_type = "CONSUMO"
+        dev1.phases_with_ct = "R,S,T"
 
     # 4. Dispositivo 2 (2 TIs)
     dev2_mac_norm = MacAddress(mac2).valor
@@ -275,12 +279,16 @@ def asegurar_organizacion_y_dispositivos(
             tag_location="Línea de Envasado Extra (2 TIs)",
             estado="ONLINE",
             last_seen_at=datetime.now(timezone.utc),
+            installation_type="CONSUMO",
+            phases_with_ct="S,T",
         )
         db.add(dev2)
     else:
         dev2.name = name2
         dev2.estado = "ONLINE"
         dev2.last_seen_at = datetime.now(timezone.utc)
+        dev2.installation_type = "CONSUMO"
+        dev2.phases_with_ct = "S,T"
 
     db.commit()
     db.refresh(dev1)

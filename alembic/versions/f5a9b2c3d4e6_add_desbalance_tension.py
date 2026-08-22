@@ -27,14 +27,16 @@ def _tiene_columna(inspector: sa.Inspector, tabla: str, columna: str) -> bool:
 
 def upgrade() -> None:
     inspector = sa.inspect(op.get_bind())
-    if not _tiene_columna(inspector, "telemetry_instantaneous", "desbalance_tension_porcentaje"):
-        op.add_column(
-            "telemetry_instantaneous",
-            sa.Column("desbalance_tension_porcentaje", sa.Numeric(5, 2), nullable=True),
-        )
+    if inspector.has_table("telemetry_instantaneous"):
+        if not _tiene_columna(inspector, "telemetry_instantaneous", "desbalance_tension_porcentaje"):
+            op.add_column(
+                "telemetry_instantaneous",
+                sa.Column("desbalance_tension_porcentaje", sa.Numeric(5, 2), nullable=True),
+            )
 
 
 def downgrade() -> None:
     inspector = sa.inspect(op.get_bind())
-    if _tiene_columna(inspector, "telemetry_instantaneous", "desbalance_tension_porcentaje"):
-        op.drop_column("telemetry_instantaneous", "desbalance_tension_porcentaje")
+    if inspector.has_table("telemetry_instantaneous"):
+        if _tiene_columna(inspector, "telemetry_instantaneous", "desbalance_tension_porcentaje"):
+            op.drop_column("telemetry_instantaneous", "desbalance_tension_porcentaje")

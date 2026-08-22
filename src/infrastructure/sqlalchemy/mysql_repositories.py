@@ -71,6 +71,8 @@ class MySQLDispositivosRepository(RepositorioDispositivosPort):
             if model.estado in EstadoDispositivo._value2member_map_
             else EstadoDispositivo.OFFLINE,
             visto_por_ultima_vez=model.last_seen_at,
+            tipo_instalacion=getattr(model, "installation_type", "CONSUMO") or "CONSUMO",
+            fases_con_ti=getattr(model, "phases_with_ct", "R,S,T") or "R,S,T",
             creado_en=model.created_at,
             actualizado_en=model.updated_at,
         )
@@ -113,11 +115,13 @@ class MySQLDispositivosRepository(RepositorioDispositivosPort):
                 esta_activo=dispositivo.esta_activo,
                 estado=dispositivo.estado.value,
                 last_seen_at=dispositivo.visto_por_ultima_vez,
+                installation_type=dispositivo.tipo_instalacion,
+                phases_with_ct=dispositivo.fases_con_ti,
             )
             self.db.add(model)
         else:
-            model.facility_id = dispositivo.planta_id
             model.name = dispositivo.nombre
+            model.facility_id = dispositivo.planta_id
             model.model = dispositivo.modelo
             model.serial_number = dispositivo.numero_serie
             model.hw_version = dispositivo.version_hw
@@ -126,6 +130,8 @@ class MySQLDispositivosRepository(RepositorioDispositivosPort):
             model.esta_activo = dispositivo.esta_activo
             model.estado = dispositivo.estado.value
             model.last_seen_at = dispositivo.visto_por_ultima_vez
+            model.installation_type = dispositivo.tipo_instalacion
+            model.phases_with_ct = dispositivo.fases_con_ti
 
         self.db.commit()
         self.db.refresh(model)

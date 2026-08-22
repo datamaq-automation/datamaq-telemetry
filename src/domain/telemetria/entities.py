@@ -76,6 +76,8 @@ class Dispositivo:
     esta_activo: bool = True
     estado: EstadoDispositivo = EstadoDispositivo.OFFLINE
     visto_por_ultima_vez: datetime | None = None
+    tipo_instalacion: str = "CONSUMO"
+    fases_con_ti: str = "R,S,T"
     creado_en: datetime = field(default_factory=ahora_utc)
     actualizado_en: datetime = field(default_factory=ahora_utc)
 

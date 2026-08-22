@@ -24,6 +24,8 @@ class DispositivoMapper:
             version_fw=entity.version_fw,
             ubicacion_tag=entity.ubicacion_tag,
             esta_activo=entity.esta_activo,
+            tipo_instalacion=entity.tipo_instalacion,
+            fases_con_ti=entity.fases_con_ti,
             estado=entity.estado.value,
             visto_por_ultima_vez=entity.visto_por_ultima_vez,
             creado_en=entity.creado_en,
@@ -43,6 +45,8 @@ class DispositivoMapper:
             version_fw=dto.version_fw,
             ubicacion_tag=dto.ubicacion_tag,
             esta_activo=dto.esta_activo,
+            tipo_instalacion=dto.tipo_instalacion or "CONSUMO",
+            fases_con_ti=dto.fases_con_ti or "R,S,T",
             estado=EstadoDispositivo.ONLINE,
         )
 

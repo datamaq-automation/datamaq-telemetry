@@ -52,6 +52,8 @@ erDiagram
         boolean is_active
         string status
         datetime last_seen_at
+        string installation_type
+        string phases_with_ct
         datetime created_at
         datetime updated_at
     }
@@ -202,6 +204,8 @@ erDiagram
 | `is_active` | `BOOLEAN` | - | No |
 | `status` | `VARCHAR(20)` | - | No |
 | `last_seen_at` | `DATETIME` | - | Sí |
+| `installation_type` | `VARCHAR(30)` | - | No |
+| `phases_with_ct` | `VARCHAR(20)` | - | No |
 | `created_at` | `DATETIME` | - | No |
 | `updated_at` | `DATETIME` | - | No |
 

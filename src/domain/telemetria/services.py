@@ -321,6 +321,56 @@ class AnalizadorCalidadEnergiaService:
                     )
         return None
 
+    @staticmethod
+    def evaluar_alerta_ti_invertido(
+        dispositivo_id: str,
+        lectura: LecturaInstantanea,
+        tipo_instalacion: str = "CONSUMO",
+        fases_con_ti: list[str] | set[str] | None = None,
+        umbral_corriente_minima: float = 5.0,
+        umbral_potencia_negativa: float = -500.0,
+    ) -> list[AlertaDispositivo]:
+        """Evalúa si algún TI está invertido físicamente en una instalación de consumo puro.
+
+        Si la instalación es de GENERACION_FV o MIXTO, no se genera alerta ya que la
+        potencia negativa representa exportación legítima hacia la red.
+        """
+        if tipo_instalacion != "CONSUMO":
+            return []
+
+        fases_activas = set(fases_con_ti) if fases_con_ti is not None else {"R", "S", "T"}
+        alertas: list[AlertaDispositivo] = []
+
+        fases = [
+            ("R", lectura.fase_r),
+            ("S", lectura.fase_s),
+            ("T", lectura.fase_t),
+        ]
+
+        for nombre_fase, med in fases:
+            if nombre_fase not in fases_activas:
+                continue
+
+            i_val = med.corriente.amperios if med.corriente else 0.0
+            p_val = med.potencia_activa.vatios if med.potencia_activa else 0.0
+
+            if i_val >= umbral_corriente_minima and p_val <= umbral_potencia_negativa:
+                alertas.append(
+                    AlertaDispositivo(
+                        id=None,
+                        dispositivo_id=dispositivo_id,
+                        tipo_alerta="TI_INVERTIDO",
+                        severidad=SeveridadAlerta.WARNING,
+                        mensaje=(
+                            f"Posible inversión de polaridad en Transformador de Corriente (TI) de Fase {nombre_fase}: "
+                            f"P={p_val}W, I={i_val}A. "
+                            f"Verificar el sentido de la flecha física o invertir la polaridad por software en 192.168.4.1."
+                        ),
+                    )
+                )
+
+        return alertas
+
 
 class PoliticaRetencionService:
     @staticmethod

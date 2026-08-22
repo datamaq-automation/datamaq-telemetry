@@ -1,5 +1,11 @@
+from datetime import datetime, timezone
+
 import pytest
 
+from src.domain.telemetria.entities import (
+    LecturaInstantanea,
+    MedicionFase,
+)
 from src.domain.telemetria.exceptions import (
     FactorPotenciaInvalidoError,
     MacAddressInvalidaError,
@@ -7,8 +13,11 @@ from src.domain.telemetria.exceptions import (
 )
 from src.domain.telemetria.services import AnalizadorCalidadEnergiaService
 from src.domain.telemetria.value_objects import (
+    Corriente,
     FactorPotencia,
     MacAddress,
+    PotenciaActiva,
+    SeveridadAlerta,
     Tension,
 )
 
@@ -297,4 +306,62 @@ def test_calcular_corriente_neutro_fasorial():
 
     # 4. Datos nulos o incompletos -> retorna None
     assert AnalizadorCalidadEnergiaService.calcular_corriente_neutro(None, 10.0, 10.0) is None
+
+
+def test_evaluar_alerta_ti_invertido():
+    ahora = datetime.now(timezone.utc)
+
+    # 1. Caso Normal (consumo positivo) -> Sin alertas
+    lectura_normal = LecturaInstantanea(
+        id=None,
+        dispositivo_id="dev-1",
+        registrado_en=ahora,
+        fase_r=MedicionFase(corriente=Corriente(50.0), potencia_activa=PotenciaActiva(11000.0)),
+        fase_s=MedicionFase(corriente=Corriente(50.0), potencia_activa=PotenciaActiva(11000.0)),
+        fase_t=MedicionFase(corriente=Corriente(50.0), potencia_activa=PotenciaActiva(11000.0)),
+    )
+    alertas_ok = AnalizadorCalidadEnergiaService.evaluar_alerta_ti_invertido("dev-1", lectura_normal)
+    assert len(alertas_ok) == 0
+
+    # 2. Caso TI Invertido en Fase S (I=40A, P=-8500W en instalación CONSUMO) -> Alerta
+    lectura_invertida = LecturaInstantanea(
+        id=None,
+        dispositivo_id="dev-1",
+        registrado_en=ahora,
+        fase_r=MedicionFase(corriente=Corriente(50.0), potencia_activa=PotenciaActiva(11000.0)),
+        fase_s=MedicionFase(corriente=Corriente(40.0), potencia_activa=PotenciaActiva(-8500.0)),
+        fase_t=MedicionFase(corriente=Corriente(50.0), potencia_activa=PotenciaActiva(11000.0)),
+    )
+    alertas_inv = AnalizadorCalidadEnergiaService.evaluar_alerta_ti_invertido(
+        "dev-1", lectura_invertida, tipo_instalacion="CONSUMO", fases_con_ti=["R", "S", "T"]
+    )
+    assert len(alertas_inv) == 1
+    assert alertas_inv[0].tipo_alerta == "TI_INVERTIDO"
+    assert "Fase S" in alertas_inv[0].mensaje
+    assert alertas_inv[0].severidad == SeveridadAlerta.WARNING
+
+    # 3. Caso Ruido residual en fase sin carga (I=1.2A, P=-10W) -> No dispara falsa alarma (menor a 5A)
+    lectura_ruido = LecturaInstantanea(
+        id=None,
+        dispositivo_id="dev-1",
+        registrado_en=ahora,
+        fase_r=MedicionFase(corriente=Corriente(1.2), potencia_activa=PotenciaActiva(-10.0)),
+        fase_s=MedicionFase(corriente=Corriente(40.0), potencia_activa=PotenciaActiva(8500.0)),
+        fase_t=MedicionFase(corriente=Corriente(50.0), potencia_activa=PotenciaActiva(11000.0)),
+    )
+    alertas_ruido = AnalizadorCalidadEnergiaService.evaluar_alerta_ti_invertido("dev-1", lectura_ruido)
+    assert len(alertas_ruido) == 0
+
+    # 4. Caso Fase no instalada en dispositivo 2 TIs (Fase R no monitoreada) -> Ignorada
+    alertas_no_ti = AnalizadorCalidadEnergiaService.evaluar_alerta_ti_invertido(
+        "dev-2", lectura_invertida, tipo_instalacion="CONSUMO", fases_con_ti=["R", "T"]
+    )
+    assert len(alertas_no_ti) == 0  # Fase S no está en fases_con_ti
+
+    # 5. Caso Instalación Fotovoltaica (GENERACION_FV) -> Potencia negativa permitida, sin alerta
+    alertas_fv = AnalizadorCalidadEnergiaService.evaluar_alerta_ti_invertido(
+        "dev-solar", lectura_invertida, tipo_instalacion="GENERACION_FV"
+    )
+    assert len(alertas_fv) == 0
+
 

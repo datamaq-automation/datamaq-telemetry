@@ -13,6 +13,8 @@ class DispositivoBaseDTO(BaseModel):
     version_fw: str | None = None
     ubicacion_tag: str | None = None
     esta_activo: bool = True
+    tipo_instalacion: str = "CONSUMO"
+    fases_con_ti: str = "R,S,T"
 
 
 class DispositivoCreateDTO(DispositivoBaseDTO):
@@ -24,6 +26,8 @@ class DispositivoUpdateDTO(BaseModel):
     planta_id: str | None = None
     ubicacion_tag: str | None = None
     esta_activo: bool | None = None
+    tipo_instalacion: str | None = None
+    fases_con_ti: str | None = None
 
 
 class DispositivoResponseDTO(DispositivoBaseDTO):
