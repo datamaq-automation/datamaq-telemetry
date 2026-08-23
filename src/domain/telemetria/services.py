@@ -803,7 +803,7 @@ class AnalizadorCalidadEnergiaService:
             if (med.thd_v_porcentaje is not None or med.thd_v_pct is not None)
         ]
         thd_v_max = max(thd_v_vals) if thd_v_vals else None
-        thd_v_max_val = float(thd_v_max) if thd_v_max is not None else None
+        thd_v_max_val = thd_v_max
         if fp_tot is not None and thd_v_max_val is not None:
             if abs(fp_tot) >= umbral_resonancia_fp and thd_v_max_val >= umbral_resonancia_thd_v:
                 alertas.append(
