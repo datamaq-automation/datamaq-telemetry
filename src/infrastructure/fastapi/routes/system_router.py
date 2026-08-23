@@ -11,6 +11,10 @@ from src.infrastructure.fastapi.dependencies import (
     requiere_rol_admin,
 )
 from src.infrastructure.fastapi.error_handler import manejar_error_http
+from src.infrastructure.sqlalchemy.database import (
+    verificar_conexion_db,
+    verificar_estado_migraciones,
+)
 
 router = APIRouter(tags=["Sistema"])
 
@@ -20,14 +24,46 @@ def favicon():
     return Response(status_code=204)
 
 
-@router.get("/health")
-def health_check():
-    listener = get_mqtt_listener()
+@router.get("/health/live")
+def liveness_check():
+    """Sonda de liveness: valida que el proceso está activo."""
     return {
-        "status": "healthy",
+        "status": "alive",
         "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@router.get("/health/ready")
+def readiness_check(response: Response):
+    """Sonda de readiness: valida que la BD esté conectada y en la versión correcta de migración."""
+    listener = get_mqtt_listener()
+    db_ok = verificar_conexion_db()
+    migraciones = verificar_estado_migraciones()
+
+    esta_listo = db_ok and migraciones.get("sincronizado", False)
+    if not esta_listo:
+        response.status_code = 503
+        return {
+            "status": "not_ready",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "database_conectada": db_ok,
+            "migraciones": migraciones,
+            "mqtt_conectado": listener.esta_conectado() if listener else False,
+        }
+
+    return {
+        "status": "ready",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "database_conectada": db_ok,
+        "migraciones": migraciones,
         "mqtt_conectado": listener.esta_conectado() if listener else False,
     }
+
+
+@router.get("/health")
+def health_check(response: Response):
+    """Chequeo general de salud (compatibilidad con monitores heredados)."""
+    return readiness_check(response)
 
 
 @router.post("/api/system/purge", response_model=PurgaResultadoDTO)

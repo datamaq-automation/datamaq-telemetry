@@ -279,3 +279,13 @@ def test_upgrade_agrega_desbalance_tension(tmp_path, monkeypatch):
     assert "unit" in columnas_alerts
     assert "category" in columnas_alerts
     assert "notes" in columnas_alerts
+
+
+def test_migraciones_tienen_una_sola_cabeza_lineal():
+    from alembic.script import ScriptDirectory
+
+    cfg = _config()
+    script = ScriptDirectory.from_config(cfg)
+    heads = script.get_heads()
+    assert len(heads) == 1, f"Se detectaron múltiples ramas en Alembic: {heads}"
+    assert heads[0] == REVISION_HEAD

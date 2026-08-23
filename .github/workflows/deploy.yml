@@ -41,7 +41,7 @@ jobs:
           DEPLOY_SSH_USER: ${{ secrets.DEPLOY_SSH_USER }}
           DEPLOY_REMOTE_DIR: ${{ vars.DEPLOY_REMOTE_DIR || '/var/www/datamaq-telemetry' }}
           DEPLOY_SERVICE_NAME: ${{ vars.DEPLOY_SERVICE_NAME || 'datamaq-telemetry.service' }}
-          DEPLOY_HEALTH_URL: ${{ vars.DEPLOY_HEALTH_URL || 'http://localhost:8000/' }}
+          DEPLOY_HEALTH_URL: ${{ vars.DEPLOY_HEALTH_URL || 'http://localhost:8000/health/ready' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: ./scripts/deploy-server.sh

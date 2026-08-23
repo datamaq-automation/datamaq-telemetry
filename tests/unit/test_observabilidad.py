@@ -187,3 +187,61 @@ def test_error_db_loguea_detalles_estructurados():
     assert errores, "No se registró el evento error_interno"
     assert "Unknown column 'thd_v_r'" in errores[0].get("db_error", "")
     assert "telemetry_instantaneous" in errores[0].get("db_statement", "")
+
+
+# E13 — Sondas de salud: /health/live siempre 200, /health/ready valida BD y migraciones
+def test_liveness_endpoint_retorna_200():
+    from src.infrastructure.fastapi.routes.system_router import router as system_router
+
+    app = FastAPI()
+    app.include_router(system_router)
+    client = TestClient(app)
+    resp = client.get("/health/live")
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "alive"
+
+
+def test_readiness_endpoint_retorna_200_cuando_ok(monkeypatch):
+    from src.infrastructure.fastapi.routes import system_router as sys_mod
+    from src.infrastructure.fastapi.routes.system_router import router as system_router
+
+    monkeypatch.setattr(sys_mod, "verificar_conexion_db", lambda: True)
+    monkeypatch.setattr(
+        sys_mod, "verificar_estado_migraciones", lambda: {"sincronizado": True, "current_rev": "h1", "head_rev": "h1"}
+    )
+
+    app = FastAPI()
+    app.include_router(system_router)
+    client = TestClient(app)
+    resp = client.get("/health/ready")
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "ready"
+
+
+def test_readiness_endpoint_retorna_503_cuando_falla_migracion_o_db(monkeypatch):
+    from src.infrastructure.fastapi.routes import system_router as sys_mod
+    from src.infrastructure.fastapi.routes.system_router import router as system_router
+
+    # Caso 1: DB caída
+    monkeypatch.setattr(sys_mod, "verificar_conexion_db", lambda: False)
+    monkeypatch.setattr(
+        sys_mod, "verificar_estado_migraciones", lambda: {"sincronizado": True, "current_rev": "h1", "head_rev": "h1"}
+    )
+
+    app = FastAPI()
+    app.include_router(system_router)
+    client = TestClient(app)
+    resp = client.get("/health/ready")
+    assert resp.status_code == 503
+    assert resp.json()["status"] == "not_ready"
+
+    # Caso 2: Desfasaje de migración
+    monkeypatch.setattr(sys_mod, "verificar_conexion_db", lambda: True)
+    monkeypatch.setattr(
+        sys_mod,
+        "verificar_estado_migraciones",
+        lambda: {"sincronizado": False, "current_rev": "rev_vieja", "head_rev": "rev_head"},
+    )
+    resp2 = client.get("/health/ready")
+    assert resp2.status_code == 503
+    assert resp2.json()["status"] == "not_ready"

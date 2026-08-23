@@ -32,7 +32,7 @@ case " $LOCAL_NAMES " in
         ;;
 esac
 
-HEALTH_URL="${DEPLOY_HEALTH_URL:-http://localhost:8000/}"
+HEALTH_URL="${DEPLOY_HEALTH_URL:-http://localhost:8000/health/ready}"
 
 log() { echo "[$(date +"%Y-%m-%dT%H:%M:%S")] $1"; }
 

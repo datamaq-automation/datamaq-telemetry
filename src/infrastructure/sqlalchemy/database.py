@@ -106,3 +106,16 @@ def verificar_estado_migraciones(engine: Engine | None = None) -> dict[str, Any]
             "head_rev": None,
             "error": str(e),
         }
+
+
+def verificar_conexion_db(engine: Engine | None = None) -> bool:
+    """Verifica si es posible establecer conexión y ejecutar una consulta simple contra la BD."""
+    try:
+        from sqlalchemy import text
+
+        engine = engine or get_engine()
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+        return True
+    except Exception:
+        return False
