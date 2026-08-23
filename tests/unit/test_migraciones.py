@@ -289,3 +289,35 @@ def test_migraciones_tienen_una_sola_cabeza_lineal():
     heads = script.get_heads()
     assert len(heads) == 1, f"Se detectaron múltiples ramas en Alembic: {heads}"
     assert heads[0] == REVISION_HEAD
+
+
+def test_paridad_completa_modelos_orm_vs_migraciones_alembic(tmp_path, monkeypatch):
+    """Garantiza que TODAS las tablas y columnas declaradas en Base.metadata existan en la BD tras 'upgrade head'."""
+    from src.infrastructure.sqlalchemy.models import Base
+
+    db = tmp_path / "parity_test.db"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db}")
+    cfg = _config()
+
+    command.upgrade(cfg, "head")
+
+    engine = create_engine(f"sqlite:///{db}")
+    inspector = inspect(engine)
+    tablas_bd = set(inspector.get_table_names())
+
+    discrepancias = []
+    for nombre_tabla, tabla_orm in Base.metadata.tables.items():
+        if nombre_tabla not in tablas_bd:
+            discrepancias.append(f"Tabla '{nombre_tabla}' declarada en ORM pero falta en BD")
+            continue
+
+        columnas_bd = {c["name"] for c in inspector.get_columns(nombre_tabla)}
+        columnas_orm = {c.name for c in tabla_orm.columns}
+
+        faltantes_en_bd = columnas_orm - columnas_bd
+        if faltantes_en_bd:
+            discrepancias.append(
+                f"Tabla '{nombre_tabla}': columnas en ORM ausentes en BD tras migraciones: {sorted(faltantes_en_bd)}"
+            )
+
+    assert not discrepancias, "\n".join(discrepancias)
