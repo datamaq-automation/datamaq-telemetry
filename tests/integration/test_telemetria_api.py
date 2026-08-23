@@ -1,13 +1,13 @@
 """Pruebas de integración de la API de telemetría: registro de rutas, ejecución end-to-end y serialización DTO."""
 
 from datetime import datetime, timezone
-from decimal import Decimal
 from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient
 
 from src.application.dtos.telemetria_dto import (
     LecturaInstantaneaDTO,
+    MedicionFaseDTO,
     TelemetriaLatestResponseDTO,
 )
 from src.infrastructure.fastapi.dependencies import (
@@ -52,32 +52,35 @@ def test_get_latest_telemetry_end_to_end_con_thd():
     ahora = datetime.now(timezone.utc)
     mock_dto = TelemetriaLatestResponseDTO(
         device_id="dev-test-1",
-        device_name="Medidor Principal",
-        device_status="ONLINE",
-        last_seen_at=ahora,
         instantanea=LecturaInstantaneaDTO(
-            recorded_at=ahora,
-            voltage_r=Decimal("220.5"),
-            voltage_s=Decimal("221.0"),
-            voltage_t=Decimal("219.8"),
-            current_r=Decimal("10.2"),
-            current_s=Decimal("9.8"),
-            current_t=Decimal("10.5"),
-            active_power_r=Decimal("2249.1"),
-            active_power_s=Decimal("2165.8"),
-            active_power_t=Decimal("2307.9"),
-            total_active_power=Decimal("6722.8"),
-            thd_v_r=Decimal("1.85"),
-            thd_i_r=Decimal("3.42"),
-            thd_v_s=Decimal("1.90"),
-            thd_i_s=Decimal("3.50"),
-            thd_v_t=Decimal("1.80"),
-            thd_i_t=Decimal("3.35"),
-            thd_v_promedio_porcentaje=Decimal("1.85"),
-            thd_i_total_porcentaje=Decimal("3.42"),
+            dispositivo_id="dev-test-1",
+            registrado_en=ahora,
+            fase_r=MedicionFaseDTO(
+                voltage_V=220.5,
+                current_A=10.2,
+                net_active_power_W=2249.1,
+                thd_v_pct=1.85,
+                thd_i_pct=3.42,
+            ),
+            fase_s=MedicionFaseDTO(
+                voltage_V=221.0,
+                current_A=9.8,
+                net_active_power_W=2165.8,
+                thd_v_pct=1.90,
+                thd_i_pct=3.50,
+            ),
+            fase_t=MedicionFaseDTO(
+                voltage_V=219.8,
+                current_A=10.5,
+                net_active_power_W=2307.9,
+                thd_v_pct=1.80,
+                thd_i_pct=3.35,
+            ),
+            potencia_activa_total_W=6722.8,
+            thd_v_promedio_pct=1.85,
+            thd_i_total_pct=3.42,
         ),
         energia=None,
-        estado=None,
     )
 
     mock_use_case = MagicMock()
@@ -93,8 +96,8 @@ def test_get_latest_telemetry_end_to_end_con_thd():
     assert "X-Request-ID" in response.headers
     data = response.json()
     assert data["device_id"] == "dev-test-1"
-    assert data["instantanea"]["thd_v_r"] == 1.85
-    assert data["instantanea"]["thd_i_total_porcentaje"] == 3.42
+    assert data["instantanea"]["thd_v_promedio_pct"] == 1.85
+    assert data["instantanea"]["thd_i_total_pct"] == 3.42
 
 
 def test_get_instantaneous_history_end_to_end():
@@ -102,16 +105,14 @@ def test_get_instantaneous_history_end_to_end():
 
     ahora = datetime.now(timezone.utc)
     mock_item = LecturaInstantaneaDTO(
-        recorded_at=ahora,
-        voltage_r=Decimal("220.0"),
-        voltage_s=Decimal("220.0"),
-        voltage_t=Decimal("220.0"),
-        current_r=Decimal("5.0"),
-        current_s=Decimal("5.0"),
-        current_t=Decimal("5.0"),
-        total_active_power=Decimal("3300.0"),
-        thd_v_r=Decimal("1.50"),
-        thd_i_r=Decimal("2.80"),
+        dispositivo_id="dev-test-1",
+        registrado_en=ahora,
+        fase_r=MedicionFaseDTO(voltage_V=220.0, current_A=5.0, thd_v_pct=1.50, thd_i_pct=2.80),
+        fase_s=MedicionFaseDTO(voltage_V=220.0, current_A=5.0, thd_v_pct=1.50, thd_i_pct=2.80),
+        fase_t=MedicionFaseDTO(voltage_V=220.0, current_A=5.0, thd_v_pct=1.50, thd_i_pct=2.80),
+        potencia_activa_total_W=3300.0,
+        thd_v_promedio_pct=1.50,
+        thd_i_total_pct=2.80,
     )
 
     mock_use_case = MagicMock()
@@ -127,4 +128,4 @@ def test_get_instantaneous_history_end_to_end():
     assert "X-Request-ID" in response.headers
     data = response.json()
     assert len(data) == 1
-    assert data[0]["thd_v_r"] == 1.50
+    assert data[0]["thd_v_promedio_pct"] == 1.50

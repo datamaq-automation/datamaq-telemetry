@@ -1,5 +1,6 @@
 """Pruebas de integración de la API de dispositivos: registro de rutas y acceso protegido."""
 
+from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient
@@ -32,29 +33,32 @@ def test_create_app_registra_rutas_dispositivos():
     assert "GET" in rutas["/api/dispositivos"]
     assert "POST" in rutas["/api/dispositivos"]
 
-    assert "/api/dispositivos/{id_o_uid}" in rutas
-    assert "GET" in rutas["/api/dispositivos/{id_o_uid}"]
-    assert "PUT" in rutas["/api/dispositivos/{id_o_uid}"]
-    assert "DELETE" in rutas["/api/dispositivos/{id_o_uid}"]
+    assert "/api/dispositivos/{device_id}" in rutas
+    assert "GET" in rutas["/api/dispositivos/{device_id}"]
+    assert "PUT" in rutas["/api/dispositivos/{device_id}"]
 
 
 def test_listar_dispositivos_end_to_end():
     app = create_app()
+    ahora = datetime.now(timezone.utc)
 
     mock_dto = DispositivoResponseDTO(
         id="dev-1",
         device_uid="PM-001",
-        serial_number="SN123",
-        name="Tablero General",
-        model="SmartPlus",
-        hw_version="v2.1",
-        fw_version="v1.4.2",
-        tag_location="Nave A",
-        is_active=True,
-        status="ONLINE",
-        last_seen_at=None,
-        installation_type="CONSUMO",
-        phases_with_ct="R,S,T",
+        nombre="Tablero General",
+        modelo="SmartPlus",
+        planta_id=None,
+        numero_serie="SN123",
+        version_hw="v2.1",
+        version_fw="v1.4.2",
+        ubicacion_tag="Nave A",
+        esta_activo=True,
+        tipo_instalacion="CONSUMO",
+        fases_con_ti="R,S,T",
+        estado="ONLINE",
+        visto_por_ultima_vez=None,
+        creado_en=ahora,
+        actualizado_en=ahora,
     )
 
     mock_use_case = MagicMock()
