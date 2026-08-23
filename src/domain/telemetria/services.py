@@ -798,9 +798,10 @@ class AnalizadorCalidadEnergiaService:
         # 3. Riesgo de Resonancia en Bancos de Capacitores (THD_V > 4.0% y FP >= 0.98)
         fp_tot = lectura.factor_potencia_total.valor if lectura.factor_potencia_total else None
         thd_v_vals = [
-            float(med.thd_v_porcentaje if med.thd_v_porcentaje is not None else med.thd_v_pct)
+            float(value)
             for _, med in fases
-            if (med.thd_v_porcentaje is not None or med.thd_v_pct is not None)
+            for value in [med.thd_v_porcentaje if med.thd_v_porcentaje is not None else med.thd_v_pct]
+            if value is not None
         ]
         thd_v_max = max(thd_v_vals) if thd_v_vals else None
         thd_v_max_val = thd_v_max
