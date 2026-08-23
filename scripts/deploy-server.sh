@@ -66,6 +66,9 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
     echo "==> Instalando dependencias..."
     ./.venv/bin/pip install -r requirements.txt
 
+    echo "==> Aplicando migraciones de base de datos (Alembic)..."
+    ./.venv/bin/alembic upgrade head
+
     echo "==> Reiniciando servicio $DEPLOY_SERVICE_NAME..."
     sudo systemctl restart "$DEPLOY_SERVICE_NAME"
 

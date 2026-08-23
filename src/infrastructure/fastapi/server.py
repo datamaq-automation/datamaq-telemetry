@@ -2,7 +2,9 @@ import asyncio
 import json
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from typing import Any
 
+import structlog
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -38,7 +40,10 @@ from src.infrastructure.fastapi.security_headers import SecurityHeadersMiddlewar
 from src.infrastructure.paho_mqtt.mqtt_listener import MQTTListener
 from src.infrastructure.settings.config import Settings, get_settings
 from src.infrastructure.settings.logger import get_logger
-from src.infrastructure.sqlalchemy.database import create_tables_if_needed
+from src.infrastructure.sqlalchemy.database import (
+    create_tables_if_needed,
+    verificar_estado_migraciones,
+)
 
 logger = get_logger("server")
 
@@ -47,14 +52,23 @@ async_loop = None
 
 
 async def manejar_excepcion_no_mapeada(request: Request, exc: Exception) -> JSONResponse:
-    logger.error(
-        "excepcion_no_mapeada",
-        exc_info=True,
-        tipo=type(exc).__name__,
-        metodo=request.method,
-        ruta=request.url.path,
-    )
-    return JSONResponse(status_code=500, content={"detail": "error_interno"})
+    request_id = structlog.contextvars.get_contextvars().get("request_id")
+    contexto: dict[str, Any] = {
+        "tipo": type(exc).__name__,
+        "metodo": request.method,
+        "ruta": request.url.path,
+        "request_id": request_id,
+    }
+    orig = getattr(exc, "orig", None)
+    if orig is not None:
+        contexto["db_error"] = str(orig)
+    statement = getattr(exc, "statement", None)
+    if statement is not None:
+        contexto["db_statement"] = str(statement)
+
+    logger.error("excepcion_no_mapeada", exc_info=True, **contexto)
+    headers = {"X-Request-ID": request_id} if request_id else None
+    return JSONResponse(status_code=500, content={"detail": "error_interno"}, headers=headers)
 
 
 def websocket_broadcast_callback(topico: str, datos: dict):
@@ -74,6 +88,7 @@ async def lifespan(app: FastAPI):
     async_loop = asyncio.get_running_loop()
 
     create_tables_if_needed()
+    verificar_estado_migraciones()
     logger.info("tablas_db_verificadas")
 
     # Hook up live WebSocket broadcasts

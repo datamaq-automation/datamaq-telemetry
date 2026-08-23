@@ -170,3 +170,20 @@ def test_favicon_endpoint_retorna_204():
     client = TestClient(app)
     respuesta = client.get("/favicon.ico")
     assert respuesta.status_code == 204
+
+
+# E12 — error de BD estructurado con orig y statement
+def test_error_db_loguea_detalles_estructurados():
+    class DBFakeError(Exception):
+        orig = "(1054, \"Unknown column 'thd_v_r' in 'field list'\")"
+        statement = "SELECT telemetry_instantaneous.thd_v_r FROM telemetry_instantaneous"
+
+    with capture_logs() as logs:
+        with pytest.raises(HTTPException) as exc_info:
+            manejar_error_http(DBFakeError("Error en query"))
+
+    assert exc_info.value.status_code == 500
+    errores = [ev for ev in logs if ev.get("event") == "error_interno"]
+    assert errores, "No se registró el evento error_interno"
+    assert "Unknown column 'thd_v_r'" in errores[0].get("db_error", "")
+    assert "telemetry_instantaneous" in errores[0].get("db_statement", "")

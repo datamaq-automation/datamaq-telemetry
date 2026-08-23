@@ -56,3 +56,65 @@ def test_create_tables_if_needed_error(monkeypatch, capsys):
     create_tables_if_needed()
 
     assert "Could not auto-create" in capsys.readouterr().out
+
+
+def test_verificar_estado_migraciones_sincronizado(monkeypatch):
+    from unittest.mock import MagicMock
+
+    engine = create_engine("sqlite://")
+    mock_context = MagicMock()
+    mock_context.get_current_revision.return_value = "f6a7b8c9d0e1"
+    mock_script = MagicMock()
+    mock_script.get_current_head.return_value = "f6a7b8c9d0e1"
+
+    monkeypatch.setattr(database_mod.MigrationContext, "configure", lambda conn: mock_context)
+    monkeypatch.setattr(database_mod.ScriptDirectory, "from_config", lambda cfg: mock_script)
+
+    resultado = database_mod.verificar_estado_migraciones(engine)
+    assert resultado["sincronizado"] is True
+    assert resultado["current_rev"] == "f6a7b8c9d0e1"
+    assert resultado["head_rev"] == "f6a7b8c9d0e1"
+
+
+def test_verificar_estado_migraciones_desfasaje(monkeypatch):
+    from unittest.mock import MagicMock
+
+    engine = create_engine("sqlite://")
+    mock_context = MagicMock()
+    mock_context.get_current_revision.return_value = "d4e5f6a7b8c9"
+    mock_script = MagicMock()
+    mock_script.get_current_head.return_value = "f6a7b8c9d0e1"
+
+    monkeypatch.setattr(database_mod.MigrationContext, "configure", lambda conn: mock_context)
+    monkeypatch.setattr(database_mod.ScriptDirectory, "from_config", lambda cfg: mock_script)
+
+    resultado = database_mod.verificar_estado_migraciones(engine)
+    assert resultado["sincronizado"] is False
+    assert resultado["current_rev"] == "d4e5f6a7b8c9"
+    assert resultado["head_rev"] == "f6a7b8c9d0e1"
+
+
+def test_verificar_estado_migraciones_sin_alembic_ini(monkeypatch, tmp_path):
+    from unittest.mock import MagicMock
+
+    engine = create_engine("sqlite://")
+    mock_context = MagicMock()
+    mock_context.get_current_revision.return_value = "abc123"
+
+    monkeypatch.setattr(database_mod.MigrationContext, "configure", lambda conn: mock_context)
+    monkeypatch.setattr(database_mod.Path, "exists", lambda self: False)
+
+    resultado = database_mod.verificar_estado_migraciones(engine)
+    assert resultado["sincronizado"] is True
+    assert resultado["detalle"] == "alembic_ini_no_encontrado"
+
+
+def test_verificar_estado_migraciones_error_conexion(monkeypatch):
+    def _boom():
+        raise RuntimeError("db_down")
+
+    monkeypatch.setattr(database_mod, "get_engine", _boom)
+
+    resultado = database_mod.verificar_estado_migraciones()
+    assert resultado["sincronizado"] is False
+    assert "db_down" in resultado["error"]

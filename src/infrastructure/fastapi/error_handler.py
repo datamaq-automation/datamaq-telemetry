@@ -27,6 +27,14 @@ def manejar_error_http(exc: Exception) -> NoReturn:
     contexto: dict[str, Any] = {"tipo": type(exc).__name__, "request_id": request_id}
     if usuario is not None:
         contexto["usuario"] = usuario
+
+    orig = getattr(exc, "orig", None)
+    if orig is not None:
+        contexto["db_error"] = str(orig)
+    statement = getattr(exc, "statement", None)
+    if statement is not None:
+        contexto["db_statement"] = str(statement)
+
     if code >= 500:
         logger.error("error_interno", exc_info=True, **contexto)
     else:

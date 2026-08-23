@@ -263,6 +263,14 @@ def test_upgrade_agrega_desbalance_tension(tmp_path, monkeypatch):
     assert "current_n" in columnas
     assert "voltage_linea_V" in columnas
     assert "tension_neutro_estimada" in columnas
+    assert "thd_v_r" in columnas
+    assert "thd_i_r" in columnas
+    assert "thd_v_s" in columnas
+    assert "thd_i_s" in columnas
+    assert "thd_v_t" in columnas
+    assert "thd_i_t" in columnas
+    assert "thd_v_promedio_porcentaje" in columnas
+    assert "thd_i_total_porcentaje" in columnas
 
     columnas_alerts = {c["name"] for c in inspector.get_columns("device_alerts")}
     assert "phase" in columnas_alerts
