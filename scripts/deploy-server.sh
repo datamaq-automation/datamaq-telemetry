@@ -42,6 +42,8 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
     DEPLOY_REMOTE_DIR="$DEPLOY_REMOTE_DIR" \
     DEPLOY_SERVICE_NAME="$DEPLOY_SERVICE_NAME" \
     HEALTH_URL="$HEALTH_URL" \
+    GITHUB_TOKEN="$GITHUB_TOKEN" \
+    GITHUB_REPOSITORY="$GITHUB_REPOSITORY" \
     bash <<'EOF'
     set -e
 
@@ -55,7 +57,11 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
     ./.venv/bin/pip freeze > /tmp/telemetry-deps.txt
 
     echo "==> Actualizando código (fast-forward only)..."
-    git pull --ff-only
+    if [ -n "$GITHUB_TOKEN" ] && [ -n "$GITHUB_REPOSITORY" ]; then
+        git pull --ff-only "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" main
+    else
+        git pull --ff-only
+    fi
 
     echo "==> Instalando dependencias..."
     ./.venv/bin/pip install -r requirements.txt
