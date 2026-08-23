@@ -304,6 +304,8 @@ class AnalizadorCalidadEnergiaService:
                 fp = round(p / s, 2)
             else:
                 fp = _avg([f.factor_potencia.valor for f in fases if f.factor_potencia])
+            thd_v = _avg([f.thd_v_porcentaje for f in fases if f.thd_v_porcentaje is not None])
+            thd_i = _avg([f.thd_i_porcentaje for f in fases if f.thd_i_porcentaje is not None])
             return MedicionFase(
                 tension=Tension(voltios=v) if v is not None else None,
                 corriente=Corriente(amperios=i) if i is not None else None,
@@ -311,6 +313,8 @@ class AnalizadorCalidadEnergiaService:
                 potencia_reactiva=PotenciaReactiva(var=q) if q is not None else None,
                 potencia_aparente=PotenciaAparente(va=s) if s is not None else None,
                 factor_potencia=FactorPotencia(valor=fp) if fp is not None else None,
+                thd_v_porcentaje=thd_v,
+                thd_i_porcentaje=thd_i,
             )
 
         fase_r = _fase_agregada([it.fase_r for it in items])
@@ -365,6 +369,26 @@ class AnalizadorCalidadEnergiaService:
             vr, vs, vt, ir_val, is_val, it_val, pr_val, ps_val, pt_val, qr_val, qs_val, qt_val
         )
 
+        thd_v_prom = _avg([it.thd_v_promedio_porcentaje for it in items if it.thd_v_promedio_porcentaje is not None])
+        if thd_v_prom is None:
+            thd_v_vals = [
+                (f.thd_v_porcentaje if f.thd_v_porcentaje is not None else f.thd_v_pct)
+                for f in (fase_r, fase_s, fase_t)
+                if (f.thd_v_porcentaje is not None or f.thd_v_pct is not None)
+            ]
+            if thd_v_vals:
+                thd_v_prom = _avg(thd_v_vals)
+
+        thd_i_tot = _avg([it.thd_i_total_porcentaje for it in items if it.thd_i_total_porcentaje is not None])
+        if thd_i_tot is None:
+            thd_i_vals = [
+                (f.thd_i_porcentaje if f.thd_i_porcentaje is not None else f.thd_i_pct)
+                for f in (fase_r, fase_s, fase_t)
+                if (f.thd_i_porcentaje is not None or f.thd_i_pct is not None)
+            ]
+            if thd_i_vals:
+                thd_i_tot = _avg(thd_i_vals)
+
         return LecturaInstantanea(
             id=None,
             dispositivo_id=dispositivo_id,
@@ -380,6 +404,8 @@ class AnalizadorCalidadEnergiaService:
             corriente_neutro_estimada=i_neutro,
             voltage_linea_V=voltage_linea_V,
             tension_neutro_estimada=v_neutro,
+            thd_v_promedio_porcentaje=thd_v_prom,
+            thd_i_total_porcentaje=thd_i_tot,
         )
 
     @classmethod
@@ -683,6 +709,121 @@ class AnalizadorCalidadEnergiaService:
                 categoria="FACTOR_POTENCIA",
             )
         return None
+
+    @staticmethod
+    def evaluar_alertas_distorsion_armonica(
+        dispositivo_id: str,
+        lectura: LecturaInstantanea,
+        umbral_thd_v_warning: float = 5.0,
+        umbral_thd_v_critico: float = 8.0,
+        umbral_thd_i_warning: float = 20.0,
+        umbral_corriente_minima_thd_i: float = 10.0,
+        umbral_resonancia_thd_v: float = 4.0,
+        umbral_resonancia_fp: float = 0.98,
+    ) -> list[AlertaDispositivo]:
+        """Evalúa anomalías por distorsión armónica total (THD) y riesgo de resonancia."""
+        alertas: list[AlertaDispositivo] = []
+        t_disparo = (
+            lectura.registrado_en if (lectura and lectura.registrado_en is not None) else datetime.now(timezone.utc)
+        )
+
+        fases = [
+            ("R", lectura.fase_r),
+            ("S", lectura.fase_s),
+            ("T", lectura.fase_t),
+        ]
+
+        # 1. Distorsión Armónica Total de Tensión (THD_V)
+        for nombre_fase, med in fases:
+            thd_v = med.thd_v_porcentaje if med.thd_v_porcentaje is not None else med.thd_v_pct
+            if thd_v is not None:
+                if thd_v > umbral_thd_v_critico:
+                    alertas.append(
+                        AlertaDispositivo(
+                            id=None,
+                            dispositivo_id=dispositivo_id,
+                            tipo_alerta="ALTO_THD_TENSION_CRITICAL",
+                            severidad=SeveridadAlerta.CRITICAL,
+                            mensaje=f"THD de Tensión Crítico en Fase {nombre_fase}: {thd_v}% (Límite IEC: {umbral_thd_v_critico}%)",
+                            disparada_en=t_disparo,
+                            fase=nombre_fase,
+                            valor_medido=thd_v,
+                            valor_umbral=umbral_thd_v_critico,
+                            unidad="%",
+                            categoria="DISTORSION_ARMONICA",
+                            observaciones="Peligro inminente de sobretensión armónica y daño en aislamientos de transformadores/motores.",
+                        )
+                    )
+                elif thd_v > umbral_thd_v_warning:
+                    alertas.append(
+                        AlertaDispositivo(
+                            id=None,
+                            dispositivo_id=dispositivo_id,
+                            tipo_alerta="ALTO_THD_TENSION_WARNING",
+                            severidad=SeveridadAlerta.WARNING,
+                            mensaje=f"THD de Tensión Elevado en Fase {nombre_fase}: {thd_v}% (Límite IEEE 519: {umbral_thd_v_warning}%)",
+                            disparada_en=t_disparo,
+                            fase=nombre_fase,
+                            valor_medido=thd_v,
+                            valor_umbral=umbral_thd_v_warning,
+                            unidad="%",
+                            categoria="DISTORSION_ARMONICA",
+                            observaciones="Supera límite normativo. Verificar presencia de cargas no lineales o variadores de velocidad.",
+                        )
+                    )
+
+        # 2. Distorsión Armónica Total de Corriente (THD_I con carga significativa)
+        for nombre_fase, med in fases:
+            thd_i = med.thd_i_porcentaje if med.thd_i_porcentaje is not None else med.thd_i_pct
+            i_val = med.corriente.amperios if med.corriente else 0.0
+            if thd_i is not None and i_val >= umbral_corriente_minima_thd_i:
+                if thd_i > umbral_thd_i_warning:
+                    alertas.append(
+                        AlertaDispositivo(
+                            id=None,
+                            dispositivo_id=dispositivo_id,
+                            tipo_alerta="ALTO_THD_CORRIENTE",
+                            severidad=SeveridadAlerta.WARNING,
+                            mensaje=f"Alta Distorsión de Corriente en Fase {nombre_fase}: {thd_i}% (Corriente: {i_val}A)",
+                            disparada_en=t_disparo,
+                            fase=nombre_fase,
+                            valor_medido=thd_i,
+                            valor_umbral=umbral_thd_i_warning,
+                            unidad="%",
+                            categoria="DISTORSION_ARMONICA",
+                            observaciones="Riesgo de calentamiento excesivo en conductores, neutro y transformador aguas arriba.",
+                        )
+                    )
+
+        # 3. Riesgo de Resonancia en Bancos de Capacitores (THD_V > 4.0% y FP >= 0.98)
+        fp_tot = lectura.factor_potencia_total.valor if lectura.factor_potencia_total else None
+        thd_v_vals = [
+            float(med.thd_v_porcentaje if med.thd_v_porcentaje is not None else med.thd_v_pct)
+            for _, med in fases
+            if (med.thd_v_porcentaje is not None or med.thd_v_pct is not None)
+        ]
+        thd_v_max = max(thd_v_vals) if thd_v_vals else None
+        thd_v_max_val = float(thd_v_max) if thd_v_max is not None else None
+        if fp_tot is not None and thd_v_max_val is not None:
+            if abs(fp_tot) >= umbral_resonancia_fp and thd_v_max_val >= umbral_resonancia_thd_v:
+                alertas.append(
+                    AlertaDispositivo(
+                        id=None,
+                        dispositivo_id=dispositivo_id,
+                        tipo_alerta="RIESGO_RESONANCIA_CAPACITORES",
+                        severidad=SeveridadAlerta.WARNING,
+                        mensaje=f"Riesgo de Resonancia Paralelo: THD_V={thd_v_max_val}% con FP={fp_tot}",
+                        disparada_en=t_disparo,
+                        fase="3F",
+                        valor_medido=thd_v_max_val,
+                        valor_umbral=umbral_resonancia_thd_v,
+                        unidad="%",
+                        categoria="DISTORSION_ARMONICA",
+                        observaciones="FP unitario/cercano a la unidad con THD_V elevado sugiere amplificación armónica por banco de capacitores.",
+                    )
+                )
+
+        return alertas
 
 
 class PoliticaRetencionService:

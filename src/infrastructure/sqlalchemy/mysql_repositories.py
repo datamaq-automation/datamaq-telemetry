@@ -142,7 +142,7 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
     def __init__(self, db: Session):
         self.db = db
 
-    def _to_fase(self, v, i, p, q, s, fp) -> MedicionFase:
+    def _to_fase(self, v, i, p, q, s, fp, thd_v=None, thd_i=None) -> MedicionFase:
         return MedicionFase(
             tension=Tension(voltios=float(v)) if v is not None else None,
             corriente=Corriente(amperios=float(i)) if i is not None else None,
@@ -150,17 +150,40 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
             potencia_reactiva=PotenciaReactiva(var=float(q)) if q is not None else None,
             potencia_aparente=PotenciaAparente(va=float(s)) if s is not None else None,
             factor_potencia=FactorPotencia(valor=float(fp)) if fp is not None else None,
+            thd_v_porcentaje=float(thd_v) if thd_v is not None else None,
+            thd_i_porcentaje=float(thd_i) if thd_i is not None else None,
         )
 
     def _instantanea_to_entity(self, m: TelemetryInstantaneousModel) -> LecturaInstantanea:
         fase_r = self._to_fase(
-            m.voltage_r, m.current_r, m.active_power_r, m.reactive_power_r, m.apparent_power_r, m.power_factor_r
+            m.voltage_r,
+            m.current_r,
+            m.active_power_r,
+            m.reactive_power_r,
+            m.apparent_power_r,
+            m.power_factor_r,
+            getattr(m, "thd_v_r", None),
+            getattr(m, "thd_i_r", None),
         )
         fase_s = self._to_fase(
-            m.voltage_s, m.current_s, m.active_power_s, m.reactive_power_s, m.apparent_power_s, m.power_factor_s
+            m.voltage_s,
+            m.current_s,
+            m.active_power_s,
+            m.reactive_power_s,
+            m.apparent_power_s,
+            m.power_factor_s,
+            getattr(m, "thd_v_s", None),
+            getattr(m, "thd_i_s", None),
         )
         fase_t = self._to_fase(
-            m.voltage_t, m.current_t, m.active_power_t, m.reactive_power_t, m.apparent_power_t, m.power_factor_t
+            m.voltage_t,
+            m.current_t,
+            m.active_power_t,
+            m.reactive_power_t,
+            m.apparent_power_t,
+            m.power_factor_t,
+            getattr(m, "thd_v_t", None),
+            getattr(m, "thd_i_t", None),
         )
 
         in_obj = None
@@ -200,6 +223,17 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
                 qt=fase_t.potencia_reactiva.var if fase_t.potencia_reactiva else None,
             )
 
+        thd_v_prom_val = (
+            float(m.thd_v_promedio_porcentaje)
+            if hasattr(m, "thd_v_promedio_porcentaje") and m.thd_v_promedio_porcentaje is not None
+            else None
+        )
+        thd_i_tot_val = (
+            float(m.thd_i_total_porcentaje)
+            if hasattr(m, "thd_i_total_porcentaje") and m.thd_i_total_porcentaje is not None
+            else None
+        )
+
         return LecturaInstantanea(
             id=m.id,
             dispositivo_id=m.device_id,
@@ -225,6 +259,8 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
             corriente_neutro_estimada=in_obj,
             voltage_linea_V=vl_val,
             tension_neutro_estimada=vn_val,
+            thd_v_promedio_porcentaje=thd_v_prom_val,
+            thd_i_total_porcentaje=thd_i_tot_val,
         )
 
     def _energia_to_entity(self, m: TelemetryEnergyModel) -> AcumuladoEnergia:
@@ -262,18 +298,36 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
             reactive_power_r=lectura.fase_r.potencia_reactiva.var if lectura.fase_r.potencia_reactiva else None,
             apparent_power_r=lectura.fase_r.potencia_aparente.va if lectura.fase_r.potencia_aparente else None,
             power_factor_r=lectura.fase_r.factor_potencia.valor if lectura.fase_r.factor_potencia else None,
+            thd_v_r=Decimal(str(lectura.fase_r.thd_v_porcentaje))
+            if lectura.fase_r.thd_v_porcentaje is not None
+            else None,
+            thd_i_r=Decimal(str(lectura.fase_r.thd_i_porcentaje))
+            if lectura.fase_r.thd_i_porcentaje is not None
+            else None,
             voltage_s=lectura.fase_s.tension.voltios if lectura.fase_s.tension else None,
             current_s=lectura.fase_s.corriente.amperios if lectura.fase_s.corriente else None,
             active_power_s=lectura.fase_s.potencia_activa.vatios if lectura.fase_s.potencia_activa else None,
             reactive_power_s=lectura.fase_s.potencia_reactiva.var if lectura.fase_s.potencia_reactiva else None,
             apparent_power_s=lectura.fase_s.potencia_aparente.va if lectura.fase_s.potencia_aparente else None,
             power_factor_s=lectura.fase_s.factor_potencia.valor if lectura.fase_s.factor_potencia else None,
+            thd_v_s=Decimal(str(lectura.fase_s.thd_v_porcentaje))
+            if lectura.fase_s.thd_v_porcentaje is not None
+            else None,
+            thd_i_s=Decimal(str(lectura.fase_s.thd_i_porcentaje))
+            if lectura.fase_s.thd_i_porcentaje is not None
+            else None,
             voltage_t=lectura.fase_t.tension.voltios if lectura.fase_t.tension else None,
             current_t=lectura.fase_t.corriente.amperios if lectura.fase_t.corriente else None,
             active_power_t=lectura.fase_t.potencia_activa.vatios if lectura.fase_t.potencia_activa else None,
             reactive_power_t=lectura.fase_t.potencia_reactiva.var if lectura.fase_t.potencia_reactiva else None,
             apparent_power_t=lectura.fase_t.potencia_aparente.va if lectura.fase_t.potencia_aparente else None,
             power_factor_t=lectura.fase_t.factor_potencia.valor if lectura.fase_t.factor_potencia else None,
+            thd_v_t=Decimal(str(lectura.fase_t.thd_v_porcentaje))
+            if lectura.fase_t.thd_v_porcentaje is not None
+            else None,
+            thd_i_t=Decimal(str(lectura.fase_t.thd_i_porcentaje))
+            if lectura.fase_t.thd_i_porcentaje is not None
+            else None,
             total_active_power=lectura.potencia_activa_total.vatios if lectura.potencia_activa_total else None,
             total_reactive_power=lectura.potencia_reactiva_total.var if lectura.potencia_reactiva_total else None,
             total_apparent_power=lectura.potencia_aparente_total.va if lectura.potencia_aparente_total else None,
@@ -282,6 +336,12 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
             current_n=lectura.corriente_neutro_estimada.amperios if lectura.corriente_neutro_estimada else None,
             voltage_linea_V=lectura.voltage_linea_V,
             tension_neutro_estimada=lectura.tension_neutro_estimada,
+            thd_v_promedio_porcentaje=Decimal(str(lectura.thd_v_promedio_porcentaje))
+            if lectura.thd_v_promedio_porcentaje is not None
+            else None,
+            thd_i_total_porcentaje=Decimal(str(lectura.thd_i_total_porcentaje))
+            if lectura.thd_i_total_porcentaje is not None
+            else None,
         )
         self.db.add(model)
         self.db.commit()

@@ -22,6 +22,8 @@ class TelemetriaMapper:
             net_reactive_power_VAR=fase.potencia_reactiva.var if fase.potencia_reactiva else None,
             net_apparent_power_VA=fase.potencia_aparente.va if fase.potencia_aparente else None,
             power_factor=fase.factor_potencia.valor if fase.factor_potencia else None,
+            thd_v_pct=fase.thd_v_porcentaje,
+            thd_i_pct=fase.thd_i_porcentaje,
         )
 
     @staticmethod
@@ -45,6 +47,8 @@ class TelemetriaMapper:
             else None,
             voltage_linea_V=lectura.voltage_linea_V,
             tension_neutro_estimada_V=lectura.tension_neutro_estimada,
+            thd_v_promedio_pct=lectura.thd_v_promedio_porcentaje,
+            thd_i_total_pct=lectura.thd_i_total_porcentaje,
         )
 
     @staticmethod

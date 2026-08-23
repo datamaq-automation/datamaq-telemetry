@@ -583,3 +583,122 @@ def test_evaluar_alerta_factor_potencia():
     assert alerta_c.severidad == SeveridadAlerta.CRITICAL
     assert alerta_c.valor_medido == 0.75
     assert alerta_c.valor_umbral == 0.85
+
+
+def test_evaluar_alertas_distorsion_armonica_tension():
+    ahora = datetime.now(timezone.utc)
+
+    # 1. Normal THD_V (<5.0%) -> Sin alertas
+    lectura_normal = LecturaInstantanea(
+        id=None,
+        dispositivo_id="dev-1",
+        registrado_en=ahora,
+        fase_r=MedicionFase(thd_v_porcentaje=2.5),
+        fase_s=MedicionFase(thd_v_porcentaje=3.1),
+        fase_t=MedicionFase(thd_v_porcentaje=2.8),
+    )
+    assert AnalizadorCalidadEnergiaService.evaluar_alertas_distorsion_armonica("dev-1", lectura_normal) == []
+
+    # 2. Warning THD_V (5.0% < THD_V <= 8.0%) en Fase R
+    lectura_warning = LecturaInstantanea(
+        id=None,
+        dispositivo_id="dev-1",
+        registrado_en=ahora,
+        fase_r=MedicionFase(thd_v_porcentaje=5.8),
+        fase_s=MedicionFase(thd_v_porcentaje=3.0),
+        fase_t=MedicionFase(thd_v_porcentaje=3.0),
+    )
+    alertas_w = AnalizadorCalidadEnergiaService.evaluar_alertas_distorsion_armonica("dev-1", lectura_warning)
+    assert len(alertas_w) == 1
+    assert alertas_w[0].tipo_alerta == "ALTO_THD_TENSION_WARNING"
+    assert alertas_w[0].severidad == SeveridadAlerta.WARNING
+    assert alertas_w[0].fase == "R"
+    assert alertas_w[0].valor_medido == 5.8
+    assert alertas_w[0].valor_umbral == 5.0
+    assert alertas_w[0].categoria == "DISTORSION_ARMONICA"
+
+    # 3. Critical THD_V (> 8.0%) en Fase S
+    lectura_critica = LecturaInstantanea(
+        id=None,
+        dispositivo_id="dev-1",
+        registrado_en=ahora,
+        fase_r=MedicionFase(thd_v_porcentaje=3.0),
+        fase_s=MedicionFase(thd_v_porcentaje=9.2),
+        fase_t=MedicionFase(thd_v_porcentaje=3.0),
+    )
+    alertas_c = AnalizadorCalidadEnergiaService.evaluar_alertas_distorsion_armonica("dev-1", lectura_critica)
+    assert len(alertas_c) == 1
+    assert alertas_c[0].tipo_alerta == "ALTO_THD_TENSION_CRITICAL"
+    assert alertas_c[0].severidad == SeveridadAlerta.CRITICAL
+    assert alertas_c[0].fase == "S"
+    assert alertas_c[0].valor_medido == 9.2
+    assert alertas_c[0].valor_umbral == 8.0
+    assert alertas_c[0].categoria == "DISTORSION_ARMONICA"
+
+
+def test_evaluar_alertas_distorsion_armonica_corriente():
+    ahora = datetime.now(timezone.utc)
+
+    # 1. THD_I alto (25%) pero corriente baja (2A < 10A) -> No dispara para evitar falsos positivos en vacío
+    lectura_vacio = LecturaInstantanea(
+        id=None,
+        dispositivo_id="dev-1",
+        registrado_en=ahora,
+        fase_r=MedicionFase(corriente=Corriente(2.0), thd_i_porcentaje=25.0),
+        fase_s=MedicionFase(corriente=Corriente(2.0), thd_i_porcentaje=25.0),
+        fase_t=MedicionFase(corriente=Corriente(2.0), thd_i_porcentaje=25.0),
+    )
+    assert AnalizadorCalidadEnergiaService.evaluar_alertas_distorsion_armonica("dev-1", lectura_vacio) == []
+
+    # 2. THD_I alto (22.5%) con corriente en carga (35A >= 10A) en Fase T
+    lectura_carga = LecturaInstantanea(
+        id=None,
+        dispositivo_id="dev-1",
+        registrado_en=ahora,
+        fase_r=MedicionFase(corriente=Corriente(30.0), thd_i_porcentaje=12.0),
+        fase_s=MedicionFase(corriente=Corriente(30.0), thd_i_porcentaje=14.0),
+        fase_t=MedicionFase(corriente=Corriente(35.0), thd_i_porcentaje=22.5),
+    )
+    alertas_i = AnalizadorCalidadEnergiaService.evaluar_alertas_distorsion_armonica("dev-1", lectura_carga)
+    assert len(alertas_i) == 1
+    assert alertas_i[0].tipo_alerta == "ALTO_THD_CORRIENTE"
+    assert alertas_i[0].severidad == SeveridadAlerta.WARNING
+    assert alertas_i[0].fase == "T"
+    assert alertas_i[0].valor_medido == 22.5
+    assert alertas_i[0].valor_umbral == 20.0
+    assert alertas_i[0].categoria == "DISTORSION_ARMONICA"
+
+
+def test_evaluar_alertas_riesgo_resonancia_capacitores():
+    ahora = datetime.now(timezone.utc)
+
+    # 1. THD_V elevado (4.5% >= 4.0%) y FP cercano a 1.0 (FP=0.99 >= 0.98) -> Resonancia
+    lectura_resonancia = LecturaInstantanea(
+        id=None,
+        dispositivo_id="dev-1",
+        registrado_en=ahora,
+        fase_r=MedicionFase(thd_v_porcentaje=4.5),
+        fase_s=MedicionFase(thd_v_porcentaje=4.2),
+        fase_t=MedicionFase(thd_v_porcentaje=4.1),
+        factor_potencia_total=FactorPotencia(0.99),
+    )
+    alertas_res = AnalizadorCalidadEnergiaService.evaluar_alertas_distorsion_armonica("dev-1", lectura_resonancia)
+    assert any(a.tipo_alerta == "RIESGO_RESONANCIA_CAPACITORES" for a in alertas_res)
+    alerta_res = next(a for a in alertas_res if a.tipo_alerta == "RIESGO_RESONANCIA_CAPACITORES")
+    assert alerta_res.severidad == SeveridadAlerta.WARNING
+    assert alerta_res.valor_medido == 4.5
+    assert alerta_res.valor_umbral == 4.0
+    assert alerta_res.categoria == "DISTORSION_ARMONICA"
+
+    # 2. THD_V normal (2.5%) con FP=0.99 -> No dispara resonancia
+    lectura_normal_fp = LecturaInstantanea(
+        id=None,
+        dispositivo_id="dev-1",
+        registrado_en=ahora,
+        fase_r=MedicionFase(thd_v_porcentaje=2.5),
+        fase_s=MedicionFase(thd_v_porcentaje=2.5),
+        fase_t=MedicionFase(thd_v_porcentaje=2.5),
+        factor_potencia_total=FactorPotencia(0.99),
+    )
+    alertas_normal = AnalizadorCalidadEnergiaService.evaluar_alertas_distorsion_armonica("dev-1", lectura_normal_fp)
+    assert not any(a.tipo_alerta == "RIESGO_RESONANCIA_CAPACITORES" for a in alertas_normal)

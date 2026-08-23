@@ -145,6 +145,16 @@ class TelemetryInstantaneousModel(Base):
     voltage_linea_V: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
     tension_neutro_estimada: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
 
+    # Distorsión Armónica Total (THD)
+    thd_v_r: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+    thd_i_r: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+    thd_v_s: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+    thd_i_s: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+    thd_v_t: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+    thd_i_t: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+    thd_v_promedio_porcentaje: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+    thd_i_total_porcentaje: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, nullable=False)
 
     device: Mapped["DeviceModel"] = relationship(back_populates="instantaneous_readings")

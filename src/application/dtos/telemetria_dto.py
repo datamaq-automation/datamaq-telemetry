@@ -11,6 +11,8 @@ class MedicionFaseDTO(BaseModel):
     net_reactive_power_VAR: float | None = None
     net_apparent_power_VA: float | None = None
     power_factor: float | None = None
+    thd_v_pct: float | None = None
+    thd_i_pct: float | None = None
 
 
 class LecturaInstantaneaDTO(BaseModel):
@@ -28,6 +30,8 @@ class LecturaInstantaneaDTO(BaseModel):
     corriente_neutro_estimada_A: float | None = None
     voltage_linea_V: float | None = None
     tension_neutro_estimada_V: float | None = None
+    thd_v_promedio_pct: float | None = None
+    thd_i_total_pct: float | None = None
     model_config = ConfigDict(from_attributes=True)
 
 

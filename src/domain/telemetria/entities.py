@@ -97,6 +97,10 @@ class MedicionFase:
     potencia_reactiva: PotenciaReactiva | None = None
     potencia_aparente: PotenciaAparente | None = None
     factor_potencia: FactorPotencia | None = None
+    thd_v_porcentaje: float | None = None
+    thd_i_porcentaje: float | None = None
+    thd_v_pct: float | None = None
+    thd_i_pct: float | None = None
 
 
 @dataclass(frozen=True)
@@ -115,6 +119,10 @@ class LecturaInstantanea:
     corriente_neutro_estimada: Corriente | None = None
     voltage_linea_V: float | None = None
     tension_neutro_estimada: float | None = None
+    thd_v_promedio_porcentaje: float | None = None
+    thd_i_total_porcentaje: float | None = None
+    thd_v_promedio_pct: float | None = None
+    thd_i_total_pct: float | None = None
 
 
 @dataclass(frozen=True)

@@ -233,6 +233,28 @@ class IngestarTelemetriaUseCase:
             "pf",
             "fp",
         )
+        thd_v = _get(
+            f"thd_v_pct{suffix}",
+            f"thd_v{suffix}",
+            f"thd_v_porcentaje{suffix}",
+            f"thdv{suffix}",
+            f"tv{suffix}",
+            "thd_v_pct",
+            "thd_v",
+            "thdv",
+            "tv",
+        )
+        thd_i = _get(
+            f"thd_i_pct{suffix}",
+            f"thd_i{suffix}",
+            f"thd_i_porcentaje{suffix}",
+            f"thdi{suffix}",
+            f"ti{suffix}",
+            "thd_i_pct",
+            "thd_i",
+            "thdi",
+            "ti",
+        )
 
         return MedicionFase(
             tension=Tension(voltios=float(v)) if v is not None else None,
@@ -241,6 +263,8 @@ class IngestarTelemetriaUseCase:
             potencia_reactiva=PotenciaReactiva(var=float(q)) if q is not None else None,
             potencia_aparente=PotenciaAparente(va=float(s)) if s is not None else None,
             factor_potencia=FactorPotencia(valor=float(fp)) if fp is not None else None,
+            thd_v_porcentaje=float(thd_v) if thd_v is not None else None,
+            thd_i_porcentaje=float(thd_i) if thd_i is not None else None,
         )
 
     def ejecutar(self, topico: str, payload: dict[str, Any]) -> None:
@@ -392,6 +416,32 @@ class IngestarTelemetriaUseCase:
                 vr, vs, vt, ir_val, is_val, it_val, pr_val, ps_val, pt_val, qr_val, qs_val, qt_val
             )
 
+            thd_v_prom = (
+                total_data.get("thd_v_promedio_pct")
+                or total_data.get("thd_v_promedio")
+                or total_data.get("thd_v_avg")
+                or total_data.get("thdv_avg")
+                or payload.get("thd_v_promedio_pct")
+                or payload.get("thd_v_avg")
+            )
+            if thd_v_prom is None:
+                thd_v_vals = [f.thd_v_porcentaje for f in (fase_r, fase_s, fase_t) if f.thd_v_porcentaje is not None]
+                if thd_v_vals:
+                    thd_v_prom = sum(thd_v_vals) / len(thd_v_vals)
+
+            thd_i_tot = (
+                total_data.get("thd_i_total_pct")
+                or total_data.get("thd_i_total")
+                or total_data.get("thd_i_tot")
+                or total_data.get("thdi_tot")
+                or payload.get("thd_i_total_pct")
+                or payload.get("thd_i_tot")
+            )
+            if thd_i_tot is None:
+                thd_i_vals = [f.thd_i_porcentaje for f in (fase_r, fase_s, fase_t) if f.thd_i_porcentaje is not None]
+                if thd_i_vals:
+                    thd_i_tot = sum(thd_i_vals) / len(thd_i_vals)
+
             lectura = LecturaInstantanea(
                 id=None,
                 dispositivo_id=dispositivo.id,
@@ -407,6 +457,8 @@ class IngestarTelemetriaUseCase:
                 corriente_neutro_estimada=i_neutro,
                 voltage_linea_V=voltage_linea_V,
                 tension_neutro_estimada=v_neutro,
+                thd_v_promedio_porcentaje=round(float(thd_v_prom), 2) if thd_v_prom is not None else None,
+                thd_i_total_porcentaje=round(float(thd_i_tot), 2) if thd_i_tot is not None else None,
             )
             # Evaluación de alertas de dominio (se evalúa siempre para cada paquete recibido)
             # 1. Tensión y falta de fase con filtro de persistencia temporal (anti-falsos positivos)
@@ -500,6 +552,33 @@ class IngestarTelemetriaUseCase:
                         mensaje=alerta_fp.mensaje,
                     )
 
+            # 5. Distorsión Armónica Total (THD) y Riesgo de Resonancia
+            alertas_thd_raw = AnalizadorCalidadEnergiaService.evaluar_alertas_distorsion_armonica(
+                dispositivo.id, lectura
+            )
+            for a_thd in alertas_thd_raw:
+                a_thd_filtrada = self._filtro_persistencia.procesar_alerta(
+                    dispositivo.id,
+                    a_thd,
+                    categoria=f"DISTORSION_ARMONICA_{a_thd.tipo_alerta}_{a_thd.fase or 'ALL'}",
+                    ahora=recorded_at,
+                )
+                if a_thd_filtrada:
+                    self.repo_telemetria.guardar_alerta(a_thd_filtrada)
+                    if self.publicador:
+                        self.publicador.publicar_telemetria_en_vivo(
+                            f"m/wifi/{mac_raw}/alertas",
+                            AlertaMapper.to_dto(a_thd_filtrada).model_dump(mode="json"),
+                        )
+                    if self.logger:
+                        self.logger.warning(
+                            "alerta_calidad_energia_detectada",
+                            dispositivo_id=dispositivo.id,
+                            tipo=a_thd_filtrada.tipo_alerta,
+                            severidad=a_thd_filtrada.severidad.value,
+                            mensaje=a_thd_filtrada.mensaje,
+                        )
+
             # Auto-despeje de perturbaciones normalizadas con difusión en vivo
             if alerta_tension_raw is None:
                 self._auto_resolver_alertas_si_corresponde(
@@ -512,6 +591,18 @@ class IngestarTelemetriaUseCase:
             if alerta_fp_raw is None:
                 self._auto_resolver_alertas_si_corresponde(
                     dispositivo.id, mac_raw, ["BAJO_FACTOR_POTENCIA"], recorded_at
+                )
+            if not alertas_thd_raw:
+                self._auto_resolver_alertas_si_corresponde(
+                    dispositivo.id,
+                    mac_raw,
+                    [
+                        "ALTO_THD_TENSION_WARNING",
+                        "ALTO_THD_TENSION_CRITICAL",
+                        "ALTO_THD_CORRIENTE",
+                        "RIESGO_RESONANCIA_CAPACITORES",
+                    ],
+                    recorded_at,
                 )
 
             # Persistencia con downsampling según granularidad configurada

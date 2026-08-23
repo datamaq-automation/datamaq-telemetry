@@ -143,6 +143,14 @@ erDiagram
         decimal current_n
         decimal voltage_linea_V
         decimal tension_neutro_estimada
+        decimal thd_v_r
+        decimal thd_i_r
+        decimal thd_v_s
+        decimal thd_i_s
+        decimal thd_v_t
+        decimal thd_i_t
+        decimal thd_v_promedio_porcentaje
+        decimal thd_i_total_porcentaje
         datetime created_at
     }
 
@@ -320,6 +328,14 @@ erDiagram
 | `current_n` | `NUMERIC(6, 2)` | - | Sí |
 | `voltage_linea_V` | `NUMERIC(6, 2)` | - | Sí |
 | `tension_neutro_estimada` | `NUMERIC(6, 2)` | - | Sí |
+| `thd_v_r` | `NUMERIC(5, 2)` | - | Sí |
+| `thd_i_r` | `NUMERIC(5, 2)` | - | Sí |
+| `thd_v_s` | `NUMERIC(5, 2)` | - | Sí |
+| `thd_i_s` | `NUMERIC(5, 2)` | - | Sí |
+| `thd_v_t` | `NUMERIC(5, 2)` | - | Sí |
+| `thd_i_t` | `NUMERIC(5, 2)` | - | Sí |
+| `thd_v_promedio_porcentaje` | `NUMERIC(5, 2)` | - | Sí |
+| `thd_i_total_porcentaje` | `NUMERIC(5, 2)` | - | Sí |
 | `created_at` | `DATETIME` | - | No |
 
 **Índices:**
