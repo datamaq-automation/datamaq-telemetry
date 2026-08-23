@@ -29,9 +29,7 @@ class ConsultarUnifilarTopologiaUseCase:
                 tension_kv=13.2,
                 frecuencia_hz=50,
                 seccionador=SeccionadorDTO(id="QS1", estado="cerrado"),
-                interruptor_general_mt=InterruptorGeneralMTDTO(
-                    id="QF1", modelo="HVX-12", protecciones=["50/51"]
-                ),
+                interruptor_general_mt=InterruptorGeneralMTDTO(id="QF1", modelo="HVX-12", protecciones=["50/51"]),
             ),
             transformador=TransformadorDTO(
                 id="T1",
