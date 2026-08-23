@@ -335,6 +335,12 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
             esta_resuelta=m.is_resolved,
             disparada_en=m.triggered_at,
             resuelta_en=m.resolved_at,
+            fase=m.phase,
+            valor_medido=float(m.measured_value) if m.measured_value is not None else None,
+            valor_umbral=float(m.threshold_value) if m.threshold_value is not None else None,
+            unidad=m.unit,
+            categoria=m.category,
+            observaciones=m.notes,
         )
 
     def guardar_alerta(self, alerta: AlertaDispositivo) -> None:
@@ -348,6 +354,12 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
                 model.is_resolved = alerta.esta_resuelta
                 model.triggered_at = alerta.disparada_en
                 model.resolved_at = alerta.resuelta_en
+                model.phase = alerta.fase
+                model.measured_value = Decimal(str(alerta.valor_medido)) if alerta.valor_medido is not None else None
+                model.threshold_value = Decimal(str(alerta.valor_umbral)) if alerta.valor_umbral is not None else None
+                model.unit = alerta.unidad
+                model.category = alerta.categoria
+                model.notes = alerta.observaciones
                 self.db.commit()
                 return
 
@@ -359,6 +371,12 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
             is_resolved=alerta.esta_resuelta,
             triggered_at=alerta.disparada_en,
             resolved_at=alerta.resuelta_en,
+            phase=alerta.fase,
+            measured_value=Decimal(str(alerta.valor_medido)) if alerta.valor_medido is not None else None,
+            threshold_value=Decimal(str(alerta.valor_umbral)) if alerta.valor_umbral is not None else None,
+            unit=alerta.unidad,
+            category=alerta.categoria,
+            notes=alerta.observaciones,
         )
         self.db.add(model)
         self.db.commit()
@@ -369,13 +387,22 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
         self,
         dispositivo_id: str | None = None,
         solo_abiertas: bool = False,
+        severidad: str | None = None,
         limite: int = 100,
+        desde: datetime | None = None,
+        hasta: datetime | None = None,
     ) -> list[AlertaDispositivo]:
         q = self.db.query(DeviceAlertModel)
         if dispositivo_id:
             q = q.filter(DeviceAlertModel.device_id == dispositivo_id)
         if solo_abiertas:
             q = q.filter(DeviceAlertModel.is_resolved.is_(False))
+        if severidad:
+            q = q.filter(DeviceAlertModel.severity == severidad.upper())
+        if desde:
+            q = q.filter(DeviceAlertModel.triggered_at >= desde)
+        if hasta:
+            q = q.filter(DeviceAlertModel.triggered_at <= hasta)
         items = q.order_by(desc(DeviceAlertModel.triggered_at)).limit(limite).all()
         return [self._alerta_to_entity(m) for m in items]
 

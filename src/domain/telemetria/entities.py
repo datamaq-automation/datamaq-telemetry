@@ -152,7 +152,21 @@ class AlertaDispositivo:
     esta_resuelta: bool = False
     disparada_en: datetime = field(default_factory=ahora_utc)
     resuelta_en: datetime | None = None
+    fase: str | None = None
+    valor_medido: float | None = None
+    valor_umbral: float | None = None
+    unidad: str | None = None
+    categoria: str | None = None
+    observaciones: str | None = None
 
-    def marcar_resuelta(self, timestamp: datetime | None = None) -> None:
+    @property
+    def duracion_segundos(self) -> float | None:
+        if self.resuelta_en and self.disparada_en:
+            return max(0.0, round((self.resuelta_en - self.disparada_en).total_seconds(), 1))
+        return None
+
+    def marcar_resuelta(self, timestamp: datetime | None = None, observaciones: str | None = None) -> None:
         self.esta_resuelta = True
         self.resuelta_en = timestamp or ahora_utc()
+        if observaciones is not None:
+            self.observaciones = observaciones

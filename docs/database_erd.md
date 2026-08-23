@@ -25,6 +25,12 @@ erDiagram
         boolean is_resolved
         datetime triggered_at
         datetime resolved_at
+        string phase
+        decimal measured_value
+        decimal threshold_value
+        string unit
+        string category
+        string notes
     }
 
     DEVICE_STATUS_LOGS {
@@ -166,6 +172,12 @@ erDiagram
 | `is_resolved` | `BOOLEAN` | - | No |
 | `triggered_at` | `DATETIME` | - | No |
 | `resolved_at` | `DATETIME` | - | Sí |
+| `phase` | `VARCHAR(10)` | - | Sí |
+| `measured_value` | `NUMERIC(10, 2)` | - | Sí |
+| `threshold_value` | `NUMERIC(10, 2)` | - | Sí |
+| `unit` | `VARCHAR(20)` | - | Sí |
+| `category` | `VARCHAR(50)` | - | Sí |
+| `notes` | `TEXT` | - | Sí |
 
 **Índices:**
 - `idx_alerts_dev_resolved`: (`device_id`, `is_resolved`)

@@ -141,13 +141,22 @@ class MockTelemetriaRepo(RepositorioTelemetriaPort):
         self,
         dispositivo_id: str | None = None,
         solo_abiertas: bool = False,
+        severidad: str | None = None,
         limite: int = 100,
+        desde: datetime | None = None,
+        hasta: datetime | None = None,
     ) -> list[AlertaDispositivo]:
         q = list(self.alertas)
         if dispositivo_id:
             q = [a for a in q if a.dispositivo_id == dispositivo_id]
         if solo_abiertas:
             q = [a for a in q if not a.esta_resuelta]
+        if severidad:
+            q = [a for a in q if a.severidad.value == severidad.upper()]
+        if desde:
+            q = [a for a in q if a.disparada_en >= desde]
+        if hasta:
+            q = [a for a in q if a.disparada_en <= hasta]
         return q[:limite]
 
     def obtener_alerta_por_id(self, alerta_id: int) -> AlertaDispositivo | None:

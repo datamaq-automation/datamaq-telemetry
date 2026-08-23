@@ -1,8 +1,9 @@
+from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Body, Depends, Query
 
-from src.application.dtos.alerta_dto import AlertaResponseDTO
+from src.application.dtos.alerta_dto import AlertaResolverRequestDTO, AlertaResponseDTO
 from src.application.use_cases.gestionar_alertas import GestionarAlertasUseCase
 from src.infrastructure.fastapi.dependencies import (
     get_alertas_use_case,
@@ -23,12 +24,18 @@ def list_alertas(
     use_case: Annotated[GestionarAlertasUseCase, Depends(get_alertas_use_case)],
     device_id: str | None = Query(None, description="Filtrar por UUID de dispositivo"),
     solo_abiertas: bool = Query(False, description="Filtrar solo alertas no resueltas"),
+    severidad: str | None = Query(None, description="Filtrar por severidad (INFO, WARNING, CRITICAL)"),
     limit: int = Query(100, le=500, description="Límite de registros"),
+    desde: datetime | None = Query(None, description="Fecha de inicio ISO8601"),
+    hasta: datetime | None = Query(None, description="Fecha de fin ISO8601"),
 ):
     return use_case.listar_alertas(
         dispositivo_id=device_id,
         solo_abiertas=solo_abiertas,
+        severidad=severidad,
         limite=limit,
+        desde=desde,
+        hasta=hasta,
     )
 
 
@@ -36,8 +43,9 @@ def list_alertas(
 def resolve_alerta(
     alerta_id: int,
     use_case: Annotated[GestionarAlertasUseCase, Depends(get_alertas_use_case)],
+    body: AlertaResolverRequestDTO | None = Body(None),
 ):
     try:
-        return use_case.resolver_alerta(alerta_id)
+        return use_case.resolver_alerta(alerta_id, observaciones=body.observaciones if body else None)
     except Exception as e:
         manejar_error_http(e)

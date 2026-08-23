@@ -321,6 +321,12 @@ class _FakeAlertModel:
         self.is_resolved = False
         self.triggered_at = _fecha(1, 10)
         self.resolved_at = None
+        self.phase = "R"
+        self.measured_value = None
+        self.threshold_value = None
+        self.unit = "V"
+        self.category = "TENSION"
+        self.notes = None
 
 
 def test_alerta_guardar_nueva_asigna_id(db: Session) -> None:

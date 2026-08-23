@@ -14,4 +14,11 @@ class AlertaMapper:
             esta_resuelta=entity.esta_resuelta,
             disparada_en=entity.disparada_en,
             resuelta_en=entity.resuelta_en,
+            fase=entity.fase,
+            valor_medido=entity.valor_medido,
+            valor_umbral=entity.valor_umbral,
+            unidad=entity.unidad,
+            categoria=entity.categoria,
+            duracion_segundos=entity.duracion_segundos,
+            observaciones=entity.observaciones,
         )

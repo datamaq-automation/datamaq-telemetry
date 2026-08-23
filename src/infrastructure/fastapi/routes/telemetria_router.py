@@ -3,13 +3,19 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 
+from src.application.dtos.alerta_dto import AlertaResponseDTO
 from src.application.dtos.telemetria_dto import (
     AcumuladoEnergiaDTO,
     LecturaInstantaneaDTO,
     TelemetriaLatestResponseDTO,
 )
 from src.application.use_cases.consultar_telemetria import ConsultarTelemetriaUseCase
-from src.infrastructure.fastapi.dependencies import get_telemetria_use_case, get_usuario_actual
+from src.application.use_cases.gestionar_alertas import GestionarAlertasUseCase
+from src.infrastructure.fastapi.dependencies import (
+    get_alertas_use_case,
+    get_telemetria_use_case,
+    get_usuario_actual,
+)
 from src.infrastructure.fastapi.error_handler import manejar_error_http
 
 router = APIRouter(
@@ -61,5 +67,28 @@ def get_energy_history(
     try:
         desde = datetime.now(timezone.utc) - timedelta(days=days) if days else None
         return use_case.listar_energias(device_id, limit, desde)
+    except Exception as e:
+        manejar_error_http(e)
+
+
+@router.get("/alerts/{device_id}", response_model=list[AlertaResponseDTO])
+def get_alerts_history(
+    device_id: str,
+    use_case: Annotated[GestionarAlertasUseCase, Depends(get_alertas_use_case)],
+    solo_abiertas: bool = Query(False, description="Filtrar solo alertas no resueltas"),
+    severidad: str | None = Query(None, description="Filtrar por severidad (INFO, WARNING, CRITICAL)"),
+    limit: int = Query(100, le=500, description="Límite de registros"),
+    desde: datetime | None = Query(None, description="Fecha de inicio ISO8601"),
+    hasta: datetime | None = Query(None, description="Fecha de fin ISO8601"),
+):
+    try:
+        return use_case.listar_alertas(
+            dispositivo_id=device_id,
+            solo_abiertas=solo_abiertas,
+            severidad=severidad,
+            limite=limit,
+            desde=desde,
+            hasta=hasta,
+        )
     except Exception as e:
         manejar_error_http(e)

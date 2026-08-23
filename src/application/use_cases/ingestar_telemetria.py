@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, ClassVar
 
+from src.application.mappers.alerta_mapper import AlertaMapper
 from src.domain.telemetria.entities import (
     AcumuladoEnergia,
     AlertaDispositivo,
@@ -408,13 +409,18 @@ class IngestarTelemetriaUseCase:
                 tension_neutro_estimada=v_neutro,
             )
             # Evaluación de alertas de dominio (se evalúa siempre para cada paquete recibido)
-            # 1. Tensión con filtro de persistencia temporal (anti-falsos positivos)
+            # 1. Tensión y falta de fase con filtro de persistencia temporal (anti-falsos positivos)
             alerta_tension_raw = AnalizadorCalidadEnergiaService.evaluar_alerta_tension(dispositivo.id, lectura)
             alerta_tension = self._filtro_persistencia.procesar_alerta(
                 dispositivo.id, alerta_tension_raw, categoria="TENSION", ahora=recorded_at
             )
             if alerta_tension:
                 self.repo_telemetria.guardar_alerta(alerta_tension)
+                if self.publicador:
+                    self.publicador.publicar_telemetria_en_vivo(
+                        f"m/wifi/{mac_raw}/alertas",
+                        AlertaMapper.to_dto(alerta_tension).model_dump(mode="json"),
+                    )
                 if self.logger:
                     self.logger.warning(
                         "alerta_calidad_energia_detectada",
@@ -431,6 +437,11 @@ class IngestarTelemetriaUseCase:
             )
             if alerta_desbalance:
                 self.repo_telemetria.guardar_alerta(alerta_desbalance)
+                if self.publicador:
+                    self.publicador.publicar_telemetria_en_vivo(
+                        f"m/wifi/{mac_raw}/alertas",
+                        AlertaMapper.to_dto(alerta_desbalance).model_dump(mode="json"),
+                    )
                 if self.logger:
                     self.logger.warning(
                         "alerta_calidad_energia_detectada",
@@ -454,6 +465,11 @@ class IngestarTelemetriaUseCase:
                 )
                 if a_ti_filtrada:
                     self.repo_telemetria.guardar_alerta(a_ti_filtrada)
+                    if self.publicador:
+                        self.publicador.publicar_telemetria_en_vivo(
+                            f"m/wifi/{mac_raw}/alertas",
+                            AlertaMapper.to_dto(a_ti_filtrada).model_dump(mode="json"),
+                        )
                     if self.logger:
                         self.logger.warning(
                             "alerta_calidad_energia_detectada",
@@ -462,6 +478,27 @@ class IngestarTelemetriaUseCase:
                             severidad=a_ti_filtrada.severidad.value,
                             mensaje=a_ti_filtrada.mensaje,
                         )
+
+            # 4. Factor de potencia bajo (penalización tarifaria ENRE)
+            alerta_fp_raw = AnalizadorCalidadEnergiaService.evaluar_alerta_factor_potencia(dispositivo.id, lectura)
+            alerta_fp = self._filtro_persistencia.procesar_alerta(
+                dispositivo.id, alerta_fp_raw, categoria="FACTOR_POTENCIA", ahora=recorded_at
+            )
+            if alerta_fp:
+                self.repo_telemetria.guardar_alerta(alerta_fp)
+                if self.publicador:
+                    self.publicador.publicar_telemetria_en_vivo(
+                        f"m/wifi/{mac_raw}/alertas",
+                        AlertaMapper.to_dto(alerta_fp).model_dump(mode="json"),
+                    )
+                if self.logger:
+                    self.logger.warning(
+                        "alerta_calidad_energia_detectada",
+                        dispositivo_id=dispositivo.id,
+                        tipo=alerta_fp.tipo_alerta,
+                        severidad=alerta_fp.severidad.value,
+                        mensaje=alerta_fp.mensaje,
+                    )
 
             # Persistencia con downsampling según granularidad configurada
             debe_persistir = True

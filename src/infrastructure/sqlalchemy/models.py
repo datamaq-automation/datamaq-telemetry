@@ -212,6 +212,12 @@ class DeviceAlertModel(Base):
     is_resolved: Mapped[bool] = mapped_column(default=False, nullable=False)
     triggered_at: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, nullable=False)
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    phase: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    measured_value: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
+    threshold_value: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
+    unit: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    category: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     device: Mapped["DeviceModel"] = relationship(back_populates="alerts")
 

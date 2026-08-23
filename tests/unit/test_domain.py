@@ -475,3 +475,111 @@ def test_politica_suscripcion_enterprise_freemium():
 
     # 4. Sin consultoría y fecha posterior al vencimiento -> no vigente (pasa a Freemium)
     assert PoliticaSuscripcionService.es_enterprise_vigente(venc_inicial, t_instalacion + timedelta(days=366)) is False
+
+
+def test_evaluar_alerta_tension_falta_fase_y_campos_enriquecidos():
+    from datetime import datetime, timezone
+
+    from src.domain.telemetria.entities import LecturaInstantanea, MedicionFase
+    from src.domain.telemetria.services import AnalizadorCalidadEnergiaService
+    from src.domain.telemetria.value_objects import SeveridadAlerta, Tension
+
+    ahora = datetime.now(timezone.utc)
+
+    # 1. Falta de fase (V < 50V) en Fase S
+    lectura_corte = LecturaInstantanea(
+        id=None,
+        dispositivo_id="dev-1",
+        registrado_en=ahora,
+        fase_r=MedicionFase(tension=Tension(220.0)),
+        fase_s=MedicionFase(tension=Tension(12.5)),
+        fase_t=MedicionFase(tension=Tension(220.0)),
+    )
+    alerta_corte = AnalizadorCalidadEnergiaService.evaluar_alerta_tension("dev-1", lectura_corte)
+    assert alerta_corte is not None
+    assert alerta_corte.tipo_alerta == "FALTA_FASE"
+    assert alerta_corte.severidad == SeveridadAlerta.CRITICAL
+    assert alerta_corte.fase == "S"
+    assert alerta_corte.valor_medido == 12.5
+    assert alerta_corte.valor_umbral == 50.0
+    assert alerta_corte.unidad == "V"
+    assert alerta_corte.categoria == "SUMINISTRO"
+
+    # 2. Subtensión contractual ENRE (195V) en Fase R
+    lectura_sub = LecturaInstantanea(
+        id=None,
+        dispositivo_id="dev-1",
+        registrado_en=ahora,
+        fase_r=MedicionFase(tension=Tension(195.0)),
+        fase_s=MedicionFase(tension=Tension(220.0)),
+        fase_t=MedicionFase(tension=Tension(220.0)),
+    )
+    alerta_sub = AnalizadorCalidadEnergiaService.evaluar_alerta_tension("dev-1", lectura_sub)
+    assert alerta_sub is not None
+    assert alerta_sub.tipo_alerta == "BAJA_TENSION"
+    assert alerta_sub.severidad == SeveridadAlerta.WARNING
+    assert alerta_sub.fase == "R"
+    assert alerta_sub.valor_medido == 195.0
+    assert alerta_sub.valor_umbral == 198.0
+    assert alerta_sub.unidad == "V"
+    assert alerta_sub.categoria == "TENSION"
+
+
+def test_evaluar_alerta_factor_potencia():
+    from datetime import datetime, timezone
+
+    from src.domain.telemetria.entities import LecturaInstantanea, MedicionFase
+    from src.domain.telemetria.services import AnalizadorCalidadEnergiaService
+    from src.domain.telemetria.value_objects import FactorPotencia, PotenciaActiva, SeveridadAlerta
+
+    ahora = datetime.now(timezone.utc)
+
+    # 1. Carga baja (<500W) -> No dispara alarma para evitar falsos positivos
+    lectura_vacio = LecturaInstantanea(
+        id=None,
+        dispositivo_id="dev-1",
+        registrado_en=ahora,
+        fase_r=MedicionFase(),
+        fase_s=MedicionFase(),
+        fase_t=MedicionFase(),
+        potencia_activa_total=PotenciaActiva(200.0),
+        factor_potencia_total=FactorPotencia(0.60),
+    )
+    assert AnalizadorCalidadEnergiaService.evaluar_alerta_factor_potencia("dev-1", lectura_vacio) is None
+
+    # 2. Carga en servicio (P=5000W) con FP=0.88 (Warning ENRE < 0.95)
+    lectura_warning = LecturaInstantanea(
+        id=None,
+        dispositivo_id="dev-1",
+        registrado_en=ahora,
+        fase_r=MedicionFase(),
+        fase_s=MedicionFase(),
+        fase_t=MedicionFase(),
+        potencia_activa_total=PotenciaActiva(5000.0),
+        factor_potencia_total=FactorPotencia(0.88),
+    )
+    alerta_w = AnalizadorCalidadEnergiaService.evaluar_alerta_factor_potencia("dev-1", lectura_warning)
+    assert alerta_w is not None
+    assert alerta_w.tipo_alerta == "BAJO_FACTOR_POTENCIA"
+    assert alerta_w.severidad == SeveridadAlerta.WARNING
+    assert alerta_w.fase == "TOTAL"
+    assert alerta_w.valor_medido == 0.88
+    assert alerta_w.valor_umbral == 0.95
+    assert alerta_w.categoria == "FACTOR_POTENCIA"
+
+    # 3. Carga en servicio (P=5000W) con FP=0.75 (Critical < 0.85)
+    lectura_critica = LecturaInstantanea(
+        id=None,
+        dispositivo_id="dev-1",
+        registrado_en=ahora,
+        fase_r=MedicionFase(),
+        fase_s=MedicionFase(),
+        fase_t=MedicionFase(),
+        potencia_activa_total=PotenciaActiva(5000.0),
+        factor_potencia_total=FactorPotencia(0.75),
+    )
+    alerta_c = AnalizadorCalidadEnergiaService.evaluar_alerta_factor_potencia("dev-1", lectura_critica)
+    assert alerta_c is not None
+    assert alerta_c.severidad == SeveridadAlerta.CRITICAL
+    assert alerta_c.valor_medido == 0.75
+    assert alerta_c.valor_umbral == 0.85

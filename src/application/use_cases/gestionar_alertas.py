@@ -14,20 +14,26 @@ class GestionarAlertasUseCase:
         self,
         dispositivo_id: str | None = None,
         solo_abiertas: bool = False,
+        severidad: str | None = None,
         limite: int = 100,
+        desde: datetime | None = None,
+        hasta: datetime | None = None,
     ) -> list[AlertaResponseDTO]:
         alertas = self.repo_telemetria.listar_alertas(
             dispositivo_id=dispositivo_id,
             solo_abiertas=solo_abiertas,
+            severidad=severidad,
             limite=limite,
+            desde=desde,
+            hasta=hasta,
         )
         return [AlertaMapper.to_dto(a) for a in alertas]
 
-    def resolver_alerta(self, alerta_id: int) -> AlertaResponseDTO:
+    def resolver_alerta(self, alerta_id: int, observaciones: str | None = None) -> AlertaResponseDTO:
         alerta = self.repo_telemetria.obtener_alerta_por_id(alerta_id)
         if not alerta:
             raise AlertaNoEncontradaError(f"Alerta con ID {alerta_id} no encontrada.")
 
-        alerta.marcar_resuelta(datetime.now(timezone.utc))
+        alerta.marcar_resuelta(datetime.now(timezone.utc), observaciones=observaciones)
         self.repo_telemetria.guardar_alerta(alerta)
         return AlertaMapper.to_dto(alerta)

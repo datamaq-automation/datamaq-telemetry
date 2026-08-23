@@ -15,7 +15,7 @@ RAIZ = Path(__file__).resolve().parents[2]
 ALEMBIC_INI = RAIZ / "alembic.ini"
 ENV_PY = RAIZ / "alembic" / "env.py"
 REVISION_INICIAL = "209ce0774d59"
-REVISION_HEAD = "d4e5f6a7b8c9"
+REVISION_HEAD = "e5f6a7b8c9d0"
 
 TABLAS_MODELO = {
     "plans",
@@ -263,3 +263,11 @@ def test_upgrade_agrega_desbalance_tension(tmp_path, monkeypatch):
     assert "current_n" in columnas
     assert "voltage_linea_V" in columnas
     assert "tension_neutro_estimada" in columnas
+
+    columnas_alerts = {c["name"] for c in inspector.get_columns("device_alerts")}
+    assert "phase" in columnas_alerts
+    assert "measured_value" in columnas_alerts
+    assert "threshold_value" in columnas_alerts
+    assert "unit" in columnas_alerts
+    assert "category" in columnas_alerts
+    assert "notes" in columnas_alerts

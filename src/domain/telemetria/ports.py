@@ -100,7 +100,10 @@ class RepositorioTelemetriaPort(ABC):
         self,
         dispositivo_id: str | None = None,
         solo_abiertas: bool = False,
+        severidad: str | None = None,
         limite: int = 100,
+        desde: datetime | None = None,
+        hasta: datetime | None = None,
     ) -> list[AlertaDispositivo]:
         pass
 

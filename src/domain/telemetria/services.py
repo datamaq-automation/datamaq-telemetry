@@ -94,9 +94,10 @@ class FiltroPersistenciaTemporalService:
         with self._lock:
             if alerta is None:
                 if categoria:
-                    if categoria.upper() == "TENSION":
+                    if categoria.upper() in ("TENSION", "SUMINISTRO"):
                         self._estados.pop(f"{dispositivo_id}:BAJA_TENSION", None)
                         self._estados.pop(f"{dispositivo_id}:SOBRETENSION", None)
+                        self._estados.pop(f"{dispositivo_id}:FALTA_FASE", None)
                     else:
                         self._estados.pop(f"{dispositivo_id}:{categoria}", None)
                 else:
@@ -107,11 +108,16 @@ class FiltroPersistenciaTemporalService:
                 return None
 
             clave = f"{dispositivo_id}:{alerta.tipo_alerta}"
-            # Si cambió el tipo de anomalía de tensión (ej. de BAJA a SOBRE), limpiar la contraria
+            # Si cambió el tipo de anomalía de tensión/suministro, limpiar los contrarios
             if alerta.tipo_alerta == "BAJA_TENSION":
                 self._estados.pop(f"{dispositivo_id}:SOBRETENSION", None)
+                self._estados.pop(f"{dispositivo_id}:FALTA_FASE", None)
             elif alerta.tipo_alerta == "SOBRETENSION":
                 self._estados.pop(f"{dispositivo_id}:BAJA_TENSION", None)
+                self._estados.pop(f"{dispositivo_id}:FALTA_FASE", None)
+            elif alerta.tipo_alerta == "FALTA_FASE":
+                self._estados.pop(f"{dispositivo_id}:BAJA_TENSION", None)
+                self._estados.pop(f"{dispositivo_id}:SOBRETENSION", None)
 
             estado = self._estados.get(clave)
 
@@ -427,6 +433,11 @@ class AnalizadorCalidadEnergiaService:
                 tipo_alerta="DESBALANCE_TENSION",
                 severidad=SeveridadAlerta.CRITICAL,
                 mensaje=f"Desbalance de tensión superior al límite normativo del 2%: {vur}%",
+                fase="3F",
+                valor_medido=vur,
+                valor_umbral=umbral_critico,
+                unidad="%",
+                categoria="DESBALANCE_TENSION",
             )
         elif vur > umbral_warning:
             return AlertaDispositivo(
@@ -435,6 +446,11 @@ class AnalizadorCalidadEnergiaService:
                 tipo_alerta="DESBALANCE_TENSION",
                 severidad=SeveridadAlerta.WARNING,
                 mensaje=f"Desbalance de tensión superior al límite normativo del 2%: {vur}%",
+                fase="3F",
+                valor_medido=vur,
+                valor_umbral=umbral_warning,
+                unidad="%",
+                categoria="DESBALANCE_TENSION",
             )
         return None
 
@@ -442,6 +458,7 @@ class AnalizadorCalidadEnergiaService:
     def evaluar_alerta_tension(
         dispositivo_id: str,
         lectura: LecturaInstantanea,
+        umbral_falta_fase: float = 50.0,
         umbral_baja_critica: float = 190.0,
         umbral_baja_warning: float = 198.0,
         umbral_alta_warning: float = 242.0,
@@ -449,6 +466,7 @@ class AnalizadorCalidadEnergiaService:
     ) -> AlertaDispositivo | None:
         """Esquema de Alertas de Tensión de Dos Niveles (Norma ENRE vs. Peligro Crítico).
 
+        - Falta de Fase / Corte de Suministro: V < 50.0V (CRITICAL)
         - Nivel 1 (Advertencia Contractual ENRE ±10%):
           * Subtensión: V < 198.0V (WARNING)
           * Sobretensión: V > 242.0V (WARNING)
@@ -457,6 +475,24 @@ class AnalizadorCalidadEnergiaService:
           * Sobretensión Crítica: V > 248.0V (CRITICAL)
         """
         fases = [("R", lectura.fase_r.tension), ("S", lectura.fase_s.tension), ("T", lectura.fase_t.tension)]
+
+        # 0. Corte de fase / Falta de suministro (V < 50V)
+        for nombre_fase, tension_obj in fases:
+            if tension_obj is not None:
+                v = tension_obj.voltios
+                if v < umbral_falta_fase:
+                    return AlertaDispositivo(
+                        id=None,
+                        dispositivo_id=dispositivo_id,
+                        tipo_alerta="FALTA_FASE",
+                        severidad=SeveridadAlerta.CRITICAL,
+                        mensaje=f"Falta de fase o corte de suministro en Fase {nombre_fase}: {v}V (Mínimo: {umbral_falta_fase}V)",
+                        fase=nombre_fase,
+                        valor_medido=v,
+                        valor_umbral=umbral_falta_fase,
+                        unidad="V",
+                        categoria="SUMINISTRO",
+                    )
 
         # 1. Prioridad: Verificar si existe condición CRITICAL en alguna fase
         for nombre_fase, tension_obj in fases:
@@ -469,6 +505,11 @@ class AnalizadorCalidadEnergiaService:
                         tipo_alerta="BAJA_TENSION",
                         severidad=SeveridadAlerta.CRITICAL,
                         mensaje=f"Baja tensión detectada en Fase {nombre_fase}: {v}V (Mínimo: {umbral_baja_critica}V)",
+                        fase=nombre_fase,
+                        valor_medido=v,
+                        valor_umbral=umbral_baja_critica,
+                        unidad="V",
+                        categoria="TENSION",
                     )
                 elif v > umbral_alta_critica:
                     return AlertaDispositivo(
@@ -477,6 +518,11 @@ class AnalizadorCalidadEnergiaService:
                         tipo_alerta="SOBRETENSION",
                         severidad=SeveridadAlerta.CRITICAL,
                         mensaje=f"Sobretensión detectada en Fase {nombre_fase}: {v}V (Máximo: {umbral_alta_critica}V)",
+                        fase=nombre_fase,
+                        valor_medido=v,
+                        valor_umbral=umbral_alta_critica,
+                        unidad="V",
+                        categoria="TENSION",
                     )
 
         # 2. Verificar condiciones WARNING (Norma ENRE)
@@ -490,6 +536,11 @@ class AnalizadorCalidadEnergiaService:
                         tipo_alerta="BAJA_TENSION",
                         severidad=SeveridadAlerta.WARNING,
                         mensaje=f"Baja tensión detectada en Fase {nombre_fase}: {v}V (Mínimo: {umbral_baja_warning}V)",
+                        fase=nombre_fase,
+                        valor_medido=v,
+                        valor_umbral=umbral_baja_warning,
+                        unidad="V",
+                        categoria="TENSION",
                     )
                 elif v > umbral_alta_warning:
                     return AlertaDispositivo(
@@ -498,6 +549,11 @@ class AnalizadorCalidadEnergiaService:
                         tipo_alerta="SOBRETENSION",
                         severidad=SeveridadAlerta.WARNING,
                         mensaje=f"Sobretensión detectada en Fase {nombre_fase}: {v}V (Máximo: {umbral_alta_warning}V)",
+                        fase=nombre_fase,
+                        valor_medido=v,
+                        valor_umbral=umbral_alta_warning,
+                        unidad="V",
+                        categoria="TENSION",
                     )
         return None
 
@@ -510,11 +566,7 @@ class AnalizadorCalidadEnergiaService:
         umbral_corriente_minima: float = 5.0,
         umbral_potencia_negativa: float = -500.0,
     ) -> list[AlertaDispositivo]:
-        """Evalúa si algún TI está invertido físicamente en una instalación de consumo puro.
-
-        Si la instalación es de GENERACION_FV o MIXTO, no se genera alerta ya que la
-        potencia negativa representa exportación legítima hacia la red.
-        """
+        """Evalúa si algún TI está invertido físicamente en una instalación de consumo puro."""
         if tipo_instalacion != "CONSUMO":
             return []
 
@@ -546,10 +598,62 @@ class AnalizadorCalidadEnergiaService:
                             f"P={p_val}W, I={i_val}A. "
                             f"Verificar el sentido de la flecha física o invertir la polaridad por software en 192.168.4.1."
                         ),
+                        fase=nombre_fase,
+                        valor_medido=p_val,
+                        valor_umbral=umbral_potencia_negativa,
+                        unidad="W",
+                        categoria="TI_INVERTIDO",
                     )
                 )
 
         return alertas
+
+    @staticmethod
+    def evaluar_alerta_factor_potencia(
+        dispositivo_id: str,
+        lectura: LecturaInstantanea,
+        umbral_warning: float = 0.95,
+        umbral_critico: float = 0.85,
+        potencia_minima_w: float = 500.0,
+    ) -> AlertaDispositivo | None:
+        """Evalúa bajo factor de potencia (penalización tarifaria ENRE/distribuidoras)."""
+        fp_obj = lectura.factor_potencia_total
+        p_obj = lectura.potencia_activa_total
+        if fp_obj is None or p_obj is None:
+            return None
+
+        # Solo evaluar si hay carga activa significativa para evitar falsas alarmas en vacío
+        if p_obj.vatios < potencia_minima_w:
+            return None
+
+        fp = fp_obj.valor
+        if fp < umbral_critico:
+            return AlertaDispositivo(
+                id=None,
+                dispositivo_id=dispositivo_id,
+                tipo_alerta="BAJO_FACTOR_POTENCIA",
+                severidad=SeveridadAlerta.CRITICAL,
+                mensaje=f"Factor de potencia crítico con penalización tarifaria: {fp} (Mínimo: {umbral_critico})",
+                fase="TOTAL",
+                valor_medido=fp,
+                valor_umbral=umbral_critico,
+                unidad="",
+                categoria="FACTOR_POTENCIA",
+            )
+        elif fp < umbral_warning:
+            return AlertaDispositivo(
+                id=None,
+                dispositivo_id=dispositivo_id,
+                tipo_alerta="BAJO_FACTOR_POTENCIA",
+                severidad=SeveridadAlerta.WARNING,
+                mensaje=f"Factor de potencia por debajo del límite regulatorio ENRE: {fp} (Mínimo: {umbral_warning})",
+                fase="TOTAL",
+                valor_medido=fp,
+                valor_umbral=umbral_warning,
+                unidad="",
+                categoria="FACTOR_POTENCIA",
+            )
+        return None
 
 
 class PoliticaRetencionService:

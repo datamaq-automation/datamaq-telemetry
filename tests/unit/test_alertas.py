@@ -77,15 +77,74 @@ def test_resolver_alerta_exitosa():
         mensaje="Tensión 195V",
         esta_resuelta=False,
         disparada_en=ahora - timedelta(minutes=15),
+        fase="R",
+        valor_medido=195.0,
+        valor_umbral=198.0,
+        unidad="V",
+        categoria="TENSION",
     )
     repo_telem.guardar_alerta(alerta)
 
-    # Resolver la alerta
-    resuelta_dto = use_case.resolver_alerta(10)
+    # Resolver la alerta con observaciones técnicas
+    resuelta_dto = use_case.resolver_alerta(10, observaciones="Se procedió a regular el tap del transformador.")
 
     assert resuelta_dto.id == 10
     assert resuelta_dto.esta_resuelta is True
     assert resuelta_dto.resuelta_en is not None
+    assert resuelta_dto.observaciones == "Se procedió a regular el tap del transformador."
+    assert resuelta_dto.fase == "R"
+    assert resuelta_dto.valor_medido == 195.0
+    assert resuelta_dto.valor_umbral == 198.0
+    assert resuelta_dto.unidad == "V"
+    assert resuelta_dto.categoria == "TENSION"
+    assert resuelta_dto.duracion_segundos is not None
+    assert resuelta_dto.duracion_segundos >= 800.0
+
+
+def test_listar_alertas_filtros_severidad_y_rango_fechas():
+    repo_telem = MockTelemetriaRepo()
+    use_case = GestionarAlertasUseCase(repo_telem)
+
+    ahora = datetime.now(timezone.utc)
+    a_critica = AlertaDispositivo(
+        id=101,
+        dispositivo_id="dev-1",
+        tipo_alerta="FALTA_FASE",
+        severidad=SeveridadAlerta.CRITICAL,
+        mensaje="Falta fase S",
+        disparada_en=ahora - timedelta(minutes=5),
+        fase="S",
+        valor_medido=12.0,
+        valor_umbral=50.0,
+        unidad="V",
+        categoria="SUMINISTRO",
+    )
+    a_warning = AlertaDispositivo(
+        id=102,
+        dispositivo_id="dev-1",
+        tipo_alerta="BAJO_FACTOR_POTENCIA",
+        severidad=SeveridadAlerta.WARNING,
+        mensaje="FP 0.88",
+        disparada_en=ahora - timedelta(hours=2),
+        fase="TOTAL",
+        valor_medido=0.88,
+        valor_umbral=0.95,
+        unidad="",
+        categoria="FACTOR_POTENCIA",
+    )
+    repo_telem.guardar_alerta(a_critica)
+    repo_telem.guardar_alerta(a_warning)
+
+    # 1. Filtro por severidad CRITICAL
+    criticas = use_case.listar_alertas(severidad="CRITICAL")
+    assert len(criticas) == 1
+    assert criticas[0].id == 101
+    assert criticas[0].categoria == "SUMINISTRO"
+
+    # 2. Filtro por rango de fechas (últimos 30 minutos)
+    recientes = use_case.listar_alertas(desde=ahora - timedelta(minutes=30))
+    assert len(recientes) == 1
+    assert recientes[0].id == 101
 
 
 def test_resolver_alerta_inexistente_lanza_error():
