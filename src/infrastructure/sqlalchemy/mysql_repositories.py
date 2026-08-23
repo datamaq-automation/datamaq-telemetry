@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy import desc
@@ -589,15 +589,23 @@ class MySQLOrganizacionesRepository(RepositorioOrganizacionesPort):
     def __init__(self, db: Session):
         self.db = db
 
-    def obtener_por_id(self, organizacion_id: str) -> Organizacion | None:
-        m = self.db.query(OrganizationModel).filter(OrganizationModel.id == organizacion_id).first()
-        if not m:
-            return None
+    def _org_to_entity(self, m: OrganizationModel) -> Organizacion:
         modo_free_vo = (
             ModoFreeTier(m.free_tier_mode)
             if m.free_tier_mode in [item.value for item in ModoFreeTier]
             else ModoFreeTier.PRIVADO_BASICO
         )
+        pro_exp = m.pro_expires_at
+        if pro_exp is not None and pro_exp.tzinfo is None:
+            pro_exp = pro_exp.replace(tzinfo=timezone.utc)
+
+        creado = (
+            m.created_at.replace(tzinfo=timezone.utc) if m.created_at and m.created_at.tzinfo is None else m.created_at
+        )
+        actualizado = (
+            m.updated_at.replace(tzinfo=timezone.utc) if m.updated_at and m.updated_at.tzinfo is None else m.updated_at
+        )
+
         return Organizacion(
             id=m.id,
             nombre=m.name,
@@ -605,33 +613,21 @@ class MySQLOrganizacionesRepository(RepositorioOrganizacionesPort):
             cuit=m.tax_id,
             email_contacto=m.contact_email,
             telefono_contacto=m.contact_phone,
-            pro_vence_en=m.pro_expires_at,
+            pro_vence_en=pro_exp,
             modo_free=modo_free_vo,
-            creado_en=m.created_at,
-            actualizado_en=m.updated_at,
+            creado_en=creado,
+            actualizado_en=actualizado,
         )
+
+    def obtener_por_id(self, organizacion_id: str) -> Organizacion | None:
+        m = self.db.query(OrganizationModel).filter(OrganizationModel.id == organizacion_id).first()
+        if not m:
+            return None
+        return self._org_to_entity(m)
 
     def listar_organizaciones(self) -> list[Organizacion]:
         models = self.db.query(OrganizationModel).all()
-        return [
-            Organizacion(
-                id=m.id,
-                nombre=m.name,
-                plan_id=m.plan_id,
-                cuit=m.tax_id,
-                email_contacto=m.contact_email,
-                telefono_contacto=m.contact_phone,
-                pro_vence_en=m.pro_expires_at,
-                modo_free=(
-                    ModoFreeTier(m.free_tier_mode)
-                    if m.free_tier_mode in [item.value for item in ModoFreeTier]
-                    else ModoFreeTier.PRIVADO_BASICO
-                ),
-                creado_en=m.created_at,
-                actualizado_en=m.updated_at,
-            )
-            for m in models
-        ]
+        return [self._org_to_entity(m) for m in models]
 
     def guardar_organizacion(self, org: Organizacion) -> Organizacion:
         model = self.db.query(OrganizationModel).filter(OrganizationModel.id == org.id).first()
@@ -659,23 +655,7 @@ class MySQLOrganizacionesRepository(RepositorioOrganizacionesPort):
 
         self.db.commit()
         self.db.refresh(model)
-        modo_free_ret = (
-            ModoFreeTier(model.free_tier_mode)
-            if model.free_tier_mode in [item.value for item in ModoFreeTier]
-            else ModoFreeTier.PRIVADO_BASICO
-        )
-        return Organizacion(
-            id=model.id,
-            nombre=model.name,
-            plan_id=model.plan_id,
-            cuit=model.tax_id,
-            email_contacto=model.contact_email,
-            telefono_contacto=model.contact_phone,
-            pro_vence_en=model.pro_expires_at,
-            modo_free=modo_free_ret,
-            creado_en=model.created_at,
-            actualizado_en=model.updated_at,
-        )
+        return self._org_to_entity(model)
 
     def obtener_planta_por_id(self, planta_id: str) -> Planta | None:
         m = self.db.query(FacilityModel).filter(FacilityModel.id == planta_id).first()

@@ -421,7 +421,10 @@ class AnalizadorCalidadEnergiaService:
 
         buckets: dict[int, list[LecturaInstantanea]] = {}
         for item in lecturas:
-            ts = item.registrado_en.timestamp()
+            reg = item.registrado_en
+            if reg.tzinfo is None:
+                reg = reg.replace(tzinfo=timezone.utc)
+            ts = reg.timestamp()
             bucket_ts = int(ts // intervalo_segundos) * intervalo_segundos
             if bucket_ts not in buckets:
                 buckets[bucket_ts] = []
@@ -858,24 +861,34 @@ class PoliticaSuscripcionService:
     DURACION_CONSULTORIA_DIAS: int = 60
 
     @staticmethod
+    def _normalizar_utc(dt: datetime) -> datetime:
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+
+    @staticmethod
     def calcular_vencimiento_inicial(fecha_instalacion: datetime) -> datetime:
         return fecha_instalacion + timedelta(days=PoliticaSuscripcionService.DURACION_INSTALACION_INICIAL_DIAS)
 
     @staticmethod
     def extender_por_consultoria(vencimiento_actual: datetime, fecha_consultoria: datetime) -> datetime:
-        nuevo_vencimiento = fecha_consultoria + timedelta(days=PoliticaSuscripcionService.DURACION_CONSULTORIA_DIAS)
-        return max(vencimiento_actual, nuevo_vencimiento)
+        v_act = PoliticaSuscripcionService._normalizar_utc(vencimiento_actual)
+        f_cons = PoliticaSuscripcionService._normalizar_utc(fecha_consultoria)
+        nuevo_vencimiento = f_cons + timedelta(days=PoliticaSuscripcionService.DURACION_CONSULTORIA_DIAS)
+        res = max(v_act, nuevo_vencimiento)
+        return res if vencimiento_actual.tzinfo is not None else res.replace(tzinfo=None)
 
     @staticmethod
     def es_pro_vigente(vencimiento: datetime | None, ahora: datetime) -> bool:
         if vencimiento is None:
             return False
-        return ahora <= vencimiento
+        v_utc = PoliticaSuscripcionService._normalizar_utc(vencimiento)
+        a_utc = PoliticaSuscripcionService._normalizar_utc(ahora)
+        return a_utc <= v_utc
 
     @staticmethod
     def es_enterprise_vigente(vencimiento: datetime, ahora: datetime) -> bool:
-        # Alias retrocompatible
-        return ahora <= vencimiento
+        return PoliticaSuscripcionService.es_pro_vigente(vencimiento, ahora)
 
     @staticmethod
     def resolver_retencion_dias(es_pro: bool, modo_free: ModoFreeTier) -> int:

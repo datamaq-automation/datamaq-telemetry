@@ -84,8 +84,9 @@ class ConsultarTelemetriaUseCase:
         corte = self._calcular_fecha_corte_retencion(dev)
         if desde is None:
             return corte
-        # Si el cliente pide desde una fecha más vieja que la retención permitida, acotamos
-        return max(desde, corte)
+        d_norm = desde if desde.tzinfo is not None else desde.replace(tzinfo=timezone.utc)
+        c_norm = corte if corte.tzinfo is not None else corte.replace(tzinfo=timezone.utc)
+        return max(d_norm, c_norm)
 
     @staticmethod
     def _resolver_intervalo_segundos(granularidad: str, horas: int | None) -> int:

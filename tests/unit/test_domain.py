@@ -498,6 +498,26 @@ def test_politica_suscripcion_pro_freemium_bifurcado():
     assert PoliticaSuscripcionService.resolver_intervalo_minimo_segundos(False, ModoFreeTier.PRIVADO_BASICO) == 3600
 
 
+def test_politica_suscripcion_compatibilidad_naive_aware_timezone():
+    from datetime import datetime, timezone
+
+    from src.domain.telemetria.services import PoliticaSuscripcionService
+
+    ahora_aware = datetime.now(timezone.utc)
+    venc_naive = datetime(2026, 12, 31, 23, 59, 59)
+    venc_aware = datetime(2026, 12, 31, 23, 59, 59, tzinfo=timezone.utc)
+    ahora_naive = datetime(2026, 1, 1, 0, 0, 0)
+
+    # Combinaciones naive vs aware
+    assert PoliticaSuscripcionService.es_pro_vigente(venc_naive, ahora_aware) is True
+    assert PoliticaSuscripcionService.es_pro_vigente(venc_aware, ahora_naive) is True
+    assert PoliticaSuscripcionService.es_pro_vigente(venc_naive, ahora_naive) is True
+    assert PoliticaSuscripcionService.es_pro_vigente(venc_aware, ahora_aware) is True
+
+    # None handling
+    assert PoliticaSuscripcionService.es_pro_vigente(None, ahora_aware) is False
+
+
 def test_evaluar_alerta_tension_falta_fase_y_campos_enriquecidos():
     from datetime import datetime, timezone
 

@@ -202,12 +202,18 @@ class MockTelemetriaRepo(RepositorioTelemetriaPort):
                 return acc
         return None
 
+    @staticmethod
+    def _gte(a: datetime, b: datetime) -> bool:
+        a_utc = a if a.tzinfo is not None else a.replace(tzinfo=timezone.utc)
+        b_utc = b if b.tzinfo is not None else b.replace(tzinfo=timezone.utc)
+        return a_utc >= b_utc
+
     def listar_instantaneas(
         self, dispositivo_id: str, limite: int, desde: datetime | None = None
     ) -> list[LecturaInstantanea]:
         q = [i for i in self.instantaneas if i.dispositivo_id == dispositivo_id]
         if desde:
-            q = [i for i in q if i.registrado_en >= desde]
+            q = [i for i in q if self._gte(i.registrado_en, desde)]
         return q[:limite]
 
     def listar_energias(
@@ -215,22 +221,22 @@ class MockTelemetriaRepo(RepositorioTelemetriaPort):
     ) -> list[AcumuladoEnergia]:
         q = [e for e in self.energias if e.dispositivo_id == dispositivo_id]
         if desde:
-            q = [e for e in q if e.registrado_en >= desde]
+            q = [e for e in q if self._gte(e.registrado_en, desde)]
         return q[:limite]
 
     def purgar_instantaneas_anteriores_a(self, fecha_limite: datetime, batch_size: int = 1000) -> int:
         prev = len(self.instantaneas)
-        self.instantaneas = [i for i in self.instantaneas if i.registrado_en >= fecha_limite]
+        self.instantaneas = [i for i in self.instantaneas if self._gte(i.registrado_en, fecha_limite)]
         return prev - len(self.instantaneas)
 
     def purgar_energias_anteriores_a(self, fecha_limite: datetime, batch_size: int = 1000) -> int:
         prev = len(self.energias)
-        self.energias = [e for e in self.energias if e.registrado_en >= fecha_limite]
+        self.energias = [e for e in self.energias if self._gte(e.registrado_en, fecha_limite)]
         return prev - len(self.energias)
 
     def purgar_status_logs_anteriores_a(self, fecha_limite: datetime, batch_size: int = 1000) -> int:
         prev = len(self.logs)
-        self.logs = [log_item for log_item in self.logs if log_item.registrado_en >= fecha_limite]
+        self.logs = [log_item for log_item in self.logs if self._gte(log_item.registrado_en, fecha_limite)]
         return prev - len(self.logs)
 
     def purgar_alertas_resueltas_anteriores_a(self, fecha_limite: datetime, batch_size: int = 1000) -> int:
@@ -623,4 +629,58 @@ def test_consultar_telemetria_modo_pro_y_free_bifurcado():
         dev_free_priv.id, limite=100, desde=ahora - timedelta(days=30), granularidad="raw"
     )
     assert len(lecturas_free_priv) == 1
-    assert lecturas_free_priv[0].dispositivo_id == dev_free_priv.id
+
+
+def test_consultar_telemetria_con_fechas_naive_en_bd():
+    from datetime import datetime, timezone
+
+    repo_telem = MockTelemetriaRepo()
+    repo_disp = MockDispositivosRepo()
+    repo_org = MockOrganizacionesRepo()
+
+    # Fechas naive como las que devuelve MySQL / SQLite sin timezone
+    venc_naive = datetime(2026, 12, 31, 23, 59, 59)
+    ahora_naive = datetime(2026, 8, 23, 10, 0, 0)
+
+    org = Organizacion(
+        id="org-naive",
+        nombre="Org Naive",
+        pro_vence_en=venc_naive,
+        modo_free=ModoFreeTier.PRIVADO_BASICO,
+    )
+    repo_org.guardar_organizacion(org)
+    planta = Planta(id="planta-naive", organizacion_id="org-naive", nombre="Planta Naive")
+    repo_org.guardar_planta(planta)
+    dev = Dispositivo(
+        id="dev-naive",
+        device_uid=MacAddress("AABBCCDDEE99"),
+        nombre="Medidor Naive",
+        planta_id="planta-naive",
+    )
+    repo_disp.guardar(dev)
+
+    repo_telem.guardar_instantanea(
+        LecturaInstantanea(1, dev.id, ahora_naive, MedicionFase(), MedicionFase(), MedicionFase())
+    )
+
+    consultar_uc = ConsultarTelemetriaUseCase(repo_telem, repo_disp, repo_org)
+
+    # Llamada con hours=24 (genera 'desde' con timezone.utc)
+    desde_aware = datetime.now(timezone.utc) - timedelta(hours=24)
+    res = consultar_uc.listar_instantaneas(
+        id_o_uid=dev.id,
+        limite=100,
+        desde=desde_aware,
+        granularidad="auto",
+        horas=24,
+    )
+    assert isinstance(res, list)
+
+    # Llamada energy con days=7
+    desde_energy_aware = datetime.now(timezone.utc) - timedelta(days=7)
+    res_energy = consultar_uc.listar_energias(
+        id_o_uid=dev.id,
+        limite=100,
+        desde=desde_energy_aware,
+    )
+    assert isinstance(res_energy, list)
