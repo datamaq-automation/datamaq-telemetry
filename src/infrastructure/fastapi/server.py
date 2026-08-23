@@ -17,6 +17,9 @@ from src.infrastructure.fastapi.dependencies import (
 )
 from src.infrastructure.fastapi.error_handler import manejar_404
 from src.infrastructure.fastapi.middleware import RequestIdMiddleware
+from src.infrastructure.fastapi.routers.unifilar_topologia_router import (
+    router as unifilar_topologia_router,
+)
 from src.infrastructure.fastapi.routes.alertas_router import (
     router as alertas_router,
 )
@@ -38,9 +41,6 @@ from src.infrastructure.fastapi.routes.planta_estructura_router import (
 from src.infrastructure.fastapi.routes.system_router import router as system_router
 from src.infrastructure.fastapi.routes.telemetria_router import (
     router as telemetria_router,
-)
-from src.infrastructure.fastapi.routers.unifilar_topologia_router import (
-    router as unifilar_topologia_router,
 )
 from src.infrastructure.fastapi.security_headers import SecurityHeadersMiddleware
 from src.infrastructure.paho_mqtt.mqtt_listener import MQTTListener

@@ -8,6 +8,7 @@ from src.adapters.controllers.unifilar_topologia_controller import UnifilarTopol
 from src.adapters.gateways.in_memory_event_broadcaster import InMemoryEventBroadcaster
 from src.application.use_cases.autenticar_usuario import AutenticarUsuarioUseCase
 from src.application.use_cases.consultar_telemetria import ConsultarTelemetriaUseCase
+from src.application.use_cases.consultar_unifilar_topologia import ConsultarUnifilarTopologiaUseCase
 from src.application.use_cases.gestionar_alertas import GestionarAlertasUseCase
 from src.application.use_cases.gestionar_dispositivos import (
     GestionarDispositivosUseCase,
@@ -16,7 +17,6 @@ from src.application.use_cases.gestionar_planes import GestionarPlanesUseCase
 from src.application.use_cases.gestionar_planta_estructura import (
     GestionarPlantaEstructuraUseCase,
 )
-from src.application.use_cases.consultar_unifilar_topologia import ConsultarUnifilarTopologiaUseCase
 from src.application.use_cases.purgar_telemetria import PurgarTelemetriaExpiradaUseCase
 from src.domain.auth.services import HashContrasenaService, RateLimiterService
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
