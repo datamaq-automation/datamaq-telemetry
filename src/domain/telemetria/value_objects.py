@@ -132,3 +132,27 @@ class EnergiaActiva:
 @dataclass(frozen=True)
 class EnergiaReactiva:
     kvarh: float
+
+
+class EstadoFactorPotencia(str, Enum):
+    OPTIMO = "OPTIMO"
+    ADVERTENCIA = "ADVERTENCIA"
+    PENALIZADO = "PENALIZADO"
+
+
+class EstadoTension(str, Enum):
+    NORMAL = "NORMAL"
+    SUBTENSION = "SUBTENSION"
+    SOBRETENSION = "SOBRETENSION"
+
+
+@dataclass(frozen=True)
+class AnaliticaCalidadEnergia:
+    requiere_compensacion: bool
+    potencia_reactiva_a_compensar_kvar: float | None = None
+    banco_sugerido_kvar: float | None = None
+    penalizacion_estimada_ars: float | None = None
+    desbalance_tension_porcentaje: float | None = None
+    desbalance_corriente_porcentaje: float | None = None
+    estado_fp: EstadoFactorPotencia = EstadoFactorPotencia.OPTIMO
+    estado_tension: EstadoTension = EstadoTension.NORMAL

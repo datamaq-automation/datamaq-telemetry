@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 
 import pytest
 
+from src.domain.telemetria.analizador_reactiva import DimensionadorCompensacionService
 from src.domain.telemetria.entities import (
     LecturaInstantanea,
     MedicionFase,
@@ -13,7 +14,10 @@ from src.domain.telemetria.exceptions import (
 )
 from src.domain.telemetria.services import AnalizadorCalidadEnergiaService
 from src.domain.telemetria.value_objects import (
+    AnaliticaCalidadEnergia,
     Corriente,
+    EstadoFactorPotencia,
+    EstadoTension,
     FactorPotencia,
     MacAddress,
     PotenciaActiva,
@@ -743,3 +747,195 @@ def test_evaluar_alertas_riesgo_resonancia_capacitores():
     )
     alertas_normal = AnalizadorCalidadEnergiaService.evaluar_alertas_distorsion_armonica("dev-1", lectura_normal_fp)
     assert not any(a.tipo_alerta == "RIESGO_RESONANCIA_CAPACITORES" for a in alertas_normal)
+
+
+def test_dimensionador_calculo_potencia_compensacion():
+    # Caso 1: P=100 kW, FP_actual=0.80, FP_objetivo=0.96
+    # tan(arccos(0.80)) = 0.75, tan(arccos(0.96)) = 0.29166667
+    # Qc = 100 * (0.75 - 0.29166667) = 45.83 kVAr
+    qc = DimensionadorCompensacionService.calcular_potencia_compensacion(100.0, 0.80, 0.96)
+    assert qc == 45.83
+
+    # Caso 2: FP_actual >= FP_objetivo -> No requiere compensación (0.0)
+    assert DimensionadorCompensacionService.calcular_potencia_compensacion(100.0, 0.98, 0.96) == 0.0
+    assert DimensionadorCompensacionService.calcular_potencia_compensacion(50.0, 1.0, 0.96) == 0.0
+    assert DimensionadorCompensacionService.calcular_potencia_compensacion(50.0, 0.96, 0.96) == 0.0
+
+    # Caso 3: Entradas inválidas o nulas
+    assert DimensionadorCompensacionService.calcular_potencia_compensacion(None, 0.80) is None
+    assert DimensionadorCompensacionService.calcular_potencia_compensacion(100.0, None) is None
+    assert DimensionadorCompensacionService.calcular_potencia_compensacion(0.0, 0.80) is None
+    assert DimensionadorCompensacionService.calcular_potencia_compensacion(-50.0, 0.80) is None
+    assert DimensionadorCompensacionService.calcular_potencia_compensacion(100.0, -0.5) is None
+    assert DimensionadorCompensacionService.calcular_potencia_compensacion(100.0, 1.2) is None
+
+
+def test_dimensionador_sugerencia_banco_comercial():
+    # Qc = 45.83 -> Banco sugerido comercial más cercano = 50.0 kVAr
+    assert DimensionadorCompensacionService.sugerir_banco_comercial(45.83) == 50.0
+    assert DimensionadorCompensacionService.sugerir_banco_comercial(11.2) == 12.5
+    assert DimensionadorCompensacionService.sugerir_banco_comercial(22.0) == 25.0
+    assert DimensionadorCompensacionService.sugerir_banco_comercial(2.0) == 2.5
+    assert DimensionadorCompensacionService.sugerir_banco_comercial(950.0) == 1000.0
+
+    # Banco > 1000 kVAr -> Múltiplo superior de 50 kVAr
+    assert DimensionadorCompensacionService.sugerir_banco_comercial(1020.0) == 1050.0
+
+    # Valores nulos o no positivos
+    assert DimensionadorCompensacionService.sugerir_banco_comercial(None) is None
+    assert DimensionadorCompensacionService.sugerir_banco_comercial(0.0) is None
+    assert DimensionadorCompensacionService.sugerir_banco_comercial(-10.0) is None
+
+
+def test_dimensionador_escalones_sugeridos():
+    # Banco pequeño <= 25 kVAr -> Escalón único
+    assert DimensionadorCompensacionService.calcular_escalones_sugeridos(10.0) == [10.0]
+    assert DimensionadorCompensacionService.calcular_escalones_sugeridos(22.0) == [25.0]
+
+    # Banco mediano (50 kVAr) -> Pasos de 12.5 kVAr: [12.5, 12.5, 12.5, 12.5]
+    escalones_50 = DimensionadorCompensacionService.calcular_escalones_sugeridos(45.83, paso_modular_kvar=12.5)
+    assert escalones_50 == [12.5, 12.5, 12.5, 12.5]
+    assert sum(escalones_50) == 50.0
+
+    # Banco grande (100 kVAr) -> Pasos de 25 kVAr: [25.0, 25.0, 25.0, 25.0]
+    escalones_100 = DimensionadorCompensacionService.calcular_escalones_sugeridos(95.0)
+    assert escalones_100 == [25.0, 25.0, 25.0, 25.0]
+    assert sum(escalones_100) == 100.0
+
+    # Casos nulos
+    assert DimensionadorCompensacionService.calcular_escalones_sugeridos(None) == []
+    assert DimensionadorCompensacionService.calcular_escalones_sugeridos(0.0) == []
+
+
+def test_dimensionador_estimacion_penalizacion_ars():
+    # P=100 kW, FP=0.80 (<0.95 penalizado)
+    # factor_recargo = (0.95 / 0.80 - 1) = 0.1875
+    # costo_base = 100 * 720 * 95 + 100 * 1500 = 6,840,000 + 150,000 = 6,990,000 ARS
+    # recargo = 6,990,000 * 0.1875 = 1,310,625.0 ARS
+    penalizacion = DimensionadorCompensacionService.estimar_penalizacion_mensual_ars(
+        potencia_activa_kw=100.0,
+        fp_actual=0.80,
+        horas_mes=720.0,
+        tarifa_kwh_ars=95.0,
+        cargo_potencia_kw_ars=1500.0,
+    )
+    assert penalizacion == 1310625.0
+
+    # FP >= 0.95 -> 0.0 (Sin penalización)
+    assert (
+        DimensionadorCompensacionService.estimar_penalizacion_mensual_ars(
+            potencia_activa_kw=100.0,
+            fp_actual=0.95,
+        )
+        == 0.0
+    )
+    assert (
+        DimensionadorCompensacionService.estimar_penalizacion_mensual_ars(
+            potencia_activa_kw=100.0,
+            fp_actual=0.99,
+        )
+        == 0.0
+    )
+
+    # Entradas inválidas
+    assert DimensionadorCompensacionService.estimar_penalizacion_mensual_ars(None, 0.80) is None
+    assert DimensionadorCompensacionService.estimar_penalizacion_mensual_ars(100.0, None) is None
+    assert DimensionadorCompensacionService.estimar_penalizacion_mensual_ars(0.0, 0.80) is None
+
+
+def test_calculo_desbalance_corriente():
+    # Balanceado
+    assert AnalizadorCalidadEnergiaService.calcular_desbalance_corriente(100.0, 100.0, 100.0) == 0.0
+
+    # Desbalanceado: I_prom = 100.0, desv_max = 10.0 -> (10/100)*100 = 10.0%
+    iur = AnalizadorCalidadEnergiaService.calcular_desbalance_corriente(110.0, 100.0, 90.0)
+    assert iur == 10.0
+
+    # Cero corriente
+    assert AnalizadorCalidadEnergiaService.calcular_desbalance_corriente(0.0, 0.0, 0.0) == 0.0
+
+    # Incompleto
+    assert AnalizadorCalidadEnergiaService.calcular_desbalance_corriente(100.0, None, 100.0) is None
+
+
+def test_determinar_estado_fp():
+    assert AnalizadorCalidadEnergiaService.determinar_estado_fp(0.98) == EstadoFactorPotencia.OPTIMO
+    assert AnalizadorCalidadEnergiaService.determinar_estado_fp(0.96) == EstadoFactorPotencia.OPTIMO
+    assert AnalizadorCalidadEnergiaService.determinar_estado_fp(0.955) == EstadoFactorPotencia.ADVERTENCIA
+    assert AnalizadorCalidadEnergiaService.determinar_estado_fp(0.95) == EstadoFactorPotencia.ADVERTENCIA
+    assert AnalizadorCalidadEnergiaService.determinar_estado_fp(0.94) == EstadoFactorPotencia.PENALIZADO
+    assert AnalizadorCalidadEnergiaService.determinar_estado_fp(0.80) == EstadoFactorPotencia.PENALIZADO
+    assert AnalizadorCalidadEnergiaService.determinar_estado_fp(None) == EstadoFactorPotencia.OPTIMO
+
+
+def test_determinar_estado_tension():
+    # Tensiones normales en banda 198V - 242V
+    assert AnalizadorCalidadEnergiaService.determinar_estado_tension(220.0, 225.0, 218.0) == EstadoTension.NORMAL
+
+    # Subtensión (< 198V)
+    assert AnalizadorCalidadEnergiaService.determinar_estado_tension(195.0, 220.0, 220.0) == EstadoTension.SUBTENSION
+
+    # Sobretensión (> 242V)
+    assert AnalizadorCalidadEnergiaService.determinar_estado_tension(220.0, 245.0, 220.0) == EstadoTension.SOBRETENSION
+
+    # Sin lecturas
+    assert AnalizadorCalidadEnergiaService.determinar_estado_tension(None, None, None) == EstadoTension.NORMAL
+
+
+def test_calcular_analitica_completa():
+    ahora = datetime.now(timezone.utc)
+
+    # 1. Caso con compensación requerida y penalización
+    lectura_baja_calidad = LecturaInstantanea(
+        id=1,
+        dispositivo_id="dev-100",
+        registrado_en=ahora,
+        fase_r=MedicionFase(
+            tension=Tension(220.0), corriente=Corriente(150.0), potencia_activa=PotenciaActiva(33333.3)
+        ),
+        fase_s=MedicionFase(
+            tension=Tension(215.0), corriente=Corriente(155.0), potencia_activa=PotenciaActiva(33333.3)
+        ),
+        fase_t=MedicionFase(
+            tension=Tension(225.0), corriente=Corriente(145.0), potencia_activa=PotenciaActiva(33333.4)
+        ),
+        potencia_activa_total=PotenciaActiva(100000.0),  # 100 kW
+        factor_potencia_total=FactorPotencia(0.80),
+        desbalance_tension_porcentaje=2.27,
+    )
+
+    analitica = AnalizadorCalidadEnergiaService.calcular_analitica_completa(lectura_baja_calidad)
+
+    assert isinstance(analitica, AnaliticaCalidadEnergia)
+    assert analitica.requiere_compensacion is True
+    assert analitica.potencia_reactiva_a_compensar_kvar == 45.83
+    assert analitica.banco_sugerido_kvar == 50.0
+    assert analitica.penalizacion_estimada_ars is not None and analitica.penalizacion_estimada_ars > 0
+    assert analitica.desbalance_tension_porcentaje == 2.27
+    assert analitica.desbalance_corriente_porcentaje is not None
+    assert analitica.estado_fp == EstadoFactorPotencia.PENALIZADO
+    assert analitica.estado_tension == EstadoTension.NORMAL
+
+    # 2. Caso óptimo sin compensación requerida
+    lectura_optima = LecturaInstantanea(
+        id=2,
+        dispositivo_id="dev-101",
+        registrado_en=ahora,
+        fase_r=MedicionFase(tension=Tension(220.0), corriente=Corriente(100.0)),
+        fase_s=MedicionFase(tension=Tension(220.0), corriente=Corriente(100.0)),
+        fase_t=MedicionFase(tension=Tension(220.0), corriente=Corriente(100.0)),
+        potencia_activa_total=PotenciaActiva(60000.0),  # 60 kW
+        factor_potencia_total=FactorPotencia(0.98),
+        desbalance_tension_porcentaje=0.0,
+    )
+
+    analitica_optima = AnalizadorCalidadEnergiaService.calcular_analitica_completa(lectura_optima)
+
+    assert analitica_optima.requiere_compensacion is False
+    assert analitica_optima.potencia_reactiva_a_compensar_kvar == 0.0
+    assert analitica_optima.banco_sugerido_kvar is None
+    assert analitica_optima.penalizacion_estimada_ars == 0.0
+    assert analitica_optima.desbalance_tension_porcentaje == 0.0
+    assert analitica_optima.desbalance_corriente_porcentaje == 0.0
+    assert analitica_optima.estado_fp == EstadoFactorPotencia.OPTIMO
+    assert analitica_optima.estado_tension == EstadoTension.NORMAL

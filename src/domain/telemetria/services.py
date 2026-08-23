@@ -4,6 +4,7 @@ import threading
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from src.domain.telemetria.analizador_reactiva import DimensionadorCompensacionService
 from src.domain.telemetria.entities import (
     AlertaDispositivo,
     LecturaInstantanea,
@@ -11,7 +12,10 @@ from src.domain.telemetria.entities import (
     PlanTelemetria,
 )
 from src.domain.telemetria.value_objects import (
+    AnaliticaCalidadEnergia,
     Corriente,
+    EstadoFactorPotencia,
+    EstadoTension,
     FactorPotencia,
     ModoFreeTier,
     PotenciaActiva,
@@ -829,6 +833,145 @@ class AnalizadorCalidadEnergiaService:
                 )
 
         return alertas
+
+    @staticmethod
+    def calcular_desbalance_corriente(
+        ir: float | None,
+        is_: float | None,
+        it: float | None,
+    ) -> float | None:
+        """Calcula el Desbalance de Corriente Trifásico (IUR) según IEC 61000-4-30 / NEMA.
+
+        I_prom = (I_R + I_S + I_T) / 3
+        IUR (%) = (max(|I_R - I_prom|, |I_S - I_prom|, |I_T - I_prom|) / I_prom) * 100
+        """
+        if ir is None or is_ is None or it is None:
+            return None
+        if ir == 0.0 and is_ == 0.0 and it == 0.0:
+            return 0.0
+        i_prom = (ir + is_ + it) / 3.0
+        if i_prom <= 0.0:
+            return None
+        desv_max = max(abs(ir - i_prom), abs(is_ - i_prom), abs(it - i_prom))
+        return round((desv_max / i_prom) * 100.0, 2)
+
+    @staticmethod
+    def determinar_estado_fp(
+        fp: float | None,
+        umbral_penalidad: float = 0.95,
+        umbral_objetivo: float = 0.96,
+    ) -> EstadoFactorPotencia:
+        """Determina el estado normativo del Factor de Potencia según Res. ENRE/Distribuidoras."""
+        if fp is None:
+            return EstadoFactorPotencia.OPTIMO
+        if fp >= umbral_objetivo:
+            return EstadoFactorPotencia.OPTIMO
+        if fp >= umbral_penalidad:
+            return EstadoFactorPotencia.ADVERTENCIA
+        return EstadoFactorPotencia.PENALIZADO
+
+    @staticmethod
+    def determinar_estado_tension(
+        vr: float | None,
+        vs: float | None,
+        vt: float | None,
+        umbral_baja: float = 198.0,
+        umbral_alta: float = 242.0,
+    ) -> EstadoTension:
+        """Determina el estado normativo de tensión según banda contractual ENRE (220V ±10%)."""
+        tensiones = [v for v in (vr, vs, vt) if v is not None]
+        if not tensiones:
+            return EstadoTension.NORMAL
+
+        if any(v < umbral_baja for v in tensiones):
+            return EstadoTension.SUBTENSION
+        if any(v > umbral_alta for v in tensiones):
+            return EstadoTension.SOBRETENSION
+        return EstadoTension.NORMAL
+
+    @classmethod
+    def calcular_analitica_completa(
+        cls,
+        lectura: LecturaInstantanea,
+        fp_objetivo: float = 0.96,
+    ) -> AnaliticaCalidadEnergia:
+        """Calcula el bloque analítico completo de calidad de energía y compensación de reactiva."""
+        # 1. Potencia activa total en kW
+        p_activa_w: float | None = None
+        if lectura.potencia_activa_total is not None:
+            p_activa_w = lectura.potencia_activa_total.vatios
+        else:
+            p_vals = [
+                f.potencia_activa.vatios
+                for f in (lectura.fase_r, lectura.fase_s, lectura.fase_t)
+                if f.potencia_activa is not None
+            ]
+            if p_vals:
+                p_activa_w = sum(p_vals)
+
+        p_activa_kw = (p_activa_w / 1000.0) if p_activa_w is not None else None
+
+        # 2. Factor de potencia total
+        fp_val: float | None = None
+        if lectura.factor_potencia_total is not None:
+            fp_val = lectura.factor_potencia_total.valor
+        else:
+            fp_vals = [
+                f.factor_potencia.valor
+                for f in (lectura.fase_r, lectura.fase_s, lectura.fase_t)
+                if f.factor_potencia is not None
+            ]
+            if fp_vals:
+                fp_val = sum(fp_vals) / len(fp_vals)
+
+        # 3. Dimensionamiento reactiva y penalización
+        requiere_comp = False
+        qc_kvar: float | None = None
+        banco_sug: float | None = None
+        penalizacion_ars: float | None = None
+
+        if p_activa_kw is not None and p_activa_kw > 0.0 and fp_val is not None and fp_val > 0.0:
+            qc_calc = DimensionadorCompensacionService.calcular_potencia_compensacion(
+                p_activa_kw, fp_val, fp_objetivo=fp_objetivo
+            )
+            if qc_calc is not None and qc_calc > 0.0:
+                requiere_comp = True
+                qc_kvar = qc_calc
+                banco_sug = DimensionadorCompensacionService.sugerir_banco_comercial(qc_kvar)
+            else:
+                qc_kvar = 0.0
+                requiere_comp = False
+
+            penalizacion_ars = DimensionadorCompensacionService.estimar_penalizacion_mensual_ars(p_activa_kw, fp_val)
+
+        # 4. Desbalances
+        vr = lectura.fase_r.tension.voltios if lectura.fase_r.tension else None
+        vs = lectura.fase_s.tension.voltios if lectura.fase_s.tension else None
+        vt = lectura.fase_t.tension.voltios if lectura.fase_t.tension else None
+
+        vur = lectura.desbalance_tension_porcentaje
+        if vur is None:
+            vur = cls.calcular_desbalance_tension(vr, vs, vt)
+
+        ir = lectura.fase_r.corriente.amperios if lectura.fase_r.corriente else None
+        is_ = lectura.fase_s.corriente.amperios if lectura.fase_s.corriente else None
+        it = lectura.fase_t.corriente.amperios if lectura.fase_t.corriente else None
+        iur = cls.calcular_desbalance_corriente(ir, is_, it)
+
+        # 5. Estados normativos
+        estado_fp = cls.determinar_estado_fp(fp_val, umbral_penalidad=0.95, umbral_objetivo=fp_objetivo)
+        estado_tension = cls.determinar_estado_tension(vr, vs, vt)
+
+        return AnaliticaCalidadEnergia(
+            requiere_compensacion=requiere_comp,
+            potencia_reactiva_a_compensar_kvar=qc_kvar,
+            banco_sugerido_kvar=banco_sug,
+            penalizacion_estimada_ars=penalizacion_ars,
+            desbalance_tension_porcentaje=vur,
+            desbalance_corriente_porcentaje=iur,
+            estado_fp=estado_fp,
+            estado_tension=estado_tension,
+        )
 
 
 class PoliticaRetencionService:

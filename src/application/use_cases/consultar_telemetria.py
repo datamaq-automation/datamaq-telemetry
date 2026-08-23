@@ -115,11 +115,13 @@ class ConsultarTelemetriaUseCase:
         dev = self._resolver_dispositivo(id_o_uid)
         inst = self.repo_telemetria.obtener_ultima_instantanea(dev.id)
         acc = self.repo_telemetria.obtener_ultimo_acumulado(dev.id)
+        inst_dto = TelemetriaMapper.instantanea_to_dto(inst) if inst else None
 
         return TelemetriaLatestResponseDTO(
             device_id=dev.id,
-            instantanea=TelemetriaMapper.instantanea_to_dto(inst) if inst else None,
+            instantanea=inst_dto,
             energia=TelemetriaMapper.acumulado_to_dto(acc) if acc else None,
+            analitica=inst_dto.analitica if inst_dto else None,
         )
 
     def listar_instantaneas(

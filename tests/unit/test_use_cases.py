@@ -602,3 +602,66 @@ def test_actualizar_dispositivo_campos_metrologia_y_patch():
     assert guardado.nombre == "Inyectoras 1 a 4"
     assert guardado.numero_serie == "SN-98234-DM"
     assert guardado.tipo_instalacion == "3P4W"
+
+
+def test_consultar_telemetria_con_analitica_calidad_energia():
+    from src.domain.telemetria.entities import MedicionFase
+    from src.domain.telemetria.value_objects import (
+        Corriente,
+        FactorPotencia,
+        PotenciaActiva,
+        Tension,
+    )
+
+    repo_disp = MockDispositivosRepo()
+    repo_telem = MockTelemetriaRepo()
+
+    dev = Dispositivo(
+        id="dev-analitica-1",
+        device_uid=MacAddress("A1B2C3D4E5F6"),
+        nombre="Medidor TGBT Planta Industrial",
+    )
+    repo_disp.guardar(dev)
+
+    lectura = LecturaInstantanea(
+        id=1,
+        dispositivo_id="dev-analitica-1",
+        registrado_en=datetime.now(),
+        fase_r=MedicionFase(
+            tension=Tension(215.0), corriente=Corriente(190.0), potencia_activa=PotenciaActiva(40000.0)
+        ),
+        fase_s=MedicionFase(
+            tension=Tension(220.0), corriente=Corriente(180.0), potencia_activa=PotenciaActiva(40000.0)
+        ),
+        fase_t=MedicionFase(
+            tension=Tension(225.0), corriente=Corriente(170.0), potencia_activa=PotenciaActiva(40000.0)
+        ),
+        potencia_activa_total=PotenciaActiva(120000.0),  # 120 kW
+        factor_potencia_total=FactorPotencia(0.82),
+        desbalance_tension_porcentaje=2.27,
+    )
+    repo_telem.guardar_instantanea(lectura)
+
+    consultar_uc = ConsultarTelemetriaUseCase(repo_telem, repo_disp)
+    res = consultar_uc.obtener_ultima_telemetria("dev-analitica-1")
+
+    assert res.instantanea is not None
+    assert res.analitica is not None
+    assert res.instantanea.analitica is not None
+    assert res.analitica.requiere_compensacion is True
+    assert res.analitica.potencia_reactiva_a_compensar_kvar is not None
+    assert res.analitica.potencia_reactiva_a_compensar_kvar > 0
+    assert res.analitica.banco_sugerido_kvar is not None
+    assert res.analitica.banco_sugerido_kvar >= res.analitica.potencia_reactiva_a_compensar_kvar
+    assert res.analitica.penalizacion_estimada_ars is not None
+    assert res.analitica.penalizacion_estimada_ars > 0
+    assert res.analitica.desbalance_tension_porcentaje == 2.27
+    assert res.analitica.desbalance_corriente_porcentaje is not None
+    assert res.analitica.estado_fp == "PENALIZADO"
+    assert res.analitica.estado_tension == "NORMAL"
+
+    # Verificar historial de instantáneas
+    historial = consultar_uc.listar_instantaneas("dev-analitica-1", limite=10)
+    assert len(historial) == 1
+    assert historial[0].analitica is not None
+    assert historial[0].analitica.requiere_compensacion is True

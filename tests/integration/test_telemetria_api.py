@@ -176,3 +176,62 @@ def test_get_energy_history_end_to_end():
     data = response.json()
     assert len(data) == 1
     assert data[0]["imported_active_energy_kwh"] == 1250.45
+
+
+def test_get_latest_telemetry_end_to_end_con_analitica_calidad_energia():
+    from src.application.dtos.telemetria_dto import AnaliticaCalidadEnergiaDTO
+
+    app = create_app()
+
+    ahora = datetime.now(timezone.utc)
+    mock_analitica = AnaliticaCalidadEnergiaDTO(
+        requiere_compensacion=True,
+        potencia_reactiva_a_compensar_kvar=45.83,
+        banco_sugerido_kvar=50.0,
+        penalizacion_estimada_ars=1310625.0,
+        desbalance_tension_porcentaje=2.27,
+        desbalance_corriente_porcentaje=5.50,
+        estado_fp="PENALIZADO",
+        estado_tension="NORMAL",
+    )
+    mock_dto = TelemetriaLatestResponseDTO(
+        device_id="dev-test-analitica",
+        instantanea=LecturaInstantaneaDTO(
+            dispositivo_id="dev-test-analitica",
+            registrado_en=ahora,
+            fase_r=MedicionFaseDTO(voltage_V=220.0, current_A=150.0, net_active_power_W=33333.3),
+            fase_s=MedicionFaseDTO(voltage_V=215.0, current_A=155.0, net_active_power_W=33333.3),
+            fase_t=MedicionFaseDTO(voltage_V=225.0, current_A=145.0, net_active_power_W=33333.4),
+            potencia_activa_total_W=100000.0,
+            factor_potencia_total=0.80,
+            desbalance_tension_porcentaje=2.27,
+            analitica=mock_analitica,
+        ),
+        energia=None,
+        analitica=mock_analitica,
+    )
+
+    mock_use_case = MagicMock()
+    mock_use_case.obtener_ultima_telemetria.return_value = mock_dto
+
+    app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "user-test", "rol": "operador"}
+    app.dependency_overrides[get_telemetria_use_case] = lambda: mock_use_case
+
+    client = TestClient(app)
+    response = client.get("/api/telemetria/latest/dev-test-analitica")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["device_id"] == "dev-test-analitica"
+    assert "analitica" in data
+    assert data["analitica"]["requiere_compensacion"] is True
+    assert data["analitica"]["potencia_reactiva_a_compensar_kvar"] == 45.83
+    assert data["analitica"]["banco_sugerido_kvar"] == 50.0
+    assert data["analitica"]["penalizacion_estimada_ars"] == 1310625.0
+    assert data["analitica"]["desbalance_tension_porcentaje"] == 2.27
+    assert data["analitica"]["desbalance_corriente_porcentaje"] == 5.50
+    assert data["analitica"]["estado_fp"] == "PENALIZADO"
+    assert data["analitica"]["estado_tension"] == "NORMAL"
+
+    # Also in instantanea.analitica
+    assert data["instantanea"]["analitica"]["requiere_compensacion"] is True

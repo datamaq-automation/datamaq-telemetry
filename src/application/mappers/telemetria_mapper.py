@@ -1,5 +1,6 @@
 from src.application.dtos.telemetria_dto import (
     AcumuladoEnergiaDTO,
+    AnaliticaCalidadEnergiaDTO,
     LecturaInstantaneaDTO,
     LogEstadoDispositivoDTO,
     MedicionFaseDTO,
@@ -10,9 +11,28 @@ from src.domain.telemetria.entities import (
     LogEstadoDispositivo,
     MedicionFase,
 )
+from src.domain.telemetria.services import AnalizadorCalidadEnergiaService
+from src.domain.telemetria.value_objects import AnaliticaCalidadEnergia
 
 
 class TelemetriaMapper:
+    @staticmethod
+    def analitica_to_dto(analitica: AnaliticaCalidadEnergia | None) -> AnaliticaCalidadEnergiaDTO | None:
+        if analitica is None:
+            return None
+        return AnaliticaCalidadEnergiaDTO(
+            requiere_compensacion=analitica.requiere_compensacion,
+            potencia_reactiva_a_compensar_kvar=analitica.potencia_reactiva_a_compensar_kvar,
+            banco_sugerido_kvar=analitica.banco_sugerido_kvar,
+            penalizacion_estimada_ars=analitica.penalizacion_estimada_ars,
+            desbalance_tension_porcentaje=analitica.desbalance_tension_porcentaje,
+            desbalance_corriente_porcentaje=analitica.desbalance_corriente_porcentaje,
+            estado_fp=analitica.estado_fp.value if hasattr(analitica.estado_fp, "value") else str(analitica.estado_fp),
+            estado_tension=analitica.estado_tension.value
+            if hasattr(analitica.estado_tension, "value")
+            else str(analitica.estado_tension),
+        )
+
     @staticmethod
     def fase_to_dto(fase: MedicionFase) -> MedicionFaseDTO:
         return MedicionFaseDTO(
@@ -27,7 +47,13 @@ class TelemetriaMapper:
         )
 
     @staticmethod
-    def instantanea_to_dto(lectura: LecturaInstantanea) -> LecturaInstantaneaDTO:
+    def instantanea_to_dto(
+        lectura: LecturaInstantanea,
+        analitica: AnaliticaCalidadEnergia | None = None,
+    ) -> LecturaInstantaneaDTO:
+        if analitica is None:
+            analitica = AnalizadorCalidadEnergiaService.calcular_analitica_completa(lectura)
+
         return LecturaInstantaneaDTO(
             id=lectura.id,
             dispositivo_id=lectura.dispositivo_id,
@@ -49,6 +75,7 @@ class TelemetriaMapper:
             tension_neutro_estimada_V=lectura.tension_neutro_estimada,
             thd_v_promedio_pct=lectura.thd_v_promedio_porcentaje,
             thd_i_total_pct=lectura.thd_i_total_porcentaje,
+            analitica=TelemetriaMapper.analitica_to_dto(analitica),
         )
 
     @staticmethod

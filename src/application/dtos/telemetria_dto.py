@@ -15,6 +15,18 @@ class MedicionFaseDTO(BaseModel):
     thd_i_pct: float | None = None
 
 
+class AnaliticaCalidadEnergiaDTO(BaseModel):
+    requiere_compensacion: bool = False
+    potencia_reactiva_a_compensar_kvar: float | None = None
+    banco_sugerido_kvar: float | None = None
+    penalizacion_estimada_ars: float | None = None
+    desbalance_tension_porcentaje: float | None = None
+    desbalance_corriente_porcentaje: float | None = None
+    estado_fp: str = "OPTIMO"
+    estado_tension: str = "NORMAL"
+    model_config = ConfigDict(from_attributes=True)
+
+
 class LecturaInstantaneaDTO(BaseModel):
     id: int | None = None
     dispositivo_id: str
@@ -32,6 +44,7 @@ class LecturaInstantaneaDTO(BaseModel):
     tension_neutro_estimada_V: float | None = None
     thd_v_promedio_pct: float | None = None
     thd_i_total_pct: float | None = None
+    analitica: AnaliticaCalidadEnergiaDTO | None = None
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -64,3 +77,4 @@ class TelemetriaLatestResponseDTO(BaseModel):
     device_id: str
     instantanea: LecturaInstantaneaDTO | None = None
     energia: AcumuladoEnergiaDTO | None = None
+    analitica: AnaliticaCalidadEnergiaDTO | None = None
