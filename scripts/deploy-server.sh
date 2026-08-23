@@ -38,7 +38,7 @@ log() { echo "[$(date +"%Y-%m-%dT%H:%M:%S")] $1"; }
 
 log "Iniciando despliegue de datamaq-telemetry en $DEPLOY_SSH_HOST..."
 
-ssh -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST" \
+ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST" \
     DEPLOY_REMOTE_DIR="$DEPLOY_REMOTE_DIR" \
     DEPLOY_SERVICE_NAME="$DEPLOY_SERVICE_NAME" \
     HEALTH_URL="$HEALTH_URL" \
