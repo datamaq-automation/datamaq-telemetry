@@ -521,3 +521,84 @@ def test_autodespeje_alertas_y_websocket_broadcast():
     ultimo_evento = [d for t, d in pub.eventos if t == "m/wifi/D48C49F03564/alertas"][-1]
     assert ultimo_evento["esta_resuelta"] is True
     assert ultimo_evento["duracion_segundos"] == 20.0
+
+
+def test_actualizar_dispositivo_campos_metrologia_y_patch():
+    from src.application.dtos.dispositivo_dto import DispositivoActualizarDTO
+    from src.application.use_cases.gestionar_dispositivos import GestionarDispositivosUseCase
+    from src.domain.telemetria.entities import Planta
+    from src.domain.telemetria.ports import RepositorioOrganizacionesPort
+
+    class MockOrgRepo(RepositorioOrganizacionesPort):
+        def obtener_por_id(self, organizacion_id: str):
+            return None
+
+        def listar_organizaciones(self):
+            return []
+
+        def guardar_organizacion(self, org):
+            return org
+
+        def obtener_planta_por_id(self, planta_id: str):
+            return Planta(id=planta_id, organizacion_id="org-1", nombre="Planta Central")
+
+        def listar_plantas(self, organizacion_id=None):
+            return []
+
+        def guardar_planta(self, planta):
+            return planta
+
+        def obtener_nodos_unifilar(self, planta_id: str):
+            return []
+
+        def guardar_nodos_unifilar(self, planta_id: str, nodos):
+            return nodos
+
+        def obtener_zonas_planta(self, planta_id: str):
+            return []
+
+        def obtener_dispositivos_layout(self, planta_id: str):
+            return []
+
+        def guardar_layout_planta(self, planta_id: str, plano_svg_url, zonas, dispositivos):
+            pass
+
+    repo_disp = MockDispositivosRepo()
+    repo_org = MockOrgRepo()
+    dev = Dispositivo(
+        id="dev-123",
+        device_uid=MacAddress("D48C49F03564"),
+        nombre="Medidor Original",
+        numero_serie="SN-OLD-001",
+        tipo_instalacion="CONSUMO",
+        fases_con_ti="R,S,T",
+    )
+    repo_disp.guardar(dev)
+
+    use_case = GestionarDispositivosUseCase(repo_disp, repo_org)
+
+    # Actualización parcial vía DTO (PATCH / PUT)
+    dto_patch = DispositivoActualizarDTO(
+        nombre="Inyectoras 1 a 4",
+        ubicacion_tag="Nave 2 · Sala de Celdas BT · TGBT-02",
+        numero_serie="SN-98234-DM",
+        tipo_instalacion="3P4W",
+        fases_con_ti="R,S,T",
+        planta_id="planta-1",
+    )
+    res = use_case.actualizar_dispositivo("dev-123", dto_patch)
+
+    assert res.id == "dev-123"
+    assert res.nombre == "Inyectoras 1 a 4"
+    assert res.ubicacion_tag == "Nave 2 · Sala de Celdas BT · TGBT-02"
+    assert res.numero_serie == "SN-98234-DM"
+    assert res.tipo_instalacion == "3P4W"
+    assert res.fases_con_ti == "R,S,T"
+    assert res.planta_id == "planta-1"
+
+    # Verificar persistencia en repo
+    guardado = repo_disp.obtener_por_id("dev-123")
+    assert guardado is not None
+    assert guardado.nombre == "Inyectoras 1 a 4"
+    assert guardado.numero_serie == "SN-98234-DM"
+    assert guardado.tipo_instalacion == "3P4W"

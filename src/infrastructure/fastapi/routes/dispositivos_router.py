@@ -53,6 +53,7 @@ def register_dispositivo(
 
 
 @router.put("/{device_id}", response_model=DispositivoResponseDTO, dependencies=[Depends(requiere_rol_escritura)])
+@router.patch("/{device_id}", response_model=DispositivoResponseDTO, dependencies=[Depends(requiere_rol_escritura)])
 def update_dispositivo(
     device_id: str,
     dto: DispositivoUpdateDTO,

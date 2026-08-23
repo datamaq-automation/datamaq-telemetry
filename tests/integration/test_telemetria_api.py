@@ -129,3 +129,50 @@ def test_get_instantaneous_history_end_to_end():
     data = response.json()
     assert len(data) == 1
     assert data[0]["thd_v_promedio_pct"] == 1.50
+
+
+def test_get_instantaneous_history_empty_result_returns_200_empty_list():
+    app = create_app()
+
+    mock_use_case = MagicMock()
+    mock_use_case.listar_instantaneas.return_value = []
+
+    app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "user-test", "rol": "invitado"}
+    app.dependency_overrides[get_telemetria_use_case] = lambda: mock_use_case
+
+    client = TestClient(app)
+    response = client.get("/api/telemetria/instantaneous/725dfb4c-2610-4405-878a-d718b4f428a4?limit=100&hours=24")
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_get_energy_history_end_to_end():
+    from src.application.dtos.telemetria_dto import AcumuladoEnergiaDTO
+
+    app = create_app()
+
+    ahora = datetime.now(timezone.utc)
+    mock_energy = AcumuladoEnergiaDTO(
+        dispositivo_id="725dfb4c-2610-4405-878a-d718b4f428a4",
+        registrado_en=ahora,
+        imported_active_energy_kwh=1250.45,
+        exported_active_energy_kwh=0.0,
+        imported_reactive_energy_kvarh=120.30,
+        exported_reactive_energy_kvarh=0.0,
+    )
+
+    mock_use_case = MagicMock()
+    mock_use_case.listar_energias.return_value = [mock_energy]
+
+    app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "user-test", "rol": "invitado"}
+    app.dependency_overrides[get_telemetria_use_case] = lambda: mock_use_case
+
+    client = TestClient(app)
+    response = client.get("/api/telemetria/energy/725dfb4c-2610-4405-878a-d718b4f428a4?limit=100&days=7")
+
+    assert response.status_code == 200
+    assert "X-Request-ID" in response.headers
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["imported_active_energy_kwh"] == 1250.45

@@ -43,6 +43,7 @@ def test_endpoints_escritura_exigen_rol_escritura():
     escrituras = [
         (dispositivos_router.router, "POST", "/api/dispositivos"),
         (dispositivos_router.router, "PUT", "/api/dispositivos/{device_id}"),
+        (dispositivos_router.router, "PATCH", "/api/dispositivos/{device_id}"),
         (organizaciones_router.router, "POST", "/api/organizaciones"),
         (organizaciones_router.router, "POST", "/api/plantas"),
         (planes_router.router, "POST", "/api/planes"),

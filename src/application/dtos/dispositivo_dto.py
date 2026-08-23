@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class DispositivoBaseDTO(BaseModel):
@@ -22,12 +22,16 @@ class DispositivoCreateDTO(DispositivoBaseDTO):
 
 
 class DispositivoUpdateDTO(BaseModel):
-    nombre: str | None = None
-    planta_id: str | None = None
-    ubicacion_tag: str | None = None
+    nombre: str | None = Field(None, min_length=1, max_length=120)
+    ubicacion_tag: str | None = Field(None, max_length=150)
+    numero_serie: str | None = Field(None, max_length=100)
+    tipo_instalacion: str | None = Field(None, description="3P4W, 3P3W, 1P2W, CONSUMO, GENERACION")
+    fases_con_ti: str | None = Field(None, description="R,S,T o S,T o R,T")
     esta_activo: bool | None = None
-    tipo_instalacion: str | None = None
-    fases_con_ti: str | None = None
+    planta_id: str | None = None
+
+
+DispositivoActualizarDTO = DispositivoUpdateDTO
 
 
 class DispositivoResponseDTO(DispositivoBaseDTO):

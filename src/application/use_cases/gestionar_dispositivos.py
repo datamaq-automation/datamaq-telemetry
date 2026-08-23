@@ -97,6 +97,12 @@ class GestionarDispositivosUseCase:
             dev.nombre = dto.nombre
         if dto.ubicacion_tag is not None:
             dev.ubicacion_tag = dto.ubicacion_tag
+        if dto.numero_serie is not None:
+            dev.numero_serie = dto.numero_serie
+        if dto.tipo_instalacion is not None:
+            dev.tipo_instalacion = dto.tipo_instalacion
+        if dto.fases_con_ti is not None:
+            dev.fases_con_ti = dto.fases_con_ti
         if dto.esta_activo is not None:
             dev.esta_activo = dto.esta_activo
 
