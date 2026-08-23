@@ -446,35 +446,56 @@ def test_agregar_lecturas_en_intervalo():
     assert b_anterior.potencia_activa_total.vatios == 6620.0
 
 
-def test_politica_suscripcion_enterprise_freemium():
+def test_politica_suscripcion_pro_freemium_bifurcado():
     from datetime import datetime, timedelta, timezone
 
     from src.domain.telemetria.services import PoliticaSuscripcionService
+    from src.domain.telemetria.value_objects import ModoFreeTier
 
     t_instalacion = datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
 
-    # 1. Instalación inicial: 12 meses (365 días) de Enterprise
+    # 1. Instalación inicial: 60 días (2 meses) de Plan PRO
     venc_inicial = PoliticaSuscripcionService.calcular_vencimiento_inicial(t_instalacion)
-    assert venc_inicial == t_instalacion + timedelta(days=365)
+    assert venc_inicial == t_instalacion + timedelta(days=60)
 
-    # Durante los 12 meses: Enterprise vigente
-    assert PoliticaSuscripcionService.es_enterprise_vigente(venc_inicial, t_instalacion + timedelta(days=100)) is True
+    # Durante los 60 días: PRO vigente
+    assert PoliticaSuscripcionService.es_pro_vigente(venc_inicial, t_instalacion + timedelta(days=30)) is True
+    assert PoliticaSuscripcionService.es_pro_vigente(venc_inicial, t_instalacion + timedelta(days=60)) is True
 
-    # 2. Consultoría antes del vencimiento (día 200) -> añade +1 mes (+30 días) al vencimiento original
-    venc_extendido = PoliticaSuscripcionService.extender_por_consultoria(
-        venc_inicial, t_instalacion + timedelta(days=200)
+    # 2. Consultoría en el día 20 (no acumulable, no suma 60+60 sino max(venc_actual, fecha+60))
+    # fecha+60 = día 80 > día 60 -> nuevo vencimiento es día 80
+    venc_consultoria = PoliticaSuscripcionService.extender_por_consultoria(
+        venc_inicial, t_instalacion + timedelta(days=20)
     )
-    assert venc_extendido == venc_inicial + timedelta(days=30)
-    assert venc_extendido == t_instalacion + timedelta(days=395)
+    assert venc_consultoria == t_instalacion + timedelta(days=80)
 
-    # 3. Consultoría después de que expiró (día 400) -> extiende 30 días a partir de la fecha de la consultoría
+    # Segunda consultoría en el día 25 (fecha+60 = día 85 > día 80)
+    venc_consultoria_2 = PoliticaSuscripcionService.extender_por_consultoria(
+        venc_consultoria, t_instalacion + timedelta(days=25)
+    )
+    assert venc_consultoria_2 == t_instalacion + timedelta(days=85)
+
+    # 3. Consultoría después de que expiró (día 100) -> fija 60 días desde la fecha del servicio
     venc_reanudado = PoliticaSuscripcionService.extender_por_consultoria(
-        venc_inicial, t_instalacion + timedelta(days=400)
+        venc_inicial, t_instalacion + timedelta(days=100)
     )
-    assert venc_reanudado == t_instalacion + timedelta(days=430)
+    assert venc_reanudado == t_instalacion + timedelta(days=160)
 
-    # 4. Sin consultoría y fecha posterior al vencimiento -> no vigente (pasa a Freemium)
-    assert PoliticaSuscripcionService.es_enterprise_vigente(venc_inicial, t_instalacion + timedelta(days=366)) is False
+    # 4. Sin consultoría y fecha posterior al vencimiento -> no vigente
+    assert PoliticaSuscripcionService.es_pro_vigente(venc_inicial, t_instalacion + timedelta(days=61)) is False
+
+    # 5. Políticas de Retención y Granularidad
+    # Plan PRO: 365 días retención, granularidad raw (0s)
+    assert PoliticaSuscripcionService.resolver_retencion_dias(True, ModoFreeTier.PRIVADO_BASICO) == 365
+    assert PoliticaSuscripcionService.resolver_intervalo_minimo_segundos(True, ModoFreeTier.PRIVADO_BASICO) == 0
+
+    # Free - Opción A (Vitrina Anónima): 30 días retención, granularidad raw (0s)
+    assert PoliticaSuscripcionService.resolver_retencion_dias(False, ModoFreeTier.VITRINA_ANONIMA) == 30
+    assert PoliticaSuscripcionService.resolver_intervalo_minimo_segundos(False, ModoFreeTier.VITRINA_ANONIMA) == 0
+
+    # Free - Opción B (Privado Básico por defecto): 14 días retención, granularidad agregada (3600s = 1 hora)
+    assert PoliticaSuscripcionService.resolver_retencion_dias(False, ModoFreeTier.PRIVADO_BASICO) == 14
+    assert PoliticaSuscripcionService.resolver_intervalo_minimo_segundos(False, ModoFreeTier.PRIVADO_BASICO) == 3600
 
 
 def test_evaluar_alerta_tension_falta_fase_y_campos_enriquecidos():

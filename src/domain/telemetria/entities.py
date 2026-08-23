@@ -10,6 +10,7 @@ from src.domain.telemetria.value_objects import (
     EstadoDispositivo,
     FactorPotencia,
     MacAddress,
+    ModoFreeTier,
     PotenciaActiva,
     PotenciaAparente,
     PotenciaReactiva,
@@ -46,6 +47,8 @@ class Organizacion:
     cuit: str | None = None
     email_contacto: str | None = None
     telefono_contacto: str | None = None
+    pro_vence_en: datetime | None = None
+    modo_free: ModoFreeTier = ModoFreeTier.PRIVADO_BASICO
     creado_en: datetime = field(default_factory=ahora_utc)
     actualizado_en: datetime = field(default_factory=ahora_utc)
 

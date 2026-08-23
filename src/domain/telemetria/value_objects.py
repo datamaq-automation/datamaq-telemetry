@@ -26,6 +26,11 @@ class VisibilidadPlan(str, Enum):
     PRIVADO = "PRIVADO"
 
 
+class ModoFreeTier(str, Enum):
+    VITRINA_ANONIMA = "VITRINA_ANONIMA"
+    PRIVADO_BASICO = "PRIVADO_BASICO"
+
+
 @dataclass(frozen=True)
 class MacAddress:
     valor: str

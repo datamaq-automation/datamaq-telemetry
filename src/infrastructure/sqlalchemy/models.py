@@ -38,6 +38,8 @@ class OrganizationModel(Base):
     tax_id: Mapped[str | None] = mapped_column(String(50), nullable=True)
     contact_email: Mapped[str | None] = mapped_column(String(120), nullable=True)
     contact_phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    pro_expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    free_tier_mode: Mapped[str] = mapped_column(String(30), default="PRIVADO_BASICO", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, onupdate=ahora_utc, nullable=False)
 

@@ -31,6 +31,7 @@ from src.domain.telemetria.ports import (
 )
 from src.domain.telemetria.value_objects import (
     MacAddress,
+    ModoFreeTier,
     SeveridadAlerta,
     VisibilidadPlan,
 )
@@ -524,3 +525,78 @@ def test_heartbeat_throttling_60s():
 
     # Ahora sí debe haberse actualizado el heartbeat en DB
     assert repo_disp.guardar_calls == 2
+
+
+def test_consultar_telemetria_modo_pro_y_free_bifurcado():
+    repo_telem = MockTelemetriaRepo()
+    repo_disp = MockDispositivosRepo()
+    repo_org = MockOrganizacionesRepo()
+
+    ahora = datetime(2026, 8, 23, 12, 0, 0, tzinfo=timezone.utc)
+
+    # 1. Caso PRO: Organización con PRO activo vence en 40 días
+    org_pro = Organizacion(
+        id="org-pro",
+        nombre="Industria Pro Activa",
+        pro_vence_en=ahora + timedelta(days=40),
+        modo_free=ModoFreeTier.PRIVADO_BASICO,
+    )
+    repo_org.guardar_organizacion(org_pro)
+    planta_pro = Planta(id="planta-pro", organizacion_id="org-pro", nombre="Planta Central")
+    repo_org.guardar_planta(planta_pro)
+    dev_pro = Dispositivo(
+        id="dev-pro", device_uid=MacAddress("AABBCCDDEE01"), nombre="Medidor Pro", planta_id="planta-pro"
+    )
+    repo_disp.guardar(dev_pro)
+
+    # Ingestar lecturas
+    repo_telem.guardar_instantanea(
+        LecturaInstantanea(1, dev_pro.id, ahora - timedelta(minutes=5), MedicionFase(), MedicionFase(), MedicionFase())
+    )
+    repo_telem.guardar_instantanea(
+        LecturaInstantanea(2, dev_pro.id, ahora - timedelta(days=100), MedicionFase(), MedicionFase(), MedicionFase())
+    )
+
+    consultar_uc = ConsultarTelemetriaUseCase(repo_telem, repo_disp, repo_org)
+
+    # PRO puede consultar raw sin restricción y retención hasta 365 días
+    lecturas_pro = consultar_uc.listar_instantaneas(
+        dev_pro.id, limite=100, desde=ahora - timedelta(days=200), granularidad="raw"
+    )
+    assert len(lecturas_pro) == 2
+
+    # 2. Caso Free Privado Básico: PRO vencido hace 10 días
+    org_free_priv = Organizacion(
+        id="org-free-priv",
+        nombre="Industria Free Privada",
+        pro_vence_en=ahora - timedelta(days=10),
+        modo_free=ModoFreeTier.PRIVADO_BASICO,
+    )
+    repo_org.guardar_organizacion(org_free_priv)
+    planta_free_priv = Planta(id="planta-free-priv", organizacion_id="org-free-priv", nombre="Planta Privada")
+    repo_org.guardar_planta(planta_free_priv)
+    dev_free_priv = Dispositivo(
+        id="dev-free-priv",
+        device_uid=MacAddress("AABBCCDDEE02"),
+        nombre="Medidor Privado",
+        planta_id="planta-free-priv",
+    )
+    repo_disp.guardar(dev_free_priv)
+
+    repo_telem.guardar_instantanea(
+        LecturaInstantanea(
+            3, dev_free_priv.id, ahora - timedelta(minutes=10), MedicionFase(), MedicionFase(), MedicionFase()
+        )
+    )
+    repo_telem.guardar_instantanea(
+        LecturaInstantanea(
+            4, dev_free_priv.id, ahora - timedelta(days=20), MedicionFase(), MedicionFase(), MedicionFase()
+        )
+    )
+
+    # Privado Básico: la retención es de 14 días (la lectura de hace 20 días no entra) y fuerza agregación (mínimo 1 hora)
+    lecturas_free_priv = consultar_uc.listar_instantaneas(
+        dev_free_priv.id, limite=100, desde=ahora - timedelta(days=30), granularidad="raw"
+    )
+    assert len(lecturas_free_priv) == 1
+    assert lecturas_free_priv[0].dispositivo_id == dev_free_priv.id

@@ -55,6 +55,7 @@ class DispositivoMapper:
 class OrganizacionMapper:
     @staticmethod
     def org_to_dto(entity: Organizacion) -> OrganizacionResponseDTO:
+        modo_free_val = entity.modo_free.value if hasattr(entity.modo_free, "value") else str(entity.modo_free)
         return OrganizacionResponseDTO(
             id=entity.id,
             nombre=entity.nombre,
@@ -62,6 +63,8 @@ class OrganizacionMapper:
             cuit=entity.cuit,
             email_contacto=entity.email_contacto,
             telefono_contacto=entity.telefono_contacto,
+            pro_vence_en=entity.pro_vence_en,
+            modo_free=modo_free_val,
             creado_en=entity.creado_en,
             actualizado_en=entity.actualizado_en,
         )

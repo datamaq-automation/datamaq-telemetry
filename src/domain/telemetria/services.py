@@ -13,6 +13,7 @@ from src.domain.telemetria.entities import (
 from src.domain.telemetria.value_objects import (
     Corriente,
     FactorPotencia,
+    ModoFreeTier,
     PotenciaActiva,
     PotenciaAparente,
     PotenciaReactiva,
@@ -846,25 +847,46 @@ class PoliticaRetencionService:
 
 
 class PoliticaSuscripcionService:
-    """Reglas de ciclo de vida del Plan Enterprise y transición a Freemium.
+    """Reglas de ciclo de vida del Plan PRO y transición al modelo Freemium bifurcado.
 
-    - Toda nueva instalación incluye 12 meses (365 días) de Plan Enterprise.
-    - Cada consultoría de eficiencia energética añade +1 mes (30 días) de Plan Enterprise.
-    - Vencido el plazo sin consultoría, la organización pasa al Plan 0 (Freemium).
+    - Toda nueva instalación incluye 60 días (2 meses) de Plan PRO.
+    - Cada consultoría garantiza 60 días de Plan PRO a partir de la fecha de realización (no acumulable).
+    - Vencido el plazo sin consultoría, la organización pasa al modo Free configurado (PRIVADO_BASICO por defecto o VITRINA_ANONIMA).
     """
 
-    DURACION_INSTALACION_INICIAL_DIAS: int = 365
-    DURACION_CONSULTORIA_DIAS: int = 30
+    DURACION_INSTALACION_INICIAL_DIAS: int = 60
+    DURACION_CONSULTORIA_DIAS: int = 60
 
     @staticmethod
     def calcular_vencimiento_inicial(fecha_instalacion: datetime) -> datetime:
-        return fecha_instalacion + timedelta(days=365)
+        return fecha_instalacion + timedelta(days=PoliticaSuscripcionService.DURACION_INSTALACION_INICIAL_DIAS)
 
     @staticmethod
     def extender_por_consultoria(vencimiento_actual: datetime, fecha_consultoria: datetime) -> datetime:
-        base = max(vencimiento_actual, fecha_consultoria)
-        return base + timedelta(days=30)
+        nuevo_vencimiento = fecha_consultoria + timedelta(days=PoliticaSuscripcionService.DURACION_CONSULTORIA_DIAS)
+        return max(vencimiento_actual, nuevo_vencimiento)
+
+    @staticmethod
+    def es_pro_vigente(vencimiento: datetime | None, ahora: datetime) -> bool:
+        if vencimiento is None:
+            return False
+        return ahora <= vencimiento
 
     @staticmethod
     def es_enterprise_vigente(vencimiento: datetime, ahora: datetime) -> bool:
+        # Alias retrocompatible
         return ahora <= vencimiento
+
+    @staticmethod
+    def resolver_retencion_dias(es_pro: bool, modo_free: ModoFreeTier) -> int:
+        if es_pro:
+            return 365
+        if modo_free == ModoFreeTier.VITRINA_ANONIMA:
+            return 30
+        return 14
+
+    @staticmethod
+    def resolver_intervalo_minimo_segundos(es_pro: bool, modo_free: ModoFreeTier) -> int:
+        if es_pro or modo_free == ModoFreeTier.VITRINA_ANONIMA:
+            return 0
+        return 3600  # En Privado Básico la granularidad mínima es de 1 hora

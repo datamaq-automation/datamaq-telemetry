@@ -82,6 +82,8 @@ erDiagram
         string tax_id
         string contact_email
         string contact_phone
+        datetime pro_expires_at
+        string free_tier_mode
         datetime created_at
         datetime updated_at
     }
@@ -257,6 +259,8 @@ erDiagram
 | `tax_id` | `VARCHAR(50)` | - | Sí |
 | `contact_email` | `VARCHAR(120)` | - | Sí |
 | `contact_phone` | `VARCHAR(50)` | - | Sí |
+| `pro_expires_at` | `DATETIME` | - | Sí |
+| `free_tier_mode` | `VARCHAR(30)` | - | No |
 | `created_at` | `DATETIME` | - | No |
 | `updated_at` | `DATETIME` | - | No |
 

@@ -31,6 +31,7 @@ from src.domain.telemetria.value_objects import (
     EstadoDispositivo,
     FactorPotencia,
     MacAddress,
+    ModoFreeTier,
     PotenciaActiva,
     PotenciaAparente,
     PotenciaReactiva,
@@ -583,6 +584,11 @@ class MySQLOrganizacionesRepository(RepositorioOrganizacionesPort):
         m = self.db.query(OrganizationModel).filter(OrganizationModel.id == organizacion_id).first()
         if not m:
             return None
+        modo_free_vo = (
+            ModoFreeTier(m.free_tier_mode)
+            if m.free_tier_mode in [item.value for item in ModoFreeTier]
+            else ModoFreeTier.PRIVADO_BASICO
+        )
         return Organizacion(
             id=m.id,
             nombre=m.name,
@@ -590,6 +596,8 @@ class MySQLOrganizacionesRepository(RepositorioOrganizacionesPort):
             cuit=m.tax_id,
             email_contacto=m.contact_email,
             telefono_contacto=m.contact_phone,
+            pro_vence_en=m.pro_expires_at,
+            modo_free=modo_free_vo,
             creado_en=m.created_at,
             actualizado_en=m.updated_at,
         )
@@ -604,6 +612,12 @@ class MySQLOrganizacionesRepository(RepositorioOrganizacionesPort):
                 cuit=m.tax_id,
                 email_contacto=m.contact_email,
                 telefono_contacto=m.contact_phone,
+                pro_vence_en=m.pro_expires_at,
+                modo_free=(
+                    ModoFreeTier(m.free_tier_mode)
+                    if m.free_tier_mode in [item.value for item in ModoFreeTier]
+                    else ModoFreeTier.PRIVADO_BASICO
+                ),
                 creado_en=m.created_at,
                 actualizado_en=m.updated_at,
             )
@@ -612,6 +626,7 @@ class MySQLOrganizacionesRepository(RepositorioOrganizacionesPort):
 
     def guardar_organizacion(self, org: Organizacion) -> Organizacion:
         model = self.db.query(OrganizationModel).filter(OrganizationModel.id == org.id).first()
+        modo_free_str = org.modo_free.value if hasattr(org.modo_free, "value") else str(org.modo_free)
         if not model:
             model = OrganizationModel(
                 id=org.id,
@@ -620,6 +635,8 @@ class MySQLOrganizacionesRepository(RepositorioOrganizacionesPort):
                 tax_id=org.cuit,
                 contact_email=org.email_contacto,
                 contact_phone=org.telefono_contacto,
+                pro_expires_at=org.pro_vence_en,
+                free_tier_mode=modo_free_str,
             )
             self.db.add(model)
         else:
@@ -628,9 +645,16 @@ class MySQLOrganizacionesRepository(RepositorioOrganizacionesPort):
             model.tax_id = org.cuit
             model.contact_email = org.email_contacto
             model.contact_phone = org.telefono_contacto
+            model.pro_expires_at = org.pro_vence_en
+            model.free_tier_mode = modo_free_str
 
         self.db.commit()
         self.db.refresh(model)
+        modo_free_ret = (
+            ModoFreeTier(model.free_tier_mode)
+            if model.free_tier_mode in [item.value for item in ModoFreeTier]
+            else ModoFreeTier.PRIVADO_BASICO
+        )
         return Organizacion(
             id=model.id,
             nombre=model.name,
@@ -638,6 +662,8 @@ class MySQLOrganizacionesRepository(RepositorioOrganizacionesPort):
             cuit=model.tax_id,
             email_contacto=model.contact_email,
             telefono_contacto=model.contact_phone,
+            pro_vence_en=model.pro_expires_at,
+            modo_free=modo_free_ret,
             creado_en=model.created_at,
             actualizado_en=model.updated_at,
         )

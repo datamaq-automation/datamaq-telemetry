@@ -25,7 +25,7 @@ from src.domain.telemetria.ports import (
     RepositorioOrganizacionesPort,
     RepositorioPlanesPort,
 )
-from src.domain.telemetria.value_objects import MacAddress
+from src.domain.telemetria.value_objects import MacAddress, ModoFreeTier
 
 
 class GestionarDispositivosUseCase:
@@ -108,6 +108,11 @@ class GestionarDispositivosUseCase:
         return [OrganizacionMapper.org_to_dto(o) for o in orgs]
 
     def crear_organizacion(self, dto: OrganizacionCreateDTO) -> OrganizacionResponseDTO:
+        modo_free_vo = (
+            ModoFreeTier(dto.modo_free)
+            if dto.modo_free in [m.value for m in ModoFreeTier]
+            else ModoFreeTier.PRIVADO_BASICO
+        )
         entity = Organizacion(
             id=str(uuid.uuid4()),
             nombre=dto.nombre,
@@ -115,6 +120,8 @@ class GestionarDispositivosUseCase:
             cuit=dto.cuit,
             email_contacto=dto.email_contacto,
             telefono_contacto=dto.telefono_contacto,
+            pro_vence_en=dto.pro_vence_en,
+            modo_free=modo_free_vo,
         )
         saved = self.repo_organizaciones.guardar_organizacion(entity)
         return OrganizacionMapper.org_to_dto(saved)

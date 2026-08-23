@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from src.application.dtos.telemetria_dto import (
     AcumuladoEnergiaDTO,
@@ -17,8 +17,9 @@ from src.domain.telemetria.ports import (
 from src.domain.telemetria.services import (
     AnalizadorCalidadEnergiaService,
     PoliticaRetencionService,
+    PoliticaSuscripcionService,
 )
-from src.domain.telemetria.value_objects import MacAddress
+from src.domain.telemetria.value_objects import MacAddress, ModoFreeTier
 
 
 class ConsultarTelemetriaUseCase:
@@ -49,20 +50,35 @@ class ConsultarTelemetriaUseCase:
             pass
         raise DispositivoNoEncontradoError(f"Dispositivo '{id_o_uid}' no encontrado.")
 
-    def _calcular_fecha_corte_retencion(self, dev: Dispositivo) -> datetime:
+    def _obtener_contexto_suscripcion(self, dev: Dispositivo) -> tuple[bool, ModoFreeTier, int, int]:
         ahora = datetime.now(timezone.utc)
-        if self.repo_organizaciones and self.repo_planes and dev.planta_id:
+        if self.repo_organizaciones and dev.planta_id:
             planta = self.repo_organizaciones.obtener_planta_por_id(dev.planta_id)
             if planta and planta.organizacion_id:
                 org = self.repo_organizaciones.obtener_por_id(planta.organizacion_id)
-                if org and org.plan_id:
+                if org:
+                    es_pro = PoliticaSuscripcionService.es_pro_vigente(org.pro_vence_en, ahora)
+                    retencion_dias = PoliticaSuscripcionService.resolver_retencion_dias(es_pro, org.modo_free)
+                    min_intervalo = PoliticaSuscripcionService.resolver_intervalo_minimo_segundos(es_pro, org.modo_free)
+                    return es_pro, org.modo_free, retencion_dias, min_intervalo
+        # Dispositivos de desarrollo o sin asignación a planta no sufren restricciones
+        return True, ModoFreeTier.PRIVADO_BASICO, 365, 0
+
+    def _calcular_fecha_corte_retencion(self, dev: Dispositivo) -> datetime:
+        ahora = datetime.now(timezone.utc)
+        if self.repo_organizaciones and dev.planta_id:
+            planta = self.repo_organizaciones.obtener_planta_por_id(dev.planta_id)
+            if planta and planta.organizacion_id:
+                org = self.repo_organizaciones.obtener_por_id(planta.organizacion_id)
+                if org and self.repo_planes and org.plan_id:
                     plan = self.repo_planes.obtener_por_id(org.plan_id)
                     if plan:
                         return PoliticaRetencionService.ventana_consulta(plan, ahora)
-        # Fallback Plan 0: 7 días de retención
-        from datetime import timedelta
-
-        return ahora - timedelta(days=7)
+                if org:
+                    es_pro = PoliticaSuscripcionService.es_pro_vigente(org.pro_vence_en, ahora)
+                    dias = PoliticaSuscripcionService.resolver_retencion_dias(es_pro, org.modo_free)
+                    return ahora - timedelta(days=dias)
+        return ahora - timedelta(days=14)
 
     def _acotar_fecha_desde(self, dev: Dispositivo, desde: datetime | None) -> datetime:
         corte = self._calcular_fecha_corte_retencion(dev)
@@ -114,13 +130,15 @@ class ConsultarTelemetriaUseCase:
         horas: int | None = None,
     ) -> list[LecturaInstantaneaDTO]:
         dev = self._resolver_dispositivo(id_o_uid)
+        _, _, _, min_intervalo = self._obtener_contexto_suscripcion(dev)
 
         ahora = datetime.now(timezone.utc)
         horas_efectivas = horas
         if horas_efectivas is None and desde is not None:
             horas_efectivas = max(1, int((ahora - desde).total_seconds() / 3600.0))
 
-        intervalo_segundos = self._resolver_intervalo_segundos(granularidad, horas_efectivas)
+        intervalo_pedido = self._resolver_intervalo_segundos(granularidad, horas_efectivas)
+        intervalo_segundos = max(intervalo_pedido, min_intervalo)
         desde_efectivo = self._acotar_fecha_desde(dev, desde)
 
         limite_db = max(limite * 10, 5000) if intervalo_segundos > 0 else limite

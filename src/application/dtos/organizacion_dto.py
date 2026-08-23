@@ -9,6 +9,8 @@ class OrganizacionBaseDTO(BaseModel):
     cuit: str | None = None
     email_contacto: str | None = None
     telefono_contacto: str | None = None
+    pro_vence_en: datetime | None = None
+    modo_free: str = "PRIVADO_BASICO"
 
 
 class OrganizacionCreateDTO(OrganizacionBaseDTO):
