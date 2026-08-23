@@ -25,6 +25,6 @@ def test_mosquitto_tls_8883_activo():
 
 
 def test_contrato_documenta_ws_global():
-    contenido = (RAIZ / "docs/contrato-auth.md").read_text(encoding="utf-8")
+    contenido = (RAIZ / "docs/frontend-integration-guide.md").read_text(encoding="utf-8")
     assert "global" in contenido
     assert "WebSocket" in contenido

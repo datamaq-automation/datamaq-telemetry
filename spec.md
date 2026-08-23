@@ -22,7 +22,15 @@ escalera de conversión de la Fase 1 (AMBA Ya) publicada en `datamaq.com.ar`.
 - Plan 2 **privado**: mayor retención/almacenamiento y más dispositivos.
 - Notificaciones por canal (email, telegram, whatsapp) según plan.
 
+> [!NOTE]
+> **Evolución del Modelo Freemium / PRO (Directiva Comercial):**  
+> Ver documento canónico [`docs/to_www-datamaq.md`](file:///home/agustin/proyectos_software/datamaq-telemetry/docs/to_www-datamaq.md) para el modelo comercial activo:  
+> • $0 de por vida (sin canon SaaS recurrente).  
+> • 60 días de Versión PRO incluidos con cada instalación de medidor o consultoría energética (retención 365 días).  
+> • Al expirar: Opción A (Vitrina Pública Anónima, 30 días de retención) vs. Opción B (Privado Básico, 14 días de retención y granularidad horaria). Implementado en el dominio en `PoliticaSuscripcionService`.
+
 **Alcance de esta iteración:** entidad, puerto de repositorio, servicio de
+
 política de retención, caso de uso de gestión, DTOs, controller y router
 `GET /api/planes` + `POST /api/planes`. La persistencia SQLAlchemy (tabla
 `plans`) y su repositorio se implementan en la fase GREEN junto con estos

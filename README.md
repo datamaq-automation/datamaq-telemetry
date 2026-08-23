@@ -18,7 +18,7 @@ Construido para despliegues ligeros y directos sin Docker (**Python 3 + venv + M
 [ Ingestion Worker & API (FastAPI) ]
    ├── Ingesta y normalización de telemetría
    ├── WebSockets en vivo (/ws/live)
-   ├── REST API (/api/devices, /api/telemetry/...)
+   ├── REST API (/api/dispositivos, /api/telemetria/...)
    └── Persistencia en MySQL (InnoDB / series temporales)
         │
         ▼
@@ -115,16 +115,22 @@ El esquema se gestiona con **Alembic** (fuente de verdad: `src/infrastructure/sq
 | **Dispositivos** | `GET /api/dispositivos?planta_id=...` | Listar medidores Powermeter |
 | | `POST /api/dispositivos` | Provisionar / registrar medidor |
 | | `GET /api/dispositivos/{id}` | Obtener detalle de medidor por UUID o MAC |
-| **Telemetría** | `GET /api/telemetria/latest/{device_id}` | Última instantánea y acumulado de energía (UUID o MAC) |
-| | `GET /api/telemetria/instantaneous/{device_id}` | Historial de V, I, P, Q, S, FP y VUR (`limit`, `hours`) |
+| | `PATCH /api/dispositivos/{id}` | Actualizar configuración y metrología (fases_con_ti, tipo_instalacion) |
+| **Telemetría** | `GET /api/telemetria/latest/{device_id}` | Última instantánea, acumulado de energía y bloque `analitica` precalculado |
+| | `GET /api/telemetria/instantaneous/{device_id}` | Historial de V, I, P, Q, S, FP, VUR y analítica (`limit`, `hours`, `granularity`) |
 | | `GET /api/telemetria/energy/{device_id}` | Historial de kWh y kVARh acumulados (`limit`, `hours`) |
 | **Alertas** | `GET /api/alertas?device_id=...&solo_abiertas=true` | Consultar alarmas activas / historial |
-| | `POST /api/alertas/{id}/resolver` | Marcar alerta como atendida / resuelta |
+| | `PATCH /api/alertas/{id}/resolver` | Marcar alerta como resuelta / atendida (`POST` también soportado) |
+| **Topología Unifilar & Layout** | `GET /api/v1/planta/unifilar?planta_id=...` | Obtener árbol de nodos unifilares de la planta |
+| | `PUT /api/v1/plantas/{planta_id}/unifilar` | Persistir estructura de nodos unifilares |
+| | `GET /api/v1/planta/layout?planta_id=...` | Obtener zonas 2D y ubicación porcentual de medidores |
+| | `PUT /api/v1/plantas/{planta_id}/layout` | Persistir zonas y coordenadas de layout |
 | **Autenticación** | `POST /api/auth/login` | Iniciar sesión (emite cookie `HttpOnly` + token JWT) |
-| | `POST /api/auth/guest` | Acceso rápido como invitado (cookie `HttpOnly`, solo lectura) |
+| | `POST /api/auth/guest` | Acceso rápido como invitado (stateless, cookie `HttpOnly`, solo lectura) |
 | | `POST /api/auth/logout` | Cerrar sesión (borra la cookie) |
 | | `GET /api/auth/me` | Obtener identidad y rol de la sesión actual |
 | **Sistema** | `POST /api/system/purge` | Ejecutar purga de telemetría expirada (solo admin) |
+
 
 ---
 

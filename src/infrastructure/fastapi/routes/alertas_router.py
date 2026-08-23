@@ -40,6 +40,7 @@ def list_alertas(
 
 
 @router.post("/{alerta_id}/resolver", response_model=AlertaResponseDTO, dependencies=[Depends(requiere_rol_escritura)])
+@router.patch("/{alerta_id}/resolver", response_model=AlertaResponseDTO, dependencies=[Depends(requiere_rol_escritura)])
 def resolve_alerta(
     alerta_id: int,
     use_case: Annotated[GestionarAlertasUseCase, Depends(get_alertas_use_case)],

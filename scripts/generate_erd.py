@@ -118,24 +118,30 @@ def generate_full_markdown() -> str:
 
         md_lines.append("")
 
-    md_lines.append("## 3. Matriz de Políticas de Retención y Granularidad")
+    md_lines.append("## 3. Matriz de Políticas de Retención y Granularidad (Modelo Activo PRO 60d / Free)")
     md_lines.append("")
-    md_lines.append("| Tabla | Categoría | Plan 0 (Freemium) | Planes Pro / Enterprise | Estrategia de Purga |")
-    md_lines.append("| :--- | :--- | :--- | :--- | :--- |")
     md_lines.append(
-        "| `telemetry_instantaneous` | Series Temporales (V, I, P, FP) | 7 días (gran. 5 min) | 30 a 90 días (gran. 1 min) | Batched `DELETE ... LIMIT 1000` |"
+        "Conforme a la directiva comercial en `docs/to_www-datamaq.md` y al servicio `PoliticaSuscripcionService`:"
+    )
+    md_lines.append("")
+    md_lines.append(
+        "| Tabla | Categoría | Free Privado Básico (Default) | Vitrina Pública Anónima (Opt-in) | Versión PRO (60d Activa) | Estrategia de Purga |"
+    )
+    md_lines.append("| :--- | :--- | :---: | :---: | :---: | :--- |")
+    md_lines.append(
+        "| `telemetry_instantaneous` | Series Temporales (V, I, P, FP) | 14 días (gran. horaria/5m) | 30 días (gran. 5 min / 1s) | 365 días (máxima resolución) | Batched `DELETE ... LIMIT 1000` |"
     )
     md_lines.append(
-        "| `telemetry_energy` | Acumulados de Energía (kWh) | 30 días | 365 a 730 días | Batched `DELETE ... LIMIT 1000` |"
+        "| `telemetry_energy` | Acumulados de Energía (kWh) | 14 días | 30 días | 365 días | Batched `DELETE ... LIMIT 1000` |"
     )
     md_lines.append(
-        "| `device_status_logs` | Diagnóstico de Conectividad (Wi-Fi, IP) | 7 días | 15 a 30 días | Batched `DELETE ... LIMIT 1000` |"
+        "| `device_status_logs` | Diagnóstico de Conectividad (Wi-Fi, IP) | 7 días | 15 días | 30 días | Batched `DELETE ... LIMIT 1000` |"
     )
     md_lines.append(
-        "| `device_alerts` (Resueltas) | Incidentes Cerrados | 30 días | 90 a 365 días | `WHERE is_resolved = TRUE AND resolved_at < corte` |"
+        "| `device_alerts` (Resueltas) | Incidentes Cerrados | 14 días | 30 días | 365 días | `WHERE is_resolved = TRUE AND resolved_at < corte` |"
     )
     md_lines.append(
-        "| `device_alerts` (Activas) | Incidentes Abiertos | **Indefinida (0 borrado)** | **Indefinida (0 borrado)** | **Preservadas permanentemente** |"
+        "| `device_alerts` (Activas) | Incidentes Abiertos | **Indefinida (0 borrado)** | **Indefinida (0 borrado)** | **Indefinida (0 borrado)** | **Preservadas permanentemente** |"
     )
     md_lines.append("")
 

@@ -54,3 +54,29 @@ src/
 2. **Imports Absolutos:** Siempre `from src....`, nunca imports relativos.
 3. **`__init__.py` de 0 bytes:** Todos los `__init__.py` en `src/` y `tests/` deben tener exactamente 0 bytes.
 4. **Commits:** Conventional Commits (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`).
+
+---
+
+## 4. Convenciones de Nomenclatura en DTOs y Metrología
+
+Para garantizar consistencia entre el backend (`datamaq-telemetry`) y el frontend (`app-datamaq`), los campos de datos siguen las siguientes reglas de sufijos:
+
+* **Magnitudes Eléctricas:**
+  * Potencia activa instantánea: `_W` (Vatios, ej. `potencia_activa_total_W`, `net_active_power_W`).
+  * Potencia reactiva instantánea: `_VAR` (Volt-Amperios Reactivos, ej. `potencia_reactiva_total_VAR`).
+  * Potencia aparente instantánea: `_VA` (Volt-Amperios, ej. `potencia_aparente_total_VA`).
+  * Potencia de compensación calculada: `_kvar` (kVAr, ej. `potencia_reactiva_a_compensar_kvar`, `banco_sugerido_kvar`).
+  * Tensiones: `_V` (Voltios RMS, ej. `voltage_V`, `voltage_linea_V`, `tension_neutro_estimada_V`).
+  * Corrientes: `_A` (Amperios RMS, ej. `current_A`, `corriente_neutro_estimada_A`).
+  * Energías acumuladas: `_kwh` / `_kvarh` (kWh / kVARh).
+* **Porcentajes y Distorsión Armónica:**
+  * Desbalances: `_porcentaje` (ej. `desbalance_tension_porcentaje`, `desbalance_corriente_porcentaje`).
+  * Distorsión armónica: `_pct` (ej. `thd_v_pct`, `thd_i_pct`, `thd_v_promedio_pct`).
+* **Valores Económicos:**
+  * Moneda local argentina: `_ars` (ej. `penalizacion_estimada_ars`, `precio_mensual_ars`).
+* **Identificadores Polimórficos:**
+  * El parámetro `{device_id}` en rutas REST acepta indistintamente UUID v4 (`725dfb4c-...`) o dirección MAC del hardware (`D48C49F03564` o `d4:8c:49:f0:35:64`).
+* **Semántica de Métodos HTTP:**
+  * `PATCH`: Modificación parcial de metrología/configuración (`/api/dispositivos/{id}`) o resolución de estados (`/api/alertas/{id}/resolver`).
+  * `PUT`: Sobreescritura idempotente de árboles (ej. `/api/v1/plantas/{id}/unifilar`, `/api/v1/plantas/{id}/layout`).
+

@@ -47,8 +47,28 @@ El prefijo estándar es `m/wifi/{UID}/`:
 ## 3. Esquemas de Payload JSON
 
 ### A. Telemetría Instantánea (`m/wifi/{UID}/inst`)
-Publicado periódicamente (por defecto cada 1 a 5 segundos):
 
+> [!NOTE]
+> **Cadencia de Publicación:**  
+> • **Modo Estándar de Fábrica (Firmware SmartPlus / HOME V2.0):** Publicación periódica **cada 5 minutos (300 segundos)** sincronizada al segundo `:00`/`:01` de cada ventana temporal.  
+> • **Modo Alta Frecuencia / Ráfaga:** Soporte backend para publicaciones sub-minutales (cada 1 a 5 segundos) en tiempo real.
+
+El backend procesa de forma transparente dos estructuras de payload:
+
+#### 1. Formato Compacto Nativo (Firmware Oficial):
+```json
+{
+  "t": 1787447872,
+  "a": 0,
+  "f": [
+    {"n": "R", "v": 228.7, "i": 12.4, "p": 2835.8, "q": 320.1},
+    {"n": "S", "v": 228.3, "i": 10.1, "p": 2305.8, "q": 210.0},
+    {"n": "T", "v": 229.1, "i": 8.5, "p": 1947.3, "q": 180.5}
+  ]
+}
+```
+
+#### 2. Formato Extendido / Normalizado:
 ```json
 {
   "timestamp": 1723652400,
@@ -84,6 +104,7 @@ Publicado periódicamente (por defecto cada 1 a 5 segundos):
   }
 }
 ```
+
 
 ### B. Energía Acumulada (`m/wifi/{UID}/acc` / `energyio`)
 
