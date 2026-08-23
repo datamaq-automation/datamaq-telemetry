@@ -22,8 +22,6 @@ class ConsultarUnifilarTopologiaUseCase:
         if not planta:
             raise PlantaNoEncontradaError(f"Planta con id '{planta_id}' no encontrada.")
 
-        nodos = self.repo_organizaciones.obtener_nodos_unifilar(planta_id)
-
         # Construir topología desde nodos (mapeo simplificado)
         # En producción, esto vendría de una tabla dedicada o se derivaría de los nodos
         return UnifilarTopologiaDTO(
