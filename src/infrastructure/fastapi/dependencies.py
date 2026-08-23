@@ -4,11 +4,9 @@ from typing import Annotated, Any
 from fastapi import Cookie, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 
-from src.adapters.controllers.unifilar_topologia_controller import UnifilarTopologiaController
 from src.adapters.gateways.in_memory_event_broadcaster import InMemoryEventBroadcaster
 from src.application.use_cases.autenticar_usuario import AutenticarUsuarioUseCase
 from src.application.use_cases.consultar_telemetria import ConsultarTelemetriaUseCase
-from src.application.use_cases.consultar_unifilar_topologia import ConsultarUnifilarTopologiaUseCase
 from src.application.use_cases.gestionar_alertas import GestionarAlertasUseCase
 from src.application.use_cases.gestionar_dispositivos import (
     GestionarDispositivosUseCase,
@@ -119,14 +117,6 @@ def get_planta_estructura_use_case(
 ) -> GestionarPlantaEstructuraUseCase:
     repo_org = MySQLOrganizacionesRepository(db)
     return GestionarPlantaEstructuraUseCase(repo_org)
-
-
-def get_unifilar_topologia_controller(
-    db: Annotated[Session, Depends(get_db_session)],
-) -> UnifilarTopologiaController:
-    repo_org = MySQLOrganizacionesRepository(db)
-    use_case = ConsultarUnifilarTopologiaUseCase(repo_org)
-    return UnifilarTopologiaController(use_case)
 
 
 def get_auth_use_case(

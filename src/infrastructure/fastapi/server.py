@@ -17,9 +17,6 @@ from src.infrastructure.fastapi.dependencies import (
 )
 from src.infrastructure.fastapi.error_handler import manejar_404
 from src.infrastructure.fastapi.middleware import RequestIdMiddleware
-from src.infrastructure.fastapi.routers.unifilar_topologia_router import (
-    router as unifilar_topologia_router,
-)
 from src.infrastructure.fastapi.routes.alertas_router import (
     router as alertas_router,
 )
@@ -159,7 +156,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(planes_router)
     app.include_router(alertas_router)
     app.include_router(auth_router)
-    app.include_router(unifilar_topologia_router)
 
     # WebSockets Live Telemetry Stream
     @app.websocket("/ws/live")
