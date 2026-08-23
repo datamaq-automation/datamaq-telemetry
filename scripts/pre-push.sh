@@ -20,7 +20,12 @@ ruff format --check .
 echo "==> [3/4] Tipado: pyright"
 pyright
 
-echo "==> [4/4] Tests unitarios con cobertura (>=85%)"
+echo "==> [4/5] Tests unitarios con cobertura (>=85%)"
 pytest tests/unit --cov=src --cov-report=term-missing --cov-fail-under=85
+
+echo "==> [5/5] Tests de integración"
+pytest tests/integration -q
+
+python scripts/verify_architecture.py
 
 echo "pre-push superado."
