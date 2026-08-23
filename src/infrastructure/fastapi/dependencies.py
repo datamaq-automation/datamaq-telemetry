@@ -101,7 +101,12 @@ def get_alertas_use_case(
     db: Annotated[Session, Depends(get_db_session)],
 ) -> GestionarAlertasUseCase:
     repo_telem = MySQLTelemetriaRepository(db)
-    return GestionarAlertasUseCase(repo_telem)
+    repo_disp = MySQLDispositivosRepository(db)
+    return GestionarAlertasUseCase(
+        repo_telemetria=repo_telem,
+        publicador=global_event_broadcaster,
+        repo_dispositivos=repo_disp,
+    )
 
 
 def get_auth_use_case(

@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 
 from src.application.use_cases.consultar_telemetria import ConsultarTelemetriaUseCase
 from src.application.use_cases.ingestar_telemetria import IngestarTelemetriaUseCase
@@ -11,6 +12,7 @@ from src.domain.telemetria.entities import (
 )
 from src.domain.telemetria.ports import (
     LoggerPort,
+    PublicadorEventosPort,
     RepositorioDispositivosPort,
     RepositorioTelemetriaPort,
 )
@@ -39,6 +41,14 @@ class MockDispositivosRepo(RepositorioDispositivosPort):
     def guardar(self, dispositivo: Dispositivo) -> Dispositivo:
         self.dispositivos[dispositivo.id] = dispositivo
         return dispositivo
+
+
+class MockPublicadorEventos(PublicadorEventosPort):
+    def __init__(self):
+        self.eventos: list[tuple[str, dict[str, Any]]] = []
+
+    def publicar_telemetria_en_vivo(self, topico: str, datos: dict[str, Any]) -> None:
+        self.eventos.append((topico, datos))
 
 
 class MockTelemetriaRepo(RepositorioTelemetriaPort):
@@ -434,3 +444,80 @@ def test_consultar_telemetria_granularidad_y_bucketing():
     # 4. Consulta 'auto' con hours=24 (2 < hours <= 24) -> usa '5m'
     res_auto_24h = consultar_uc.listar_instantaneas(dev.id, limite=100, granularidad="auto", horas=24)
     assert len(res_auto_24h) == 2
+
+
+def test_jerarquia_falta_fase_inhibe_desbalance():
+
+    repo_disp = MockDispositivosRepo()
+    repo_telem = MockTelemetriaRepo()
+    pub = MockPublicadorEventos()
+    use_case = IngestarTelemetriaUseCase(repo_disp, repo_telem, publicador=pub)
+
+    # 1. Falta de Fase en Fase S (Vs = 10.0V < 50V)
+    # Jerarquía: Solo debe emitir FALTA_FASE, inhibiendo DESBALANCE_TENSION
+    payload_corte_1 = {
+        "timestamp": 1767377900,
+        "phase_r": {"voltage_V": 220.0, "current_A": 10.0, "net_active_power_W": 2200.0},
+        "phase_s": {"voltage_V": 10.0, "current_A": 0.0, "net_active_power_W": 0.0},
+        "phase_t": {"voltage_V": 220.0, "current_A": 10.0, "net_active_power_W": 2200.0},
+    }
+    use_case.ejecutar("m/wifi/D48C49F03564/inst", payload_corte_1)
+
+    payload_corte_2 = {
+        "timestamp": 1767377901,
+        "phase_r": {"voltage_V": 220.0, "current_A": 10.0, "net_active_power_W": 2200.0},
+        "phase_s": {"voltage_V": 10.0, "current_A": 0.0, "net_active_power_W": 0.0},
+        "phase_t": {"voltage_V": 220.0, "current_A": 10.0, "net_active_power_W": 2200.0},
+    }
+    use_case.ejecutar("m/wifi/D48C49F03564/inst", payload_corte_2)
+
+    alertas = repo_telem.listar_alertas()
+    tipos = [a.tipo_alerta for a in alertas]
+    assert "FALTA_FASE" in tipos
+    assert "DESBALANCE_TENSION" not in tipos
+
+
+def test_autodespeje_alertas_y_websocket_broadcast():
+    repo_disp = MockDispositivosRepo()
+    repo_telem = MockTelemetriaRepo()
+    pub = MockPublicadorEventos()
+    use_case = IngestarTelemetriaUseCase(repo_disp, repo_telem, publicador=pub)
+
+    # 1. Disparar subtensión simétrica (2 lecturas consecutivas a 192V en R, S, T)
+    p1 = {
+        "timestamp": 1767378000,
+        "phase_r": {"voltage_V": 192.0, "current_A": 5.0, "net_active_power_W": 960.0},
+        "phase_s": {"voltage_V": 192.0, "current_A": 5.0, "net_active_power_W": 960.0},
+        "phase_t": {"voltage_V": 192.0, "current_A": 5.0, "net_active_power_W": 960.0},
+    }
+    p2 = {
+        "timestamp": 1767378001,
+        "phase_r": {"voltage_V": 192.0, "current_A": 5.0, "net_active_power_W": 960.0},
+        "phase_s": {"voltage_V": 192.0, "current_A": 5.0, "net_active_power_W": 960.0},
+        "phase_t": {"voltage_V": 192.0, "current_A": 5.0, "net_active_power_W": 960.0},
+    }
+    use_case.ejecutar("m/wifi/D48C49F03564/inst", p1)
+    use_case.ejecutar("m/wifi/D48C49F03564/inst", p2)
+
+    assert len(repo_telem.listar_alertas(solo_abiertas=True)) == 1
+
+    # 2. Se normaliza la tensión a 220V simétrico -> Auto-despeje automático y broadcast WS
+    p_normal = {
+        "timestamp": 1767378020,
+        "phase_r": {"voltage_V": 220.0, "current_A": 5.0, "net_active_power_W": 1100.0},
+        "phase_s": {"voltage_V": 220.0, "current_A": 5.0, "net_active_power_W": 1100.0},
+        "phase_t": {"voltage_V": 220.0, "current_A": 5.0, "net_active_power_W": 1100.0},
+    }
+    use_case.ejecutar("m/wifi/D48C49F03564/inst", p_normal)
+
+    assert len(repo_telem.listar_alertas(solo_abiertas=True)) == 0
+    alerta_resuelta = repo_telem.listar_alertas()[0]
+    assert alerta_resuelta.esta_resuelta is True
+    assert alerta_resuelta.duracion_segundos == 20.0
+
+    # Verificar que se emitió el evento de resolución en vivo
+    topicos = [t for t, _ in pub.eventos]
+    assert "m/wifi/D48C49F03564/alertas" in topicos
+    ultimo_evento = [d for t, d in pub.eventos if t == "m/wifi/D48C49F03564/alertas"][-1]
+    assert ultimo_evento["esta_resuelta"] is True
+    assert ultimo_evento["duracion_segundos"] == 20.0

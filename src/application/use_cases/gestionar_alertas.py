@@ -3,12 +3,23 @@ from datetime import datetime, timezone
 from src.application.dtos.alerta_dto import AlertaResponseDTO
 from src.application.mappers.alerta_mapper import AlertaMapper
 from src.domain.telemetria.exceptions import AlertaNoEncontradaError
-from src.domain.telemetria.ports import RepositorioTelemetriaPort
+from src.domain.telemetria.ports import (
+    PublicadorEventosPort,
+    RepositorioDispositivosPort,
+    RepositorioTelemetriaPort,
+)
 
 
 class GestionarAlertasUseCase:
-    def __init__(self, repo_telemetria: RepositorioTelemetriaPort):
+    def __init__(
+        self,
+        repo_telemetria: RepositorioTelemetriaPort,
+        publicador: PublicadorEventosPort | None = None,
+        repo_dispositivos: RepositorioDispositivosPort | None = None,
+    ):
         self.repo_telemetria = repo_telemetria
+        self.publicador = publicador
+        self.repo_dispositivos = repo_dispositivos
 
     def listar_alertas(
         self,
@@ -36,4 +47,17 @@ class GestionarAlertasUseCase:
 
         alerta.marcar_resuelta(datetime.now(timezone.utc), observaciones=observaciones)
         self.repo_telemetria.guardar_alerta(alerta)
+
+        # Difusión en vivo vía WebSocket hacia todas las consolas conectadas
+        if self.publicador:
+            mac_str = alerta.dispositivo_id
+            if self.repo_dispositivos:
+                dev = self.repo_dispositivos.obtener_por_id(alerta.dispositivo_id)
+                if dev and dev.device_uid:
+                    mac_str = dev.device_uid.valor.upper()
+            self.publicador.publicar_telemetria_en_vivo(
+                f"m/wifi/{mac_str}/alertas",
+                AlertaMapper.to_dto(alerta).model_dump(mode="json"),
+            )
+
         return AlertaMapper.to_dto(alerta)

@@ -500,6 +500,20 @@ class IngestarTelemetriaUseCase:
                         mensaje=alerta_fp.mensaje,
                     )
 
+            # Auto-despeje de perturbaciones normalizadas con difusión en vivo
+            if alerta_tension_raw is None:
+                self._auto_resolver_alertas_si_corresponde(
+                    dispositivo.id, mac_raw, ["BAJA_TENSION", "SOBRETENSION", "FALTA_FASE"], recorded_at
+                )
+            if alerta_desbalance_raw is None:
+                self._auto_resolver_alertas_si_corresponde(dispositivo.id, mac_raw, ["DESBALANCE_TENSION"], recorded_at)
+            if not alertas_ti_raw:
+                self._auto_resolver_alertas_si_corresponde(dispositivo.id, mac_raw, ["TI_INVERTIDO"], recorded_at)
+            if alerta_fp_raw is None:
+                self._auto_resolver_alertas_si_corresponde(
+                    dispositivo.id, mac_raw, ["BAJO_FACTOR_POTENCIA"], recorded_at
+                )
+
             # Persistencia con downsampling según granularidad configurada
             debe_persistir = True
             if self.granularidad_segundos > 0:
@@ -636,6 +650,38 @@ class IngestarTelemetriaUseCase:
                 mensaje=str(payload.get("event") or payload),
             )
             self.repo_telemetria.guardar_alerta(alerta)
+
+    def _auto_resolver_alertas_si_corresponde(
+        self,
+        dispositivo_id: str,
+        mac_raw: str,
+        tipos_alerta: list[str],
+        recorded_at: datetime,
+    ) -> None:
+        """Despeja automáticamente alertas abiertas de los tipos indicados al normalizarse la variable."""
+        alertas_abiertas = self.repo_telemetria.listar_alertas(
+            dispositivo_id=dispositivo_id,
+            solo_abiertas=True,
+        )
+        for a in alertas_abiertas:
+            if a.tipo_alerta in tipos_alerta:
+                a.marcar_resuelta(
+                    recorded_at,
+                    observaciones="Despeje automático: la variable normalizó su valor dentro del rango admisible.",
+                )
+                self.repo_telemetria.guardar_alerta(a)
+                if self.publicador:
+                    self.publicador.publicar_telemetria_en_vivo(
+                        f"m/wifi/{mac_raw}/alertas",
+                        AlertaMapper.to_dto(a).model_dump(mode="json"),
+                    )
+                if self.logger:
+                    self.logger.info(
+                        "alerta_auto_resuelta_normalizada",
+                        dispositivo_id=dispositivo_id,
+                        tipo=a.tipo_alerta,
+                        duracion_segundos=a.duracion_segundos,
+                    )
 
 
 def sanear_entero(valor: Any) -> int | None:
