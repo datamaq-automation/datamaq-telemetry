@@ -4,6 +4,7 @@ from decimal import Decimal
 from typing import Any
 
 from src.domain.telemetria.value_objects import (
+    CoordenadasZona,
     Corriente,
     EnergiaActiva,
     EnergiaReactiva,
@@ -11,11 +12,13 @@ from src.domain.telemetria.value_objects import (
     FactorPotencia,
     MacAddress,
     ModoFreeTier,
+    PosicionLayout,
     PotenciaActiva,
     PotenciaAparente,
     PotenciaReactiva,
     SeveridadAlerta,
     Tension,
+    TipoNodoUnifilar,
     VisibilidadPlan,
 )
 
@@ -61,8 +64,61 @@ class Planta:
     direccion: str | None = None
     latitud: float | None = None
     longitud: float | None = None
+    layout_svg_url: str | None = None
     creado_en: datetime = field(default_factory=ahora_utc)
     actualizado_en: datetime = field(default_factory=ahora_utc)
+
+
+@dataclass
+class NodoUnifilar:
+    id: str
+    planta_id: str
+    nombre: str
+    tipo: TipoNodoUnifilar
+    tension_nominal_v: float
+    parent_id: str | None = None
+    device_id: str | None = None
+    capacidad_nominal_kva: float | None = None
+    orden: int = 0
+    creado_en: datetime = field(default_factory=ahora_utc)
+    actualizado_en: datetime = field(default_factory=ahora_utc)
+
+
+@dataclass
+class ZonaPlanta:
+    id: str
+    planta_id: str
+    nombre: str
+    coordenadas: CoordenadasZona
+    creado_en: datetime = field(default_factory=ahora_utc)
+    actualizado_en: datetime = field(default_factory=ahora_utc)
+
+
+@dataclass
+class DispositivoLayout:
+    id: str
+    planta_id: str
+    device_id: str
+    posicion: PosicionLayout
+    zona_id: str | None = None
+    creado_en: datetime = field(default_factory=ahora_utc)
+    actualizado_en: datetime = field(default_factory=ahora_utc)
+
+
+@dataclass
+class UnifilarPlanta:
+    planta_id: str
+    nombre_planta: str
+    nodos: list[NodoUnifilar] = field(default_factory=list)
+
+
+@dataclass
+class LayoutPlanta:
+    planta_id: str
+    nombre_planta: str
+    plano_svg_url: str | None = None
+    zonas: list[ZonaPlanta] = field(default_factory=list)
+    dispositivos: list[DispositivoLayout] = field(default_factory=list)
 
 
 @dataclass

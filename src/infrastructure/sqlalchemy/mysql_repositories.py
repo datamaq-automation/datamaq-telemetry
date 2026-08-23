@@ -10,12 +10,15 @@ from src.domain.telemetria.entities import (
     AcumuladoEnergia,
     AlertaDispositivo,
     Dispositivo,
+    DispositivoLayout,
     LecturaInstantanea,
     LogEstadoDispositivo,
     MedicionFase,
+    NodoUnifilar,
     Organizacion,
     Planta,
     PlanTelemetria,
+    ZonaPlanta,
 )
 from src.domain.telemetria.ports import (
     RepositorioDispositivosPort,
@@ -25,6 +28,7 @@ from src.domain.telemetria.ports import (
 )
 from src.domain.telemetria.services import AnalizadorCalidadEnergiaService
 from src.domain.telemetria.value_objects import (
+    CoordenadasZona,
     Corriente,
     EnergiaActiva,
     EnergiaReactiva,
@@ -32,18 +36,23 @@ from src.domain.telemetria.value_objects import (
     FactorPotencia,
     MacAddress,
     ModoFreeTier,
+    PosicionLayout,
     PotenciaActiva,
     PotenciaAparente,
     PotenciaReactiva,
     SeveridadAlerta,
     Tension,
+    TipoNodoUnifilar,
     VisibilidadPlan,
 )
 from src.infrastructure.sqlalchemy.models import (
     DeviceAlertModel,
     DeviceModel,
     DeviceStatusLogModel,
+    FacilityDeviceLayoutModel,
     FacilityModel,
+    FacilityUnifilarNodeModel,
+    FacilityZoneModel,
     OrganizationModel,
     PlanModel,
     TelemetryEnergyModel,
@@ -679,6 +688,7 @@ class MySQLOrganizacionesRepository(RepositorioOrganizacionesPort):
             direccion=m.address,
             latitud=float(m.latitude) if m.latitude is not None else None,
             longitud=float(m.longitude) if m.longitude is not None else None,
+            layout_svg_url=m.layout_svg_url,
             creado_en=m.created_at,
             actualizado_en=m.updated_at,
         )
@@ -695,6 +705,7 @@ class MySQLOrganizacionesRepository(RepositorioOrganizacionesPort):
                 direccion=m.address,
                 latitud=float(m.latitude) if m.latitude is not None else None,
                 longitud=float(m.longitude) if m.longitude is not None else None,
+                layout_svg_url=m.layout_svg_url,
                 creado_en=m.created_at,
                 actualizado_en=m.updated_at,
             )
@@ -713,6 +724,7 @@ class MySQLOrganizacionesRepository(RepositorioOrganizacionesPort):
                 address=planta.direccion,
                 latitude=lat_dec,
                 longitude=lon_dec,
+                layout_svg_url=planta.layout_svg_url,
             )
             self.db.add(model)
         else:
@@ -721,6 +733,7 @@ class MySQLOrganizacionesRepository(RepositorioOrganizacionesPort):
             model.address = planta.direccion
             model.latitude = lat_dec
             model.longitude = lon_dec
+            model.layout_svg_url = planta.layout_svg_url
 
         self.db.commit()
         self.db.refresh(model)
@@ -731,9 +744,142 @@ class MySQLOrganizacionesRepository(RepositorioOrganizacionesPort):
             direccion=model.address,
             latitud=float(model.latitude) if model.latitude is not None else None,
             longitud=float(model.longitude) if model.longitude is not None else None,
+            layout_svg_url=model.layout_svg_url,
             creado_en=model.created_at,
             actualizado_en=model.updated_at,
         )
+
+    def obtener_nodos_unifilar(self, planta_id: str) -> list[NodoUnifilar]:
+        models = (
+            self.db.query(FacilityUnifilarNodeModel)
+            .filter(FacilityUnifilarNodeModel.facility_id == planta_id)
+            .order_by(FacilityUnifilarNodeModel.sort_order.asc())
+            .all()
+        )
+        return [
+            NodoUnifilar(
+                id=m.id,
+                planta_id=m.facility_id,
+                parent_id=m.parent_id,
+                nombre=m.name,
+                tipo=(
+                    TipoNodoUnifilar(m.node_type)
+                    if m.node_type in [t.value for t in TipoNodoUnifilar]
+                    else TipoNodoUnifilar.CARGA
+                ),
+                device_id=m.device_id,
+                tension_nominal_v=float(m.nominal_voltage_v),
+                capacidad_nominal_kva=float(m.nominal_capacity_kva) if m.nominal_capacity_kva is not None else None,
+                orden=m.sort_order,
+                creado_en=m.created_at,
+                actualizado_en=m.updated_at,
+            )
+            for m in models
+        ]
+
+    def guardar_nodos_unifilar(self, planta_id: str, nodos: list[NodoUnifilar]) -> list[NodoUnifilar]:
+        # Reemplazo transaccional de nodos unifilares para la planta
+        self.db.query(FacilityUnifilarNodeModel).filter(FacilityUnifilarNodeModel.facility_id == planta_id).delete()
+
+        for nodo in nodos:
+            tipo_str = nodo.tipo.value if hasattr(nodo.tipo, "value") else str(nodo.tipo)
+            model = FacilityUnifilarNodeModel(
+                id=nodo.id,
+                facility_id=planta_id,
+                parent_id=nodo.parent_id,
+                name=nodo.nombre,
+                node_type=tipo_str,
+                device_id=nodo.device_id,
+                nominal_voltage_v=Decimal(str(nodo.tension_nominal_v)),
+                nominal_capacity_kva=(
+                    Decimal(str(nodo.capacidad_nominal_kva)) if nodo.capacidad_nominal_kva is not None else None
+                ),
+                sort_order=nodo.orden,
+            )
+            self.db.add(model)
+
+        self.db.commit()
+        return self.obtener_nodos_unifilar(planta_id)
+
+    def obtener_zonas_planta(self, planta_id: str) -> list[ZonaPlanta]:
+        models = self.db.query(FacilityZoneModel).filter(FacilityZoneModel.facility_id == planta_id).all()
+        return [
+            ZonaPlanta(
+                id=m.id,
+                planta_id=m.facility_id,
+                nombre=m.name,
+                coordenadas=CoordenadasZona(
+                    x_porcentaje=float(m.x_pct),
+                    y_porcentaje=float(m.y_pct),
+                    ancho_porcentaje=float(m.width_pct),
+                    alto_porcentaje=float(m.height_pct),
+                ),
+                creado_en=m.created_at,
+                actualizado_en=m.updated_at,
+            )
+            for m in models
+        ]
+
+    def obtener_dispositivos_layout(self, planta_id: str) -> list[DispositivoLayout]:
+        models = (
+            self.db.query(FacilityDeviceLayoutModel).filter(FacilityDeviceLayoutModel.facility_id == planta_id).all()
+        )
+        return [
+            DispositivoLayout(
+                id=m.id,
+                planta_id=m.facility_id,
+                device_id=m.device_id,
+                zona_id=m.zone_id,
+                posicion=PosicionLayout(
+                    x_porcentaje=float(m.pos_x_pct),
+                    y_porcentaje=float(m.pos_y_pct),
+                ),
+                creado_en=m.created_at,
+                actualizado_en=m.updated_at,
+            )
+            for m in models
+        ]
+
+    def guardar_layout_planta(
+        self,
+        planta_id: str,
+        plano_svg_url: str | None,
+        zonas: list[ZonaPlanta],
+        dispositivos: list[DispositivoLayout],
+    ) -> None:
+        # Actualizar plano_svg_url en planta si se especificó
+        planta_model = self.db.query(FacilityModel).filter(FacilityModel.id == planta_id).first()
+        if planta_model:
+            planta_model.layout_svg_url = plano_svg_url
+
+        # Reemplazar zonas y layouts
+        self.db.query(FacilityDeviceLayoutModel).filter(FacilityDeviceLayoutModel.facility_id == planta_id).delete()
+        self.db.query(FacilityZoneModel).filter(FacilityZoneModel.facility_id == planta_id).delete()
+
+        for z in zonas:
+            zm = FacilityZoneModel(
+                id=z.id,
+                facility_id=planta_id,
+                name=z.nombre,
+                x_pct=Decimal(str(z.coordenadas.x_porcentaje)),
+                y_pct=Decimal(str(z.coordenadas.y_porcentaje)),
+                width_pct=Decimal(str(z.coordenadas.ancho_porcentaje)),
+                height_pct=Decimal(str(z.coordenadas.alto_porcentaje)),
+            )
+            self.db.add(zm)
+
+        for d in dispositivos:
+            dm = FacilityDeviceLayoutModel(
+                id=d.id,
+                facility_id=planta_id,
+                device_id=d.device_id,
+                zone_id=d.zona_id,
+                pos_x_pct=Decimal(str(d.posicion.x_porcentaje)),
+                pos_y_pct=Decimal(str(d.posicion.y_porcentaje)),
+            )
+            self.db.add(dm)
+
+        self.db.commit()
 
 
 class MySQLPlanesRepository(RepositorioPlanesPort):

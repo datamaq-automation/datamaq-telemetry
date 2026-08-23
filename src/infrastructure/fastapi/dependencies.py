@@ -12,6 +12,9 @@ from src.application.use_cases.gestionar_dispositivos import (
     GestionarDispositivosUseCase,
 )
 from src.application.use_cases.gestionar_planes import GestionarPlanesUseCase
+from src.application.use_cases.gestionar_planta_estructura import (
+    GestionarPlantaEstructuraUseCase,
+)
 from src.application.use_cases.purgar_telemetria import PurgarTelemetriaExpiradaUseCase
 from src.domain.auth.services import HashContrasenaService, RateLimiterService
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
@@ -107,6 +110,13 @@ def get_alertas_use_case(
         publicador=global_event_broadcaster,
         repo_dispositivos=repo_disp,
     )
+
+
+def get_planta_estructura_use_case(
+    db: Annotated[Session, Depends(get_db_session)],
+) -> GestionarPlantaEstructuraUseCase:
+    repo_org = MySQLOrganizacionesRepository(db)
+    return GestionarPlantaEstructuraUseCase(repo_org)
 
 
 def get_auth_use_case(

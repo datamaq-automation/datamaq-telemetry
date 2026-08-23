@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from src.domain.telemetria.exceptions import (
+    CoordenadaInvalidaError,
     FactorPotenciaInvalidoError,
     MacAddressInvalidaError,
     TensionInvalidaError,
@@ -29,6 +30,46 @@ class VisibilidadPlan(str, Enum):
 class ModoFreeTier(str, Enum):
     VITRINA_ANONIMA = "VITRINA_ANONIMA"
     PRIVADO_BASICO = "PRIVADO_BASICO"
+
+
+class TipoNodoUnifilar(str, Enum):
+    ACOMETIDA = "acometida"
+    TRANSFORMADOR = "transformador"
+    TGBT = "tgbt"
+    SECCIONAL = "seccional"
+    CARGA = "carga"
+
+
+@dataclass(frozen=True)
+class CoordenadasZona:
+    x_porcentaje: float
+    y_porcentaje: float
+    ancho_porcentaje: float
+    alto_porcentaje: float
+
+    def __post_init__(self):
+        for nombre, val in (
+            ("x_porcentaje", self.x_porcentaje),
+            ("y_porcentaje", self.y_porcentaje),
+            ("ancho_porcentaje", self.ancho_porcentaje),
+            ("alto_porcentaje", self.alto_porcentaje),
+        ):
+            if val < 0.0 or val > 100.0:
+                raise CoordenadaInvalidaError(f"{nombre} fuera de rango (0-100%): {val}")
+
+
+@dataclass(frozen=True)
+class PosicionLayout:
+    x_porcentaje: float
+    y_porcentaje: float
+
+    def __post_init__(self):
+        for nombre, val in (
+            ("x_porcentaje", self.x_porcentaje),
+            ("y_porcentaje", self.y_porcentaje),
+        ):
+            if val < 0.0 or val > 100.0:
+                raise CoordenadaInvalidaError(f"{nombre} fuera de rango (0-100%): {val}")
 
 
 @dataclass(frozen=True)

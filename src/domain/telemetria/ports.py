@@ -5,11 +5,14 @@ from src.domain.telemetria.entities import (
     AcumuladoEnergia,
     AlertaDispositivo,
     Dispositivo,
+    DispositivoLayout,
     LecturaInstantanea,
     LogEstadoDispositivo,
+    NodoUnifilar,
     Organizacion,
     Planta,
     PlanTelemetria,
+    ZonaPlanta,
 )
 from src.domain.telemetria.value_objects import MacAddress
 
@@ -135,6 +138,32 @@ class RepositorioOrganizacionesPort(ABC):
 
     @abstractmethod
     def guardar_planta(self, planta: Planta) -> Planta:
+        pass
+
+    @abstractmethod
+    def obtener_nodos_unifilar(self, planta_id: str) -> list[NodoUnifilar]:
+        pass
+
+    @abstractmethod
+    def guardar_nodos_unifilar(self, planta_id: str, nodos: list[NodoUnifilar]) -> list[NodoUnifilar]:
+        pass
+
+    @abstractmethod
+    def obtener_zonas_planta(self, planta_id: str) -> list[ZonaPlanta]:
+        pass
+
+    @abstractmethod
+    def obtener_dispositivos_layout(self, planta_id: str) -> list[DispositivoLayout]:
+        pass
+
+    @abstractmethod
+    def guardar_layout_planta(
+        self,
+        planta_id: str,
+        plano_svg_url: str | None,
+        zonas: list[ZonaPlanta],
+        dispositivos: list[DispositivoLayout],
+    ) -> None:
         pass
 
 

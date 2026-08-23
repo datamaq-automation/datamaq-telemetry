@@ -10,9 +10,15 @@
 erDiagram
     DEVICES ||--o{ DEVICE_ALERTS : "FK_device_id"
     DEVICES ||--o{ DEVICE_STATUS_LOGS : "FK_device_id"
+    DEVICES ||--o{ FACILITY_DEVICE_LAYOUTS : "FK_device_id"
     DEVICES ||--o{ TELEMETRY_ENERGY : "FK_device_id"
     DEVICES ||--o{ TELEMETRY_INSTANTANEOUS : "FK_device_id"
+    DEVICES ||--o{ UNIFILAR_NODES : "FK_device_id"
     FACILITIES ||--o{ DEVICES : "FK_facility_id"
+    FACILITIES ||--o{ FACILITY_DEVICE_LAYOUTS : "FK_facility_id"
+    FACILITIES ||--o{ FACILITY_ZONES : "FK_facility_id"
+    FACILITIES ||--o{ UNIFILAR_NODES : "FK_facility_id"
+    FACILITY_ZONES ||--o{ FACILITY_DEVICE_LAYOUTS : "FK_zone_id"
     ORGANIZATIONS ||--o{ FACILITIES : "FK_organization_id"
     PLANS ||--o{ ORGANIZATIONS : "FK_plan_id"
 
@@ -71,6 +77,30 @@ erDiagram
         string address
         decimal latitude
         decimal longitude
+        string layout_svg_url
+        datetime created_at
+        datetime updated_at
+    }
+
+    FACILITY_DEVICE_LAYOUTS {
+        string id PK
+        string facility_id FK
+        string device_id FK
+        string zone_id FK
+        decimal pos_x_pct
+        decimal pos_y_pct
+        datetime created_at
+        datetime updated_at
+    }
+
+    FACILITY_ZONES {
+        string id PK
+        string facility_id FK
+        string name
+        decimal x_pct
+        decimal y_pct
+        decimal width_pct
+        decimal height_pct
         datetime created_at
         datetime updated_at
     }
@@ -154,6 +184,20 @@ erDiagram
         decimal thd_v_promedio_porcentaje
         decimal thd_i_total_porcentaje
         datetime created_at
+    }
+
+    UNIFILAR_NODES {
+        string id PK
+        string facility_id FK
+        string parent_id
+        string name
+        string node_type
+        string device_id FK
+        decimal nominal_voltage_v
+        decimal nominal_capacity_kva
+        int sort_order
+        datetime created_at
+        datetime updated_at
     }
 
     USERS {
@@ -246,8 +290,43 @@ erDiagram
 | `address` | `VARCHAR(255)` | - | Sí |
 | `latitude` | `NUMERIC(10, 8)` | - | Sí |
 | `longitude` | `NUMERIC(11, 8)` | - | Sí |
+| `layout_svg_url` | `VARCHAR(500)` | - | Sí |
 | `created_at` | `DATETIME` | - | No |
 | `updated_at` | `DATETIME` | - | No |
+
+### Tabla `facility_device_layouts`
+
+| Columna | Tipo SQL | Clave / Restricción | Nullable |
+| :--- | :--- | :--- | :--- |
+| `id` | `VARCHAR(36)` | **PRIMARY KEY** | No |
+| `facility_id` | `VARCHAR(36)` | FK -> `facilities.id` | No |
+| `device_id` | `VARCHAR(36)` | FK -> `devices.id` | No |
+| `zone_id` | `VARCHAR(36)` | FK -> `facility_zones.id` | Sí |
+| `pos_x_pct` | `NUMERIC(6, 2)` | - | No |
+| `pos_y_pct` | `NUMERIC(6, 2)` | - | No |
+| `created_at` | `DATETIME` | - | No |
+| `updated_at` | `DATETIME` | - | No |
+
+**Índices:**
+- `idx_layout_device`: (`device_id`)
+- `idx_layout_facility`: (`facility_id`)
+
+### Tabla `facility_zones`
+
+| Columna | Tipo SQL | Clave / Restricción | Nullable |
+| :--- | :--- | :--- | :--- |
+| `id` | `VARCHAR(36)` | **PRIMARY KEY** | No |
+| `facility_id` | `VARCHAR(36)` | FK -> `facilities.id` | No |
+| `name` | `VARCHAR(150)` | - | No |
+| `x_pct` | `NUMERIC(6, 2)` | - | No |
+| `y_pct` | `NUMERIC(6, 2)` | - | No |
+| `width_pct` | `NUMERIC(6, 2)` | - | No |
+| `height_pct` | `NUMERIC(6, 2)` | - | No |
+| `created_at` | `DATETIME` | - | No |
+| `updated_at` | `DATETIME` | - | No |
+
+**Índices:**
+- `idx_zone_facility`: (`facility_id`)
 
 ### Tabla `organizations`
 
@@ -345,6 +424,26 @@ erDiagram
 **Índices:**
 - `idx_telemetry_inst_dev_time`: (`device_id`, `recorded_at`)
 - `idx_telemetry_inst_time`: (`recorded_at`)
+
+### Tabla `unifilar_nodes`
+
+| Columna | Tipo SQL | Clave / Restricción | Nullable |
+| :--- | :--- | :--- | :--- |
+| `id` | `VARCHAR(36)` | **PRIMARY KEY** | No |
+| `facility_id` | `VARCHAR(36)` | FK -> `facilities.id` | No |
+| `parent_id` | `VARCHAR(36)` | - | Sí |
+| `name` | `VARCHAR(150)` | - | No |
+| `node_type` | `VARCHAR(50)` | - | No |
+| `device_id` | `VARCHAR(36)` | FK -> `devices.id` | Sí |
+| `nominal_voltage_v` | `NUMERIC(8, 2)` | - | No |
+| `nominal_capacity_kva` | `NUMERIC(10, 2)` | - | Sí |
+| `sort_order` | `INTEGER` | - | No |
+| `created_at` | `DATETIME` | - | No |
+| `updated_at` | `DATETIME` | - | No |
+
+**Índices:**
+- `idx_unifilar_facility`: (`facility_id`)
+- `idx_unifilar_parent`: (`parent_id`)
 
 ### Tabla `users`
 

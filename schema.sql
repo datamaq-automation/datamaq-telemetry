@@ -45,10 +45,65 @@ CREATE TABLE IF NOT EXISTS `facilities` (
     `address` VARCHAR(255) DEFAULT NULL,
     `latitude` DECIMAL(10, 8) DEFAULT NULL,
     `longitude` DECIMAL(11, 8) DEFAULT NULL,
+    `layout_svg_url` VARCHAR(500) DEFAULT NULL,
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     CONSTRAINT `fk_facilities_org` FOREIGN KEY (`organization_id`) REFERENCES `organizations` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 2.1 Unifilar Nodes (Diagrama Unifilar Eléctrico)
+CREATE TABLE IF NOT EXISTS `unifilar_nodes` (
+    `id` VARCHAR(36) NOT NULL,
+    `facility_id` VARCHAR(36) NOT NULL,
+    `parent_id` VARCHAR(36) DEFAULT NULL,
+    `name` VARCHAR(150) NOT NULL,
+    `node_type` VARCHAR(50) NOT NULL, -- acometida, transformador, tgbt, seccional, carga
+    `device_id` VARCHAR(36) DEFAULT NULL,
+    `nominal_voltage_v` DECIMAL(8, 2) NOT NULL,
+    `nominal_capacity_kva` DECIMAL(10, 2) DEFAULT NULL,
+    `sort_order` INT NOT NULL DEFAULT 0,
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `idx_unifilar_facility` (`facility_id`),
+    KEY `idx_unifilar_parent` (`parent_id`),
+    CONSTRAINT `fk_unifilar_facility` FOREIGN KEY (`facility_id`) REFERENCES `facilities` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_unifilar_device` FOREIGN KEY (`device_id`) REFERENCES `devices` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 2.2 Facility Zones (Zonas y Naves de Planta para Layout 2D)
+CREATE TABLE IF NOT EXISTS `facility_zones` (
+    `id` VARCHAR(36) NOT NULL,
+    `facility_id` VARCHAR(36) NOT NULL,
+    `name` VARCHAR(150) NOT NULL,
+    `x_pct` DECIMAL(6, 2) NOT NULL,
+    `y_pct` DECIMAL(6, 2) NOT NULL,
+    `width_pct` DECIMAL(6, 2) NOT NULL,
+    `height_pct` DECIMAL(6, 2) NOT NULL,
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `idx_zone_facility` (`facility_id`),
+    CONSTRAINT `fk_zones_facility` FOREIGN KEY (`facility_id`) REFERENCES `facilities` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 2.3 Facility Device Layouts (Posicionamiento 2D de Medidores)
+CREATE TABLE IF NOT EXISTS `facility_device_layouts` (
+    `id` VARCHAR(36) NOT NULL,
+    `facility_id` VARCHAR(36) NOT NULL,
+    `device_id` VARCHAR(36) NOT NULL,
+    `zone_id` VARCHAR(36) DEFAULT NULL,
+    `pos_x_pct` DECIMAL(6, 2) NOT NULL,
+    `pos_y_pct` DECIMAL(6, 2) NOT NULL,
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `idx_layout_facility` (`facility_id`),
+    KEY `idx_layout_device` (`device_id`),
+    CONSTRAINT `fk_layout_facility` FOREIGN KEY (`facility_id`) REFERENCES `facilities` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_layout_device` FOREIGN KEY (`device_id`) REFERENCES `devices` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_layout_zone` FOREIGN KEY (`zone_id`) REFERENCES `facility_zones` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 3. Devices (Medidores Powermeter)

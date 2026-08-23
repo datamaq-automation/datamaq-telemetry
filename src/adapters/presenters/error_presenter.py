@@ -12,6 +12,7 @@ from src.domain.telemetria.exceptions import (
     DominioTelemetriaException,
     FactorPotenciaInvalidoError,
     MacAddressInvalidaError,
+    PlantaNoEncontradaError,
     TensionInvalidaError,
 )
 
@@ -21,7 +22,7 @@ class ErrorPresenter:
 
     @staticmethod
     def presentar_excepcion(exc: Exception) -> tuple[int, dict[str, Any]]:
-        if isinstance(exc, (DispositivoNoEncontradoError, AlertaNoEncontradaError)):
+        if isinstance(exc, (DispositivoNoEncontradoError, AlertaNoEncontradaError, PlantaNoEncontradaError)):
             return 404, {"error": "NotFound", "mensaje": exc.mensaje}
         elif isinstance(exc, (MacAddressInvalidaError, TensionInvalidaError, FactorPotenciaInvalidoError)):
             return 400, {"error": "ValidationError", "mensaje": exc.mensaje}

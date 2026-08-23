@@ -14,12 +14,15 @@ from src.domain.telemetria.entities import (
     AcumuladoEnergia,
     AlertaDispositivo,
     Dispositivo,
+    DispositivoLayout,
     LecturaInstantanea,
     LogEstadoDispositivo,
     MedicionFase,
+    NodoUnifilar,
     Organizacion,
     Planta,
     PlanTelemetria,
+    ZonaPlanta,
 )
 from src.domain.telemetria.exceptions import LimiteDispositivosExcedidoError
 from src.domain.telemetria.ports import (
@@ -86,6 +89,27 @@ class MockOrganizacionesRepo(RepositorioOrganizacionesPort):
     def guardar_planta(self, planta: Planta) -> Planta:
         self.plantas[planta.id] = planta
         return planta
+
+    def obtener_nodos_unifilar(self, planta_id: str) -> list[NodoUnifilar]:
+        return []
+
+    def guardar_nodos_unifilar(self, planta_id: str, nodos: list[NodoUnifilar]) -> list[NodoUnifilar]:
+        return list(nodos)
+
+    def obtener_zonas_planta(self, planta_id: str) -> list[ZonaPlanta]:
+        return []
+
+    def obtener_dispositivos_layout(self, planta_id: str) -> list[DispositivoLayout]:
+        return []
+
+    def guardar_layout_planta(
+        self,
+        planta_id: str,
+        plano_svg_url: str | None,
+        zonas: list[ZonaPlanta],
+        dispositivos: list[DispositivoLayout],
+    ) -> None:
+        pass
 
 
 class MockDispositivosRepo(RepositorioDispositivosPort):

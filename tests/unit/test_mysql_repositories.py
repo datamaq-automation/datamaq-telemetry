@@ -13,25 +13,31 @@ from src.domain.telemetria.entities import (
     AcumuladoEnergia,
     AlertaDispositivo,
     Dispositivo,
+    DispositivoLayout,
     LecturaInstantanea,
     LogEstadoDispositivo,
     MedicionFase,
+    NodoUnifilar,
     Organizacion,
     Planta,
     PlanTelemetria,
+    ZonaPlanta,
 )
 from src.domain.telemetria.value_objects import (
+    CoordenadasZona,
     Corriente,
     EnergiaActiva,
     EnergiaReactiva,
     EstadoDispositivo,
     FactorPotencia,
     MacAddress,
+    PosicionLayout,
     PotenciaActiva,
     PotenciaAparente,
     PotenciaReactiva,
     SeveridadAlerta,
     Tension,
+    TipoNodoUnifilar,
     VisibilidadPlan,
 )
 from src.infrastructure.sqlalchemy.models import (
@@ -639,3 +645,100 @@ def test_plan_visibilidad_invalida_fallback(db: Session) -> None:
 
     assert obtenido is not None
     assert obtenido.visibilidad == VisibilidadPlan.PUBLICO
+
+
+def test_unifilar_nodos_guardar_y_obtener(db: Session) -> None:
+    org_repo = MySQLOrganizacionesRepository(db)
+    org_repo.guardar_organizacion(Organizacion(id="org-uni", nombre="Org Unifilar"))
+    org_repo.guardar_planta(Planta(id="plant-uni", organizacion_id="org-uni", nombre="Planta Unifilar"))
+
+    nodos = [
+        NodoUnifilar(
+            id="node-1",
+            planta_id="plant-uni",
+            parent_id=None,
+            nombre="Acometida MT",
+            tipo=TipoNodoUnifilar.ACOMETIDA,
+            device_id=None,
+            tension_nominal_v=13200.0,
+            capacidad_nominal_kva=1000.0,
+            orden=0,
+        ),
+        NodoUnifilar(
+            id="node-2",
+            planta_id="plant-uni",
+            parent_id="node-1",
+            nombre="Trafo Principal",
+            tipo=TipoNodoUnifilar.TRANSFORMADOR,
+            device_id=None,
+            tension_nominal_v=380.0,
+            capacidad_nominal_kva=800.0,
+            orden=1,
+        ),
+    ]
+
+    guardados = org_repo.guardar_nodos_unifilar("plant-uni", nodos)
+    assert len(guardados) == 2
+    assert guardados[0].nombre == "Acometida MT"
+    assert guardados[1].parent_id == "node-1"
+
+    recuperados = org_repo.obtener_nodos_unifilar("plant-uni")
+    assert len(recuperados) == 2
+    assert recuperados[1].tipo == TipoNodoUnifilar.TRANSFORMADOR
+
+
+def test_layout_planta_guardar_y_obtener(db: Session) -> None:
+    org_repo = MySQLOrganizacionesRepository(db)
+    org_repo.guardar_organizacion(Organizacion(id="org-lay", nombre="Org Layout"))
+    org_repo.guardar_planta(Planta(id="plant-lay", organizacion_id="org-lay", nombre="Planta Layout"))
+
+    zonas = [
+        ZonaPlanta(
+            id="zone-1",
+            planta_id="plant-lay",
+            nombre="Nave A",
+            coordenadas=CoordenadasZona(
+                x_porcentaje=5.0,
+                y_porcentaje=10.0,
+                ancho_porcentaje=45.0,
+                alto_porcentaje=30.0,
+            ),
+        )
+    ]
+    disp_repo = MySQLDispositivosRepository(db)
+    disp_repo.guardar(
+        Dispositivo(
+            id="dev-lay-1",
+            device_uid=MacAddress("A1B2C3D4E5F6"),
+            nombre="Medidor 1",
+            planta_id="plant-lay",
+        )
+    )
+    dispositivos = [
+        DispositivoLayout(
+            id="dl-1",
+            planta_id="plant-lay",
+            device_id="dev-lay-1",
+            zona_id="zone-1",
+            posicion=PosicionLayout(x_porcentaje=12.0, y_porcentaje=18.0),
+        )
+    ]
+
+    org_repo.guardar_layout_planta(
+        "plant-lay",
+        "https://cdn.datamaq.com.ar/plano.svg",
+        zonas,
+        dispositivos,
+    )
+
+    planta_act = org_repo.obtener_planta_por_id("plant-lay")
+    assert planta_act is not None
+    assert planta_act.layout_svg_url == "https://cdn.datamaq.com.ar/plano.svg"
+
+    zonas_rec = org_repo.obtener_zonas_planta("plant-lay")
+    assert len(zonas_rec) == 1
+    assert zonas_rec[0].nombre == "Nave A"
+
+    disp_rec = org_repo.obtener_dispositivos_layout("plant-lay")
+    assert len(disp_rec) == 1
+    assert disp_rec[0].device_id == "dev-lay-1"

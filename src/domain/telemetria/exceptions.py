@@ -32,3 +32,11 @@ class LimiteDispositivosExcedidoError(DominioTelemetriaException):
 
 class AlertaNoEncontradaError(DominioTelemetriaException):
     """Lanzada cuando se intenta operar con una alerta que no existe."""
+
+
+class CoordenadaInvalidaError(DominioTelemetriaException):
+    """Lanzada cuando una coordenada o dimensión porcentual está fuera del rango [0.0, 100.0]."""
+
+
+class PlantaNoEncontradaError(DominioTelemetriaException):
+    """Lanzada cuando se intenta operar con una planta que no existe."""
