@@ -47,6 +47,27 @@ Ignorar el ruido de fondo: el `8883` recibe escaneo constante de internet
 (`195.96.139.x`, `87.236.176.x`, `185.247.137.x`, `66.132.x.x`). Se reconocen porque el cliente
 es `<unknown>` y nunca llegan a `New client connected`.
 
+> [!CAUTION]
+> **Si el equipo ve la red pero no se asocia, sospechá de un homóglifo en la contraseña.**
+> El PSK de WPA2 se deriva de los **bytes** de la passphrase: un carácter visualmente idéntico
+> pero de otro bloque Unicode (la MU griega U+039C en lugar de la `M` ASCII, la `а` cirílica en
+> lugar de la `a`, etc.) genera un PSK distinto y la asociación falla sin ningún mensaje útil.
+> Se cuela al copiar la clave desde un documento, un chat o un PDF. Detección en un comando:
+>
+> ```bash
+> python3 scripts/provision_device.py --wifi-audit            # AP del equipo
+> python3 scripts/provision_device.py --wifi-audit --host <IP-LAN>
+> ```
+
+### Dos trampas del firmware que invalidan lecturas
+
+1. **`status.json` → `wifi_sta.ssid` es la red *asociada*, no la *configurada*.** Con el equipo
+   sin asociar vale `""` aunque tenga redes guardadas. La configuración real está en
+   `lan_config.json` (`wifi_sta[]`, hasta 3 slots).
+2. **`mqtt_config.json` devuelve `username` y `password` SIEMPRE vacíos:** son de solo
+   escritura. Verificado con una escritura centinela. **No se puede auditar las credenciales
+   MQTT por GET** — la única evidencia válida es el `u'...'` que registra el log del broker.
+
 ---
 
 ## 3. Playbook de comandos
@@ -113,6 +134,31 @@ Imprime `wifi_sta.connected`, `wifi_sta.quality`, `mqtt.connected` y un veredict
 Equivale a `GET http://192.168.4.1/status.json` con Basic Auth `admin:powermeter`, que se puede
 abrir desde el navegador de un celular.
 
+Cuando el equipo **sí** está en la red, todo esto funciona igual contra su IP de LAN
+(`--host 192.168.0.6`), sin necesidad de conectarse a su AP.
+
+#### Endpoints HTTP del medidor (Basic Auth `admin:powermeter`)
+
+Descubiertos descomprimiendo `home.html` (gzip) del propio firmware:
+
+| Endpoint | Uso |
+|---|---|
+| `status.json` | Estado en vivo: Wi-Fi STA, MQTT, `device_info`, `power_off_timestamp`, `uptime` |
+| `lan_config.json` | **Redes Wi-Fi guardadas** (`wifi_sta[]`) y config del AP (`wifi_ap`). GET y POST |
+| `wifiscan.json` | Escaneo de redes visibles con `quality` y `security` — prueba si la red está a la vista |
+| `mqtt_config.json` | Broker, puerto, seguridad, `client_id`. Credenciales de solo escritura |
+| `mqtt_ca_certificate_config.json` | Certificado CA para TLS. **Un POST vacío lo borra** |
+| `reboot.json` | Reinicio (POST `{}`) |
+| `restore.json` | Restauración de fábrica |
+
+El webserver del ESP32 atiende **una conexión por vez**: las peticiones en paralelo devuelven
+HTTP 000. Hay que serializarlas.
+
+> [!IMPORTANT]
+> Al escribir configuración, **partí siempre del GET actual y modificá solo los campos
+> necesarios**. Un POST armado desde cero pierde los campos que no incluyas (`client_id`, entre
+> otros) y borra el certificado CA.
+
 ---
 
 ## 4. Incidente 2026-09-01 — "el medidor no termina de conectarse"
@@ -146,26 +192,64 @@ si había fallado el Wi-Fi o la conexión al servidor.
 En MySQL: `last_seen_at = 2026-08-23 02:05`, 116 filas en `telemetry_instantaneous`,
 última del `2026-08-23 01:50`.
 
-### Conclusión
+**Confirmación en sitio** (adaptador Wi-Fi USB asociado al AP del equipo): el medidor estaba en
+**modo AP** publicando `Powermeter-D48C49F03564`, con `wifi_sta.connected=false`, `ip=0.0.0.0` y
+`quality=0`. Es decir: efectivamente nunca se asoció al Wi-Fi, como decía la hipótesis.
 
-**El equipo no se asoció al Wi-Fi.** Si se hubiera asociado y sólo fallara MQTT, aparecería en la
-LAN con IP, o el intento (aunque rechazado por TLS/credenciales) figuraría en el log del broker.
-No ocurrió ninguna de las dos cosas.
+### Causa raíz (confirmada experimentalmente el 2026-09-01)
 
-Como causa secundaria, el patrón histórico —sesiones de 20-50 min que **siempre** mueren por
-keepalive vencido y **nunca** reconectan solas— apunta a señal Wi-Fi débil en el punto de
-instalación o a un cuelgue del stack Wi-Fi del ESP32, no a un problema de broker.
+La contraseña WPA2 guardada en el equipo para `Telecentro-1397` empezaba con
+**GREEK CAPITAL LETTER MU (U+039C)** en lugar de la `M` ASCII. Visualmente idénticas; para el
+cálculo del PSK, dos claves distintas.
 
-### Pendiente de confirmar en sitio
+Cómo se probó, sin exponer la contraseña:
 
-1. Desde un celular, buscar el SSID `Powermeter-D48C49F03564`. Si aparece → confirmado que no
-   entró al Wi-Fi.
-2. Conectarse a ese AP y correr `provision_device.py --status` (o abrir
-   `http://192.168.4.1/status.json`) para leer `wifi_sta.quality` y confirmar la señal.
-3. Verificar que la red destino sea **2.4 GHz WPA2**: el ESP32 no soporta 5 GHz ni WPA3-only, y
-   falla si el router unifica ambas bandas en un mismo SSID (*band steering*).
-4. Revisar la ubicación del equipo en el tablero: la señal baja explicaría las caídas por
-   keepalive del historial.
+1. `wifiscan.json` mostró que el equipo **veía** `Telecentro-1397` a 57% de calidad y `WPA2`
+   ⇒ descartado 5 GHz, WPA3 y falta de alcance.
+2. `lan_config.json` reveló una clave de **12 caracteres pero 13 bytes UTF-8** ⇒ un carácter
+   multibyte. `unicodedata` lo identificó en la posición 0.
+3. Se intentó asociar un adaptador Wi-Fi con la clave tal cual está guardada: **falló**
+   (`Se necesitan secretos, pero no se han proporcionado`).
+4. Se repitió reemplazando U+039C por `M` ASCII: **asoció y tomó DHCP** (`192.168.0.5`),
+   confirmando además que `Telecentro-1397` es la red correcta.
+
+El corte original del 2026-08-22 fue **otra cosa**: `power_off_timestamp = 1787450841`
+(22-ago 23:07:21) coincide al segundo con el último `exceeded timeout` del broker — el equipo
+perdió alimentación. La contraseña se corrompió después, al reconfigurarlo.
+
+> [!NOTE]
+> Una hipótesis intermedia resultó **falsa** y quedó anotada para que nadie la repita: se leyó
+> `mqtt_config.json` con `username`/`password` vacíos y se concluyó que faltaban credenciales.
+> Una escritura centinela demostró que esos campos son de solo escritura y el GET siempre los
+> devuelve vacíos. Las credenciales MQTT estaban bien desde el principio.
+
+### Resolución aplicada
+
+1. **Wi-Fi:** `POST lan_config.json` con la clave corregida a ASCII puro (merge sobre el GET
+   actual, para no perder los otros slots ni la config del AP).
+2. **MQTT:** se reescribieron `username=datamaq_device` y la contraseña del broker por
+   precaución, partiendo también del GET actual para preservar `client_id`.
+3. `POST reboot.json`.
+
+### Verificación
+
+| Comprobación | Resultado |
+|---|---|
+| Asociación Wi-Fi | `Conectado=True`, IP `192.168.0.6`, señal **52%** |
+| Conexión al broker | `New client connected from 181.46.69.159 as D48C49F03564 (u'datamaq_device')`, 7 s tras el reinicio |
+| `devices.last_seen_at` | actualizado a `2026-09-01 21:40:03` |
+| Telemetría persistida | fila nueva `2026-09-01 21:40:04` — 226.7 V, 7.40 A, 1676 W |
+| Enlace estable | sin `exceeded timeout` tras la reconexión de las 18:40 |
+
+Respaldos de la configuración previa del equipo: `backup_lan_config.json`,
+`backup_mqtt_config.json`, `backup_status.json` (scratchpad de la sesión; **no versionados**,
+contienen credenciales).
+
+### Seguimiento pendiente
+
+- La señal es **52%** y el historial muestra cortes por keepalive. Si vuelven a aparecer
+  `exceeded timeout` seguidos, el problema es de cobertura en el tablero, no de configuración.
+- El equipo sigue con `device_name: "test"` y S/N 377; conviene nombrarlo antes de producción.
 
 ---
 
@@ -182,3 +266,4 @@ instalación o a un cuelgue del stack Wi-Fi del ESP32, no a un problema de broke
 | `logs.sh --mqtt` usaba journald ⇒ siempre "No entries" | Corregido (lee el archivo) |
 | `logs.sh --status` buscaba el puerto inexistente `8885` | Corregido a `8883` |
 | `isrg_root_x1.pem` estaba en `.gitignore` pese a ser una CA raíz pública necesaria para aprovisionar | Versionado |
+| No existía forma rápida de detectar homóglifos en el PSK (el diagnóstico llevó ~40 min) | Nuevo `provision_device.py --wifi-audit` |

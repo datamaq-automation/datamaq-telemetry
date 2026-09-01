@@ -9,6 +9,7 @@ import base64
 import json
 import os
 import sys
+import unicodedata
 import urllib.error
 import urllib.request
 
@@ -90,6 +91,54 @@ def _diagnosticar(wifi, mqtt):
         return
 
     print("[✓] DIAGNÓSTICO: Wi-Fi y MQTT conectados. El equipo está reportando.")
+
+
+def _homoglifos(texto):
+    """Devuelve los caracteres no ASCII de `texto` como (posición, nombre Unicode, codepoint).
+
+    Una passphrase WPA2 se deriva de sus bytes: un homóglifo (p. ej. GREEK CAPITAL LETTER MU,
+    U+039C, en lugar de la `M` ASCII) produce un PSK distinto y la asociación falla en silencio,
+    sin ninguna pista visual. Es exactamente lo que dejó fuera de línea al medidor
+    `D48C49F03564` (ver docs/troubleshooting-conectividad-dispositivos.md).
+    """
+    return [(i, unicodedata.name(c, "?"), hex(ord(c))) for i, c in enumerate(texto) if not c.isascii()]
+
+
+def auditar_wifi(host, user, password):
+    """Audita las redes Wi-Fi guardadas sin revelar las contraseñas."""
+    print(f"[*] Auditando redes Wi-Fi guardadas en http://{host}/ ...")
+    code, info = make_request(f"http://{host}/lan_config.json", user=user, password=password)
+    if code != 200:
+        print(f"[!] Error al leer lan_config.json (HTTP {code}): {info}")
+        return False
+
+    redes = [r for r in info.get("wifi_sta", []) if r.get("ssid")]
+    if not redes:
+        print("[!] El equipo no tiene ninguna red Wi-Fi configurada.")
+        return False
+
+    limpio = True
+    for r in redes:
+        ssid = r.get("ssid", "")
+        clave = r.get("password") or ""
+        print(f"\n  • SSID: {ssid!r} (slot {r.get('id')}) — clave de {len(clave)} caracteres")
+
+        for etiqueta, valor in (("SSID", ssid), ("contraseña", clave)):
+            raros = _homoglifos(valor)
+            if raros:
+                limpio = False
+                print(f"    [!] {etiqueta}: {len(raros)} carácter(es) NO ASCII — la asociación va a fallar:")
+                for pos, nombre, cp in raros:
+                    print(f"        posición {pos}: {nombre} ({cp})")
+
+        if not clave:
+            print("    [!] contraseña vacía (solo válido si la red es abierta)")
+
+    if limpio:
+        print("\n[✓] Todas las credenciales Wi-Fi son ASCII puro.")
+    else:
+        print("\n[!] Corregí los caracteres marcados desde la web del equipo (sección Wi-Fi).")
+    return limpio
 
 
 def _validar_config(mqtt_cfg, ca_cert):
@@ -246,6 +295,11 @@ if __name__ == "__main__":
     parser.add_argument("--user", default="admin", help="Usuario HTTP Basic Auth (default: admin)")
     parser.add_argument("--password", default="powermeter", help="Contraseña HTTP Basic Auth (default: powermeter)")
     parser.add_argument("--status", action="store_true", help="Mostrar estado y broker actual del medidor")
+    parser.add_argument(
+        "--wifi-audit",
+        action="store_true",
+        help="Auditar las redes Wi-Fi guardadas buscando caracteres no ASCII (homóglifos) que rompen el PSK",
+    )
     parser.add_argument("--profile", choices=["datamaq", "powermeter-official"], help="Perfil a aplicar")
     parser.add_argument("--broker-host", help="Sobrescribir Host del Broker (ej: IP o dominio de tu VPS)")
     parser.add_argument("--broker-port", type=int, help="Sobrescribir Puerto del Broker (ej: 1883 o 8883)")
@@ -261,7 +315,9 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    if args.status:
+    if args.wifi_audit:
+        sys.exit(0 if auditar_wifi(args.host, args.user, args.password) else 1)
+    elif args.status:
         show_status(args.host, args.user, args.password)
     elif args.profile:
         ok = apply_profile(

@@ -77,7 +77,18 @@ python3 scripts/provision_device.py --status
 Devuelve el `status.json` del equipo **y un diagnóstico explícito** que distingue las dos causas
 posibles de "no reporta": Wi-Fi no asociado vs. Wi-Fi OK pero broker rechazando.
 
-### 3. (Opcional) Restaurar al servidor oficial de Powermeter
+### 3. Auditar las credenciales Wi-Fi guardadas
+
+```bash
+python3 scripts/provision_device.py --wifi-audit
+```
+
+Marca cualquier carácter **no ASCII** en el SSID o en la contraseña. Un homóglifo (la MU griega
+U+039C en lugar de la `M` ASCII, por ejemplo) produce un PSK distinto y el equipo no se asocia
+nunca, sin mensaje de error. Se cuela al copiar la clave desde un documento o un chat, y fue la
+causa del incidente del 2026-09-01.
+
+### 4. (Opcional) Restaurar al servidor oficial de Powermeter
 
 ```bash
 python3 scripts/provision_device.py --profile powermeter-official --reboot

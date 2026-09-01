@@ -144,3 +144,52 @@ def test_perfil_datamaq_referencia_ca_existente():
     ca = RAIZ / perfil["mqtt_ca_certificate_file"]
     assert ca.exists(), f"El perfil referencia un CA inexistente: {ca}"
     assert "BEGIN CERTIFICATE" in ca.read_text(encoding="utf-8")
+
+
+def _fake_lan_config(redes):
+    def fake(url, method="GET", data=None, **kwargs):
+        assert url.endswith("/lan_config.json")
+        return 200, {"wifi_sta": redes}
+
+    return fake
+
+
+def test_homoglifos_detecta_mu_griega():
+    """La MU griega (U+039C) es indistinguible de la M ASCII pero produce otro PSK."""
+    mu = chr(0x39C)
+    hallazgos = pd._homoglifos(mu + "ABC123")
+    assert len(hallazgos) == 1
+    pos, nombre, _ = hallazgos[0]
+    assert pos == 0
+    assert "GREEK" in nombre
+    assert pd._homoglifos("ABC123") == []
+
+
+def test_wifi_audit_rechaza_clave_no_ascii(monkeypatch, capsys):
+    mu = chr(0x39C)
+    monkeypatch.setattr(
+        pd,
+        "make_request",
+        _fake_lan_config([{"id": 1, "ssid": "MiRed", "password": mu + "iClave123"}]),
+    )
+
+    assert pd.auditar_wifi("192.168.4.1", "admin", "powermeter") is False
+    salida = capsys.readouterr().out
+    assert "NO ASCII" in salida
+    assert "GREEK CAPITAL LETTER MU" in salida
+
+
+def test_wifi_audit_acepta_clave_ascii(monkeypatch):
+    monkeypatch.setattr(
+        pd,
+        "make_request",
+        _fake_lan_config([{"id": 1, "ssid": "MiRed", "password": "MiClave123"}]),
+    )
+
+    assert pd.auditar_wifi("192.168.4.1", "admin", "powermeter") is True
+
+
+def test_wifi_audit_sin_redes_configuradas(monkeypatch):
+    monkeypatch.setattr(pd, "make_request", _fake_lan_config([{"id": 1, "ssid": "", "password": ""}]))
+
+    assert pd.auditar_wifi("192.168.4.1", "admin", "powermeter") is False

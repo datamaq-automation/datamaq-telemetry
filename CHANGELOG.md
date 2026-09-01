@@ -17,7 +17,8 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
   - `isrg_root_x1.pem` (CA raíz pública de Let's Encrypt, necesaria para aprovisionar) dejó de estar en `.gitignore`.
 
 ### Agregado
-- **Documentación de diagnóstico de campo:** [`docs/troubleshooting-conectividad-dispositivos.md`](file:///home/agustin/proyectos_software/datamaq-telemetry/docs/troubleshooting-conectividad-dispositivos.md) — árbol de decisión Wi-Fi vs. broker, playbook de comandos y bitácora del incidente del 2026-09-01 (medidor `D48C49F03564` sin reportar desde el 2026-08-23).
+- **Auditoría de credenciales Wi-Fi:** `scripts/provision_device.py --wifi-audit` detecta caracteres no ASCII (homóglifos Unicode) en el SSID y la contraseña guardados en el medidor. Un homóglifo produce un PSK distinto y el equipo no se asocia jamás, sin mensaje de error; fue la causa raíz del incidente del 2026-09-01.
+- **Documentación de diagnóstico de campo:** [`docs/troubleshooting-conectividad-dispositivos.md`](file:///home/agustin/proyectos_software/datamaq-telemetry/docs/troubleshooting-conectividad-dispositivos.md) — árbol de decisión Wi-Fi vs. broker, playbook de comandos y bitácora del incidente del 2026-09-01 (medidor `D48C49F03564`), incluidos el mapa de endpoints HTTP del firmware y dos trampas que invalidan lecturas: `status.json.wifi_sta.ssid` refleja la red asociada y no la configurada, y `mqtt_config.json` devuelve las credenciales siempre vacías por ser de solo escritura.
 
 ---
 
