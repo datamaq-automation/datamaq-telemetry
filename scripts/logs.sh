@@ -167,7 +167,7 @@ case "$MODO" in
             ps aux | grep -E 'uvicorn|fastapi|datamaq' | grep -v grep || true
             echo ''
             echo '--- [Puertos en Escucha] ---'
-            sudo ss -tulpn | grep -E '8000|8883|1883' || true
+            sudo ss -tulpn | grep -E '8000|8885|8883|1883' || true   # 8885=API datamaq-telemetry, 8883/1883=broker
         "
         ;;
     save)
