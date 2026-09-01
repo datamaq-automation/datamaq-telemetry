@@ -6,6 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 from scripts import provision_device as pd
 
 RAIZ = Path(__file__).resolve().parents[2]
@@ -45,21 +47,72 @@ def test_apply_profile_ca_file_sobrescribe_ca(monkeypatch, tmp_path):
     capturas = []
     monkeypatch.setattr(pd, "make_request", _fake_make_request(capturas))
 
-    pd.apply_profile("192.168.4.1", "datamaq", custom_ca_file=str(pem))
+    pd.apply_profile(
+        "192.168.4.1",
+        "datamaq",
+        custom_username="datamaq_device",
+        custom_password="secreto123",
+        custom_ca_file=str(pem),
+    )
 
     post_ca = next(d for u, d in capturas if u.endswith("/mqtt_ca_certificate_config.json"))
     assert "AAAA" in post_ca["ca_certificate"]
 
 
-def test_apply_profile_sin_credenciales_mantiene_perfil(monkeypatch):
+def test_apply_profile_sin_credenciales_aborta_sin_escribir(monkeypatch):
+    """El broker tiene `allow_anonymous false`: escribir un perfil sin credenciales
+    dejaría al medidor sin poder conectar nunca. Debe abortar antes de tocar el equipo."""
     capturas = []
     monkeypatch.setattr(pd, "make_request", _fake_make_request(capturas))
 
-    pd.apply_profile("192.168.4.1", "datamaq")
+    with pytest.raises(SystemExit) as exc:
+        pd.apply_profile("192.168.4.1", "datamaq")
 
-    post_mqtt = next(d for u, d in capturas if u.endswith("/mqtt_config.json"))
-    assert post_mqtt["username"] == ""
-    assert post_mqtt["password"] == ""
+    assert exc.value.code == 1
+    assert capturas == []
+
+
+def test_apply_profile_rechaza_puerto_1883(monkeypatch):
+    """El 1883 solo escucha en 127.0.0.1: es inalcanzable desde un medidor."""
+    capturas = []
+    monkeypatch.setattr(pd, "make_request", _fake_make_request(capturas))
+
+    with pytest.raises(SystemExit):
+        pd.apply_profile(
+            "192.168.4.1",
+            "datamaq",
+            custom_port=1883,
+            custom_username="datamaq_device",
+            custom_password="secreto123",
+        )
+
+    assert capturas == []
+
+
+def test_apply_profile_no_borra_ca_del_equipo(monkeypatch, tmp_path):
+    """Un POST de `ca_certificate` vacío borra el CA del medidor y rompe el TLS."""
+    perfil_sin_ca = tmp_path / "perfil.json"
+    perfil_sin_ca.write_text(
+        json.dumps(
+            {
+                "mqtt_config": {
+                    "broker_host": "mqtt.datamaq.com.ar",
+                    "broker_port": 8883,
+                    "security": "NO-SECURITY",
+                    "username": "datamaq_device",
+                    "password": "secreto123",
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    capturas = []
+    monkeypatch.setattr(pd, "make_request", _fake_make_request(capturas))
+
+    # NO-SECURITY sobre 8883 tampoco es válido; se fuerza un modo sin TLS para aislar el caso.
+    pd.apply_profile("192.168.4.1", str(perfil_sin_ca), custom_port=1884)
+
+    assert not any(u.endswith("/mqtt_ca_certificate_config.json") for u, _ in capturas)
 
 
 def test_cli_ayuda_incluye_flags_credenciales():
@@ -79,7 +132,15 @@ def test_perfil_datamaq_usa_tls_8883():
 
 
 def test_perfil_datamaq_sin_secretos_hardcodeados():
+    """El usuario MQTT no es secreto y debe venir fijado; la contraseña nunca se versiona."""
     perfil = json.loads((RAIZ / "profiles/datamaq_server.json").read_text(encoding="utf-8"))
     cfg = perfil["mqtt_config"]
-    assert cfg["username"] == ""
+    assert cfg["username"] == "datamaq_device"
     assert cfg["password"] == ""
+
+
+def test_perfil_datamaq_referencia_ca_existente():
+    perfil = json.loads((RAIZ / "profiles/datamaq_server.json").read_text(encoding="utf-8"))
+    ca = RAIZ / perfil["mqtt_ca_certificate_file"]
+    assert ca.exists(), f"El perfil referencia un CA inexistente: {ca}"
+    assert "BEGIN CERTIFICATE" in ca.read_text(encoding="utf-8")

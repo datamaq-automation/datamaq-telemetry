@@ -6,6 +6,21 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
+## [Sin publicar]
+
+### Corregido
+- **Aprovisionamiento de medidores Powermeter (documentación y tooling desalineados con el broker):**
+  - [`docs/provisioning_guide.md`](file:///home/agustin/proyectos_software/datamaq-telemetry/docs/provisioning_guide.md) indicaba puerto `1883` con `NO-SECURITY` y usuario vacío. El broker escucha el `1883` solo en `127.0.0.1` y tiene `allow_anonymous false`, por lo que esa configuración impide toda conexión. Reescrita con la configuración obligatoria: `mqtt.datamaq.com.ar:8883`, `TLS-SERVER-AUTH`, CA ISRG Root X1 y usuario `datamaq_device`.
+  - [`profiles/datamaq_server.json`](file:///home/agustin/proyectos_software/datamaq-telemetry/profiles/datamaq_server.json): usuario MQTT fijo y CA referenciada por archivo (`mqtt_ca_certificate_file`); la contraseña se inyecta con `--mqtt-password` o `MQTT_PASSWORD` y nunca se versiona.
+  - [`scripts/provision_device.py`](file:///home/agustin/proyectos_software/datamaq-telemetry/scripts/provision_device.py): ya no publica el certificado CA cuando está vacío (ese POST **borraba** el CA del equipo y rompía el TLS); valida la configuración antes de escribir en el medidor (`_validar_config`); `--status` emite un veredicto explícito Wi-Fi vs. MQTT (`_diagnosticar`); propaga código de salida distinto de cero ante fallo.
+  - [`scripts/logs.sh`](file:///home/agustin/proyectos_software/datamaq-telemetry/scripts/logs.sh): `--mqtt` leía `journalctl -u mosquitto` y siempre devolvía "No entries" porque el broker usa `log_dest file`; ahora lee `/var/log/mosquitto/mosquitto.log`. Nuevo filtro `--device [UID]` que descarta el escaneo de internet. `--status` inspeccionaba el puerto inexistente `8885` en vez de `8883`.
+  - `isrg_root_x1.pem` (CA raíz pública de Let's Encrypt, necesaria para aprovisionar) dejó de estar en `.gitignore`.
+
+### Agregado
+- **Documentación de diagnóstico de campo:** [`docs/troubleshooting-conectividad-dispositivos.md`](file:///home/agustin/proyectos_software/datamaq-telemetry/docs/troubleshooting-conectividad-dispositivos.md) — árbol de decisión Wi-Fi vs. broker, playbook de comandos y bitácora del incidente del 2026-09-01 (medidor `D48C49F03564` sin reportar desde el 2026-08-23).
+
+---
+
 ## [1.3.0] - 2026-08-23
 
 ### Agregado

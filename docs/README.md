@@ -1,7 +1,7 @@
 # Índice Maestro de Documentación Técnica — Datamaq Telemetry
 
 > **Repositorio:** `datamaq-telemetry` (Backend FastAPI, Ingestión MQTT y Motor de Analítica)  
-> **Última Actualización:** 2026-08-23  
+> **Última Actualización:** 2026-09-01  
 > **Estado:** Documentación Centralizada y Sincronizada
 
 Bienvenido al centro de documentación técnica del backend de telemetría de energía DataMaq. Los documentos canónicos vivos están organizados temáticamente según el área técnica:
@@ -29,7 +29,9 @@ Bienvenido al centro de documentación técnica del backend de telemetría de en
 * 📄 [`docs/powermeter_mqtt_protocol.md`](file:///home/agustin/proyectos_software/datamaq-telemetry/docs/powermeter_mqtt_protocol.md)  
   *Protocolo MQTT:* Mapa completo de tópicos (`inst`, `acc`, `energyio`, `status`, `event`, `add`, `onoff`, `conf`), esquemas JSON (formatos compacto por fase y extendido), cadencia de publicación (300s estándar / ráfagas sub-minutales), QoS y perfiles de conexión.
 * 📄 [`docs/provisioning_guide.md`](file:///home/agustin/proyectos_software/datamaq-telemetry/docs/provisioning_guide.md)  
-  *Guía de Aprovisionamiento en Campo:* Procedimiento CLI (`scripts/provision_device.py`) e interfaz web local (`192.168.4.1`) para conectar medidores al servidor propio de Datamaq o restaurar al broker oficial de fábrica.
+  *Guía de Aprovisionamiento en Campo:* Procedimiento CLI (`scripts/provision_device.py`) e interfaz web local (`192.168.4.1`) para conectar medidores al servidor propio de Datamaq o restaurar al broker oficial de fábrica. Configuración obligatoria del broker: `mqtt.datamaq.com.ar:8883`, `TLS-SERVER-AUTH` con CA ISRG Root X1 y usuario `datamaq_device`.
+* 📄 [`docs/troubleshooting-conectividad-dispositivos.md`](file:///home/agustin/proyectos_software/datamaq-telemetry/docs/troubleshooting-conectividad-dispositivos.md)  
+  *Diagnóstico de Conectividad de Medidores:* Árbol de decisión para separar fallo de Wi-Fi vs. fallo de broker, playbook de comandos (log de Mosquitto, barrido de LAN, prueba end-to-end con `mosquitto_pub`, `status.json` del equipo) y bitácora del incidente del 2026-09-01.
 * 📄 [`docs/deteccion-anomalias-fases-y-polaridad.md`](file:///home/agustin/proyectos_software/datamaq-telemetry/docs/deteccion-anomalias-fases-y-polaridad.md)  
   *Detección de Anomalías Eléctricas:* Algoritmos matemáticos en dominio para detección automática de inversión de polaridad en transformadores de corriente (`TI_INVERTIDO`), cruce de fases (CT Mismatch) y orden de secuencia de fases ($R-S-T$ vs. $R-T-S$).
 

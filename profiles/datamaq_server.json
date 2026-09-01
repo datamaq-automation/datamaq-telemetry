@@ -1,11 +1,13 @@
 {
-  "_description": "Perfil Datamaq Telemetry - Servidor Propio en VPS / Local",
+  "_description": "Perfil Datamaq Telemetry - Servidor Propio en VPS",
+  "_nota_credenciales": "El broker exige autenticacion (allow_anonymous false). La contrasena NO se versiona: pasala con --mqtt-password o exportala en MQTT_PASSWORD (valor en /var/www/datamaq-telemetry/.env del VPS).",
+  "mqtt_ca_certificate_file": "isrg_root_x1.pem",
   "mqtt_config": {
     "enable_mqtt": true,
     "enable_extended_topics": true,
     "broker_host": "mqtt.datamaq.com.ar",
     "broker_port": 8883,
-    "username": "",
+    "username": "datamaq_device",
     "password": "",
     "security": "TLS-SERVER-AUTH",
     "clean_session": true,

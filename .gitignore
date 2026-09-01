@@ -46,7 +46,6 @@ htmlcov/
 # Backups & Data
 backups/
 data/
-isrg_root_x1.pem
 .aider.conf.yml
 .aider.conventions.md
 .aider*
