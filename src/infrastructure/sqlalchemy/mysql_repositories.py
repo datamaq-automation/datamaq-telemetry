@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import desc
+from sqlalchemy import asc, desc
 from sqlalchemy.orm import Session
 
 from src.domain.auth.entities import UsuarioAuth
@@ -488,6 +488,15 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
         if desde:
             q = q.filter(TelemetryEnergyModel.recorded_at >= desde)
         items = q.order_by(desc(TelemetryEnergyModel.recorded_at)).limit(limite).all()
+        return [self._energia_to_entity(m) for m in items]
+
+    def listar_acumulados_para_agregacion(
+        self, dispositivo_id: str, desde: datetime | None = None
+    ) -> list[AcumuladoEnergia]:
+        q = self.db.query(TelemetryEnergyModel).filter(TelemetryEnergyModel.device_id == dispositivo_id)
+        if desde:
+            q = q.filter(TelemetryEnergyModel.recorded_at >= desde)
+        items = q.order_by(asc(TelemetryEnergyModel.recorded_at)).all()
         return [self._energia_to_entity(m) for m in items]
 
     def purgar_instantaneas_anteriores_a(self, fecha_limite: datetime, batch_size: int = 1000) -> int:

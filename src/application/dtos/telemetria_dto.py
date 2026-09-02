@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict
@@ -60,6 +61,12 @@ class AcumuladoEnergiaDTO(BaseModel):
     exported_active_energy_kwh: float | None = None
     imported_reactive_energy_kvarh: float | None = None
     exported_reactive_energy_kvarh: float | None = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class EnergiaAgregadaDTO(BaseModel):
+    periodo: date
+    energia_activa_neta_kwh: float | None = None
     model_config = ConfigDict(from_attributes=True)
 
 

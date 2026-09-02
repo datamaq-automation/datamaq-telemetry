@@ -40,6 +40,11 @@ class TipoNodoUnifilar(str, Enum):
     CARGA = "carga"
 
 
+class GranularidadEnergia(str, Enum):
+    DIA = "day"
+    MES = "month"
+
+
 @dataclass(frozen=True)
 class CoordenadasZona:
     x_porcentaje: float

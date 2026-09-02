@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Any
 
@@ -195,6 +195,18 @@ class AcumuladoEnergia:
     energia_activa_exportada: EnergiaActiva | None = None
     energia_reactiva_importada: EnergiaReactiva | None = None
     energia_reactiva_exportada: EnergiaReactiva | None = None
+
+
+@dataclass(frozen=True)
+class EnergiaAgregada:
+    """Consumo de energía de un periodo (día o mes), calculado como delta del contador acumulado.
+
+    ``energia_activa_neta_kwh`` es ``None`` en el primer periodo, que no tiene un
+    periodo anterior como referencia: la UI omite esa barra en vez de inventar un valor.
+    """
+
+    periodo: date
+    energia_activa_neta_kwh: float | None = None
 
 
 @dataclass(frozen=True)

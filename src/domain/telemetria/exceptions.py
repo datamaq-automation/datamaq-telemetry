@@ -44,3 +44,11 @@ class PlantaNoEncontradaError(DominioTelemetriaException):
 
 class CortePurgaFuturoError(DominioTelemetriaException):
     """Lanzada cuando el corte de purga (corte_hasta) es posterior al instante actual."""
+
+
+class GranularidadEnergiaInvalidaError(DominioTelemetriaException):
+    """Lanzada cuando la granularidad de energía solicitada no es day ni month."""
+
+
+class ZonaHorariaInvalidaError(DominioTelemetriaException):
+    """Lanzada cuando el identificador IANA de zona horaria no existe o es inválido."""

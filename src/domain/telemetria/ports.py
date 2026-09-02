@@ -83,6 +83,14 @@ class RepositorioTelemetriaPort(ABC):
         pass
 
     @abstractmethod
+    def listar_acumulados_para_agregacion(
+        self,
+        dispositivo_id: str,
+        desde: datetime | None = None,
+    ) -> list[AcumuladoEnergia]:
+        pass
+
+    @abstractmethod
     def purgar_instantaneas_anteriores_a(self, fecha_limite: datetime, batch_size: int = 1000) -> int:
         pass
 

@@ -1,11 +1,12 @@
-from datetime import datetime, timedelta, timezone
-from typing import Annotated
+from datetime import datetime, timedelta, timezone as tz
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query
 
 from src.application.dtos.alerta_dto import AlertaResponseDTO
 from src.application.dtos.telemetria_dto import (
     AcumuladoEnergiaDTO,
+    EnergiaAgregadaDTO,
     LecturaInstantaneaDTO,
     TelemetriaLatestResponseDTO,
 )
@@ -46,7 +47,7 @@ def get_instantaneous_history(
     granularity: str = Query("auto", description="Granularidad temporal: auto, raw, 1m, 5m, 15m, 1h"),
 ):
     try:
-        desde = datetime.now(timezone.utc) - timedelta(hours=hours) if hours else None
+        desde = datetime.now(tz.utc) - timedelta(hours=hours) if hours else None
         return use_case.listar_instantaneas(
             id_o_uid=device_id,
             limite=limit,
@@ -58,16 +59,20 @@ def get_instantaneous_history(
         manejar_error_http(e)
 
 
-@router.get("/energy/{device_id}", response_model=list[AcumuladoEnergiaDTO])
+@router.get("/energy/{device_id}", response_model=list[AcumuladoEnergiaDTO | EnergiaAgregadaDTO])
 def get_energy_history(
     device_id: str,
     use_case: Annotated[ConsultarTelemetriaUseCase, Depends(get_telemetria_use_case)],
     limit: int = Query(100, le=1000),
     days: int | None = Query(None, description="Últimos N días"),
+    granularity: Literal["raw", "day", "month"] = Query("raw", description="Granularidad: raw, day, month"),
+    timezone: str = Query("America/Argentina/Buenos_Aires", description="Zona horaria IANA"),
 ):
     try:
-        desde = datetime.now(timezone.utc) - timedelta(days=days) if days else None
-        return use_case.listar_energias(device_id, limit, desde)
+        if granularity == "raw":
+            desde = datetime.now(tz.utc) - timedelta(days=days) if days else None
+            return use_case.listar_energias(device_id, limit, desde)
+        return use_case.listar_energia_agregada(device_id, granularity, timezone, days)
     except Exception as e:
         manejar_error_http(e)
 

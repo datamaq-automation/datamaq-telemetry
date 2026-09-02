@@ -1,12 +1,14 @@
 from src.application.dtos.telemetria_dto import (
     AcumuladoEnergiaDTO,
     AnaliticaCalidadEnergiaDTO,
+    EnergiaAgregadaDTO,
     LecturaInstantaneaDTO,
     LogEstadoDispositivoDTO,
     MedicionFaseDTO,
 )
 from src.domain.telemetria.entities import (
     AcumuladoEnergia,
+    EnergiaAgregada,
     LecturaInstantanea,
     LogEstadoDispositivo,
     MedicionFase,
@@ -98,6 +100,13 @@ class TelemetriaMapper:
             exported_reactive_energy_kvarh=acumulado.energia_reactiva_exportada.kvarh
             if acumulado.energia_reactiva_exportada
             else None,
+        )
+
+    @staticmethod
+    def energia_agregada_to_dto(agregada: EnergiaAgregada) -> EnergiaAgregadaDTO:
+        return EnergiaAgregadaDTO(
+            periodo=agregada.periodo,
+            energia_activa_neta_kwh=agregada.energia_activa_neta_kwh,
         )
 
     @staticmethod

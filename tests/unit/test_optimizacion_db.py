@@ -224,6 +224,14 @@ class MockTelemetriaRepo(RepositorioTelemetriaPort):
             q = [e for e in q if self._gte(e.registrado_en, desde)]
         return q[:limite]
 
+    def listar_acumulados_para_agregacion(
+        self, dispositivo_id: str, desde: datetime | None = None
+    ) -> list[AcumuladoEnergia]:
+        q = [e for e in self.energias if e.dispositivo_id == dispositivo_id]
+        if desde:
+            q = [e for e in q if self._gte(e.registrado_en, desde)]
+        return q
+
     def purgar_instantaneas_anteriores_a(self, fecha_limite: datetime, batch_size: int = 1000) -> int:
         prev = len(self.instantaneas)
         self.instantaneas = [i for i in self.instantaneas if self._gte(i.registrado_en, fecha_limite)]

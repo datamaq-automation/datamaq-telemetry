@@ -1,12 +1,15 @@
 import cmath
 import math
 import threading
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from src.domain.telemetria.analizador_reactiva import DimensionadorCompensacionService
 from src.domain.telemetria.entities import (
+    AcumuladoEnergia,
     AlertaDispositivo,
+    EnergiaAgregada,
     LecturaInstantanea,
     MedicionFase,
     PlanTelemetria,
@@ -17,6 +20,7 @@ from src.domain.telemetria.value_objects import (
     EstadoFactorPotencia,
     EstadoTension,
     FactorPotencia,
+    GranularidadEnergia,
     ModoFreeTier,
     PotenciaActiva,
     PotenciaAparente,
@@ -81,6 +85,53 @@ class CalculadoraPotenciaService:
         if not presentes:
             return None
         return round(sum(presentes), 2)
+
+
+class AgregacionEnergiaService:
+    """Agrega el contador acumulado de energía en consumos por periodo (día o mes).
+
+    El consumo de un periodo es el delta del último acumulado respecto del último
+    del periodo anterior, en la zona horaria configurada. El primer periodo no
+    tiene referencia y se devuelve con ``energia_activa_neta_kwh=None``.
+    """
+
+    @staticmethod
+    def _normalizar_utc(registrado_en: datetime) -> datetime:
+        if registrado_en.tzinfo is None:
+            return registrado_en.replace(tzinfo=timezone.utc)
+        return registrado_en.astimezone(timezone.utc)
+
+    @staticmethod
+    def agregar_por_periodo(
+        acumulados: list[AcumuladoEnergia],
+        granularidad: GranularidadEnergia,
+        zona: ZoneInfo,
+    ) -> list[EnergiaAgregada]:
+        ordenados = sorted(
+            (a for a in acumulados if a.energia_activa_neta is not None),
+            key=lambda a: AgregacionEnergiaService._normalizar_utc(a.registrado_en),
+        )
+
+        ultimos: dict[date, float] = {}
+        for a in ordenados:
+            ena = a.energia_activa_neta
+            if ena is None:
+                continue
+            local = AgregacionEnergiaService._normalizar_utc(a.registrado_en).astimezone(zona)
+            if granularidad == GranularidadEnergia.DIA:
+                periodo = local.date()
+            else:
+                periodo = local.date().replace(day=1)
+            ultimos[periodo] = ena.kwh
+
+        resultado: list[EnergiaAgregada] = []
+        anterior: float | None = None
+        for periodo in sorted(ultimos):
+            kwh = ultimos[periodo]
+            delta = None if anterior is None else round(kwh - anterior, 3)
+            resultado.append(EnergiaAgregada(periodo=periodo, energia_activa_neta_kwh=delta))
+            anterior = kwh
+        return resultado
 
 
 class FiltroDeduplicacionService:

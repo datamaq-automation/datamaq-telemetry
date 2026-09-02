@@ -1,13 +1,19 @@
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from src.application.dtos.telemetria_dto import (
     AcumuladoEnergiaDTO,
+    EnergiaAgregadaDTO,
     LecturaInstantaneaDTO,
     TelemetriaLatestResponseDTO,
 )
 from src.application.mappers.telemetria_mapper import TelemetriaMapper
 from src.domain.telemetria.entities import Dispositivo
-from src.domain.telemetria.exceptions import DispositivoNoEncontradoError
+from src.domain.telemetria.exceptions import (
+    DispositivoNoEncontradoError,
+    GranularidadEnergiaInvalidaError,
+    ZonaHorariaInvalidaError,
+)
 from src.domain.telemetria.ports import (
     RepositorioDispositivosPort,
     RepositorioOrganizacionesPort,
@@ -15,11 +21,12 @@ from src.domain.telemetria.ports import (
     RepositorioTelemetriaPort,
 )
 from src.domain.telemetria.services import (
+    AgregacionEnergiaService,
     AnalizadorCalidadEnergiaService,
     PoliticaRetencionService,
     PoliticaSuscripcionService,
 )
-from src.domain.telemetria.value_objects import MacAddress, ModoFreeTier
+from src.domain.telemetria.value_objects import GranularidadEnergia, MacAddress, ModoFreeTier
 
 
 class ConsultarTelemetriaUseCase:
@@ -167,3 +174,28 @@ class ConsultarTelemetriaUseCase:
         desde_efectivo = self._acotar_fecha_desde(dev, desde)
         acumulados = self.repo_telemetria.listar_energias(dev.id, limite, desde_efectivo)
         return [TelemetriaMapper.acumulado_to_dto(a) for a in acumulados]
+
+    def listar_energia_agregada(
+        self,
+        id_o_uid: str,
+        granularidad: str = "day",
+        zona: str = "America/Argentina/Buenos_Aires",
+        dias: int | None = None,
+    ) -> list[EnergiaAgregadaDTO]:
+        dev = self._resolver_dispositivo(id_o_uid)
+
+        try:
+            granularidad_enum = GranularidadEnergia(granularidad)
+        except ValueError as exc:
+            raise GranularidadEnergiaInvalidaError(f"Granularidad inválida: {granularidad}") from exc
+
+        try:
+            zona_info = ZoneInfo(zona)
+        except (ZoneInfoNotFoundError, ValueError) as exc:
+            raise ZonaHorariaInvalidaError(f"Zona horaria inválida: {zona}") from exc
+
+        desde = datetime.now(timezone.utc) - timedelta(days=dias) if dias else None
+        desde_efectivo = self._acotar_fecha_desde(dev, desde)
+        acumulados = self.repo_telemetria.listar_acumulados_para_agregacion(dev.id, desde_efectivo)
+        agregados = AgregacionEnergiaService.agregar_por_periodo(acumulados, granularidad_enum, zona_info)
+        return [TelemetriaMapper.energia_agregada_to_dto(a) for a in agregados]
