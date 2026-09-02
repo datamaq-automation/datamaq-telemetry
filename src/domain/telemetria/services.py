@@ -964,8 +964,17 @@ class AnalizadorCalidadEnergiaService:
         cls,
         lectura: LecturaInstantanea,
         fp_objetivo: float = 0.96,
+        potencia_minima_w: float = 500.0,
     ) -> AnaliticaCalidadEnergia:
-        """Calcula el bloque analítico completo de calidad de energía y compensación de reactiva."""
+        """Calcula el bloque analítico completo de calidad de energía y compensación de reactiva.
+
+        Por debajo de `potencia_minima_w` no se dimensiona compensación ni se estima
+        penalización: el factor de potencia de una carga en standby es real pero no
+        describe el consumo facturable. Con 148 W de standby la analítica llegaba a
+        recomendar un banco de 2.5 kVAr y a estimar una multa de ARS 4.774, cifras
+        inventadas sobre una carga despreciable. El umbral replica el que ya exige
+        `evaluar_alerta_factor_potencia`.
+        """
         # 1. Potencia activa total en kW
         p_activa_w: float | None = None
         if lectura.potencia_activa_total is not None:
@@ -1000,7 +1009,8 @@ class AnalizadorCalidadEnergiaService:
         banco_sug: float | None = None
         penalizacion_ars: float | None = None
 
-        if p_activa_kw is not None and p_activa_kw > 0.0 and fp_val is not None and fp_val > 0.0:
+        supera_minimo = p_activa_w is not None and p_activa_w >= potencia_minima_w
+        if supera_minimo and p_activa_kw is not None and fp_val is not None and fp_val > 0.0:
             qc_calc = DimensionadorCompensacionService.calcular_potencia_compensacion(
                 p_activa_kw, fp_val, fp_objetivo=fp_objetivo
             )

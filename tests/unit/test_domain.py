@@ -21,6 +21,7 @@ from src.domain.telemetria.value_objects import (
     FactorPotencia,
     MacAddress,
     PotenciaActiva,
+    PotenciaAparente,
     PotenciaReactiva,
     SeveridadAlerta,
     Tension,
@@ -1047,3 +1048,51 @@ def test_agregacion_usa_v_por_i_y_no_hypot():
     assert fase_r.potencia_aparente.va == 400.0
     assert fase_r.factor_potencia is not None
     assert fase_r.factor_potencia.valor == 0.75
+
+
+def test_analitica_no_dimensiona_compensacion_con_carga_despreciable():
+    """Con 148 W de standby la analítica llegaba a estimar una multa de ARS 4.774."""
+    fase = MedicionFase(
+        tension=Tension(voltios=227.7),
+        corriente=Corriente(amperios=0.9),
+        potencia_activa=PotenciaActiva(vatios=147.0),
+        potencia_aparente=PotenciaAparente(va=204.93),
+        factor_potencia=FactorPotencia(valor=0.72),
+    )
+    lectura = LecturaInstantanea(
+        id=None,
+        dispositivo_id="dev-1",
+        registrado_en=datetime(2026, 9, 1, 23, 20, tzinfo=timezone.utc),
+        fase_r=fase,
+        fase_s=MedicionFase(),
+        fase_t=MedicionFase(),
+        potencia_activa_total=PotenciaActiva(vatios=148.0),
+        factor_potencia_total=FactorPotencia(valor=0.65),
+    )
+
+    analitica = AnalizadorCalidadEnergiaService.calcular_analitica_completa(lectura)
+
+    assert analitica.requiere_compensacion is False
+    assert analitica.banco_sugerido_kvar is None
+    assert analitica.penalizacion_estimada_ars is None
+    # El estado del FP sí se reporta: la medición es real aunque no se dimensione nada
+    assert analitica.estado_fp == EstadoFactorPotencia.PENALIZADO
+
+
+def test_analitica_dimensiona_compensacion_con_carga_facturable():
+    lectura = LecturaInstantanea(
+        id=None,
+        dispositivo_id="dev-1",
+        registrado_en=datetime(2026, 9, 1, 23, 20, tzinfo=timezone.utc),
+        fase_r=MedicionFase(),
+        fase_s=MedicionFase(),
+        fase_t=MedicionFase(),
+        potencia_activa_total=PotenciaActiva(vatios=15000.0),
+        factor_potencia_total=FactorPotencia(valor=0.80),
+    )
+
+    analitica = AnalizadorCalidadEnergiaService.calcular_analitica_completa(lectura)
+
+    assert analitica.requiere_compensacion is True
+    assert analitica.banco_sugerido_kvar is not None
+    assert analitica.penalizacion_estimada_ars is not None
