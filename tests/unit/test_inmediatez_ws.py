@@ -115,9 +115,7 @@ def test_broadcast_subtopic_distinto_de_inst_conserva_payload_crudo():
     repo_disp = _RepoDisp()
     repo_telem = _RepoTelem()
     pub = _Publicador()
-    use_case = IngestarTelemetriaUseCase(
-        repo_disp, repo_telem, publicador=pub, permitir_auto_registro=False
-    )
+    use_case = IngestarTelemetriaUseCase(repo_disp, repo_telem, publicador=pub, permitir_auto_registro=False)
 
     payload = {"timestamp": 1788303000, "x": 1}
 
