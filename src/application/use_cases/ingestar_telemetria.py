@@ -683,13 +683,14 @@ class IngestarTelemetriaUseCase:
                 self.repo_telemetria.guardar_instantanea(lectura)
                 with self._lock:
                     self._ultimas_persistencias[dispositivo.id] = recorded_at
-                if self.logger:
-                    self.logger.debug(
-                        "telemetria_instantanea_guardada",
-                        device_uid=dispositivo.device_uid.valor,
-                        p_activa_W=float(p_tot) if p_tot is not None else None,
-                        fp=float(fp_tot) if fp_tot is not None else None,
-                    )
+            if self.logger:
+                self.logger.info(
+                    "telemetria_instantanea_procesada",
+                    device_uid=dispositivo.device_uid.valor,
+                    p_activa_W=float(p_tot) if p_tot is not None else None,
+                    fp=float(fp_tot) if fp_tot is not None else None,
+                    persistido_db=debe_persistir,
+                )
 
         elif subtopico in ("acc", "energyio"):
             total = payload.get("total") if isinstance(payload.get("total"), dict) else payload

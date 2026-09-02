@@ -78,15 +78,101 @@ async def manejar_excepcion_no_mapeada(request: Request, exc: Exception) -> JSON
     return JSONResponse(status_code=500, content={"detail": "error_interno"}, headers=headers)
 
 
+class WebSocketMetrics:
+    def __init__(self) -> None:
+        self.total_conexiones: int = 0
+        self.total_desconexiones: int = 0
+        self.total_broadcasts: int = 0
+        self.ultimo_broadcast_en: str | None = None
+        self.ultimo_topico: str | None = None
+        self.ultimo_payload_bytes: int = 0
+        self.total_mensajes_enviados_ok: int = 0
+        self.total_mensajes_fallidos: int = 0
+
+    def to_dict(self, clientes_activos: int) -> dict[str, Any]:
+        return {
+            "clientes_activos": clientes_activos,
+            "total_conexiones": self.total_conexiones,
+            "total_desconexiones": self.total_desconexiones,
+            "total_broadcasts": self.total_broadcasts,
+            "ultimo_broadcast_en": self.ultimo_broadcast_en,
+            "ultimo_topico": self.ultimo_topico,
+            "ultimo_payload_bytes": self.ultimo_payload_bytes,
+            "total_mensajes_enviados_ok": self.total_mensajes_enviados_ok,
+            "total_mensajes_fallidos": self.total_mensajes_fallidos,
+        }
+
+
+ws_metrics = WebSocketMetrics()
+
+
+def obtener_metricas_ws() -> dict[str, Any]:
+    return ws_metrics.to_dict(len(active_websockets))
+
+
 def websocket_broadcast_callback(topico: str, datos: dict):
-    if not active_websockets or not async_loop:
-        return
-    # `.isoformat()` produce "+00:00"; REST emite "Z". Se unifica el formato entre ambos canales.
     recibido_en = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     msg = json.dumps({"topic": topico, "data": datos, "received_at": recibido_en})
+    msg_bytes = len(msg)
+
+    total_clientes = len(active_websockets)
+    if total_clientes == 0:
+        logger.info("ws_broadcast_sin_clientes", topico=topico, bytes=msg_bytes)
+        ws_metrics.total_broadcasts += 1
+        ws_metrics.ultimo_broadcast_en = recibido_en
+        ws_metrics.ultimo_topico = topico
+        ws_metrics.ultimo_payload_bytes = msg_bytes
+        return
+
+    if not async_loop:
+        logger.warning("ws_broadcast_sin_loop", topico=topico)
+        return
+
+    enviados_ok = 0
+    fallidos = 0
     for ws in list(active_websockets):
         try:
             asyncio.run_coroutine_threadsafe(ws.send_text(msg), async_loop)
+            enviados_ok += 1
+        except Exception as exc:
+            fallidos += 1
+            logger.warning("ws_broadcast_error_cliente", error=str(exc), topico=topico)
+            if ws in active_websockets:
+                active_websockets.remove(ws)
+
+    ws_metrics.total_broadcasts += 1
+    ws_metrics.ultimo_broadcast_en = recibido_en
+    ws_metrics.ultimo_topico = topico
+    ws_metrics.ultimo_payload_bytes = msg_bytes
+    ws_metrics.total_mensajes_enviados_ok += enviados_ok
+    ws_metrics.total_mensajes_fallidos += fallidos
+
+    logger.info(
+        "ws_broadcast_despachado",
+        topico=topico,
+        bytes=msg_bytes,
+        clientes_activos=total_clientes,
+        enviados_ok=enviados_ok,
+        fallidos=fallidos,
+    )
+
+
+async def _ws_heartbeat_loop() -> None:
+    """Mantiene activa la conexión a través de Cloudflare o Nginx ante períodos de inactividad."""
+    while True:
+        try:
+            await asyncio.sleep(25)
+            if active_websockets:
+                ahora = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+                ping_msg = json.dumps({"topic": "system/heartbeat", "data": {"status": "ok"}, "received_at": ahora})
+                for ws in list(active_websockets):
+                    try:
+                        await ws.send_text(ping_msg)
+                    except Exception:
+                        if ws in active_websockets:
+                            active_websockets.remove(ws)
+        except asyncio.CancelledError:
+            break
         except Exception:
             pass
 
@@ -108,12 +194,20 @@ async def lifespan(app: FastAPI):
     registrar_mqtt_listener(mqtt_listener)
     mqtt_listener.start()
 
+    # Iniciar heartbeat para Cloudflare / proxies
+    heartbeat_task = asyncio.create_task(_ws_heartbeat_loop())
+
     logger.info("servidor_datamaq_listo", websockets_route="/ws/live", docs_route="/docs")
 
     yield
 
     # Clean shutdown
     logger.info("deteniendo_servidor_datamaq")
+    heartbeat_task.cancel()
+    try:
+        await heartbeat_task
+    except asyncio.CancelledError:
+        pass
     mqtt_listener.stop()
     global_event_broadcaster.desuscribir(websocket_broadcast_callback)
 
@@ -166,19 +260,38 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # WebSockets Live Telemetry Stream
     @app.websocket("/ws/live")
     async def websocket_stream(websocket: WebSocket):
+        client_host = websocket.client.host if websocket.client else "desconocido"
         await websocket.accept()
         if settings.AUTH_REQUIRED:
             cookie_token = websocket.cookies.get(settings.AUTH_COOKIE_NOMBRE)
             auth_header = websocket.headers.get("authorization")
             if not token_valido(cookie_token, auth_header, settings.API_SECRET_KEY, settings.API_SECRET_KEY_ANTERIOR):
+                logger.warning("ws_auth_rechazada", client=client_host, razon="token_invalido")
                 await websocket.close(code=WS_CLOSE_TOKEN_INVALIDO, reason="token_invalido")
                 return
         active_websockets.append(websocket)
+        ws_metrics.total_conexiones += 1
+        logger.info("ws_cliente_conectado", client=client_host, total_activos=len(active_websockets))
         try:
             while True:
-                await websocket.receive_text()
-        except WebSocketDisconnect:
+                data = await websocket.receive_text()
+                if data in ("ping", '{"type":"ping"}'):
+                    await websocket.send_text(
+                        json.dumps({"type": "pong", "timestamp": datetime.now(timezone.utc).isoformat()})
+                    )
+        except WebSocketDisconnect as e:
             if websocket in active_websockets:
                 active_websockets.remove(websocket)
+            ws_metrics.total_desconexiones += 1
+            logger.info(
+                "ws_cliente_desconectado", client=client_host, code=e.code, total_activos=len(active_websockets)
+            )
+        except Exception as e:
+            if websocket in active_websockets:
+                active_websockets.remove(websocket)
+            ws_metrics.total_desconexiones += 1
+            logger.warning(
+                "ws_cliente_error_conexion", client=client_host, error=str(e), total_activos=len(active_websockets)
+            )
 
     return app

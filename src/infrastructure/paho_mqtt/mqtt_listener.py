@@ -115,11 +115,11 @@ class MQTTListener:
             logger.warning("mqtt_payload_no_dict", topico=topic)
             return
 
-        logger.debug("mqtt_mensaje_recibido", topico=topic, tamano_bytes=len(payload_bytes))
+        logger.info("mqtt_mensaje_recibido", topico=topic, tamano_bytes=len(payload_bytes))
 
         clave_dedup = f"{topic}:{hashlib.sha256(payload_bytes).hexdigest()}"
         if self._dedup.es_duplicado(clave_dedup):
-            logger.debug("mqtt_mensaje_duplicado", topico=topic)
+            logger.warning("mqtt_mensaje_duplicado", topico=topic)
             return
 
         self._executor.submit(self._procesar_mensaje, topic, payload)

@@ -66,6 +66,17 @@ def health_check(response: Response):
     return readiness_check(response)
 
 
+@router.get("/system/ws-status")
+def websocket_status():
+    """Estado y métricas de observabilidad de los WebSockets en vivo."""
+    from src.infrastructure.fastapi.server import obtener_metricas_ws
+
+    listener = get_mqtt_listener()
+    metricas = obtener_metricas_ws()
+    metricas["mqtt_conectado"] = listener.esta_conectado() if listener else False
+    return metricas
+
+
 @router.post("/api/system/purge", response_model=PurgaResultadoDTO)
 def trigger_purge(
     claims: Annotated[dict, Depends(requiere_rol_admin)],
