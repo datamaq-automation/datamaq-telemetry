@@ -21,6 +21,7 @@ from src.domain.telemetria.value_objects import (
     FactorPotencia,
     MacAddress,
     PotenciaActiva,
+    PotenciaReactiva,
     SeveridadAlerta,
     Tension,
 )
@@ -1009,3 +1010,40 @@ def test_calcular_analitica_completa_sin_factor_potencia():
 
     assert analitica.estado_fp == EstadoFactorPotencia.SIN_DATOS
     assert analitica.requiere_compensacion is False
+
+
+def test_agregacion_usa_v_por_i_y_no_hypot():
+    """La agregación comparte definición con `raw`: S = V̄·Ī, no hypot(P,Q).
+
+    Antes una consulta `raw` devolvía null donde la agregada devolvía hypot, es decir
+    dos definiciones distintas de potencia aparente en la misma API.
+    """
+    base = datetime(2026, 9, 1, 23, 0, tzinfo=timezone.utc)
+
+    def _lectura(segundo: int) -> LecturaInstantanea:
+        fase = MedicionFase(
+            tension=Tension(voltios=200.0),
+            corriente=Corriente(amperios=2.0),
+            potencia_activa=PotenciaActiva(vatios=300.0),
+            potencia_reactiva=PotenciaReactiva(var=400.0),
+        )
+        return LecturaInstantanea(
+            id=None,
+            dispositivo_id="dev-1",
+            registrado_en=base.replace(second=segundo),
+            fase_r=fase,
+            fase_s=fase,
+            fase_t=fase,
+        )
+
+    agregadas = AnalizadorCalidadEnergiaService.agregar_lecturas_en_intervalo(
+        [_lectura(0), _lectura(30)], intervalo_segundos=60
+    )
+
+    assert len(agregadas) == 1
+    fase_r = agregadas[0].fase_r
+    assert fase_r.potencia_aparente is not None
+    # V·I = 200 * 2 = 400 VA. hypot(300, 400) habría dado 500 VA.
+    assert fase_r.potencia_aparente.va == 400.0
+    assert fase_r.factor_potencia is not None
+    assert fase_r.factor_potencia.valor == 0.75

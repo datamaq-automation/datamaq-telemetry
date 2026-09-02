@@ -358,13 +358,13 @@ class AnalizadorCalidadEnergiaService:
             i = _avg([f.corriente.amperios for f in fases if f.corriente])
             p = _avg([f.potencia_activa.vatios for f in fases if f.potencia_activa])
             q = _avg([f.potencia_reactiva.var for f in fases if f.potencia_reactiva])
-            s = _avg([f.potencia_aparente.va for f in fases if f.potencia_aparente])
-            if s is None and p is not None and q is not None:
-                s = round(math.hypot(p, q), 2)
-            fp: float | None = None
-            if p is not None and s is not None and s > 0:
-                fp = round(p / s, 2)
-            else:
+            # S se recalcula desde V e I promediadas del bucket en vez de promediar las S
+            # almacenadas: así `raw` y las granularidades agregadas comparten definición.
+            s = CalculadoraPotenciaService.calcular_potencia_aparente(v, i)
+            if s is None:
+                s = _avg([f.potencia_aparente.va for f in fases if f.potencia_aparente])
+            fp = CalculadoraPotenciaService.calcular_factor_potencia(p, s)
+            if fp is None:
                 fp = _avg([f.factor_potencia.valor for f in fases if f.factor_potencia])
             thd_v = _avg([f.thd_v_porcentaje for f in fases if f.thd_v_porcentaje is not None])
             thd_i = _avg([f.thd_i_porcentaje for f in fases if f.thd_i_porcentaje is not None])
@@ -395,14 +395,14 @@ class AnalizadorCalidadEnergiaService:
             if q_sub:
                 q_tot = round(sum(q_sub), 2)
 
-        s_tot = _avg([it.potencia_aparente_total.va for it in items if it.potencia_aparente_total])
-        if s_tot is None and p_tot is not None and q_tot is not None:
-            s_tot = round(math.hypot(p_tot, q_tot), 2)
+        s_tot = CalculadoraPotenciaService.calcular_potencia_aparente_total(
+            *(f.potencia_aparente.va if f.potencia_aparente else None for f in (fase_r, fase_s, fase_t))
+        )
+        if s_tot is None:
+            s_tot = _avg([it.potencia_aparente_total.va for it in items if it.potencia_aparente_total])
 
-        fp_tot: float | None = None
-        if p_tot is not None and s_tot is not None and s_tot > 0:
-            fp_tot = round(p_tot / s_tot, 2)
-        else:
+        fp_tot = CalculadoraPotenciaService.calcular_factor_potencia(p_tot, s_tot)
+        if fp_tot is None:
             fp_tot = _avg([it.factor_potencia_total.valor for it in items if it.factor_potencia_total])
 
         vr = fase_r.tension.voltios if fase_r.tension else None
