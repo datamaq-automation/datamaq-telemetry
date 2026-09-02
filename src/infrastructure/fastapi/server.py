@@ -1,5 +1,6 @@
 import asyncio
 import json
+import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Any
@@ -11,6 +12,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from src.infrastructure.fastapi.dependencies import (
+    get_mqtt_listener,
     global_event_broadcaster,
     registrar_mqtt_listener,
     token_valido,
@@ -45,8 +47,10 @@ from src.infrastructure.settings.config import Settings, get_settings
 from src.infrastructure.settings.logger import get_logger
 from src.infrastructure.sqlalchemy.database import (
     create_tables_if_needed,
+    get_session_factory,
     verificar_estado_migraciones,
 )
+from src.infrastructure.sqlalchemy.mysql_repositories import MySQLDispositivosRepository
 
 logger = get_logger("server")
 
@@ -157,8 +161,27 @@ def websocket_broadcast_callback(topico: str, datos: dict):
     )
 
 
+def _renovar_modo_tiempo_real_medidores(listener: Any) -> None:
+    try:
+        session_factory = get_session_factory()
+        db = session_factory()
+        try:
+            repo = MySQLDispositivosRepository(db)
+            dispositivos = repo.listar()
+            for disp in dispositivos:
+                if disp.device_uid and disp.device_uid.valor:
+                    listener.activar_tiempo_real_dispositivo(disp.device_uid.valor, segundos=120)
+            logger.info("realtime_mode_auto_renovado", total_dispositivos=len(dispositivos))
+        finally:
+            db.close()
+    except Exception as e:
+        logger.warning("realtime_mode_auto_renovacion_fallida", error=str(e))
+
+
 async def _ws_heartbeat_loop() -> None:
-    """Mantiene activa la conexión a través de Cloudflare o Nginx ante períodos de inactividad."""
+    """Mantiene activa la conexión a través de Cloudflare o Nginx ante períodos de inactividad
+    y renueva el modo de tiempo real en medidores mientras haya clientes WebSocket conectados."""
+    ultimo_sync_realtime: float = 0.0
     while True:
         try:
             await asyncio.sleep(25)
@@ -171,6 +194,14 @@ async def _ws_heartbeat_loop() -> None:
                     except Exception:
                         if ws in active_websockets:
                             active_websockets.remove(ws)
+
+                # Renovación periódica de sampleo rápido (cada 60 segundos si hay clientes activos)
+                ahora_ts = time.time()
+                if ahora_ts - ultimo_sync_realtime >= 60.0:
+                    ultimo_sync_realtime = ahora_ts
+                    listener = get_mqtt_listener()
+                    if listener and listener.esta_conectado():
+                        _renovar_modo_tiempo_real_medidores(listener)
         except asyncio.CancelledError:
             break
         except Exception:
@@ -272,6 +303,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         active_websockets.append(websocket)
         ws_metrics.total_conexiones += 1
         logger.info("ws_cliente_conectado", client=client_host, total_activos=len(active_websockets))
+        if len(active_websockets) == 1:
+            listener = get_mqtt_listener()
+            if listener and listener.esta_conectado():
+                _renovar_modo_tiempo_real_medidores(listener)
         try:
             while True:
                 data = await websocket.receive_text()

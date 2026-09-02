@@ -1,5 +1,6 @@
 import hashlib
 import json
+import time
 from concurrent.futures import ThreadPoolExecutor
 
 import paho.mqtt.client as mqtt
@@ -144,6 +145,31 @@ class MQTTListener:
 
     def esta_conectado(self) -> bool:
         return self._esta_conectado
+
+    def publicar_comando(self, topico: str, payload: dict) -> bool:
+        if not self._esta_conectado:
+            logger.warning("mqtt_comando_no_enviado_desconectado", topico=topico)
+            return False
+        try:
+            payload_str = json.dumps(payload)
+            self.client.publish(topico, payload_str, qos=1)
+            logger.info("mqtt_comando_publicado", topico=topico, payload=payload)
+            return True
+        except Exception as e:
+            logger.error("mqtt_error_publicar_comando", topico=topico, error=str(e))
+            return False
+
+    def activar_tiempo_real_dispositivo(self, device_uid: str, segundos: int = 120) -> bool:
+        """Envía el comando nativo realtime_sync_mode al medidor físico por MQTT."""
+        uid_limpio = device_uid.replace(":", "").replace("-", "").upper()
+        topico = f"m/wifi/{uid_limpio}/conf/com"
+        correlator = int(time.time())
+        comando = {
+            "correlatorid": correlator,
+            "set": "realtime_sync_mode",
+            "payload": {"time_s": segundos},
+        }
+        return self.publicar_comando(topico, comando)
 
     def start(self):
         logger.info("iniciando_mqtt_listener")

@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from src.application.dtos.dispositivo_dto import (
     DispositivoCreateDTO,
@@ -10,6 +10,7 @@ from src.application.dtos.dispositivo_dto import (
 from src.application.use_cases.gestionar_dispositivos import GestionarDispositivosUseCase
 from src.infrastructure.fastapi.dependencies import (
     get_dispositivos_use_case,
+    get_mqtt_listener,
     get_usuario_actual,
     requiere_rol_escritura,
 )
@@ -61,5 +62,28 @@ def update_dispositivo(
 ):
     try:
         return use_case.actualizar_dispositivo(device_id, dto)
+    except Exception as e:
+        manejar_error_http(e)
+
+
+@router.post("/{device_id}/realtime")
+def activate_realtime_mode(
+    device_id: str,
+    use_case: Annotated[GestionarDispositivosUseCase, Depends(get_dispositivos_use_case)],
+    segundos: int = Query(120, ge=10, le=600),
+):
+    try:
+        disp = use_case.obtener_dispositivo(device_id)
+        listener = get_mqtt_listener()
+        enviado = False
+        if listener:
+            enviado = listener.activar_tiempo_real_dispositivo(disp.device_uid, segundos=segundos)
+        return {
+            "status": "ok" if enviado else "mqtt_offline",
+            "device_id": disp.id,
+            "device_uid": disp.device_uid,
+            "tiempo_real_activado": enviado,
+            "segundos": segundos,
+        }
     except Exception as e:
         manejar_error_http(e)
