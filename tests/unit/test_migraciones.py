@@ -6,6 +6,7 @@ import types
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import pytest
 from alembic.config import Config
 from sqlalchemy import create_engine, inspect, text
 
@@ -410,3 +411,75 @@ def test_backfill_es_idempotente(tmp_path, monkeypatch):
         ).first()
     assert fila is not None
     assert (float(fila[0]), float(fila[1])) == (204.93, 0.72)
+
+
+@pytest.mark.parametrize("installation_type,phases_with_ct", [("1P2W", "R"), ("CONSUMO", "R")])
+def test_backfill_monofasico_anula_columnas_trifasicas(tmp_path, monkeypatch, installation_type, phases_with_ct):
+    """El backfill anula las 4 columnas derivadas trifásicas solo en dispositivos monofásicos."""
+    db = tmp_path / "backfill_mono.db"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db}")
+    cfg = _config()
+    engine = create_engine(f"sqlite:///{db}")
+
+    command.upgrade(cfg, "c9d0e1f2a3b4")
+
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO devices "
+                "(id, device_uid, name, model, is_active, status, installation_type, phases_with_ct, created_at, updated_at) "
+                "VALUES ('dev-mono', 'MONO-UID', 'Mono', 'SmartPlus', 1, 'ONLINE', :it, :pc, '2026-09-01 00:00:00', '2026-09-01 00:00:00')"
+            ),
+            {"it": installation_type, "pc": phases_with_ct},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO devices "
+                "(id, device_uid, name, model, is_active, status, installation_type, phases_with_ct, created_at, updated_at) "
+                "VALUES ('dev-tri', 'TRI-UID', 'Tri', 'SmartPlus', 1, 'ONLINE', 'CONSUMO', 'R,S,T', '2026-09-01 00:00:00', '2026-09-01 00:00:00')"
+            )
+        )
+        # Lectura monofásica con residuales trifásicos que el backfill debe anular
+        conn.execute(
+            text(
+                "INSERT INTO telemetry_instantaneous "
+                "(id, device_id, created_at, recorded_at, desbalance_tension_porcentaje, current_n, voltage_linea_V, tension_neutro_estimada) "
+                "VALUES (1, 'dev-mono', '2026-09-01 23:00:00', '2026-09-01 23:00:00', 12.3, 4.5, 395.0, 1.2)"
+            )
+        )
+        # Lectura trifásica que debe conservar sus columnas
+        conn.execute(
+            text(
+                "INSERT INTO telemetry_instantaneous "
+                "(id, device_id, created_at, recorded_at, desbalance_tension_porcentaje, current_n, voltage_linea_V, tension_neutro_estimada) "
+                "VALUES (2, 'dev-tri', '2026-09-01 23:00:00', '2026-09-01 23:00:00', 1.5, 0.4, 395.0, 0.0)"
+            )
+        )
+
+    command.upgrade(cfg, "head")
+
+    with engine.connect() as conn:
+        mono = conn.execute(
+            text(
+                "SELECT desbalance_tension_porcentaje, current_n, voltage_linea_V, tension_neutro_estimada "
+                "FROM telemetry_instantaneous WHERE id = 1"
+            )
+        ).first()
+        tri = conn.execute(
+            text(
+                "SELECT desbalance_tension_porcentaje, current_n, voltage_linea_V, tension_neutro_estimada "
+                "FROM telemetry_instantaneous WHERE id = 2"
+            )
+        ).first()
+
+    assert mono is not None
+    assert mono[0] is None
+    assert mono[1] is None
+    assert mono[2] is None
+    assert mono[3] is None
+
+    assert tri is not None
+    assert float(tri[0]) == 1.5
+    assert float(tri[1]) == 0.4
+    assert float(tri[2]) == 395.0
+    assert float(tri[3]) == 0.0
