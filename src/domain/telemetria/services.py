@@ -26,6 +26,63 @@ from src.domain.telemetria.value_objects import (
 )
 
 
+class CalculadoraPotenciaService:
+    """Cálculo canónico de potencia aparente y factor de potencia.
+
+    El firmware Powermeter publica el formato compacto `{"n":"R","v":..,"i":..,"p":..,"q":..}`,
+    sin potencia aparente. Antes nadie la derivaba en la ingesta y la agregación la
+    aproximaba con `hypot(P, Q)`, así que una consulta `raw` devolvía `null` donde la
+    agregada devolvía un número, y con dos definiciones distintas.
+
+    Se unifica en `S = V_rms · I_rms`, que es la definición exacta de potencia aparente.
+    A diferencia de `hypot(P, Q)`, incluye la potencia de distorsión, que en cargas
+    conmutadas es sustancial: para una fase con V=227.7, I=0.9, P=147 y Q=-51, `hypot`
+    da FP 0.94 mientras que V·I da 0.72. La diferencia es real y estaba invisible.
+    """
+
+    @staticmethod
+    def calcular_potencia_aparente(tension_v: float | None, corriente_a: float | None) -> float | None:
+        """S = |V| · |I| en VA. `None` si falta cualquiera de los dos factores.
+
+        Cero es un resultado válido —significa que no hay carga—, no un dato ausente.
+        """
+        if tension_v is None or corriente_a is None:
+            return None
+        return round(abs(tension_v) * abs(corriente_a), 2)
+
+    @staticmethod
+    def calcular_factor_potencia(
+        potencia_activa_w: float | None,
+        potencia_aparente_va: float | None,
+    ) -> float | None:
+        """FP = P / S, acotado a [-1, 1]. `None` si falta un término o si S <= 0.
+
+        Sin potencia aparente el factor de potencia es indefinido, no óptimo: devolver
+        1.0 sería la misma mentira optimista que arrastraba `determinar_estado_fp`.
+
+        El acotado no es cosmético. `FactorPotencia` rechaza valores fuera de [-1, 1],
+        y `S = V·I` se calcula con tensión y corriente redondeadas a dos decimales por
+        el firmware, mientras que P se mide aparte: el cociente puede superar 1 por
+        redondeo y hacer fallar la ingesta entera.
+
+        Se preserva el signo de P, que distingue consumo de exportación (o un TI invertido).
+        """
+        if potencia_activa_w is None or potencia_aparente_va is None:
+            return None
+        if potencia_aparente_va <= 0.0:
+            return None
+        fp = potencia_activa_w / potencia_aparente_va
+        return round(max(-1.0, min(1.0, fp)), 2)
+
+    @staticmethod
+    def calcular_potencia_aparente_total(*aparentes: float | None) -> float | None:
+        """Potencia aparente aritmética trifásica: suma de las S de fase presentes."""
+        presentes = [s for s in aparentes if s is not None]
+        if not presentes:
+            return None
+        return round(sum(presentes), 2)
+
+
 class FiltroDeduplicacionService:
     """Filtro de deduplicación de mensajes MQTT (at-least-once → exactly-once).
 
@@ -839,18 +896,23 @@ class AnalizadorCalidadEnergiaService:
         ir: float | None,
         is_: float | None,
         it: float | None,
+        umbral_corriente_minima: float = 5.0,
     ) -> float | None:
         """Calcula el Desbalance de Corriente Trifásico (IUR) según IEC 61000-4-30 / NEMA.
 
         I_prom = (I_R + I_S + I_T) / 3
         IUR (%) = (max(|I_R - I_prom|, |I_S - I_prom|, |I_T - I_prom|) / I_prom) * 100
+
+        Por debajo de `umbral_corriente_minima` el indicador se satura con ruido: una
+        instalación en standby con R=0.9 A y S/T en miliamperes daba 170% de desbalance,
+        que no describe nada. Sin carga el IUR no es "0% de desbalance" sino "no medible",
+        así que se devuelve `None`. El umbral sigue el precedente de la detección de TI
+        invertido, que ya exige 5 A.
         """
         if ir is None or is_ is None or it is None:
             return None
-        if ir == 0.0 and is_ == 0.0 and it == 0.0:
-            return 0.0
         i_prom = (ir + is_ + it) / 3.0
-        if i_prom <= 0.0:
+        if i_prom <= 0.0 or i_prom < umbral_corriente_minima:
             return None
         desv_max = max(abs(ir - i_prom), abs(is_ - i_prom), abs(it - i_prom))
         return round((desv_max / i_prom) * 100.0, 2)
@@ -861,9 +923,13 @@ class AnalizadorCalidadEnergiaService:
         umbral_penalidad: float = 0.95,
         umbral_objetivo: float = 0.96,
     ) -> EstadoFactorPotencia:
-        """Determina el estado normativo del Factor de Potencia según Res. ENRE/Distribuidoras."""
+        """Determina el estado normativo del Factor de Potencia según Res. ENRE/Distribuidoras.
+
+        Sin factor de potencia medido el estado es SIN_DATOS: afirmar OPTIMO sobre un
+        valor inexistente hacía que la UI mostrara un badge «ÓPTIMO» junto a un guion.
+        """
         if fp is None:
-            return EstadoFactorPotencia.OPTIMO
+            return EstadoFactorPotencia.SIN_DATOS
         if fp >= umbral_objetivo:
             return EstadoFactorPotencia.OPTIMO
         if fp >= umbral_penalidad:
@@ -878,10 +944,14 @@ class AnalizadorCalidadEnergiaService:
         umbral_baja: float = 198.0,
         umbral_alta: float = 242.0,
     ) -> EstadoTension:
-        """Determina el estado normativo de tensión según banda contractual ENRE (220V ±10%)."""
+        """Determina el estado normativo de tensión según banda contractual ENRE (220V ±10%).
+
+        Sin ninguna tensión medida el estado es SIN_DATOS: un medidor caído no está
+        reportando "tensión normal".
+        """
         tensiones = [v for v in (vr, vs, vt) if v is not None]
         if not tensiones:
-            return EstadoTension.NORMAL
+            return EstadoTension.SIN_DATOS
 
         if any(v < umbral_baja for v in tensiones):
             return EstadoTension.SUBTENSION

@@ -3,6 +3,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict
 
 from src.application.dtos.tipos import FechaHoraUTC
+from src.domain.telemetria.value_objects import EstadoFactorPotencia, EstadoTension
 
 
 class MedicionFaseDTO(BaseModel):
@@ -23,8 +24,8 @@ class AnaliticaCalidadEnergiaDTO(BaseModel):
     penalizacion_estimada_ars: float | None = None
     desbalance_tension_porcentaje: float | None = None
     desbalance_corriente_porcentaje: float | None = None
-    estado_fp: str = "OPTIMO"
-    estado_tension: str = "NORMAL"
+    estado_fp: EstadoFactorPotencia = EstadoFactorPotencia.SIN_DATOS
+    estado_tension: EstadoTension = EstadoTension.SIN_DATOS
     model_config = ConfigDict(from_attributes=True)
 
 

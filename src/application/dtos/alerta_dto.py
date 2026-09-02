@@ -1,4 +1,3 @@
-
 from pydantic import BaseModel, ConfigDict
 
 from src.application.dtos.tipos import FechaHoraUTC

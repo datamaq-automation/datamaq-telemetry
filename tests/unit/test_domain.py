@@ -12,7 +12,7 @@ from src.domain.telemetria.exceptions import (
     MacAddressInvalidaError,
     TensionInvalidaError,
 )
-from src.domain.telemetria.services import AnalizadorCalidadEnergiaService
+from src.domain.telemetria.services import AnalizadorCalidadEnergiaService, CalculadoraPotenciaService
 from src.domain.telemetria.value_objects import (
     AnaliticaCalidadEnergia,
     Corriente,
@@ -851,11 +851,18 @@ def test_calculo_desbalance_corriente():
     iur = AnalizadorCalidadEnergiaService.calcular_desbalance_corriente(110.0, 100.0, 90.0)
     assert iur == 10.0
 
-    # Cero corriente
-    assert AnalizadorCalidadEnergiaService.calcular_desbalance_corriente(0.0, 0.0, 0.0) == 0.0
+    # Sin carga el IUR no es "0% de desbalance", es no medible
+    assert AnalizadorCalidadEnergiaService.calcular_desbalance_corriente(0.0, 0.0, 0.0) is None
 
     # Incompleto
     assert AnalizadorCalidadEnergiaService.calcular_desbalance_corriente(100.0, None, 100.0) is None
+
+    # Carga despreciable: el indicador se satura con ruido y no describe nada.
+    # Caso real medido: R=0.9 A con S y T en miliamperes daba 170% de "desbalance".
+    assert AnalizadorCalidadEnergiaService.calcular_desbalance_corriente(0.9, 0.05, 0.05) is None
+
+    # Justo por encima del umbral sí se reporta
+    assert AnalizadorCalidadEnergiaService.calcular_desbalance_corriente(20.0, 10.0, 10.0) == 50.0
 
 
 def test_determinar_estado_fp():
@@ -865,7 +872,8 @@ def test_determinar_estado_fp():
     assert AnalizadorCalidadEnergiaService.determinar_estado_fp(0.95) == EstadoFactorPotencia.ADVERTENCIA
     assert AnalizadorCalidadEnergiaService.determinar_estado_fp(0.94) == EstadoFactorPotencia.PENALIZADO
     assert AnalizadorCalidadEnergiaService.determinar_estado_fp(0.80) == EstadoFactorPotencia.PENALIZADO
-    assert AnalizadorCalidadEnergiaService.determinar_estado_fp(None) == EstadoFactorPotencia.OPTIMO
+    # Sin FP medido no se afirma que sea óptimo
+    assert AnalizadorCalidadEnergiaService.determinar_estado_fp(None) == EstadoFactorPotencia.SIN_DATOS
 
 
 def test_determinar_estado_tension():
@@ -878,8 +886,8 @@ def test_determinar_estado_tension():
     # Sobretensión (> 242V)
     assert AnalizadorCalidadEnergiaService.determinar_estado_tension(220.0, 245.0, 220.0) == EstadoTension.SOBRETENSION
 
-    # Sin lecturas
-    assert AnalizadorCalidadEnergiaService.determinar_estado_tension(None, None, None) == EstadoTension.NORMAL
+    # Sin lecturas: un medidor caído no está reportando "tensión normal"
+    assert AnalizadorCalidadEnergiaService.determinar_estado_tension(None, None, None) == EstadoTension.SIN_DATOS
 
 
 def test_calcular_analitica_completa():
@@ -939,3 +947,65 @@ def test_calcular_analitica_completa():
     assert analitica_optima.desbalance_corriente_porcentaje == 0.0
     assert analitica_optima.estado_fp == EstadoFactorPotencia.OPTIMO
     assert analitica_optima.estado_tension == EstadoTension.NORMAL
+
+
+def test_calculadora_potencia_aparente_es_v_por_i():
+    calc = CalculadoraPotenciaService
+    # Caso real medido en el SmartPlus: V=227.7, I=0.9
+    assert calc.calcular_potencia_aparente(227.7, 0.9) == 204.93
+    # Cero es una medición válida de "sin carga", no un dato ausente
+    assert calc.calcular_potencia_aparente(220.0, 0.0) == 0.0
+    assert calc.calcular_potencia_aparente(None, 0.9) is None
+    assert calc.calcular_potencia_aparente(227.7, None) is None
+    # V e I son magnitudes RMS: un signo indicaría dato corrupto, no dirección
+    assert calc.calcular_potencia_aparente(-227.7, 0.9) == 204.93
+
+
+def test_calculadora_factor_potencia_acota_y_preserva_signo():
+    calc = CalculadoraPotenciaService
+    assert calc.calcular_factor_potencia(147.0, 204.93) == 0.72
+    # Sin potencia aparente el FP es indefinido, no óptimo
+    assert calc.calcular_factor_potencia(147.0, 0.0) is None
+    assert calc.calcular_factor_potencia(None, 204.93) is None
+    assert calc.calcular_factor_potencia(147.0, None) is None
+    # P negativo = exportación o TI invertido
+    assert calc.calcular_factor_potencia(-147.0, 204.93) == -0.72
+
+
+def test_calculadora_factor_potencia_no_rompe_el_value_object():
+    """V·I sobre valores redondeados por el firmware puede quedar por debajo de |P|.
+
+    Sin acotar, el cociente supera 1 y `FactorPotencia` lanza, tumbando la ingesta entera.
+    """
+    fp = CalculadoraPotenciaService.calcular_factor_potencia(250.0, 200.0)
+    assert fp == 1.0
+    assert FactorPotencia(valor=fp).valor == 1.0
+
+    fp_neg = CalculadoraPotenciaService.calcular_factor_potencia(-250.0, 200.0)
+    assert fp_neg == -1.0
+    assert FactorPotencia(valor=fp_neg).valor == -1.0
+
+
+def test_calculadora_potencia_aparente_total():
+    calc = CalculadoraPotenciaService
+    assert calc.calcular_potencia_aparente_total(204.93, 10.0, 5.07) == 220.0
+    assert calc.calcular_potencia_aparente_total(204.93, None, None) == 204.93
+    assert calc.calcular_potencia_aparente_total(None, None, None) is None
+
+
+def test_calcular_analitica_completa_sin_factor_potencia():
+    """El caso que producía el badge «ÓPTIMO» junto a un guion en el dashboard."""
+    lectura = LecturaInstantanea(
+        id=None,
+        dispositivo_id="dev-1",
+        registrado_en=datetime(2026, 9, 1, 23, 20, tzinfo=timezone.utc),
+        fase_r=MedicionFase(tension=Tension(voltios=227.7)),
+        fase_s=MedicionFase(tension=Tension(voltios=227.4)),
+        fase_t=MedicionFase(tension=Tension(voltios=228.5)),
+        factor_potencia_total=None,
+    )
+
+    analitica = AnalizadorCalidadEnergiaService.calcular_analitica_completa(lectura)
+
+    assert analitica.estado_fp == EstadoFactorPotencia.SIN_DATOS
+    assert analitica.requiere_compensacion is False

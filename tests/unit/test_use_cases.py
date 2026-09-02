@@ -218,6 +218,62 @@ def test_ingestar_telemetria_compacta_inst():
     assert inst.voltage_linea_V is not None
     assert inst.voltage_linea_V > 0
     assert inst.tension_neutro_estimada is not None
+    # Sin carga: S = V·I = 0, y con S en cero el FP queda indefinido
+    assert inst.fase_r.potencia_aparente is not None and inst.fase_r.potencia_aparente.va == 0.0
+    assert inst.fase_r.factor_potencia is None
+
+
+def test_ingestar_telemetria_compacta_deriva_potencia_aparente_y_fp():
+    """El firmware compacto no publica S ni FP; el backend los deriva de V·I y P/S.
+
+    Antes quedaban en null y la API igual afirmaba `estado_fp: OPTIMO`.
+    """
+    repo_disp = MockDispositivosRepo()
+    repo_telem = MockTelemetriaRepo()
+    use_case = IngestarTelemetriaUseCase(repo_disp, repo_telem, logger=MockLogger())
+
+    # Valores reales medidos por el SmartPlus D48C49F03564
+    payload = {
+        "t": 1788302700,
+        "a": 0,
+        "f": [
+            {"n": "R", "v": 227.7, "i": 0.9, "p": 147, "q": -51},
+            {"n": "S", "v": 227.4, "i": 0.0, "p": 0, "q": 2},
+            {"n": "T", "v": 228.5, "i": 0.1, "p": 1, "q": 5},
+        ],
+    }
+
+    use_case.ejecutar("m/wifi/D48C49F03564/inst", payload)
+
+    inst = repo_telem.instantaneas[0]
+    assert inst.fase_r.potencia_aparente is not None
+    assert inst.fase_r.potencia_aparente.va == 204.93
+    assert inst.fase_r.factor_potencia is not None
+    assert inst.fase_r.factor_potencia.valor == 0.72
+    assert inst.potencia_aparente_total is not None
+    assert inst.potencia_aparente_total.va == 227.78
+    assert inst.factor_potencia_total is not None
+
+
+def test_ingestar_telemetria_no_rompe_si_p_supera_v_por_i():
+    """V e I llegan redondeados del firmware; P se mide aparte y puede exceder V·I.
+
+    Sin acotar el cociente, `FactorPotencia` lanza y se pierde la lectura entera.
+    """
+    repo_telem = MockTelemetriaRepo()
+    use_case = IngestarTelemetriaUseCase(MockDispositivosRepo(), repo_telem, logger=MockLogger())
+
+    payload = {
+        "t": 1788303000,
+        "a": 0,
+        "f": [{"n": "R", "v": 100.0, "i": 1.0, "p": 250, "q": 0}],
+    }
+
+    use_case.ejecutar("m/wifi/AA11BB22CC33/inst", payload)
+
+    inst = repo_telem.instantaneas[0]
+    assert inst.fase_r.factor_potencia is not None
+    assert inst.fase_r.factor_potencia.valor == 1.0
 
 
 def test_ingestar_telemetria_compacta_acc():

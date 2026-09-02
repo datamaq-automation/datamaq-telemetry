@@ -27,10 +27,8 @@ class TelemetriaMapper:
             penalizacion_estimada_ars=analitica.penalizacion_estimada_ars,
             desbalance_tension_porcentaje=analitica.desbalance_tension_porcentaje,
             desbalance_corriente_porcentaje=analitica.desbalance_corriente_porcentaje,
-            estado_fp=analitica.estado_fp.value if hasattr(analitica.estado_fp, "value") else str(analitica.estado_fp),
-            estado_tension=analitica.estado_tension.value
-            if hasattr(analitica.estado_tension, "value")
-            else str(analitica.estado_tension),
+            estado_fp=analitica.estado_fp,
+            estado_tension=analitica.estado_tension,
         )
 
     @staticmethod

@@ -21,6 +21,7 @@ from src.domain.telemetria.ports import (
 )
 from src.domain.telemetria.services import (
     AnalizadorCalidadEnergiaService,
+    CalculadoraPotenciaService,
     FiltroPersistenciaTemporalService,
 )
 from src.domain.telemetria.value_objects import (
@@ -256,13 +257,27 @@ class IngestarTelemetriaUseCase:
             "ti",
         )
 
+        # S = V·I es la fuente canónica; el `s` del firmware queda como respaldo para
+        # payloads que no traen tensión o corriente. El firmware compacto no manda ninguno
+        # de los dos, y sin esto la fase quedaba sin potencia aparente ni factor de potencia.
+        s_calc = CalculadoraPotenciaService.calcular_potencia_aparente(
+            float(v) if v is not None else None,
+            float(i) if i is not None else None,
+        )
+        s_final = s_calc if s_calc is not None else (float(s) if s is not None else None)
+        fp_calc = CalculadoraPotenciaService.calcular_factor_potencia(
+            float(p) if p is not None else None,
+            s_final,
+        )
+        fp_final = fp_calc if fp_calc is not None else (float(fp) if fp is not None else None)
+
         return MedicionFase(
             tension=Tension(voltios=float(v)) if v is not None else None,
             corriente=Corriente(amperios=float(i)) if i is not None else None,
             potencia_activa=PotenciaActiva(vatios=float(p)) if p is not None else None,
             potencia_reactiva=PotenciaReactiva(var=float(q)) if q is not None else None,
-            potencia_aparente=PotenciaAparente(va=float(s)) if s is not None else None,
-            factor_potencia=FactorPotencia(valor=float(fp)) if fp is not None else None,
+            potencia_aparente=PotenciaAparente(va=s_final) if s_final is not None else None,
+            factor_potencia=FactorPotencia(valor=fp_final) if fp_final is not None else None,
             thd_v_porcentaje=float(thd_v) if thd_v is not None else None,
             thd_i_porcentaje=float(thd_i) if thd_i is not None else None,
         )
@@ -369,9 +384,12 @@ class IngestarTelemetriaUseCase:
             if s_tot is None and not phases_dict:
                 s_tot = total_data.get("s")
             if s_tot is None:
-                s_vals = [f.potencia_aparente.va for f in (fase_r, fase_s, fase_t) if f.potencia_aparente is not None]
-                if s_vals:
-                    s_tot = sum(s_vals)
+                s_tot = CalculadoraPotenciaService.calcular_potencia_aparente_total(
+                    *(
+                        f.potencia_aparente.va if f.potencia_aparente is not None else None
+                        for f in (fase_r, fase_s, fase_t)
+                    )
+                )
 
             fp_tot = (
                 total_data.get("power_factor")
@@ -382,8 +400,13 @@ class IngestarTelemetriaUseCase:
             )
             if fp_tot is None and not phases_dict:
                 fp_tot = total_data.get("fp") or total_data.get("pf")
-            if fp_tot is None and p_tot is not None and s_tot is not None and float(s_tot) > 0:
-                fp_tot = round(float(p_tot) / float(s_tot), 2)
+            if fp_tot is None:
+                # Con clamp: S = V·I sobre valores redondeados por el firmware puede quedar
+                # por debajo de |P| y el VO FactorPotencia rechaza cualquier cosa fuera de [-1,1].
+                fp_tot = CalculadoraPotenciaService.calcular_factor_potencia(
+                    float(p_tot) if p_tot is not None else None,
+                    float(s_tot) if s_tot is not None else None,
+                )
 
             vr = fase_r.tension.voltios if fase_r.tension else None
             vs = fase_s.tension.voltios if fase_s.tension else None

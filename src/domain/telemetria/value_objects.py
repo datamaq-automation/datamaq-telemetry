@@ -138,12 +138,14 @@ class EstadoFactorPotencia(str, Enum):
     OPTIMO = "OPTIMO"
     ADVERTENCIA = "ADVERTENCIA"
     PENALIZADO = "PENALIZADO"
+    SIN_DATOS = "SIN_DATOS"
 
 
 class EstadoTension(str, Enum):
     NORMAL = "NORMAL"
     SUBTENSION = "SUBTENSION"
     SOBRETENSION = "SOBRETENSION"
+    SIN_DATOS = "SIN_DATOS"
 
 
 @dataclass(frozen=True)
@@ -154,5 +156,5 @@ class AnaliticaCalidadEnergia:
     penalizacion_estimada_ars: float | None = None
     desbalance_tension_porcentaje: float | None = None
     desbalance_corriente_porcentaje: float | None = None
-    estado_fp: EstadoFactorPotencia = EstadoFactorPotencia.OPTIMO
-    estado_tension: EstadoTension = EstadoTension.NORMAL
+    estado_fp: EstadoFactorPotencia = EstadoFactorPotencia.SIN_DATOS
+    estado_tension: EstadoTension = EstadoTension.SIN_DATOS
