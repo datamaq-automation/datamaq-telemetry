@@ -3,8 +3,6 @@
 from datetime import datetime, timezone
 from typing import Any
 
-import pytest
-
 from src.application.use_cases.ingestar_telemetria import IngestarTelemetriaUseCase
 from src.domain.telemetria.entities import (
     Dispositivo,
@@ -61,7 +59,9 @@ class _RepoTelem:
     def guardar_alerta(self, alerta: Any) -> None:
         self.alertas.append(alerta)
 
-    def listar_alertas(self, dispositivo_id: str | None = None, solo_abiertas: bool = False, **kwargs: object) -> list[Any]:
+    def listar_alertas(
+        self, dispositivo_id: str | None = None, solo_abiertas: bool = False, **kwargs: object
+    ) -> list[Any]:
         q = list(self.alertas)
         if dispositivo_id:
             q = [a for a in q if a.dispositivo_id == dispositivo_id]
