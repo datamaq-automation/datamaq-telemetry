@@ -26,9 +26,7 @@ class PurgarTelemetriaExpiradaUseCase:
         # 1. Fechas de corte según política
         if dto.corte_hasta is not None:
             if dto.corte_hasta > ahora:
-                raise CortePurgaFuturoError(
-                    f"corte_hasta ({dto.corte_hasta.isoformat()}) es posterior a ahora"
-                )
+                raise CortePurgaFuturoError(f"corte_hasta ({dto.corte_hasta.isoformat()}) es posterior a ahora")
             corte_telemetria = dto.corte_hasta
             corte_logs = dto.corte_hasta
             corte_alertas = dto.corte_hasta

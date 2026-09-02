@@ -47,7 +47,7 @@ Se reutilizan tal cual:
 ```python
 class PurgaRequestDTO(BaseModel):
     dias_retencion_override: int | None = None
-    corte_hasta: FechaHoraUTC | None = None   # NUEVO
+    corte_hasta: FechaHoraUTC | None = None  # NUEVO
     batch_size: int = 1000
 ```
 
