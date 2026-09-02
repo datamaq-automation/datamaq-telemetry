@@ -15,7 +15,7 @@ RAIZ = Path(__file__).resolve().parents[2]
 ALEMBIC_INI = RAIZ / "alembic.ini"
 ENV_PY = RAIZ / "alembic" / "env.py"
 REVISION_INICIAL = "209ce0774d59"
-REVISION_HEAD = "b8c9d0e1f2a3"
+REVISION_HEAD = "c9d0e1f2a3b4"
 
 TABLAS_MODELO = {
     "plans",
@@ -324,3 +324,89 @@ def test_paridad_completa_modelos_orm_vs_migraciones_alembic(tmp_path, monkeypat
             )
 
     assert not discrepancias, "\n".join(discrepancias)
+
+
+def test_backfill_recalcula_potencia_aparente_y_fp(tmp_path, monkeypatch):
+    """El backfill reescribe S = V·I y FP = P/S sobre las lecturas ya persistidas."""
+    db = tmp_path / "backfill.db"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db}")
+    cfg = _config()
+    engine = create_engine(f"sqlite:///{db}")
+
+    command.upgrade(cfg, "b8c9d0e1f2a3")
+
+    with engine.begin() as conn:
+        # Fila histórica sin potencia aparente: el firmware compacto nunca la publicó
+        conn.execute(
+            text(
+                "INSERT INTO telemetry_instantaneous "
+                "(id, device_id, created_at, recorded_at, voltage_r, current_r, active_power_r, total_active_power) "
+                "VALUES (1, 'dev-1', '2026-09-01 23:20:00', '2026-09-01 23:20:00', 227.7, 0.9, 147.0, 147.0)"
+            )
+        )
+        # Fila con la semántica vieja de hypot(P, Q), que debe quedar reescrita
+        conn.execute(
+            text(
+                "INSERT INTO telemetry_instantaneous "
+                "(id, device_id, created_at, recorded_at, voltage_r, current_r, active_power_r, apparent_power_r, power_factor_r) "
+                "VALUES (2, 'dev-1', '2026-09-01 23:25:00', '2026-09-01 23:25:00', 200.0, 2.0, 300.0, 500.0, 0.6)"
+            )
+        )
+        # Fila donde P supera V·I por redondeo del firmware: el FP debe quedar acotado
+        conn.execute(
+            text(
+                "INSERT INTO telemetry_instantaneous "
+                "(id, device_id, created_at, recorded_at, voltage_r, current_r, active_power_r) "
+                "VALUES (3, 'dev-1', '2026-09-01 23:30:00', '2026-09-01 23:30:00', 100.0, 1.0, 250.0)"
+            )
+        )
+
+    command.upgrade(cfg, "head")
+
+    with engine.connect() as conn:
+        filas = {
+            r[0]: (float(r[1]), float(r[2]))
+            for r in conn.execute(
+                text("SELECT id, apparent_power_r, power_factor_r FROM telemetry_instantaneous ORDER BY id")
+            )
+        }
+
+    assert filas[1] == (204.93, 0.72)
+    assert filas[2] == (400.0, 0.75)  # hypot daba 500.0 y FP 0.6
+    assert filas[3] == (100.0, 1.0)  # acotado, no 2.5
+
+    with engine.connect() as conn:
+        total = conn.execute(
+            text("SELECT total_apparent_power, total_power_factor FROM telemetry_instantaneous WHERE id = 1")
+        ).first()
+    assert total is not None
+    assert float(total[0]) == 204.93
+    assert float(total[1]) == 0.72
+
+
+def test_backfill_es_idempotente(tmp_path, monkeypatch):
+    db = tmp_path / "backfill_idem.db"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db}")
+    cfg = _config()
+    engine = create_engine(f"sqlite:///{db}")
+
+    command.upgrade(cfg, "b8c9d0e1f2a3")
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO telemetry_instantaneous "
+                "(id, device_id, created_at, recorded_at, voltage_r, current_r, active_power_r) "
+                "VALUES (1, 'dev-1', '2026-09-01 23:20:00', '2026-09-01 23:20:00', 227.7, 0.9, 147.0)"
+            )
+        )
+
+    command.upgrade(cfg, "head")
+    command.downgrade(cfg, "b8c9d0e1f2a3")
+    command.upgrade(cfg, "head")
+
+    with engine.connect() as conn:
+        fila = conn.execute(
+            text("SELECT apparent_power_r, power_factor_r FROM telemetry_instantaneous WHERE id = 1")
+        ).first()
+    assert fila is not None
+    assert (float(fila[0]), float(fila[1])) == (204.93, 0.72)
