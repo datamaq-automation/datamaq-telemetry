@@ -231,6 +231,49 @@ class AnalizadorCalidadEnergiaService:
     """Servicio de dominio puro para validar balances y detectar anomalías en mediciones."""
 
     @staticmethod
+    def es_instalacion_monofasica(tipo_instalacion: str | None, fases_con_ti: str | None) -> bool:
+        """Determina si una instalación es monofásica (1P2W).
+
+        Criterio: tipo de instalación explícito ``1P2W``, o bien una única fase con TI.
+        Una instalación Aron (dos fases con TI) sigue siendo trifásica a efectos de
+        balance, aunque no mida la tercera corriente.
+        """
+        tipo_norm = (tipo_instalacion or "").strip().upper()
+        if tipo_norm == "1P2W":
+            return True
+        return len(AnalizadorCalidadEnergiaService.fases_con_ti_como_lista(fases_con_ti)) == 1
+
+    @staticmethod
+    def fases_con_ti_como_lista(fases_con_ti: str | list[str] | set[str] | tuple[str, ...] | None) -> set[str]:
+        """Normaliza la configuración de fases con TI a un conjunto de fases en mayúsculas.
+
+        ``None`` o vacío se interpreta como las tres fases (configuración por defecto).
+        """
+        if fases_con_ti is None:
+            return {"R", "S", "T"}
+        if isinstance(fases_con_ti, (list, set, tuple)):
+            fases = {str(f).strip().upper() for f in fases_con_ti if str(f).strip()}
+        else:
+            fases = {f.strip().upper() for f in str(fases_con_ti).split(",") if f.strip()}
+        if not fases:
+            return {"R", "S", "T"}
+        return fases
+
+    @staticmethod
+    def sanear_fase_sin_ti(fase: MedicionFase) -> MedicionFase:
+        """Anula corriente/P/Q/S/FP/THD_I de una fase sin TI, conservando tensión y THD_V.
+
+        En una instalación monofásica los tres bornes de tensión están en paralelo, así
+        que la tensión (y su THD) es real, pero la corriente y las potencias medidas sin
+        transformador de corriente son ruido que no debe propagarse.
+        """
+        return MedicionFase(
+            tension=fase.tension,
+            thd_v_porcentaje=fase.thd_v_porcentaje,
+            thd_v_pct=fase.thd_v_pct,
+        )
+
+    @staticmethod
     def calcular_potencia_trifasica_activa(
         pr: float | None, ps: float | None, pt: float | None
     ) -> PotenciaActiva | None:
@@ -344,6 +387,7 @@ class AnalizadorCalidadEnergiaService:
         cls,
         items: list[LecturaInstantanea],
         bucket_dt: datetime,
+        es_monofasico: bool = False,
     ) -> LecturaInstantanea:
         dispositivo_id = items[0].dispositivo_id
 
@@ -431,6 +475,12 @@ class AnalizadorCalidadEnergiaService:
             vr, vs, vt, ir_val, is_val, it_val, pr_val, ps_val, pt_val, qr_val, qs_val, qt_val
         )
 
+        if es_monofasico:
+            desbalance_v = None
+            voltage_linea_V = None
+            i_neutro = None
+            v_neutro = None
+
         thd_v_prom = _avg([it.thd_v_promedio_porcentaje for it in items if it.thd_v_promedio_porcentaje is not None])
         if thd_v_prom is None:
             thd_v_vals = [
@@ -475,6 +525,7 @@ class AnalizadorCalidadEnergiaService:
         cls,
         lecturas: list[LecturaInstantanea],
         intervalo_segundos: int,
+        es_monofasico: bool = False,
     ) -> list[LecturaInstantanea]:
         """Agrupa y remuestrea una lista de LecturaInstantanea en buckets de tiempo fijos."""
         if intervalo_segundos <= 0 or not lecturas:
@@ -495,7 +546,7 @@ class AnalizadorCalidadEnergiaService:
         for bucket_ts in sorted(buckets.keys(), reverse=True):
             bucket_items = buckets[bucket_ts]
             bucket_dt = datetime.fromtimestamp(bucket_ts, tz=timezone.utc)
-            agregada = cls._agregar_grupo_lecturas(bucket_items, bucket_dt)
+            agregada = cls._agregar_grupo_lecturas(bucket_items, bucket_dt, es_monofasico=es_monofasico)
             resultado.append(agregada)
 
         return resultado

@@ -304,6 +304,13 @@ class IngestarTelemetriaUseCase:
             return
 
         if subtopico == "inst":
+            tipo_instalacion = getattr(dispositivo, "tipo_instalacion", "CONSUMO")
+            fases_con_ti_raw = getattr(dispositivo, "fases_con_ti", "R,S,T")
+            es_monofasico = AnalizadorCalidadEnergiaService.es_instalacion_monofasica(
+                tipo_instalacion, fases_con_ti_raw
+            )
+            fases_con_ti_set = AnalizadorCalidadEnergiaService.fases_con_ti_como_lista(fases_con_ti_raw)
+
             # Extraer fases de estructura de arreglo 'f': [{"n":"R","v":223.4,...}, ...]
             phases_dict: dict[str, dict[str, Any]] = {}
             if isinstance(payload.get("f"), list):
@@ -311,37 +318,54 @@ class IngestarTelemetriaUseCase:
                     if isinstance(item, dict) and "n" in item:
                         phases_dict[str(item["n"]).strip().upper()] = item
 
-            data_r = (
-                phases_dict.get("R")
-                or phases_dict.get("1")
-                or payload.get("phase_r")
-                or payload.get("phase_1")
-                or payload.get("fase_r")
-                or (payload.get("r") if isinstance(payload.get("r"), dict) else None)
-                or payload
-            )
-            data_s = (
-                phases_dict.get("S")
-                or phases_dict.get("2")
-                or payload.get("phase_s")
-                or payload.get("phase_2")
-                or payload.get("fase_s")
-                or (payload.get("s") if isinstance(payload.get("s"), dict) else None)
-                or payload
-            )
-            data_t = (
-                phases_dict.get("T")
-                or phases_dict.get("3")
-                or payload.get("phase_t")
-                or payload.get("phase_3")
-                or payload.get("fase_t")
-                or (payload.get("t") if isinstance(payload.get("t"), dict) else None)
-                or payload
-            )
+            root_n = payload.get("n")
+            if isinstance(root_n, str) and root_n.strip():
+                # Formato compacto de raíz `{"n":"R","v":..,"i":..,"p":..,"q":..}`: solo la
+                # fase indicada recibe datos; las demás quedan vacías (sin réplica).
+                fase_raiz = root_n.strip().upper()
+                data_r = payload if fase_raiz == "R" else {}
+                data_s = payload if fase_raiz == "S" else {}
+                data_t = payload if fase_raiz == "T" else {}
+            else:
+                data_r = (
+                    phases_dict.get("R")
+                    or phases_dict.get("1")
+                    or payload.get("phase_r")
+                    or payload.get("phase_1")
+                    or payload.get("fase_r")
+                    or (payload.get("r") if isinstance(payload.get("r"), dict) else None)
+                    or payload
+                )
+                data_s = (
+                    phases_dict.get("S")
+                    or phases_dict.get("2")
+                    or payload.get("phase_s")
+                    or payload.get("phase_2")
+                    or payload.get("fase_s")
+                    or (payload.get("s") if isinstance(payload.get("s"), dict) else None)
+                    or payload
+                )
+                data_t = (
+                    phases_dict.get("T")
+                    or phases_dict.get("3")
+                    or payload.get("phase_t")
+                    or payload.get("phase_3")
+                    or payload.get("fase_t")
+                    or (payload.get("t") if isinstance(payload.get("t"), dict) else None)
+                    or payload
+                )
 
             fase_r = self._parse_fase(data_r, suffix="_r")
             fase_s = self._parse_fase(data_s, suffix="_s")
             fase_t = self._parse_fase(data_t, suffix="_t")
+
+            # D1: anular corriente/P/Q/S/FP/THD_I de las fases sin TI, conservando tensión.
+            if "R" not in fases_con_ti_set:
+                fase_r = AnalizadorCalidadEnergiaService.sanear_fase_sin_ti(fase_r)
+            if "S" not in fases_con_ti_set:
+                fase_s = AnalizadorCalidadEnergiaService.sanear_fase_sin_ti(fase_s)
+            if "T" not in fases_con_ti_set:
+                fase_t = AnalizadorCalidadEnergiaService.sanear_fase_sin_ti(fase_t)
 
             total = payload.get("total") or payload.get("tot")
             total_data = total if isinstance(total, dict) else payload
@@ -439,6 +463,13 @@ class IngestarTelemetriaUseCase:
                 vr, vs, vt, ir_val, is_val, it_val, pr_val, ps_val, pt_val, qr_val, qs_val, qt_val
             )
 
+            # D4: en monofásico las métricas trifásicas derivadas no tienen significado físico.
+            if es_monofasico:
+                desbalance_v = None
+                voltage_linea_V = None
+                i_neutro = None
+                v_neutro = None
+
             thd_v_prom = (
                 total_data.get("thd_v_promedio_pct")
                 or total_data.get("thd_v_promedio")
@@ -505,8 +536,12 @@ class IngestarTelemetriaUseCase:
                         mensaje=alerta_tension.mensaje,
                     )
 
-            # 2. Desbalance trifásico (VUR)
-            alerta_desbalance_raw = AnalizadorCalidadEnergiaService.evaluar_alerta_desbalance(dispositivo.id, lectura)
+            # 2. Desbalance trifásico (VUR) — sin significado físico en monofásico.
+            alerta_desbalance_raw = (
+                AnalizadorCalidadEnergiaService.evaluar_alerta_desbalance(dispositivo.id, lectura)
+                if not es_monofasico
+                else None
+            )
             alerta_desbalance = self._filtro_persistencia.procesar_alerta(
                 dispositivo.id, alerta_desbalance_raw, categoria="DESBALANCE_TENSION", ahora=recorded_at
             )

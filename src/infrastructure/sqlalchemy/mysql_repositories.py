@@ -26,7 +26,6 @@ from src.domain.telemetria.ports import (
     RepositorioPlanesPort,
     RepositorioTelemetriaPort,
 )
-from src.domain.telemetria.services import AnalizadorCalidadEnergiaService
 from src.domain.telemetria.value_objects import (
     CoordenadasZona,
     Corriente,
@@ -199,39 +198,14 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
         in_obj = None
         if hasattr(m, "current_n") and m.current_n is not None:
             in_obj = Corriente(amperios=float(m.current_n))
-        else:
-            in_obj = AnalizadorCalidadEnergiaService.calcular_corriente_neutro(
-                ir=fase_r.corriente.amperios if fase_r.corriente else None,
-                is_=fase_s.corriente.amperios if fase_s.corriente else None,
-                it=fase_t.corriente.amperios if fase_t.corriente else None,
-                pr=fase_r.potencia_activa.vatios if fase_r.potencia_activa else None,
-                ps=fase_s.potencia_activa.vatios if fase_s.potencia_activa else None,
-                pt=fase_t.potencia_activa.vatios if fase_t.potencia_activa else None,
-                qr=fase_r.potencia_reactiva.var if fase_r.potencia_reactiva else None,
-                qs=fase_s.potencia_reactiva.var if fase_s.potencia_reactiva else None,
-                qt=fase_t.potencia_reactiva.var if fase_t.potencia_reactiva else None,
-            )
 
         vl_val = float(m.voltage_linea_V) if hasattr(m, "voltage_linea_V") and m.voltage_linea_V is not None else None
 
-        vn_val = None
-        if hasattr(m, "tension_neutro_estimada") and m.tension_neutro_estimada is not None:
-            vn_val = float(m.tension_neutro_estimada)
-        else:
-            vn_val = AnalizadorCalidadEnergiaService.calcular_tension_neutro(
-                vr=fase_r.tension.voltios if fase_r.tension else None,
-                vs=fase_s.tension.voltios if fase_s.tension else None,
-                vt=fase_t.tension.voltios if fase_t.tension else None,
-                ir=fase_r.corriente.amperios if fase_r.corriente else None,
-                is_=fase_s.corriente.amperios if fase_s.corriente else None,
-                it=fase_t.corriente.amperios if fase_t.corriente else None,
-                pr=fase_r.potencia_activa.vatios if fase_r.potencia_activa else None,
-                ps=fase_s.potencia_activa.vatios if fase_s.potencia_activa else None,
-                pt=fase_t.potencia_activa.vatios if fase_t.potencia_activa else None,
-                qr=fase_r.potencia_reactiva.var if fase_r.potencia_reactiva else None,
-                qs=fase_s.potencia_reactiva.var if fase_s.potencia_reactiva else None,
-                qt=fase_t.potencia_reactiva.var if fase_t.potencia_reactiva else None,
-            )
+        vn_val = (
+            float(m.tension_neutro_estimada)
+            if hasattr(m, "tension_neutro_estimada") and m.tension_neutro_estimada is not None
+            else None
+        )
 
         thd_v_prom_val = (
             float(m.thd_v_promedio_porcentaje)

@@ -134,6 +134,10 @@ class ConsultarTelemetriaUseCase:
     ) -> list[LecturaInstantaneaDTO]:
         dev = self._resolver_dispositivo(id_o_uid)
         _, _, _, min_intervalo = self._obtener_contexto_suscripcion(dev)
+        es_monofasico = AnalizadorCalidadEnergiaService.es_instalacion_monofasica(
+            getattr(dev, "tipo_instalacion", "CONSUMO"),
+            getattr(dev, "fases_con_ti", "R,S,T"),
+        )
 
         ahora = datetime.now(timezone.utc)
         horas_efectivas = horas
@@ -148,9 +152,9 @@ class ConsultarTelemetriaUseCase:
         lecturas = self.repo_telemetria.listar_instantaneas(dev.id, limite_db, desde_efectivo)
 
         if intervalo_segundos > 0:
-            lecturas = AnalizadorCalidadEnergiaService.agregar_lecturas_en_intervalo(lecturas, intervalo_segundos)[
-                :limite
-            ]
+            lecturas = AnalizadorCalidadEnergiaService.agregar_lecturas_en_intervalo(
+                lecturas, intervalo_segundos, es_monofasico=es_monofasico
+            )[:limite]
         else:
             lecturas = lecturas[:limite]
 
