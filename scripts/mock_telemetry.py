@@ -161,21 +161,24 @@ def generar_lectura_sintetica(
     qs = round(_jitter(base["qs"]), 1)
     qt = round(_jitter(base["qt"]), 1)
 
-    # Potencias aparentes y factores de potencia
-    def _pot_aparente_y_fp(p: float, q: float) -> tuple[float, float]:
-        s = math.sqrt(p * p + q * q)
-        fp = round(abs(p) / s, 2) if s > 1.0 else 1.0
-        return round(s, 1), min(1.0, max(0.0, fp))
+    # Potencias aparentes y factores de potencia.
+    # S = V·I, igual que el backend. Con hypot(P,Q) el modo `seed` poblaba los entornos
+    # de desarrollo con la semántica vieja y nadie reproducía el comportamiento real.
+    def _pot_aparente_y_fp(v: float, i: float, p: float) -> tuple[float, float]:
+        s = round(abs(v) * abs(i), 1)
+        if s <= 0.0:
+            return s, 0.0
+        return s, round(max(-1.0, min(1.0, p / s)), 2)
 
-    sr, fpr = _pot_aparente_y_fp(pr, qr)
-    ss, fps = _pot_aparente_y_fp(ps, qs)
-    st, fpt = _pot_aparente_y_fp(pt, qt)
+    sr, fpr = _pot_aparente_y_fp(vr, ir, pr)
+    ss, fps = _pot_aparente_y_fp(vs, is_, ps)
+    st, fpt = _pot_aparente_y_fp(vt, it, pt)
 
     # Totales
     p_tot = round(pr + ps + pt, 1)
     q_tot = round(qr + qs + qt, 1)
-    s_tot = round(math.sqrt(p_tot * p_tot + q_tot * q_tot), 1)
-    fp_tot = round(abs(p_tot) / s_tot, 2) if s_tot > 1.0 else 1.0
+    s_tot = round(sr + ss + st, 1)
+    fp_tot = round(max(-1.0, min(1.0, p_tot / s_tot)), 2) if s_tot > 0.0 else 0.0
 
     # Desbalance de tensión (VUR)
     desbalance_v = AnalizadorCalidadEnergiaService.calcular_desbalance_tension(vr, vs, vt)
@@ -616,8 +619,6 @@ def ejecutar_live_replay(
                         "i": d1["ir"],
                         "p": d1["pr"],
                         "q": d1["qr"],
-                        "s": d1["sr"],
-                        "pf": d1["fpr"],
                     },
                     {
                         "n": "S",
@@ -625,8 +626,6 @@ def ejecutar_live_replay(
                         "i": d1["is"],
                         "p": d1["ps"],
                         "q": d1["qs"],
-                        "s": d1["ss"],
-                        "pf": d1["fps"],
                     },
                     {
                         "n": "T",
@@ -634,15 +633,11 @@ def ejecutar_live_replay(
                         "i": d1["it"],
                         "p": d1["pt"],
                         "q": d1["qt"],
-                        "s": d1["st"],
-                        "pf": d1["fpt"],
                     },
                 ],
                 "total": {
                     "p": d1["p_tot"],
                     "q": d1["q_tot"],
-                    "s": d1["s_tot"],
-                    "pf": d1["fp_tot"],
                 },
             }
 
@@ -663,8 +658,6 @@ def ejecutar_live_replay(
                         "i": d2["ir"],
                         "p": d2["pr"],
                         "q": d2["qr"],
-                        "s": d2["sr"],
-                        "pf": d2["fpr"],
                     },
                     {
                         "n": "S",
@@ -672,8 +665,6 @@ def ejecutar_live_replay(
                         "i": d2["is"],
                         "p": d2["ps"],
                         "q": d2["qs"],
-                        "s": d2["ss"],
-                        "pf": d2["fps"],
                     },
                     {
                         "n": "T",
@@ -681,15 +672,11 @@ def ejecutar_live_replay(
                         "i": d2["it"],
                         "p": d2["pt"],
                         "q": d2["qt"],
-                        "s": d2["st"],
-                        "pf": d2["fpt"],
                     },
                 ],
                 "total": {
                     "p": d2["p_tot"],
                     "q": d2["q_tot"],
-                    "s": d2["s_tot"],
-                    "pf": d2["fp_tot"],
                 },
             }
 
