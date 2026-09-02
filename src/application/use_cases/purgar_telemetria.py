@@ -2,6 +2,7 @@ import time
 from datetime import datetime, timedelta, timezone
 
 from src.application.dtos.purga_dto import PurgaRequestDTO, PurgaResultadoDTO
+from src.domain.telemetria.exceptions import CortePurgaFuturoError
 from src.domain.telemetria.ports import (
     LoggerPort,
     RepositorioTelemetriaPort,
@@ -23,7 +24,15 @@ class PurgarTelemetriaExpiradaUseCase:
         ahora = datetime.now(timezone.utc)
 
         # 1. Fechas de corte según política
-        if dto.dias_retencion_override is not None:
+        if dto.corte_hasta is not None:
+            if dto.corte_hasta > ahora:
+                raise CortePurgaFuturoError(
+                    f"corte_hasta ({dto.corte_hasta.isoformat()}) es posterior a ahora"
+                )
+            corte_telemetria = dto.corte_hasta
+            corte_logs = dto.corte_hasta
+            corte_alertas = dto.corte_hasta
+        elif dto.dias_retencion_override is not None:
             corte_telemetria = ahora - timedelta(days=dto.dias_retencion_override)
             corte_logs = ahora - timedelta(days=dto.dias_retencion_override)
             corte_alertas = ahora - timedelta(days=dto.dias_retencion_override)

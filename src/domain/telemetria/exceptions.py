@@ -40,3 +40,7 @@ class CoordenadaInvalidaError(DominioTelemetriaException):
 
 class PlantaNoEncontradaError(DominioTelemetriaException):
     """Lanzada cuando se intenta operar con una planta que no existe."""
+
+
+class CortePurgaFuturoError(DominioTelemetriaException):
+    """Lanzada cuando el corte de purga (corte_hasta) es posterior al instante actual."""

@@ -1,6 +1,7 @@
 import argparse
 import os
 import sys
+from datetime import datetime, timezone
 
 # Add root directory to python path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -10,6 +11,18 @@ from src.application.use_cases.purgar_telemetria import PurgarTelemetriaExpirada
 from src.infrastructure.settings.logger import get_logger
 from src.infrastructure.sqlalchemy.database import get_session_factory
 from src.infrastructure.sqlalchemy.mysql_repositories import MySQLTelemetriaRepository
+
+
+def parsear_corte_hasta(valor: str) -> datetime:
+    """Convierte un string ISO en un datetime UTC *aware*.
+
+    Un valor sin offset (naive) se interpreta como UTC. Un formato inválido
+    lanza `ValueError`.
+    """
+    corte = datetime.fromisoformat(valor)
+    if corte.tzinfo is None:
+        return corte.replace(tzinfo=timezone.utc)
+    return corte.astimezone(timezone.utc)
 
 
 def main():
@@ -28,6 +41,12 @@ def main():
         default=1000,
         help="Tamaño de lote para borrados por transacción (default: 1000).",
     )
+    parser.add_argument(
+        "--hasta",
+        type=str,
+        default=None,
+        help="Corte temporal explícito en UTC (ej. '2026-09-01 21:40:04'); purga todo lo anterior.",
+    )
     args = parser.parse_args()
 
     logger = get_logger("cli_purge")
@@ -41,6 +60,7 @@ def main():
 
         req_dto = PurgaRequestDTO(
             dias_retencion_override=args.days,
+            corte_hasta=parsear_corte_hasta(args.hasta) if args.hasta else None,
             batch_size=args.batch_size,
         )
         res = use_case.ejecutar(req_dto)

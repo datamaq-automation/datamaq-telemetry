@@ -5,6 +5,7 @@ from src.application.dtos.tipos import FechaHoraUTC
 
 class PurgaRequestDTO(BaseModel):
     dias_retencion_override: int | None = Field(default=None, description="Sobrescribir días de retención global")
+    corte_hasta: FechaHoraUTC | None = Field(default=None, description="Corte por timestamp UTC explícito (purga todo lo anterior)")
     batch_size: int = Field(default=1000, description="Tamaño de lote para borrados por transacción", ge=10, le=10000)
 
 
