@@ -1,6 +1,7 @@
-from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from src.application.dtos.tipos import FechaHoraUTC
 
 
 class DispositivoBaseDTO(BaseModel):
@@ -37,8 +38,8 @@ DispositivoActualizarDTO = DispositivoUpdateDTO
 class DispositivoResponseDTO(DispositivoBaseDTO):
     id: str
     estado: str
-    visto_por_ultima_vez: datetime | None = None
-    creado_en: datetime
-    actualizado_en: datetime
+    visto_por_ultima_vez: FechaHoraUTC | None = None
+    creado_en: FechaHoraUTC
+    actualizado_en: FechaHoraUTC
     voltage_linea_V: float | None = None
     model_config = ConfigDict(from_attributes=True)

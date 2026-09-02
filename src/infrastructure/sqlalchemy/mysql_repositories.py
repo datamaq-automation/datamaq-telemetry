@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import desc
@@ -595,16 +595,10 @@ class MySQLOrganizacionesRepository(RepositorioOrganizacionesPort):
             if m.free_tier_mode in [item.value for item in ModoFreeTier]
             else ModoFreeTier.PRIVADO_BASICO
         )
+        # UtcDateTime ya devuelve aware desde el borde de persistencia.
         pro_exp = m.pro_expires_at
-        if pro_exp is not None and pro_exp.tzinfo is None:
-            pro_exp = pro_exp.replace(tzinfo=timezone.utc)
-
-        creado = (
-            m.created_at.replace(tzinfo=timezone.utc) if m.created_at and m.created_at.tzinfo is None else m.created_at
-        )
-        actualizado = (
-            m.updated_at.replace(tzinfo=timezone.utc) if m.updated_at and m.updated_at.tzinfo is None else m.updated_at
-        )
+        creado = m.created_at
+        actualizado = m.updated_at
 
         return Organizacion(
             id=m.id,

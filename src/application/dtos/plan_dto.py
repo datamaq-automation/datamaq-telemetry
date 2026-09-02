@@ -1,8 +1,8 @@
-from datetime import datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict
 
+from src.application.dtos.tipos import FechaHoraUTC
 from src.domain.telemetria.value_objects import VisibilidadPlan
 
 
@@ -19,6 +19,6 @@ class PlanCreateDTO(BaseModel):
 
 class PlanResponseDTO(PlanCreateDTO):
     id: str
-    creado_en: datetime
-    actualizado_en: datetime
+    creado_en: FechaHoraUTC
+    actualizado_en: FechaHoraUTC
     model_config = ConfigDict(from_attributes=True)

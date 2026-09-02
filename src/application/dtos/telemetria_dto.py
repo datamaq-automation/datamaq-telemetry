@@ -1,7 +1,8 @@
-from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict
+
+from src.application.dtos.tipos import FechaHoraUTC
 
 
 class MedicionFaseDTO(BaseModel):
@@ -30,7 +31,7 @@ class AnaliticaCalidadEnergiaDTO(BaseModel):
 class LecturaInstantaneaDTO(BaseModel):
     id: int | None = None
     dispositivo_id: str
-    registrado_en: datetime
+    registrado_en: FechaHoraUTC
     fase_r: MedicionFaseDTO
     fase_s: MedicionFaseDTO
     fase_t: MedicionFaseDTO
@@ -51,7 +52,7 @@ class LecturaInstantaneaDTO(BaseModel):
 class AcumuladoEnergiaDTO(BaseModel):
     id: int | None = None
     dispositivo_id: str
-    registrado_en: datetime
+    registrado_en: FechaHoraUTC
     net_active_energy_kwh: float | None = None
     net_reactive_energy_kvarh: float | None = None
     imported_active_energy_kwh: float | None = None
@@ -64,7 +65,7 @@ class AcumuladoEnergiaDTO(BaseModel):
 class LogEstadoDispositivoDTO(BaseModel):
     id: int | None = None
     dispositivo_id: str
-    registrado_en: datetime
+    registrado_en: FechaHoraUTC
     wifi_rssi_dbm: int | None = None
     wifi_calidad: int | None = None
     direccion_ip: str | None = None

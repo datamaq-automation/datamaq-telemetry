@@ -77,7 +77,9 @@ async def manejar_excepcion_no_mapeada(request: Request, exc: Exception) -> JSON
 def websocket_broadcast_callback(topico: str, datos: dict):
     if not active_websockets or not async_loop:
         return
-    msg = json.dumps({"topic": topico, "data": datos, "received_at": datetime.now(timezone.utc).isoformat()})
+    # `.isoformat()` produce "+00:00"; REST emite "Z". Se unifica el formato entre ambos canales.
+    recibido_en = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    msg = json.dumps({"topic": topico, "data": datos, "received_at": recibido_en})
     for ws in list(active_websockets):
         try:
             asyncio.run_coroutine_threadsafe(ws.send_text(msg), async_loop)

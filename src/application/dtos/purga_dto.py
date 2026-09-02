@@ -1,6 +1,7 @@
-from datetime import datetime
 
 from pydantic import BaseModel, Field
+
+from src.application.dtos.tipos import FechaHoraUTC
 
 
 class PurgaRequestDTO(BaseModel):
@@ -15,4 +16,4 @@ class PurgaResultadoDTO(BaseModel):
     alertas_resueltas_eliminadas: int = 0
     total_registros_eliminados: int = 0
     duracion_segundos: float = 0.0
-    ejecutado_en: datetime
+    ejecutado_en: FechaHoraUTC

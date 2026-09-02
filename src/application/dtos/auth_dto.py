@@ -1,7 +1,8 @@
-from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
+
+from src.application.dtos.tipos import FechaHoraUTC
 
 
 class LoginRequestDTO(BaseModel):
@@ -11,7 +12,7 @@ class LoginRequestDTO(BaseModel):
 
 class LoginResponseDTO(BaseModel):
     token: str
-    expira_en: datetime
+    expira_en: FechaHoraUTC
 
 
 class MeResponseDTO(BaseModel):

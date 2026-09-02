@@ -1,6 +1,7 @@
-from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
+
+from src.application.dtos.tipos import FechaHoraUTC
 
 
 class OrganizacionBaseDTO(BaseModel):
@@ -9,7 +10,7 @@ class OrganizacionBaseDTO(BaseModel):
     cuit: str | None = None
     email_contacto: str | None = None
     telefono_contacto: str | None = None
-    pro_vence_en: datetime | None = None
+    pro_vence_en: FechaHoraUTC | None = None
     modo_free: str = "PRIVADO_BASICO"
 
 
@@ -19,8 +20,8 @@ class OrganizacionCreateDTO(OrganizacionBaseDTO):
 
 class OrganizacionResponseDTO(OrganizacionBaseDTO):
     id: str
-    creado_en: datetime
-    actualizado_en: datetime
+    creado_en: FechaHoraUTC
+    actualizado_en: FechaHoraUTC
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -38,6 +39,6 @@ class PlantaCreateDTO(PlantaBaseDTO):
 
 class PlantaResponseDTO(PlantaBaseDTO):
     id: str
-    creado_en: datetime
-    actualizado_en: datetime
+    creado_en: FechaHoraUTC
+    actualizado_en: FechaHoraUTC
     model_config = ConfigDict(from_attributes=True)

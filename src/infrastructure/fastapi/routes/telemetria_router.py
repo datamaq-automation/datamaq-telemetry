@@ -9,6 +9,7 @@ from src.application.dtos.telemetria_dto import (
     LecturaInstantaneaDTO,
     TelemetriaLatestResponseDTO,
 )
+from src.application.dtos.tipos import FechaHoraUTC
 from src.application.use_cases.consultar_telemetria import ConsultarTelemetriaUseCase
 from src.application.use_cases.gestionar_alertas import GestionarAlertasUseCase
 from src.infrastructure.fastapi.dependencies import (
@@ -78,8 +79,8 @@ def get_alerts_history(
     solo_abiertas: bool = Query(False, description="Filtrar solo alertas no resueltas"),
     severidad: str | None = Query(None, description="Filtrar por severidad (INFO, WARNING, CRITICAL)"),
     limit: int = Query(100, le=500, description="Límite de registros"),
-    desde: datetime | None = Query(None, description="Fecha de inicio ISO8601"),
-    hasta: datetime | None = Query(None, description="Fecha de fin ISO8601"),
+    desde: FechaHoraUTC | None = Query(None, description="Fecha de inicio ISO8601"),
+    hasta: FechaHoraUTC | None = Query(None, description="Fecha de fin ISO8601"),
 ):
     try:
         return use_case.listar_alertas(

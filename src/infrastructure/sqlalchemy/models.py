@@ -6,7 +6,6 @@ from typing import Any, Optional
 from sqlalchemy import (
     JSON,
     BigInteger,
-    DateTime,
     Enum,
     ForeignKey,
     Index,
@@ -15,6 +14,8 @@ from sqlalchemy import (
     Text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
+from src.infrastructure.sqlalchemy.types import UtcDateTime
 
 
 def ahora_utc() -> datetime:
@@ -38,10 +39,10 @@ class OrganizationModel(Base):
     tax_id: Mapped[str | None] = mapped_column(String(50), nullable=True)
     contact_email: Mapped[str | None] = mapped_column(String(120), nullable=True)
     contact_phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    pro_expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    pro_expires_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
     free_tier_mode: Mapped[str] = mapped_column(String(30), default="PRIVADO_BASICO", nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, onupdate=ahora_utc, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, onupdate=ahora_utc, nullable=False)
 
     plan: Mapped[Optional["PlanModel"]] = relationship()
     facilities: Mapped[list["FacilityModel"]] = relationship(
@@ -61,8 +62,8 @@ class FacilityModel(Base):
     latitude: Mapped[Decimal | None] = mapped_column(Numeric(10, 8), nullable=True)
     longitude: Mapped[Decimal | None] = mapped_column(Numeric(11, 8), nullable=True)
     layout_svg_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, onupdate=ahora_utc, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, onupdate=ahora_utc, nullable=False)
 
     organization: Mapped["OrganizationModel"] = relationship(back_populates="facilities")
     devices: Mapped[list["DeviceModel"]] = relationship(back_populates="facility")
@@ -95,8 +96,8 @@ class FacilityUnifilarNodeModel(Base):
     nominal_voltage_v: Mapped[Decimal] = mapped_column(Numeric(8, 2), nullable=False)
     nominal_capacity_kva: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
     sort_order: Mapped[int] = mapped_column(default=0, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, onupdate=ahora_utc, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, onupdate=ahora_utc, nullable=False)
 
     facility: Mapped["FacilityModel"] = relationship(back_populates="unifilar_nodes")
     device: Mapped[Optional["DeviceModel"]] = relationship()
@@ -115,8 +116,8 @@ class FacilityZoneModel(Base):
     y_pct: Mapped[Decimal] = mapped_column(Numeric(6, 2), nullable=False)
     width_pct: Mapped[Decimal] = mapped_column(Numeric(6, 2), nullable=False)
     height_pct: Mapped[Decimal] = mapped_column(Numeric(6, 2), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, onupdate=ahora_utc, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, onupdate=ahora_utc, nullable=False)
 
     facility: Mapped["FacilityModel"] = relationship(back_populates="zones")
 
@@ -138,8 +139,8 @@ class FacilityDeviceLayoutModel(Base):
     )
     pos_x_pct: Mapped[Decimal] = mapped_column(Numeric(6, 2), nullable=False)
     pos_y_pct: Mapped[Decimal] = mapped_column(Numeric(6, 2), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, onupdate=ahora_utc, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, onupdate=ahora_utc, nullable=False)
 
     facility: Mapped["FacilityModel"] = relationship(back_populates="device_layouts")
     device: Mapped["DeviceModel"] = relationship()
@@ -162,11 +163,11 @@ class DeviceModel(Base):
     tag_location: Mapped[str | None] = mapped_column(String(100), nullable=True)
     esta_activo: Mapped[bool] = mapped_column("is_active", default=True, nullable=False)
     estado: Mapped[str] = mapped_column("status", String(20), default="OFFLINE", nullable=False)
-    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_seen_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
     installation_type: Mapped[str] = mapped_column(String(30), default="CONSUMO", nullable=False)
     phases_with_ct: Mapped[str] = mapped_column(String(20), default="R,S,T", nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, onupdate=ahora_utc, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, onupdate=ahora_utc, nullable=False)
 
     facility: Mapped[Optional["FacilityModel"]] = relationship(back_populates="devices")
     instantaneous_readings: Mapped[list["TelemetryInstantaneousModel"]] = relationship(
@@ -190,7 +191,7 @@ class TelemetryInstantaneousModel(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     device_id: Mapped[str] = mapped_column(String(36), ForeignKey("devices.id", ondelete="CASCADE"), nullable=False)
-    recorded_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    recorded_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     # Fase R
     voltage_r: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
@@ -236,7 +237,7 @@ class TelemetryInstantaneousModel(Base):
     thd_v_promedio_porcentaje: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     thd_i_total_porcentaje: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
 
     device: Mapped["DeviceModel"] = relationship(back_populates="instantaneous_readings")
 
@@ -250,7 +251,7 @@ class TelemetryEnergyModel(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     device_id: Mapped[str] = mapped_column(String(36), ForeignKey("devices.id", ondelete="CASCADE"), nullable=False)
-    recorded_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    recorded_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
 
     net_active_energy_kwh: Mapped[Decimal | None] = mapped_column(Numeric(14, 3), nullable=True)
     net_reactive_energy_kvarh: Mapped[Decimal | None] = mapped_column(Numeric(14, 3), nullable=True)
@@ -259,7 +260,7 @@ class TelemetryEnergyModel(Base):
     imported_reactive_energy_kvarh: Mapped[Decimal | None] = mapped_column(Numeric(14, 3), nullable=True)
     exported_reactive_energy_kvarh: Mapped[Decimal | None] = mapped_column(Numeric(14, 3), nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
 
     device: Mapped["DeviceModel"] = relationship(back_populates="energy_readings")
 
@@ -273,13 +274,13 @@ class DeviceStatusLogModel(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     device_id: Mapped[str] = mapped_column(String(36), ForeignKey("devices.id", ondelete="CASCADE"), nullable=False)
-    recorded_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    recorded_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
     wifi_rssi_dbm: Mapped[int | None] = mapped_column(nullable=True)
     wifi_calidad: Mapped[int | None] = mapped_column(nullable=True)
     ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
     uptime_seconds: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     raw_payload: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
 
     device: Mapped["DeviceModel"] = relationship(back_populates="status_logs")
 
@@ -301,8 +302,8 @@ class DeviceAlertModel(Base):
     )
     message: Mapped[str] = mapped_column(Text, nullable=False)
     is_resolved: Mapped[bool] = mapped_column(default=False, nullable=False)
-    triggered_at: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, nullable=False)
-    resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    triggered_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
+    resolved_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
     phase: Mapped[str | None] = mapped_column(String(10), nullable=True)
     measured_value: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
     threshold_value: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
@@ -325,8 +326,8 @@ class PlanModel(Base):
     granularity_minutes: Mapped[int] = mapped_column(nullable=False)
     max_devices: Mapped[int] = mapped_column(nullable=False)
     notification_channels: Mapped[list[str]] = mapped_column(JSON, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, onupdate=ahora_utc, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, onupdate=ahora_utc, nullable=False)
 
 
 class UserModel(Base):
@@ -337,5 +338,5 @@ class UserModel(Base):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(20), default="operador", nullable=False)
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=ahora_utc, onupdate=ahora_utc, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, onupdate=ahora_utc, nullable=False)
