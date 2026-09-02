@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import Any, ClassVar
 
 from src.application.mappers.alerta_mapper import AlertaMapper
+from src.application.mappers.telemetria_mapper import TelemetriaMapper
 from src.domain.telemetria.entities import (
     AcumuladoEnergia,
     AlertaDispositivo,
@@ -286,15 +287,18 @@ class IngestarTelemetriaUseCase:
         if not isinstance(payload, dict):
             return
 
-        if self.publicador:
-            self.publicador.publicar_telemetria_en_vivo(topico, payload)
-
         partes = topico.split("/")
         if len(partes) < 4:
             return
 
         mac_raw = partes[2]
         subtopico = partes[3]
+
+        # Los subtopics distintos de `inst` se difunden tal cual llegan. `inst` se
+        # normaliza a LecturaInstantaneaDTO más abajo para que el frontend pueda
+        # parsear también el formato compacto de raíz (root-n) de los monofásicos.
+        if self.publicador and subtopico != "inst":
+            self.publicador.publicar_telemetria_en_vivo(topico, payload)
 
         dev_info = payload.get("device_info") if isinstance(payload.get("device_info"), dict) else None
         recorded_at = self._parse_timestamp(payload.get("timestamp") or payload.get("t") or payload.get("time"))
@@ -514,6 +518,10 @@ class IngestarTelemetriaUseCase:
                 thd_v_promedio_porcentaje=round(float(thd_v_prom), 2) if thd_v_prom is not None else None,
                 thd_i_total_porcentaje=round(float(thd_i_tot), 2) if thd_i_tot is not None else None,
             )
+            if self.publicador:
+                self.publicador.publicar_telemetria_en_vivo(
+                    topico, TelemetriaMapper.instantanea_to_dto(lectura).model_dump(mode="json")
+                )
             # Evaluación de alertas de dominio (se evalúa siempre para cada paquete recibido)
             # 1. Tensión y falta de fase con filtro de persistencia temporal (anti-falsos positivos)
             alerta_tension_raw = AnalizadorCalidadEnergiaService.evaluar_alerta_tension(dispositivo.id, lectura)
