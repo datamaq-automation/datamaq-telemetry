@@ -53,6 +53,10 @@ logger = get_logger("server")
 active_websockets: list[WebSocket] = []
 async_loop = None
 
+# Código de cierre de aplicación que distingue "token inválido" en /ws/live.
+# Se emite tras `accept()` para que el navegador pueda leerlo (evita el 1006 opaco).
+WS_CLOSE_TOKEN_INVALIDO = 4401
+
 
 async def manejar_excepcion_no_mapeada(request: Request, exc: Exception) -> JSONResponse:
     request_id = structlog.contextvars.get_contextvars().get("request_id")
@@ -162,13 +166,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # WebSockets Live Telemetry Stream
     @app.websocket("/ws/live")
     async def websocket_stream(websocket: WebSocket):
+        await websocket.accept()
         if settings.AUTH_REQUIRED:
             cookie_token = websocket.cookies.get(settings.AUTH_COOKIE_NOMBRE)
             auth_header = websocket.headers.get("authorization")
             if not token_valido(cookie_token, auth_header, settings.API_SECRET_KEY, settings.API_SECRET_KEY_ANTERIOR):
-                await websocket.close(code=1008)
+                await websocket.close(code=WS_CLOSE_TOKEN_INVALIDO, reason="token_invalido")
                 return
-        await websocket.accept()
         active_websockets.append(websocket)
         try:
             while True:
