@@ -274,7 +274,8 @@ consumo desde la SPA y conviene decidirlas juntos.
 5. **Un payload monofásico se replica en las tres fases.** Si el mensaje no trae la estructura
    `f:[...]`, la misma fase se copia en R, S y T, produciendo un trifásico perfectamente
    balanceado ficticio: VUR 0, IUR 0, neutro 0. Falso negativo sistemático de las alertas de
-   desbalance.
+   desbalance. *(Resuelto por el backend: soporte monofásico 1P2W — ver
+   `specs/metrologia-monofasica.md` y migración `1f2e3d4c5b6a`.)*
 
 ---
 
