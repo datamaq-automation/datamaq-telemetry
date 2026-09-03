@@ -35,14 +35,13 @@ DEFAULT_MAX_FUNC_LINES = 75
 BASELINE_CEILINGS: dict[str, int] = {
     # Archivos
     "file:src/domain/telemetria/services.py": 1250,
-    "file:src/infrastructure/sqlalchemy/mysql_repositories.py": 1200,
     "file:src/application/use_cases/ingestar_telemetria.py": 900,
     "file:src/domain/disponibilidad/services.py": 650,
     # Clases
     "class:src/domain/telemetria/services.py::AnalizadorCalidadEnergiaService": 900,
     "class:src/application/use_cases/ingestar_telemetria.py::IngestarTelemetriaUseCase": 820,
     "class:src/domain/disponibilidad/services.py::SegmentadorRegimenesService": 550,
-    "class:src/infrastructure/sqlalchemy/mysql_repositories.py::MySQLTelemetriaRepository": 450,
+    "class:src/infrastructure/sqlalchemy/repositories/telemetria_repository.py::MySQLTelemetriaRepository": 450,
     # Métodos y Funciones
     "func:src/application/use_cases/ingestar_telemetria.py::ejecutar": 550,
     "func:src/application/use_cases/ingestar_telemetria.py::_parse_fase": 150,
@@ -52,7 +51,7 @@ BASELINE_CEILINGS: dict[str, int] = {
     "func:src/domain/telemetria/services.py::calcular_analitica_completa": 100,
     "func:src/infrastructure/fastapi/server.py::create_app": 95,
     "func:src/domain/telemetria/services.py::procesar_alerta": 90,
-    "func:src/infrastructure/sqlalchemy/mysql_repositories.py::_instantanea_to_entity": 90,
+    "func:src/infrastructure/sqlalchemy/repositories/telemetria_repository.py::_instantanea_to_entity": 90,
     "func:src/application/use_cases/purgar_telemetria.py::ejecutar": 85,
 }
 
