@@ -1,7 +1,7 @@
 # Índice Maestro de Documentación Técnica — Datamaq Telemetry
 
 > **Repositorio:** `datamaq-telemetry` (Backend FastAPI, Ingestión MQTT y Motor de Analítica)  
-> **Última Actualización:** 2026-09-01  
+> **Última Actualización:** 2026-09-03  
 > **Estado:** Documentación Centralizada y Sincronizada
 
 Bienvenido al centro de documentación técnica del backend de telemetría de energía DataMaq. Los documentos canónicos vivos están organizados temáticamente según el área técnica:
@@ -45,6 +45,13 @@ Bienvenido al centro de documentación técnica del backend de telemetría de en
   *Diagrama Entidad-Relación (ERD):* Diagrama Mermaid autogenerado de todas las tablas MySQL, índices B-Tree, columnas de ingeniería y matriz de políticas de retención.
 * 📄 [`docs/to_www-datamaq.md`](file:///home/agustin/proyectos_software/datamaq-telemetry/docs/to_www-datamaq.md)  
   *Directiva de Negocio y Modelo Freemium:* Especificación del modelo comercial de DataMaq ($0 de por vida, Ciclo PRO de 60 días incluido en obras/consultorías, bifurcación Free entre Vitrina Pública Anonimizada de 30 días y Monitoreo Privado Básico de 14 días).
+
+---
+
+### 4. Analítica de Procesos — Diseño Conceptual (Exploratorio)
+
+* 📄 [`docs/disponibilidad-maquina-diseno-conceptual.md`](file:///home/agustin/proyectos_software/datamaq-telemetry/docs/disponibilidad-maquina-diseno-conceptual.md)
+  *Disponibilidad de Máquina a partir del Comportamiento Energético:* Documento de diseño conceptual (sin tablas ni servicios definidos aún) sobre cómo inferir marcha / parada programada / parada no programada desde las variables eléctricas. Cubre certezas y dudas abiertas, calibración de umbrales por histograma bimodal de potencia (suavizado, escala logarítmica, rol de promedio/mediana), desagregación de cargas para medidores agregados (NILM: clustering por nivel vs. detección de eventos ΔP, decisión algorítmico vs. submedición dedicada), comparación Reglas vs. ML supervisado, y el roadmap secuencial propuesto (reglas → corrección humana → modelo de ML).
 
 ---
 
