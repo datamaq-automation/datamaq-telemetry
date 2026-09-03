@@ -21,7 +21,7 @@ def test_metricas_ws_inicial():
 def test_endpoint_ws_status():
     app = create_app()
     client = TestClient(app)
-    response = client.get("/system/ws-status")
+    response = client.get("/api/v1/system/ws-status")
     assert response.status_code == 200
     data = response.json()
     assert "clientes_activos" in data

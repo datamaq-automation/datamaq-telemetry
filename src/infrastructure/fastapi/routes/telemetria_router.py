@@ -22,7 +22,7 @@ from src.infrastructure.fastapi.dependencies import (
 from src.infrastructure.fastapi.error_handler import manejar_error_http
 
 router = APIRouter(
-    prefix="/api/telemetria",
+    prefix="/api/v1/telemetria",
     tags=["Telemetría"],
     dependencies=[Depends(get_usuario_actual)],
 )

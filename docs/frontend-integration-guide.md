@@ -20,7 +20,7 @@ Por directiva de arquitectura del ecosistema DataMaq:
 ## 2. Autenticación, Sesión y Control de Acceso
 
 ### 2.1 Mecanismo de Sesión por Cookie HttpOnly
-* **Transporte Seguro:** La autenticación principal se basa en una cookie `HttpOnly` (`datamaq_token`) emitida por el backend en `/api/auth/login` o `/api/auth/guest`. La SPA **no almacena tokens en `localStorage` ni firma tokens**.
+* **Transporte Seguro:** La autenticación principal se basa en una cookie `HttpOnly` (`datamaq_token`) emitida por el backend en `/api/v1/auth/login` o `/api/v1/auth/guest`. La SPA **no almacena tokens en `localStorage` ni firma tokens**.
 * **Configuración de Cookie:** `HttpOnly=True`, `Path=/`, `Max-Age=AUTH_TOKEN_EXPIRA_MINUTOS * 60` (por defecto 120 min / configurable), `SameSite=Strict` en producción (configurable a `SameSite=Lax` en desarrollo local para soporte cross-port `localhost:5173` ↔ `localhost:8000`).
 * **Fallback:** El backend acepta alternativamente el header `Authorization: Bearer <token>` para clientes sin soporte de cookies.
 
@@ -28,23 +28,23 @@ Por directiva de arquitectura del ecosistema DataMaq:
 
 | Endpoint | Método | Acceso | Descripción |
 | :--- | :---: | :---: | :--- |
-| `/api/auth/login` | `POST` | Público | Autenticación con `{"usuario": "...", "contrasena": "..."}`. Emite cookie y JWT. |
-| `/api/auth/guest` | `POST` | Público | **Acceso Invitado Stateless:** Emite cookie y JWT con rol `invitado` sin consultar la base de datos (con rate limiting por IP). |
-| `/api/auth/logout` | `POST` | Público | Cierre de sesión. Borra la cookie `datamaq_token`. |
-| `/api/auth/me` | `GET` | Autenticado | Devuelve la identidad y rol activo `{"usuario": "...", "rol": "admin" \| "operador" \| "invitado"}`. |
+| `/api/v1/auth/login` | `POST` | Público | Autenticación con `{"usuario": "...", "contrasena": "..."}`. Emite cookie y JWT. |
+| `/api/v1/auth/guest` | `POST` | Público | **Acceso Invitado Stateless:** Emite cookie y JWT con rol `invitado` sin consultar la base de datos (con rate limiting por IP). |
+| `/api/v1/auth/logout` | `POST` | Público | Cierre de sesión. Borra la cookie `datamaq_token`. |
+| `/api/v1/auth/me` | `GET` | Autenticado | Devuelve la identidad y rol activo `{"usuario": "...", "rol": "admin" \| "operador" \| "invitado"}`. |
 
 ### 2.3 Matriz de Permisos por Rol
 
 | Módulo / Rutas | `invitado` (Demo) | `operador` | `admin` |
 | :--- | :---: | :---: | :---: |
-| Consultas de Telemetría (`/api/telemetria/*`, `/ws/live`) | ✅ Lectura | ✅ Lectura | ✅ Lectura |
+| Consultas de Telemetría (`/api/v1/telemetria/*`, `/ws/live`) | ✅ Lectura | ✅ Lectura | ✅ Lectura |
 | Consulta de Dispositivos, Plantas, Organizaciones y Planes (`GET`) | ✅ Lectura | ✅ Lectura | ✅ Lectura |
 | Alta y Edición de Dispositivos y Metrología (`POST`, `PUT`, `PATCH`) | ❌ 403 Forbidden | ✅ Escritura | ✅ Escritura |
 | Gestión de Plantas, Organizaciones y Planes (`POST`) | ❌ 403 Forbidden | ✅ Escritura | ✅ Escritura |
-| Consulta de Alertas (`GET /api/alertas`) | ✅ Lectura | ✅ Lectura | ✅ Lectura |
-| Resolución de Alertas (`PATCH /api/alertas/{id}/resolver`) | ❌ 403 Forbidden | ✅ Escritura | ✅ Escritura |
+| Consulta de Alertas (`GET /api/v1/alertas`) | ✅ Lectura | ✅ Lectura | ✅ Lectura |
+| Resolución de Alertas (`PATCH /api/v1/alertas/{id}/resolver`) | ❌ 403 Forbidden | ✅ Escritura | ✅ Escritura |
 | Modificación de Diagrama Unifilar y Layout (`PUT /api/v1/plantas/*`) | ❌ 403 Forbidden | ✅ Escritura | ✅ Escritura |
-| Purga de Telemetría (`POST /api/system/purge`) | ❌ 403 Forbidden | ❌ 403 Forbidden | ✅ Admin |
+| Purga de Telemetría (`POST /api/v1/system/purge`) | ❌ 403 Forbidden | ❌ 403 Forbidden | ✅ Admin |
 
 ---
 
@@ -55,7 +55,7 @@ Por directiva de arquitectura del ecosistema DataMaq:
 │                    Canales de Telemetría                    │
 ├──────────────────────────────┬──────────────────────────────┤
 │    Canal A: Tiempo Real      │    Canal B: Histórico REST   │
-│    (WebSocket /ws/live)      │    (/api/telemetria/...)     │
+│    (WebSocket /ws/live)      │    (/api/v1/telemetria/...)     │
 ├──────────────────────────────┼──────────────────────────────┤
 │ • Gauges y velocímetros      │ • Gráficos de tendencias     │
 │ • Potencia y FP instantáneo  │ • Curvas de carga (24h, 7d)  │
@@ -150,7 +150,7 @@ export interface TelemetriaLatestResponseDTO {
 }
 ```
 
-### 4.2 Endpoint `GET /api/telemetria/latest/{device_id}`
+### 4.2 Endpoint `GET /api/v1/telemetria/latest/{device_id}`
 * `{device_id}` acepta polimórficamente UUID (`725dfb4c-...`) o dirección MAC (`D48C49F03564` / `d4:8c:49:f0:35:64`).
 * **Ejemplo de Respuesta JSON:**
 ```json
@@ -191,7 +191,7 @@ export interface TelemetriaLatestResponseDTO {
 }
 ```
 
-### 4.3 Endpoint Histórico `GET /api/telemetria/instantaneous/{device_id}`
+### 4.3 Endpoint Histórico `GET /api/v1/telemetria/instantaneous/{device_id}`
 * **Query Parameters:**
   * `limit`: Entero (1 a 5000, default `500`).
   * `hours`: Entero (1 a 720, ej: `2`, `24`, `168`).
@@ -202,10 +202,10 @@ export interface TelemetriaLatestResponseDTO {
 ## 5. Gestión de Incidentes y Alertas Normativas
 
 ### 5.1 Listar Alertas
-* **Endpoint:** `GET /api/alertas?device_id={id}&solo_abiertas={bool}&severidad={WARNING|CRITICAL}&limit=100`
+* **Endpoint:** `GET /api/v1/alertas?device_id={id}&solo_abiertas={bool}&severidad={WARNING|CRITICAL}&limit=100`
 
 ### 5.2 Resolver Alerta
-* **Endpoint:** `PATCH /api/alertas/{alerta_id}/resolver` (o `POST`)
+* **Endpoint:** `PATCH /api/v1/alertas/{alerta_id}/resolver` (o `POST`)
 * **Body Opcional:**
 ```json
 {
@@ -228,7 +228,7 @@ export interface TelemetriaLatestResponseDTO {
 
 Para editar parámetros de instalación de un medidor en campo:
 
-* **Endpoint:** `PATCH /api/dispositivos/{device_id}` (o `PUT`)
+* **Endpoint:** `PATCH /api/v1/dispositivos/{device_id}` (o `PUT`)
 * **Payload:**
 ```json
 {

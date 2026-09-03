@@ -77,6 +77,19 @@ Para garantizar consistencia entre el backend (`datamaq-telemetry`) y el fronten
 * **Identificadores Polimórficos:**
   * El parámetro `{device_id}` en rutas REST acepta indistintamente UUID v4 (`725dfb4c-...`) o dirección MAC del hardware (`D48C49F03564` o `d4:8c:49:f0:35:64`).
 * **Semántica de Métodos HTTP:**
-  * `PATCH`: Modificación parcial de metrología/configuración (`/api/dispositivos/{id}`) o resolución de estados (`/api/alertas/{id}/resolver`).
+  * `PATCH`: Modificación parcial de metrología/configuración (`/api/v1/dispositivos/{id}`) o resolución de estados (`/api/v1/alertas/{id}/resolver`).
   * `PUT`: Sobreescritura idempotente de árboles (ej. `/api/v1/plantas/{id}/unifilar`, `/api/v1/plantas/{id}/layout`).
 
+---
+
+## 5. Versionado de API y Compatibilidad con el Frontend
+
+Todo endpoint de negocio vive bajo `/api/{version}/{recurso}` (ej. `/api/v1/telemetria`, `/api/v1/dispositivos`). Excepciones explícitas fuera de este esquema:
+* Sondas de infraestructura: `/health`, `/health/live`, `/health/ready`, `/favicon.ico` — consumidas por balanceadores/monitores externos al contrato de negocio, no se versionan.
+* WebSocket `/ws/live` — la versión de un contrato de conexión persistente no se resuelve por URL; queda fuera de este esquema hasta que se defina un mecanismo propio (ej. negociación de subprotocolo).
+
+**La versión es por router/recurso, no global.** Un cambio incompatible en un recurso (ej. `telemetria`) se resuelve introduciendo `/api/v2/telemetria`, sin forzar a los demás recursos (`auth`, `alertas`, etc.) a moverse de versión.
+
+* **Breaking change** (requiere nueva versión del recurso): remover o renombrar un campo, cambiar su tipo, remover un valor de enum ya consumido por el frontend, cambiar la semántica de autenticación.
+* **No-breaking** (se aplica in-place en la versión vigente): agregar un campo opcional, agregar un valor de enum nuevo — siempre que el frontend valide de forma tolerante (`safeParse` en Zod, no `parse`).
+* **Proceso ante un breaking change:** documentar en `docs/informe-cambios-contrato-*.md`, indexar en `docs/README.md` y coordinar el despliegue con `app-datamaq` antes de retirar la versión anterior del recurso afectado.

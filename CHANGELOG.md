@@ -8,6 +8,9 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ## [Sin publicar]
 
+### Cambiado
+- **Versionado de API — `BREAKING CHANGE`:** todos los endpoints de negocio pasan de `/api/{recurso}` a `/api/v1/{recurso}` (auth, dispositivos, telemetría, alertas, planes, organizaciones/plantas, y las rutas de sistema `ws-status`/`purge`). Se formaliza la política de versionado (por recurso, no global) en [`CONVENTIONS.md`](file:///home/agustin/proyectos_software/datamaq-telemetry/CONVENTIONS.md#5-versionado-de-api-y-compatibilidad-con-el-frontend). `planta_estructura_router` (`/api/v1/planta/*`) ya cumplía la convención y no cambia. Quedan sin versionar, deliberadamente, las sondas de infraestructura (`/health*`, `/favicon.ico`) y el WebSocket `/ws/live`. Requiere desplegar `app-datamaq` en la misma ventana que este backend, dado que las rutas cambian sin convivencia temporal de la versión anterior.
+
 ### Corregido
 - **Aprovisionamiento de medidores Powermeter (documentación y tooling desalineados con el broker):**
   - [`docs/provisioning_guide.md`](file:///home/agustin/proyectos_software/datamaq-telemetry/docs/provisioning_guide.md) indicaba puerto `1883` con `NO-SECURITY` y usuario vacío. El broker escucha el `1883` solo en `127.0.0.1` y tiene `allow_anonymous false`, por lo que esa configuración impide toda conexión. Reescrita con la configuración obligatoria: `mqtt.datamaq.com.ar:8883`, `TLS-SERVER-AUTH`, CA ISRG Root X1 y usuario `datamaq_device`.

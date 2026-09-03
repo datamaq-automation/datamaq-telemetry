@@ -18,8 +18,8 @@ Bienvenido al centro de documentación técnica del backend de telemetría de en
   - **Telemetría en Tiempo Real:** WebSocket `/ws/live` con autenticación en handshake.
   - **Telemetría REST:** `/latest` e `/instantaneous` con remuestreo inteligente (`granularity`).
   - **Analítica de Calidad y Compensación de Reactiva:** Bloque [`AnaliticaCalidadEnergiaDTO`](file:///home/agustin/proyectos_software/datamaq-telemetry/src/application/dtos/telemetria_dto.py#L18-L27) (*Thin Client / Backend SSOT*), dimensionamiento de $Q_c$ (kVAr), catálogo de bancos comerciales, recargo tarifario ENRE en ARS, desbalances $\text{VUR}$/$\text{IUR}$ y estados de red.
-  - **Alertas e Incidentes:** `GET /api/alertas` y `PATCH /api/alertas/{id}/resolver`.
-  - **Metrología 2-TI:** `PATCH /api/dispositivos/{id}` (`fases_con_ti`, `tipo_instalacion`).
+  - **Alertas e Incidentes:** `GET /api/v1/alertas` y `PATCH /api/v1/alertas/{id}/resolver`.
+  - **Metrología 2-TI:** `PATCH /api/v1/dispositivos/{id}` (`fases_con_ti`, `tipo_instalacion`).
   - **Topología Unifilar y Layout 2D:** `/api/v1/planta/unifilar` y `/api/v1/planta/layout`.
 
 ---

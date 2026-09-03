@@ -9,7 +9,7 @@ from src.infrastructure.fastapi.dependencies import get_auth_use_case, get_setti
 from src.infrastructure.fastapi.error_handler import manejar_error_http
 from src.infrastructure.settings.config import Settings
 
-router = APIRouter(prefix="/api/auth", tags=["Autenticación"])
+router = APIRouter(prefix="/api/v1/auth", tags=["Autenticación"])
 
 logger = structlog.get_logger("auth")
 

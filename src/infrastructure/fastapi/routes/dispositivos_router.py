@@ -17,7 +17,7 @@ from src.infrastructure.fastapi.dependencies import (
 from src.infrastructure.fastapi.error_handler import manejar_error_http
 
 router = APIRouter(
-    prefix="/api/dispositivos",
+    prefix="/api/v1/dispositivos",
     tags=["Dispositivos"],
     dependencies=[Depends(get_usuario_actual)],
 )

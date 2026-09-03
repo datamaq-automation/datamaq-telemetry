@@ -27,7 +27,7 @@ def test_get_energy_aggregated_day_end_to_end():
 
     client = TestClient(app)
     response = client.get(
-        "/api/telemetria/energy/725dfb4c-2610-4405-878a-d718b4f428a4"
+        "/api/v1/telemetria/energy/725dfb4c-2610-4405-878a-d718b4f428a4"
         "?granularity=day&timezone=America/Argentina/Buenos_Aires"
     )
 
@@ -50,7 +50,7 @@ def test_get_energy_granularity_invalida_422():
     app.dependency_overrides[get_telemetria_use_case] = lambda: mock_use_case
 
     client = TestClient(app)
-    response = client.get("/api/telemetria/energy/725dfb4c-2610-4405-878a-d718b4f428a4?granularity=week")
+    response = client.get("/api/v1/telemetria/energy/725dfb4c-2610-4405-878a-d718b4f428a4?granularity=week")
 
     assert response.status_code == 422
     mock_use_case.listar_energia_agregada.assert_not_called()

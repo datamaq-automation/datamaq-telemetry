@@ -26,24 +26,24 @@ def _rutas_telemetria(app) -> dict[str, set[str]]:
             for subruta in ruta.original_router.routes:
                 if hasattr(subruta, "methods") and hasattr(subruta, "path"):
                     rutas.setdefault(subruta.path, set()).update(subruta.methods or set())
-    return {k: v for k, v in rutas.items() if k.startswith("/api/telemetria")}
+    return {k: v for k, v in rutas.items() if k.startswith("/api/v1/telemetria")}
 
 
 def test_create_app_registra_rutas_telemetria():
     app = create_app()
     rutas = _rutas_telemetria(app)
 
-    assert "/api/telemetria/latest/{device_id}" in rutas
-    assert "GET" in rutas["/api/telemetria/latest/{device_id}"]
+    assert "/api/v1/telemetria/latest/{device_id}" in rutas
+    assert "GET" in rutas["/api/v1/telemetria/latest/{device_id}"]
 
-    assert "/api/telemetria/instantaneous/{device_id}" in rutas
-    assert "GET" in rutas["/api/telemetria/instantaneous/{device_id}"]
+    assert "/api/v1/telemetria/instantaneous/{device_id}" in rutas
+    assert "GET" in rutas["/api/v1/telemetria/instantaneous/{device_id}"]
 
-    assert "/api/telemetria/energy/{device_id}" in rutas
-    assert "GET" in rutas["/api/telemetria/energy/{device_id}"]
+    assert "/api/v1/telemetria/energy/{device_id}" in rutas
+    assert "GET" in rutas["/api/v1/telemetria/energy/{device_id}"]
 
-    assert "/api/telemetria/alerts/{device_id}" in rutas
-    assert "GET" in rutas["/api/telemetria/alerts/{device_id}"]
+    assert "/api/v1/telemetria/alerts/{device_id}" in rutas
+    assert "GET" in rutas["/api/v1/telemetria/alerts/{device_id}"]
 
 
 def test_get_latest_telemetry_end_to_end_con_thd():
@@ -90,7 +90,7 @@ def test_get_latest_telemetry_end_to_end_con_thd():
     app.dependency_overrides[get_telemetria_use_case] = lambda: mock_use_case
 
     client = TestClient(app)
-    response = client.get("/api/telemetria/latest/dev-test-1")
+    response = client.get("/api/v1/telemetria/latest/dev-test-1")
 
     assert response.status_code == 200
     assert "X-Request-ID" in response.headers
@@ -122,7 +122,7 @@ def test_get_instantaneous_history_end_to_end():
     app.dependency_overrides[get_telemetria_use_case] = lambda: mock_use_case
 
     client = TestClient(app)
-    response = client.get("/api/telemetria/instantaneous/dev-test-1?limit=10&hours=24")
+    response = client.get("/api/v1/telemetria/instantaneous/dev-test-1?limit=10&hours=24")
 
     assert response.status_code == 200
     assert "X-Request-ID" in response.headers
@@ -141,7 +141,7 @@ def test_get_instantaneous_history_empty_result_returns_200_empty_list():
     app.dependency_overrides[get_telemetria_use_case] = lambda: mock_use_case
 
     client = TestClient(app)
-    response = client.get("/api/telemetria/instantaneous/725dfb4c-2610-4405-878a-d718b4f428a4?limit=100&hours=24")
+    response = client.get("/api/v1/telemetria/instantaneous/725dfb4c-2610-4405-878a-d718b4f428a4?limit=100&hours=24")
 
     assert response.status_code == 200
     assert response.json() == []
@@ -169,7 +169,7 @@ def test_get_energy_history_end_to_end():
     app.dependency_overrides[get_telemetria_use_case] = lambda: mock_use_case
 
     client = TestClient(app)
-    response = client.get("/api/telemetria/energy/725dfb4c-2610-4405-878a-d718b4f428a4?limit=100&days=7")
+    response = client.get("/api/v1/telemetria/energy/725dfb4c-2610-4405-878a-d718b4f428a4?limit=100&days=7")
 
     assert response.status_code == 200
     assert "X-Request-ID" in response.headers
@@ -218,7 +218,7 @@ def test_get_latest_telemetry_end_to_end_con_analitica_calidad_energia():
     app.dependency_overrides[get_telemetria_use_case] = lambda: mock_use_case
 
     client = TestClient(app)
-    response = client.get("/api/telemetria/latest/dev-test-analitica")
+    response = client.get("/api/v1/telemetria/latest/dev-test-analitica")
 
     assert response.status_code == 200
     data = response.json()

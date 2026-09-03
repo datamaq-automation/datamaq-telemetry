@@ -18,7 +18,7 @@ Construido para despliegues ligeros y directos sin Docker (**Python 3 + venv + M
 [ Ingestion Worker & API (FastAPI) ]
    ├── Ingesta y normalización de telemetría
    ├── WebSockets en vivo (/ws/live)
-   ├── REST API (/api/dispositivos, /api/telemetria/...)
+   ├── REST API (/api/v1/dispositivos, /api/v1/telemetria/...)
    └── Persistencia en MySQL (InnoDB / series temporales)
         │
         ▼
@@ -106,30 +106,30 @@ El esquema se gestiona con **Alembic** (fuente de verdad: `src/infrastructure/sq
 
 | Módulo | Método & Ruta | Descripción |
 |---|---|---|
-| **Planes SaaS** | `GET /api/planes?solo_publicos=true` | Catálogo de planes freemium/privados |
-| | `POST /api/planes` | Crear nuevo plan de suscripción |
-| **Organizaciones** | `GET /api/organizaciones` | Listar clientes y organizaciones |
-| | `POST /api/organizaciones` | Registrar nueva organización |
-| **Plantas** | `GET /api/plantas?organizacion_id=...` | Listar sedes/establecimientos |
-| | `POST /api/plantas` | Registrar nueva planta |
-| **Dispositivos** | `GET /api/dispositivos?planta_id=...` | Listar medidores Powermeter |
-| | `POST /api/dispositivos` | Provisionar / registrar medidor |
-| | `GET /api/dispositivos/{id}` | Obtener detalle de medidor por UUID o MAC |
-| | `PATCH /api/dispositivos/{id}` | Actualizar configuración y metrología (fases_con_ti, tipo_instalacion) |
-| **Telemetría** | `GET /api/telemetria/latest/{device_id}` | Última instantánea, acumulado de energía y bloque `analitica` precalculado |
-| | `GET /api/telemetria/instantaneous/{device_id}` | Historial de V, I, P, Q, S, FP, VUR y analítica (`limit`, `hours`, `granularity`) |
-| | `GET /api/telemetria/energy/{device_id}` | Historial de kWh y kVARh acumulados (`limit`, `hours`) |
-| **Alertas** | `GET /api/alertas?device_id=...&solo_abiertas=true` | Consultar alarmas activas / historial |
-| | `PATCH /api/alertas/{id}/resolver` | Marcar alerta como resuelta / atendida (`POST` también soportado) |
+| **Planes SaaS** | `GET /api/v1/planes?solo_publicos=true` | Catálogo de planes freemium/privados |
+| | `POST /api/v1/planes` | Crear nuevo plan de suscripción |
+| **Organizaciones** | `GET /api/v1/organizaciones` | Listar clientes y organizaciones |
+| | `POST /api/v1/organizaciones` | Registrar nueva organización |
+| **Plantas** | `GET /api/v1/plantas?organizacion_id=...` | Listar sedes/establecimientos |
+| | `POST /api/v1/plantas` | Registrar nueva planta |
+| **Dispositivos** | `GET /api/v1/dispositivos?planta_id=...` | Listar medidores Powermeter |
+| | `POST /api/v1/dispositivos` | Provisionar / registrar medidor |
+| | `GET /api/v1/dispositivos/{id}` | Obtener detalle de medidor por UUID o MAC |
+| | `PATCH /api/v1/dispositivos/{id}` | Actualizar configuración y metrología (fases_con_ti, tipo_instalacion) |
+| **Telemetría** | `GET /api/v1/telemetria/latest/{device_id}` | Última instantánea, acumulado de energía y bloque `analitica` precalculado |
+| | `GET /api/v1/telemetria/instantaneous/{device_id}` | Historial de V, I, P, Q, S, FP, VUR y analítica (`limit`, `hours`, `granularity`) |
+| | `GET /api/v1/telemetria/energy/{device_id}` | Historial de kWh y kVARh acumulados (`limit`, `hours`) |
+| **Alertas** | `GET /api/v1/alertas?device_id=...&solo_abiertas=true` | Consultar alarmas activas / historial |
+| | `PATCH /api/v1/alertas/{id}/resolver` | Marcar alerta como resuelta / atendida (`POST` también soportado) |
 | **Topología Unifilar & Layout** | `GET /api/v1/planta/unifilar?planta_id=...` | Obtener árbol de nodos unifilares de la planta |
 | | `PUT /api/v1/plantas/{planta_id}/unifilar` | Persistir estructura de nodos unifilares |
 | | `GET /api/v1/planta/layout?planta_id=...` | Obtener zonas 2D y ubicación porcentual de medidores |
 | | `PUT /api/v1/plantas/{planta_id}/layout` | Persistir zonas y coordenadas de layout |
-| **Autenticación** | `POST /api/auth/login` | Iniciar sesión (emite cookie `HttpOnly` + token JWT) |
-| | `POST /api/auth/guest` | Acceso rápido como invitado (stateless, cookie `HttpOnly`, solo lectura) |
-| | `POST /api/auth/logout` | Cerrar sesión (borra la cookie) |
-| | `GET /api/auth/me` | Obtener identidad y rol de la sesión actual |
-| **Sistema** | `POST /api/system/purge` | Ejecutar purga de telemetría expirada (solo admin) |
+| **Autenticación** | `POST /api/v1/auth/login` | Iniciar sesión (emite cookie `HttpOnly` + token JWT) |
+| | `POST /api/v1/auth/guest` | Acceso rápido como invitado (stateless, cookie `HttpOnly`, solo lectura) |
+| | `POST /api/v1/auth/logout` | Cerrar sesión (borra la cookie) |
+| | `GET /api/v1/auth/me` | Obtener identidad y rol de la sesión actual |
+| **Sistema** | `POST /api/v1/system/purge` | Ejecutar purga de telemetría expirada (solo admin) |
 
 
 ---

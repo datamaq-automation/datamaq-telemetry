@@ -7,7 +7,7 @@ wiring de producción real: levanta la app con su `lifespan` (que suscribe
 `server.py` con el listener MQTT real), simula una lectura `inst` llegando por el broadcaster
 —tal como la publicaría `IngestarTelemetriaUseCase` al recibir un mensaje MQTT—, y confirma que
 el endpoint REST que el frontend ya consume en cada F5
-(`GET /api/telemetria/instantaneous/{device_id}`) la devuelve mezclada con el histórico de BD,
+(`GET /api/v1/telemetria/instantaneous/{device_id}`) la devuelve mezclada con el histórico de BD,
 sin requerir MySQL ni un broker MQTT reales.
 """
 
@@ -128,7 +128,7 @@ def test_recarga_de_pagina_recupera_lectura_en_vivo_no_persistida_todavia():
     # global_telemetria_buffer.agregar al broadcaster (igual que en producción).
     with TestClient(app) as client:
         # Antes de que llegue nada en vivo: la respuesta es solo lo persistido en "BD".
-        respuesta_inicial = client.get("/api/telemetria/instantaneous/dev-e2e-1?hours=1")
+        respuesta_inicial = client.get("/api/v1/telemetria/instantaneous/dev-e2e-1?hours=1")
         assert respuesta_inicial.status_code == 200
         assert len(respuesta_inicial.json()) == 1
 
@@ -148,7 +148,7 @@ def test_recarga_de_pagina_recupera_lectura_en_vivo_no_persistida_todavia():
         )
 
         # Simula un F5: el frontend vuelve a llamar exactamente el mismo endpoint REST.
-        respuesta_tras_recarga = client.get("/api/telemetria/instantaneous/dev-e2e-1?hours=1")
+        respuesta_tras_recarga = client.get("/api/v1/telemetria/instantaneous/dev-e2e-1?hours=1")
 
     assert respuesta_tras_recarga.status_code == 200
     datos = respuesta_tras_recarga.json()

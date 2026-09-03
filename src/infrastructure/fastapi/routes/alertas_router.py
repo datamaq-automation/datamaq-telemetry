@@ -13,7 +13,7 @@ from src.infrastructure.fastapi.dependencies import (
 from src.infrastructure.fastapi.error_handler import manejar_error_http
 
 router = APIRouter(
-    prefix="/api/alertas",
+    prefix="/api/v1/alertas",
     tags=["Alertas"],
     dependencies=[Depends(get_usuario_actual)],
 )

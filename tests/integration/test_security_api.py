@@ -31,7 +31,7 @@ def _rutas_api(app):
 
 def test_create_app_requiere_auth_en_telemetria():
     app = create_app()
-    rutas = [r for r in _rutas_api(app) if r.path.startswith("/api/telemetria")]
+    rutas = [r for r in _rutas_api(app) if r.path.startswith("/api/v1/telemetria")]
     assert len(rutas) > 0
     for ruta in rutas:
         assert get_usuario_actual in _callables(ruta.dependant)
@@ -39,14 +39,14 @@ def test_create_app_requiere_auth_en_telemetria():
 
 def test_purge_requiere_admin():
     app = create_app()
-    purge = [r for r in _rutas_api(app) if r.path == "/api/system/purge"]
+    purge = [r for r in _rutas_api(app) if r.path == "/api/v1/system/purge"]
     assert len(purge) == 1
     assert requiere_rol_admin in _callables(purge[0].dependant)
 
 
 def test_login_y_health_son_publicos():
     app = create_app()
-    publicos = ["/api/auth/login", "/health"]
+    publicos = ["/api/v1/auth/login", "/health"]
     for ruta in _rutas_api(app):
         if ruta.path in publicos:
             assert get_usuario_actual not in _callables(ruta.dependant)

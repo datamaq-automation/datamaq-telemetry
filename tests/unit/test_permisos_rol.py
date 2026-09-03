@@ -41,13 +41,13 @@ def test_requiere_rol_escritura_acepta_admin_y_operador():
 # P3 — endpoints de escritura exigen requiere_rol_escritura
 def test_endpoints_escritura_exigen_rol_escritura():
     escrituras = [
-        (dispositivos_router.router, "POST", "/api/dispositivos"),
-        (dispositivos_router.router, "PUT", "/api/dispositivos/{device_id}"),
-        (dispositivos_router.router, "PATCH", "/api/dispositivos/{device_id}"),
-        (organizaciones_router.router, "POST", "/api/organizaciones"),
-        (organizaciones_router.router, "POST", "/api/plantas"),
-        (planes_router.router, "POST", "/api/planes"),
-        (alertas_router.router, "POST", "/api/alertas/{alerta_id}/resolver"),
+        (dispositivos_router.router, "POST", "/api/v1/dispositivos"),
+        (dispositivos_router.router, "PUT", "/api/v1/dispositivos/{device_id}"),
+        (dispositivos_router.router, "PATCH", "/api/v1/dispositivos/{device_id}"),
+        (organizaciones_router.router, "POST", "/api/v1/organizaciones"),
+        (organizaciones_router.router, "POST", "/api/v1/plantas"),
+        (planes_router.router, "POST", "/api/v1/planes"),
+        (alertas_router.router, "POST", "/api/v1/alertas/{alerta_id}/resolver"),
     ]
     for router, metodo, path in escrituras:
         ruta = _ruta(router, metodo, path)
@@ -57,12 +57,12 @@ def test_endpoints_escritura_exigen_rol_escritura():
 # P4 — endpoints de lectura no exigen requiere_rol_escritura
 def test_endpoints_lectura_no_exigen_rol_escritura():
     lecturas = [
-        (dispositivos_router.router, "GET", "/api/dispositivos"),
-        (dispositivos_router.router, "GET", "/api/dispositivos/{device_id}"),
-        (organizaciones_router.router, "GET", "/api/organizaciones"),
-        (organizaciones_router.router, "GET", "/api/plantas"),
-        (planes_router.router, "GET", "/api/planes"),
-        (alertas_router.router, "GET", "/api/alertas"),
+        (dispositivos_router.router, "GET", "/api/v1/dispositivos"),
+        (dispositivos_router.router, "GET", "/api/v1/dispositivos/{device_id}"),
+        (organizaciones_router.router, "GET", "/api/v1/organizaciones"),
+        (organizaciones_router.router, "GET", "/api/v1/plantas"),
+        (planes_router.router, "GET", "/api/v1/planes"),
+        (alertas_router.router, "GET", "/api/v1/alertas"),
     ]
     for router, metodo, path in lecturas:
         ruta = _ruta(router, metodo, path)

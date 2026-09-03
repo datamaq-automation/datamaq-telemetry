@@ -34,18 +34,18 @@ def test_create_app_registra_router_auth():
                 if hasattr(subruta, "methods") and hasattr(subruta, "path"):
                     rutas.setdefault(subruta.path, set()).update(subruta.methods or set())
 
-    assert "/api/auth/login" in rutas
-    assert "POST" in rutas["/api/auth/login"]
+    assert "/api/v1/auth/login" in rutas
+    assert "POST" in rutas["/api/v1/auth/login"]
 
 
 def test_create_app_registra_ruta_me():
     app = create_app()
-    ruta_me = [r for r in _rutas(app) if r.path == "/api/auth/me" and "GET" in (r.methods or set())]
+    ruta_me = [r for r in _rutas(app) if r.path == "/api/v1/auth/me" and "GET" in (r.methods or set())]
     assert len(ruta_me) == 1
 
 
 def test_me_protegido_por_get_usuario_actual():
     app = create_app()
-    ruta_me = [r for r in _rutas(app) if r.path == "/api/auth/me"]
+    ruta_me = [r for r in _rutas(app) if r.path == "/api/v1/auth/me"]
     assert len(ruta_me) == 1
     assert get_usuario_actual in _callables(ruta_me[0].dependant)

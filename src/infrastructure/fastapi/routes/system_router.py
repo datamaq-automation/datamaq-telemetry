@@ -66,7 +66,7 @@ def health_check(response: Response):
     return readiness_check(response)
 
 
-@router.get("/system/ws-status")
+@router.get("/api/v1/system/ws-status")
 def websocket_status():
     """Estado y métricas de observabilidad de los WebSockets en vivo."""
     from src.infrastructure.fastapi.server import obtener_metricas_ws
@@ -77,7 +77,7 @@ def websocket_status():
     return metricas
 
 
-@router.post("/api/system/purge", response_model=PurgaResultadoDTO)
+@router.post("/api/v1/system/purge", response_model=PurgaResultadoDTO)
 def trigger_purge(
     claims: Annotated[dict, Depends(requiere_rol_admin)],
     use_case: Annotated[PurgarTelemetriaExpiradaUseCase, Depends(get_purga_use_case)],

@@ -22,20 +22,20 @@ def _rutas_dispositivos(app) -> dict[str, set[str]]:
             for subruta in ruta.original_router.routes:
                 if hasattr(subruta, "methods") and hasattr(subruta, "path"):
                     rutas.setdefault(subruta.path, set()).update(subruta.methods or set())
-    return {k: v for k, v in rutas.items() if k.startswith("/api/dispositivos")}
+    return {k: v for k, v in rutas.items() if k.startswith("/api/v1/dispositivos")}
 
 
 def test_create_app_registra_rutas_dispositivos():
     app = create_app()
     rutas = _rutas_dispositivos(app)
 
-    assert "/api/dispositivos" in rutas
-    assert "GET" in rutas["/api/dispositivos"]
-    assert "POST" in rutas["/api/dispositivos"]
+    assert "/api/v1/dispositivos" in rutas
+    assert "GET" in rutas["/api/v1/dispositivos"]
+    assert "POST" in rutas["/api/v1/dispositivos"]
 
-    assert "/api/dispositivos/{device_id}" in rutas
-    assert "GET" in rutas["/api/dispositivos/{device_id}"]
-    assert "PUT" in rutas["/api/dispositivos/{device_id}"]
+    assert "/api/v1/dispositivos/{device_id}" in rutas
+    assert "GET" in rutas["/api/v1/dispositivos/{device_id}"]
+    assert "PUT" in rutas["/api/v1/dispositivos/{device_id}"]
 
 
 def test_listar_dispositivos_end_to_end():
@@ -68,7 +68,7 @@ def test_listar_dispositivos_end_to_end():
     app.dependency_overrides[get_dispositivos_use_case] = lambda: mock_use_case
 
     client = TestClient(app)
-    response = client.get("/api/dispositivos")
+    response = client.get("/api/v1/dispositivos")
 
     assert response.status_code == 200
     assert "X-Request-ID" in response.headers

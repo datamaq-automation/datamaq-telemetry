@@ -14,7 +14,7 @@ def test_create_app_registra_router_alertas():
                 if hasattr(subruta, "methods") and hasattr(subruta, "path"):
                     rutas.setdefault(subruta.path, set()).update(subruta.methods or set())
 
-    assert "/api/alertas" in rutas
-    assert "GET" in rutas["/api/alertas"]
-    assert "/api/alertas/{alerta_id}/resolver" in rutas
-    assert "POST" in rutas["/api/alertas/{alerta_id}/resolver"]
+    assert "/api/v1/alertas" in rutas
+    assert "GET" in rutas["/api/v1/alertas"]
+    assert "/api/v1/alertas/{alerta_id}/resolver" in rutas
+    assert "POST" in rutas["/api/v1/alertas/{alerta_id}/resolver"]

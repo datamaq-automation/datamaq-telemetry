@@ -51,7 +51,7 @@ def test_endpoint_activar_tiempo_real():
     app.dependency_overrides[get_dispositivos_use_case] = lambda: mock_uc
 
     client = TestClient(app)
-    resp = client.post("/api/dispositivos/disp-1/realtime?segundos=120")
+    resp = client.post("/api/v1/dispositivos/disp-1/realtime?segundos=120")
     assert resp.status_code == 200
     data = resp.json()
     assert data["status"] == "ok"
