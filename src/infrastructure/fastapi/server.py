@@ -14,6 +14,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from src.infrastructure.fastapi.dependencies import (
     get_mqtt_listener,
     global_event_broadcaster,
+    global_telemetria_buffer,
     registrar_mqtt_listener,
     token_valido,
 )
@@ -219,6 +220,8 @@ async def lifespan(app: FastAPI):
 
     # Hook up live WebSocket broadcasts
     global_event_broadcaster.suscribir(websocket_broadcast_callback)
+    # Buffer en RAM de lecturas en vivo por dispositivo (sobrevive a un F5 del navegador)
+    global_event_broadcaster.suscribir(global_telemetria_buffer.agregar)
 
     # Start MQTT background listener
     mqtt_listener = MQTTListener(publicador_eventos=global_event_broadcaster)
@@ -241,6 +244,7 @@ async def lifespan(app: FastAPI):
         pass
     mqtt_listener.stop()
     global_event_broadcaster.desuscribir(websocket_broadcast_callback)
+    global_event_broadcaster.desuscribir(global_telemetria_buffer.agregar)
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:

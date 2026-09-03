@@ -15,6 +15,7 @@ from src.domain.telemetria.exceptions import (
     ZonaHorariaInvalidaError,
 )
 from src.domain.telemetria.ports import (
+    BufferTelemetriaEnVivoPort,
     RepositorioDispositivosPort,
     RepositorioOrganizacionesPort,
     RepositorioPlanesPort,
@@ -36,11 +37,13 @@ class ConsultarTelemetriaUseCase:
         repo_dispositivos: RepositorioDispositivosPort,
         repo_organizaciones: RepositorioOrganizacionesPort | None = None,
         repo_planes: RepositorioPlanesPort | None = None,
+        buffer_en_vivo: BufferTelemetriaEnVivoPort | None = None,
     ):
         self.repo_telemetria = repo_telemetria
         self.repo_dispositivos = repo_dispositivos
         self.repo_organizaciones = repo_organizaciones
         self.repo_planes = repo_planes
+        self.buffer_en_vivo = buffer_en_vivo
 
     def _resolver_dispositivo(self, id_o_uid: str) -> Dispositivo:
         # Check by UUID first
@@ -165,7 +168,25 @@ class ConsultarTelemetriaUseCase:
         else:
             lecturas = lecturas[:limite]
 
-        return [TelemetriaMapper.instantanea_to_dto(item) for item in lecturas]
+        lecturas_dto = [TelemetriaMapper.instantanea_to_dto(item) for item in lecturas]
+        return self._mezclar_buffer_en_vivo(dev.id, lecturas_dto, limite)
+
+    def _mezclar_buffer_en_vivo(
+        self, dispositivo_id: str, lecturas_dto: list[LecturaInstantaneaDTO], limite: int
+    ) -> list[LecturaInstantaneaDTO]:
+        """Antepone al histórico de BD las lecturas recibidas en vivo que todavía no bajaron
+        a la base de datos (downsampling de persistencia), para que un F5 del navegador no
+        pierda continuidad mientras el buffer en RAM del backend siga vivo."""
+        if not self.buffer_en_vivo:
+            return lecturas_dto
+
+        vistos = {dto.registrado_en for dto in lecturas_dto}
+        candidatos = [
+            LecturaInstantaneaDTO.model_validate(dato) for dato in self.buffer_en_vivo.obtener(dispositivo_id)
+        ]
+        recientes = [dto for dto in candidatos if dto.registrado_en not in vistos]
+        recientes.sort(key=lambda dto: dto.registrado_en, reverse=True)
+        return (recientes + lecturas_dto)[:limite]
 
     def listar_energias(
         self, id_o_uid: str, limite: int = 100, desde: datetime | None = None

@@ -507,6 +507,102 @@ def test_consultar_telemetria_granularidad_y_bucketing():
     assert len(res_auto_24h) == 2
 
 
+class FakeBufferTelemetriaEnVivo:
+    """Fake plano del puerto `BufferTelemetriaEnVivoPort` para tests."""
+
+    def __init__(self, por_dispositivo: dict[str, list[dict]] | None = None):
+        self._por_dispositivo = por_dispositivo or {}
+
+    def obtener(self, dispositivo_id: str) -> list[dict]:
+        return self._por_dispositivo.get(dispositivo_id, [])
+
+
+def _lectura_buffer_dto(registrado_en: str, dispositivo_id: str = "dev-buffer") -> dict:
+    fase_vacia = {"voltage_V": None, "current_A": None}
+    return {
+        "dispositivo_id": dispositivo_id,
+        "registrado_en": registrado_en,
+        "fase_r": fase_vacia,
+        "fase_s": fase_vacia,
+        "fase_t": fase_vacia,
+        "potencia_activa_total_W": 500.0,
+    }
+
+
+def test_listar_instantaneas_antepone_lecturas_del_buffer_en_vivo():
+    from datetime import datetime, timezone
+
+    from src.domain.telemetria.entities import Dispositivo, LecturaInstantanea, MedicionFase
+    from src.domain.telemetria.value_objects import MacAddress, PotenciaActiva
+
+    repo_disp = MockDispositivosRepo()
+    repo_telem = MockTelemetriaRepo()
+
+    dev = Dispositivo(id="dev-buffer", device_uid=MacAddress("D48C49F03564"), nombre="Medidor Buffer")
+    repo_disp.guardar(dev)
+
+    persistida = LecturaInstantanea(
+        id=1,
+        dispositivo_id=dev.id,
+        registrado_en=datetime(2026, 8, 17, 12, 0, 0, tzinfo=timezone.utc),
+        fase_r=MedicionFase(),
+        fase_s=MedicionFase(),
+        fase_t=MedicionFase(),
+        potencia_activa_total=PotenciaActiva(700.0),
+    )
+    repo_telem.guardar_instantanea(persistida)
+
+    buffer = FakeBufferTelemetriaEnVivo(
+        {
+            "dev-buffer": [
+                _lectura_buffer_dto("2026-08-17T12:00:00Z"),  # ya está en BD -> se descarta (dedup)
+                _lectura_buffer_dto("2026-08-17T12:03:00Z"),  # más reciente que BD -> se antepone
+            ]
+        }
+    )
+    consultar_uc = ConsultarTelemetriaUseCase(repo_telem, repo_disp, buffer_en_vivo=buffer)
+
+    resultado = consultar_uc.listar_instantaneas(dev.id, limite=100, granularidad="raw")
+
+    assert [r.registrado_en.isoformat() for r in resultado] == [
+        "2026-08-17T12:03:00+00:00",
+        "2026-08-17T12:00:00+00:00",
+    ]
+
+
+def test_listar_instantaneas_respeta_limite_tras_mezclar_buffer():
+    from datetime import datetime, timezone
+
+    from src.domain.telemetria.entities import Dispositivo, LecturaInstantanea, MedicionFase
+    from src.domain.telemetria.value_objects import MacAddress, PotenciaActiva
+
+    repo_disp = MockDispositivosRepo()
+    repo_telem = MockTelemetriaRepo()
+
+    dev = Dispositivo(id="dev-buffer-2", device_uid=MacAddress("AABBCCDDEEFF"), nombre="Medidor Buffer 2")
+    repo_disp.guardar(dev)
+
+    repo_telem.guardar_instantanea(
+        LecturaInstantanea(
+            id=1,
+            dispositivo_id=dev.id,
+            registrado_en=datetime(2026, 8, 17, 12, 0, 0, tzinfo=timezone.utc),
+            fase_r=MedicionFase(),
+            fase_s=MedicionFase(),
+            fase_t=MedicionFase(),
+            potencia_activa_total=PotenciaActiva(700.0),
+        )
+    )
+
+    buffer = FakeBufferTelemetriaEnVivo({"dev-buffer-2": [_lectura_buffer_dto("2026-08-17T12:03:00Z", "dev-buffer-2")]})
+    consultar_uc = ConsultarTelemetriaUseCase(repo_telem, repo_disp, buffer_en_vivo=buffer)
+
+    resultado = consultar_uc.listar_instantaneas(dev.id, limite=1, granularidad="raw")
+
+    assert len(resultado) == 1
+    assert resultado[0].registrado_en.isoformat() == "2026-08-17T12:03:00+00:00"
+
+
 def test_jerarquia_falta_fase_inhibe_desbalance():
 
     repo_disp = MockDispositivosRepo()

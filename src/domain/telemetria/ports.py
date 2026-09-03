@@ -195,6 +195,12 @@ class PublicadorEventosPort(ABC):
         pass
 
 
+class BufferTelemetriaEnVivoPort(ABC):
+    @abstractmethod
+    def obtener(self, dispositivo_id: str) -> list[dict]:
+        pass
+
+
 class LoggerPort(ABC):
     @abstractmethod
     def info(self, evento: str, **kwargs: object) -> None:

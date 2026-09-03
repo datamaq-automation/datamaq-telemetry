@@ -5,6 +5,7 @@ from fastapi import Cookie, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 
 from src.adapters.gateways.in_memory_event_broadcaster import InMemoryEventBroadcaster
+from src.adapters.gateways.in_memory_telemetria_buffer import InMemoryTelemetriaBuffer
 from src.application.use_cases.autenticar_usuario import AutenticarUsuarioUseCase
 from src.application.use_cases.consultar_telemetria import ConsultarTelemetriaUseCase
 from src.application.use_cases.gestionar_alertas import GestionarAlertasUseCase
@@ -33,6 +34,9 @@ from src.infrastructure.sqlalchemy.mysql_repositories import (
 # Singleton in-memory broadcaster
 global_event_broadcaster = InMemoryEventBroadcaster()
 
+# Singleton en RAM de últimas lecturas en vivo por dispositivo (sobrevive a un F5 del navegador)
+global_telemetria_buffer = InMemoryTelemetriaBuffer()
+
 # Listener MQTT registrado en el lifespan del servidor (estado de conexión)
 _mqtt_listener_registrado: MQTTListener | None = None
 
@@ -50,6 +54,10 @@ def get_mqtt_listener() -> MQTTListener | None:
 
 def get_broadcaster() -> InMemoryEventBroadcaster:
     return global_event_broadcaster
+
+
+def get_telemetria_buffer() -> InMemoryTelemetriaBuffer:
+    return global_telemetria_buffer
 
 
 def get_settings_dep() -> Settings:
@@ -73,7 +81,9 @@ def get_telemetria_use_case(
     repo_telem = MySQLTelemetriaRepository(db)
     repo_org = MySQLOrganizacionesRepository(db)
     repo_planes = MySQLPlanesRepository(db)
-    return ConsultarTelemetriaUseCase(repo_telem, repo_disp, repo_org, repo_planes)
+    return ConsultarTelemetriaUseCase(
+        repo_telem, repo_disp, repo_org, repo_planes, buffer_en_vivo=global_telemetria_buffer
+    )
 
 
 def get_dispositivos_use_case(
