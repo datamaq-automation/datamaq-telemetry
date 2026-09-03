@@ -49,3 +49,4 @@ data/
 .aider.conf.yml
 .aider.conventions.md
 .aider*
+tmp/
