@@ -10,22 +10,24 @@ fi
 
 export PYTHONPATH=.
 
-echo "==> [1/4] Integridad: __init__.py de 0 bytes"
+echo "==> [1/6] Integridad: __init__.py de 0 bytes"
 pytest tests/test_empty_inits.py -q
 
-echo "==> [2/4] Estilo: ruff check + format"
+echo "==> [2/6] Estilo: ruff check + format"
 ruff check .
 ruff format --check .
 
-echo "==> [3/4] Tipado: pyright"
+echo "==> [3/6] Tipado: pyright"
 pyright
 
-echo "==> [4/5] Tests unitarios con cobertura (>=85%)"
+echo "==> [4/6] Tests unitarios con cobertura (>=85%)"
 pytest tests/unit --cov=src --cov-report=term-missing --cov-fail-under=85
 
-echo "==> [5/5] Tests de integración"
+echo "==> [5/6] Tests de integración"
 pytest tests/integration -q
 
+echo "==> [6/6] Reglas de Arquitectura y Tamaño de Código"
 python scripts/verify_architecture.py
+python scripts/verify_code_size.py
 
 echo "pre-push superado."
