@@ -14,7 +14,7 @@ from src.domain.telemetria.entities import (
     PlanTelemetria,
     ZonaPlanta,
 )
-from src.domain.telemetria.value_objects import MacAddress
+from src.domain.telemetria.value_objects import LecturaPotenciaTemporal, MacAddress
 
 
 class RepositorioDispositivosPort(ABC):
@@ -95,7 +95,8 @@ class RepositorioTelemetriaPort(ABC):
         self,
         dispositivo_id: str,
         desde: datetime,
-    ) -> list[float]:
+        limite: int | None = None,
+    ) -> list[LecturaPotenciaTemporal]:
         pass
 
     @abstractmethod

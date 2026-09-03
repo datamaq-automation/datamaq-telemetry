@@ -1,14 +1,21 @@
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
+import pytest
+
 from src.application.use_cases.consultar_telemetria import ConsultarTelemetriaUseCase
+from src.application.use_cases.gestionar_maquinas import GestionarMaquinasUseCase
 from src.application.use_cases.ingestar_telemetria import IngestarTelemetriaUseCase
+from src.domain.disponibilidad.entities import Maquina
+from src.domain.disponibilidad.exceptions import MaquinaNoEncontradaError
+from src.domain.disponibilidad.ports import RepositorioMaquinasPort
 from src.domain.telemetria.entities import (
     AcumuladoEnergia,
     AlertaDispositivo,
     Dispositivo,
     LecturaInstantanea,
     LogEstadoDispositivo,
+    MedicionFase,
 )
 from src.domain.telemetria.ports import (
     LoggerPort,
@@ -16,7 +23,29 @@ from src.domain.telemetria.ports import (
     RepositorioDispositivosPort,
     RepositorioTelemetriaPort,
 )
-from src.domain.telemetria.value_objects import MacAddress
+from src.domain.telemetria.value_objects import (
+    LecturaPotenciaTemporal,
+    MacAddress,
+    PotenciaActiva,
+)
+
+
+class MockMaquinasRepo(RepositorioMaquinasPort):
+    def __init__(self):
+        self.maquinas: dict[str, Maquina] = {}
+
+    def obtener_por_id(self, maquina_id: str) -> Maquina | None:
+        return self.maquinas.get(maquina_id)
+
+    def obtener_por_dispositivo_id(self, dispositivo_id: str) -> Maquina | None:
+        return next((m for m in self.maquinas.values() if m.dispositivo_id == dispositivo_id), None)
+
+    def listar(self) -> list[Maquina]:
+        return list(self.maquinas.values())
+
+    def guardar(self, maquina: Maquina) -> Maquina:
+        self.maquinas[maquina.id] = maquina
+        return maquina
 
 
 class MockDispositivosRepo(RepositorioDispositivosPort):
@@ -125,12 +154,18 @@ class MockTelemetriaRepo(RepositorioTelemetriaPort):
     ) -> list[AcumuladoEnergia]:
         return [e for e in self.energias if e.dispositivo_id == dispositivo_id]
 
-    def listar_potencias_para_histograma(self, dispositivo_id: str, desde: datetime) -> list[float]:
-        return [
-            i.potencia_activa_total.vatios
+    def listar_potencias_para_histograma(
+        self, dispositivo_id: str, desde: datetime, limite: int | None = None
+    ) -> list[LecturaPotenciaTemporal]:
+        items = [
+            LecturaPotenciaTemporal(momento=i.registrado_en, potencia_w=i.potencia_activa_total.vatios)
             for i in self.instantaneas
-            if i.dispositivo_id == dispositivo_id and i.potencia_activa_total is not None
+            if i.dispositivo_id == dispositivo_id and i.potencia_activa_total is not None and i.registrado_en >= desde
         ]
+        items.sort(key=lambda x: x.momento)
+        if limite is not None:
+            items = items[:limite]
+        return items
 
     def purgar_instantaneas_anteriores_a(self, fecha_limite: datetime, batch_size: int = 1000) -> int:
         prev = len(self.instantaneas)
@@ -829,3 +864,85 @@ def test_consultar_telemetria_con_analitica_calidad_energia():
     assert len(historial) == 1
     assert historial[0].analitica is not None
     assert historial[0].analitica.requiere_compensacion is True
+
+
+def test_gestionar_maquinas_calcular_histograma_maquina_no_encontrada():
+    repo_maq = MockMaquinasRepo()
+    repo_telem = MockTelemetriaRepo()
+    uc = GestionarMaquinasUseCase(repo_maq, repo_telem)
+
+    with pytest.raises(MaquinaNoEncontradaError):
+        uc.calcular_histograma("maq-inexistente")
+
+
+def test_gestionar_maquinas_calcular_histograma_exitoso():
+    repo_maq = MockMaquinasRepo()
+    repo_telem = MockTelemetriaRepo()
+    maquina = Maquina(id="maq-1", dispositivo_id="dev-1", nombre="Torno CNC")
+    repo_maq.guardar(maquina)
+
+    ahora = datetime.now(timezone.utc)
+    for i in range(15):
+        repo_telem.guardar_instantanea(
+            LecturaInstantanea(
+                id=i,
+                dispositivo_id="dev-1",
+                registrado_en=ahora - timedelta(minutes=60 - i),
+                fase_r=MedicionFase(),
+                fase_s=MedicionFase(),
+                fase_t=MedicionFase(),
+                potencia_activa_total=PotenciaActiva(50.0 + (i % 3)),
+            )
+        )
+    for i in range(15, 30):
+        repo_telem.guardar_instantanea(
+            LecturaInstantanea(
+                id=i,
+                dispositivo_id="dev-1",
+                registrado_en=ahora - timedelta(minutes=60 - i),
+                fase_r=MedicionFase(),
+                fase_s=MedicionFase(),
+                fase_t=MedicionFase(),
+                potencia_activa_total=PotenciaActiva(2000.0 + (i % 5)),
+            )
+        )
+
+    uc = GestionarMaquinasUseCase(repo_maq, repo_telem)
+    res = uc.calcular_histograma("maq-1", dias=7)
+
+    assert res.dispositivo_id == "dev-1"
+    assert res.dias_analizados == 7
+    assert res.cantidad_lecturas == 30
+    assert len(res.bordes_bins_w) == len(res.frecuencias) + 1
+    assert res.escala == "logaritmica"
+    assert res.lecturas_truncadas is False
+    assert len(res.regimenes) >= 2
+    assert res.umbral_sugerido_w is not None
+    assert 50.0 < res.umbral_sugerido_w < 2000.0
+
+
+def test_gestionar_maquinas_calcular_histograma_detecta_truncamiento():
+    repo_maq = MockMaquinasRepo()
+    repo_telem = MockTelemetriaRepo()
+    maquina = Maquina(id="maq-2", dispositivo_id="dev-2", nombre="Fresadora")
+    repo_maq.guardar(maquina)
+
+    ahora = datetime.now(timezone.utc)
+    for i in range(25):
+        repo_telem.guardar_instantanea(
+            LecturaInstantanea(
+                id=i,
+                dispositivo_id="dev-2",
+                registrado_en=ahora - timedelta(minutes=50 - i),
+                fase_r=MedicionFase(),
+                fase_s=MedicionFase(),
+                fase_t=MedicionFase(),
+                potencia_activa_total=PotenciaActiva(100.0 + i),
+            )
+        )
+
+    uc = GestionarMaquinasUseCase(repo_maq, repo_telem)
+    res = uc.calcular_histograma("maq-2", dias=7, limite=20)
+
+    assert res.cantidad_lecturas == 20
+    assert res.lecturas_truncadas is True

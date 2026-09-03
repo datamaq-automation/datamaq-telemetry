@@ -252,3 +252,88 @@ Endpoints para persistencia y renderizado dinámico de la infraestructura de pla
 * `PUT /api/v1/plantas/{planta_id}/unifilar`: Guardar topología unifilar.
 * `GET /api/v1/planta/layout?planta_id=...`: Zonas de planta y ubicación porcentual (`pos_x_pct`, `pos_y_pct`) de los tableros sobre el plano SVG.
 * `PUT /api/v1/plantas/{planta_id}/layout`: Guardar distribución espacial 2D.
+
+---
+
+## 8. Módulo de Disponibilidad y Segmentación Modal de Potencia
+
+### 8.1 Histograma de Potencia y Partición Modal
+
+Permite a la SPA visualizar la distribución histórica de potencia de una máquina, sus regímenes de operación identificados algorítmicamente (standby, marcha baja, marcha plena) y el umbral sugerido marcha/parada.
+
+* **Endpoint:** `GET /api/v1/disponibilidad/maquinas/{maquina_id}/histograma?dias={1..90}`
+* **Query Params:** `dias` (opcional, por defecto `7`, rango 1 a 90).
+
+> [!WARNING]
+> **Contrato de Bins de Ancho Variable (Escala Logarítmica en Potencia):**
+> * El array `bordes_bins_w` contiene exactamente $n+1$ bordes para $n$ elementos en `frecuencias`.
+> * Debido al binning en escala logarítmica, **los bins tienen ancho variable en Watts** (angostos en baja potencia para resolver standby, anchos en alta potencia para marcha).
+> * La SPA **no debe asumir espaciado uniforme** en el eje X (no asumir `ancho = bordes[1] - bordes[0]`). Cada barra $i$ se extiende desde `bordes_bins_w[i]` hasta `bordes_bins_w[i+1]`.
+
+#### Payload de Respuesta (`HistogramaPotenciaResponseDTO`):
+```json
+{
+  "dispositivo_id": "dev-cnc-01",
+  "dias_analizados": 7,
+  "cantidad_lecturas": 2016,
+  "bordes_bins_w": [18.5, 22.1, 26.4, "...", 3250.0],
+  "frecuencias": [45, 120, 310, "...", 12],
+  "umbral_sugerido_w": 145.5,
+  "escala": "logaritmica",
+  "epsilon_w": 0.05,
+  "lecturas_truncadas": false,
+  "lecturas_descartadas": 2,
+  "regimenes": [
+    {
+      "indice": 0,
+      "potencia_tipica_w": 28.5,
+      "limite_inferior_w": 18.5,
+      "limite_superior_w": 145.5,
+      "masa": 0.625,
+      "mediana_w": 28.2,
+      "mad_w": 3.1,
+      "persistencia": 1.0,
+      "variacion_mediana_w_s": 0.012,
+      "naturaleza": "ESTABLE"
+    },
+    {
+      "indice": 1,
+      "potencia_tipica_w": 2150.0,
+      "limite_inferior_w": 145.5,
+      "limite_superior_w": 3250.0,
+      "masa": 0.375,
+      "mediana_w": 2140.0,
+      "mad_w": 65.4,
+      "persistencia": 0.85,
+      "variacion_mediana_w_s": 0.045,
+      "naturaleza": "ESTABLE"
+    }
+  ],
+  "diagnostico_modal": {
+    "num_modas_estable": 2,
+    "fraccion_ventanas_consistentes": 0.875,
+    "es_multimodal_confiable": true
+  },
+  "diagnostico_estacionariedad": {
+    "num_subventanas": 4,
+    "desplazamiento_maximo_w": 15.2,
+    "desplazamiento_maximo_relativo": 0.007,
+    "es_estacionario": true
+  }
+}
+```
+
+* **`naturaleza` de un régimen:**
+  * `"ESTABLE"`: La tasa $|\Delta P|/\Delta t$ es baja comparada con el ancho de banda del régimen (la máquina permanece operando allí).
+  * `"TRANSITORIO"`: Tasa alta de variación (la máquina cruza rápidamente esa banda).
+  * `"INDETERMINADO"`: Cadencia insuficiente (ej. 5 minutos estándar) o falta de lecturas temporales para sostener la clasificación con respaldo metrológico.
+
+### 8.2 Gestión de Máquinas y Disponibilidad
+
+* `GET /api/v1/disponibilidad/maquinas`: Listar máquinas registradas con su estado de calibración y umbrales.
+* `POST /api/v1/disponibilidad/maquinas`: Registrar máquina vinculada a un `dispositivo_id`.
+* `PATCH /api/v1/disponibilidad/maquinas/{id}`: Actualizar nombre, umbral manual (`umbral_marcha_w`), o ventana de persistencia anti-transitorios (`ventana_persistencia_lecturas`, `ventana_persistencia_segundos`).
+* `GET /api/v1/disponibilidad/maquinas/{id}/eventos?limite=100`: Listar eventos históricos de marcha/parada.
+* `POST /api/v1/disponibilidad/eventos/{id}/corregir`: Corrección humana de estado (`{"tipo_parada": "PROGRAMADA", "comentario": "..."}`).
+* `POST /api/v1/disponibilidad/paradas-programadas`: Carga de paradas programadas de mantenimiento (`{"maquina_id": "...", "inicio_at": "...", "fin_at": "...", "motivo": "..."}`).
+

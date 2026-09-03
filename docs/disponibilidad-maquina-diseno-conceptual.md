@@ -55,29 +55,63 @@ Relevado sobre el modelo de datos y el código de ingesta (`src/infrastructure/s
 
 ---
 
-## 5. Calibración de umbrales por histograma de potencia
+## 5. Segmentación modal de regímenes de potencia
 
-### 5.1 Por qué el histograma es la herramienta correcta
+### 5.1 De la calibración bimodal a la partición modal general (k modas)
 
-Para una máquina que alterna entre parada y marcha, el histograma de sus lecturas de potencia (eje X = potencia, eje Y = frecuencia de lecturas) tiende a ser **bimodal**: una campana angosta cerca del consumo de parada/standby, y otra más ancha centrada en la potencia operativa típica. El **valle** entre ambas campanas es el umbral que minimiza la clasificación errónea — es la misma idea detrás del método clásico de Otsu en procesamiento de imágenes.
+Para una máquina que alterna entre parada y marcha, el histograma de sus lecturas de potencia (eje X = potencia, eje Y = frecuencia de lecturas) tiende a ser bimodal: una campana angosta cerca del consumo de parada/standby, y otra más ancha centrada en la potencia operativa típica. El **valle** entre ambas campanas es el umbral que minimiza la clasificación errónea — análogo al método clásico de Otsu en procesamiento de imágenes.
 
-### 5.2 Escala logarítmica en el eje de frecuencia
+Sin embargo, fijar el problema a $k=2$ presenta tres límites severos:
+1. **El ancho de bin lo fija el outlier:** un arranque de motor (6–8× la nominal) estira el rango crudo y colapsa la campana de standby en un solo bin, destruyendo el valle.
+2. **Heterocedasticidad:** un standby angosto (decenas de W) y una marcha ancha (kW) tienen dispersiones incompatibles con un ancho de bin uniforme.
+3. **Máquinas multiproceso y medidores agregados (NILM):** exhiben múltiples regímenes estables ($k > 2$).
 
-Si la máquina pasa mucho más tiempo en un estado que en otro (ej. 80% parada / 20% en marcha), en escala lineal la campana minoritaria queda achatada contra el eje y el valle es difícil de ubicar, tanto visualmente como para un algoritmo de detección de mínimos locales. Usar **escala logarítmica en el eje de frecuencia** comprime la campana dominante y hace visible la campana minoritaria con la misma nitidez.
+Por ende, el umbral de marcha/parada se modela formalmente como el **caso particular $k=2$** de un servicio general de **segmentación modal**: identificar las potencias típicas (**modas**, regímenes estables) y las potencias de transición (**antimodas**, valles) que delimitan una **partición modal** del eje de potencia.
 
-### 5.3 Suavizado previo
+### 5.2 Escala logarítmica: visualización vs. estimación
 
-Un histograma crudo es ruidoso: fluctuaciones estadísticas generan mini-picos y mini-valles falsos que no corresponden a estados reales. Antes de buscar picos/valles hace falta suavizar (promedio móvil sobre bins, o una curva continua vía estimación de densidad por kernel — KDE). El rol de este suavizado es equivalente, a nivel de la forma de la distribución, al que cumple `FiltroPersistenciaTemporalService` a nivel de la serie temporal: filtrar ruido transitorio antes de tomar una decisión de clasificación.
+Es crítico distinguir dos usos de la escala logarítmica que responden a necesidades distintas:
 
-### 5.4 Rol de promedio y mediana — y su límite
+* **Log en el eje de potencia (estimación / resolución de bins):** es una decisión de modelado físico. El ruido de potencia en régimen escala con la potencia ($\Delta P \propto P$). Construir bins de ancho constante en $\log(P + \epsilon)$ genera **bins de ancho relativo constante en watts** (ej. 10 W cerca de 100 W, 1 kW cerca de 10 kW). Un solo parámetro de binning resuelve standby y marcha sin sobre-suavizar uno ni sub-suavizar el otro, y evita que un transitorio estire el rango dinámico lineal. $\epsilon$ aproxima el cuanto de resolución del ADC/firmware.
+* **Log en el eje de frecuencia (ayuda visual para presentación):** si la máquina opera 85% del tiempo en parada y 15% en marcha, la campana de marcha se aplana contra el eje X en escala lineal. La escala log en el conteo comprime la campana dominante para hacer visible la minoritaria en UI.
 
-- El **promedio** de toda la serie no sirve para encontrar el umbral en una distribución bimodal: cae en un punto intermedio entre ambas campanas que no representa ningún estado real.
-- La **mediana** tampoco separa las campanas: solo indica en cuál cae más del 50% de las lecturas.
-- Donde sí son útiles: **una vez clasificado** cada intervalo (marcha/parada) mediante el umbral del valle, calcular la mediana de potencia **dentro de cada grupo por separado** da una estadística robusta de "potencia operativa típica" (menos sensible a picos anómalos puntuales que el promedio) — útil para dashboards y para detectar degradación del proceso a lo largo del tiempo, no para trazar la frontera entre categorías.
+Ambas técnicas son válidas y complementarias, pero operan sobre ejes distintos.
 
-### 5.5 Relación con técnicas estadísticas más rigurosas
+### 5.3 Persistencia topológica 1-D y validación por barrido de ancho de banda
 
-Este método (encontrar dos modos y el valle entre ellos sobre una curva suavizada) es la versión más simple de un problema estadístico más general: **ajustar un Modelo de Mezcla Gaussiana (GMM) de 2 componentes** a los datos. Cuando las campanas se superponen mucho o el histograma es ambiguo, GMM da el punto de cruce de forma matemáticamente más robusta que buscar un mínimo local a ojo. Es un método **no supervisado** (no requiere etiquetas humanas) — un escalón intermedio entre "umbral fijo a mano" y "ML supervisado con etiquetas".
+Para identificar modas significativas sin fijar un umbral de prominencia empírico arbitrario:
+
+1. **Persistencia topológica 1-D (Merge Tree por Union-Find):** se ordenan las alturas suavizadas de forma descendente. Al barrer, los máximos locales nacen como componentes conexas independientes; cuando dos componentes se tocan en un valle, la componente más baja (más joven) muere absorbida por la más alta. Su *persistencia* es la caída de densidad necesaria para alcanzar un pico mayor. Esto rankea rigurosamente la saliencia de cada régimen y descarta fluctuaciones espurias en $O(n \log n)$ con stdlib puro.
+2. **Barrido de ancho de banda (ancho crítico de Silverman discreto):** el número de modas es monótono no creciente con el radio de suavizado. Barriendo ventanas $[1, 3, 5, \dots, 15]$ y evaluando persistencia, la estructura modal que forma una **meseta estable** representa regímenes reales del proceso; picos que solo existen en ventanas angostas son ruido de muestreo. Esto provee una confianza continua $[0, 1]$ sobre la multimodalidad.
+
+### 5.4 Dispersión robusta por régimen (MAD)
+
+Una vez dividida la distribución por las antimodas:
+* Mediana ($P_{50}$) y desviación absoluta respecto a la mediana (**MAD** — *Median Absolute Deviation*) se calculan directamente sobre las **lecturas crudas** asignadas a cada régimen, no sobre los bins discretizados, preservando la fidelidad metrológica.
+
+### 5.5 Sucesores probabilísticos: GMM vs. HSMM
+
+* **GMM (Gaussian Mixture Model):** es el sucesor estático natural para densidades continuas complejas, pero queda descartado en la capa de dominio por la directiva de arquitectura stdlib-only (`CONVENTIONS.md:19`).
+* **HSMM (Hidden Semi-Markov Model):** es el modelo teórico definitivo para predecir comportamiento. La distribución marginal de potencia descarta el tiempo; un HSMM incorpora $k$ estados, distribución de potencia por estado, matriz de probabilidades de transición y distribución de tiempo de permanencia (duración). Es el estándar unificado de NILM y modelado de disponibilidad.
+
+### 5.6 Dinámica temporal $|\Delta P| / \Delta t$ por régimen y la advertencia de cadencia
+
+El histograma es una proyección marginal que no distingue dos causas de baja densidad:
+1. **Regímenes transitorios:** la máquina pasa rápido por esa potencia.
+2. **Regímenes estables infrecuentes:** la máquina opera establemente allí, pero con baja utilización.
+
+Se separan midiendo la mediana de $|\Delta P| / \Delta t$ (W/s) entre muestras consecutivas, comparada contra el ancho de banda del propio régimen (para respetar la heterocedasticidad).
+
+> [!WARNING]
+> **La advertencia fundamental de cadencia de muestreo:**
+> A cadencia estándar de 5 minutos ($300\text{ s}$), los valles del histograma **casi no contienen transiciones: contienen regímenes desocupados**. Una rampa de arranque que dura $20\text{ s}$ tiene una probabilidad de muestreo $\approx 20/300 \approx 6.6\%$ por evento; la potencia transitoria casi nunca es capturada. Ningún algoritmo matemático puede inventar muestras que el hardware no midió.
+> 
+> Caracterizar transiciones reales es un problema de **instrumentación**, no de algoritmo: requiere campañas acotadas con `realtime_sync_mode` ($1\text{--}5\text{ s}$) sobre máquinas de referencia para extraer firmas de transición. Por ello, ante cadencias inadecuadas o pares insuficientes, el dominio clasifica la naturaleza como `INDETERMINADO` en lugar de generar clasificaciones sin respaldo.
+
+### 5.7 Estacionariedad del proceso
+
+Una ventana histórica de 30 a 90 días puede fundir campanas si el proceso cambia (desgaste de herramental, variaciones de producto, cambio estacional).
+El diagnóstico de estacionariedad divide la serie temporal en subventanas cronológicas iguales (ej. 4 tramos), segmenta cada una, y empareja modas consecutivas mediante vecino más cercano 1-D. Un desplazamiento relativo excesivo ($\Delta P / P > 20\%$) alerta al analista sobre deriva del proceso.
 
 ---
 
@@ -89,13 +123,12 @@ Ejemplo real de referencia: un medidor que agrega iluminación + compresor + lí
 
 Este es el problema clásico de **desagregación de cargas no intrusiva (NILM — Non-Intrusive Load Monitoring)**, estudiado desde los años 80 (Hart, 1992) para inferir qué electrodomésticos/cargas están activos a partir de un único medidor agregado.
 
-### 6.2 Dos técnicas, con condiciones de éxito distintas
+### 6.2 Dos técnicas operativas en la plataforma
 
-**Técnica A — Clustering por nivel de potencia.**
-Generaliza el histograma bimodal a un agrupamiento de hasta k modos (ej. k-means), uno por combinación de cargas activas. Funciona si cada combinación produce un nivel de potencia total estable y suficientemente distinto de las demás. Falla si dos combinaciones distintas dan sumas parecidas, o si alguna carga tiene potencia variable (no fija) mientras está activa.
+La implementación de `SegmentadorRegimenesService` convierte estas técnicas de aspiracionales a operativas:
 
-**Técnica B — Detección de eventos/escalones (ΔP).**
-En vez de mirar el nivel, mirar el **cambio** de potencia entre lecturas consecutivas. Cada carga que se prende/apaga produce un salto (escalón) de tamaño aproximadamente igual a su potencia característica ("firma"). Si se conoce la firma de cada carga, se puede atribuir cada escalón observado a la carga correspondiente sin enumerar todas las combinaciones de antemano. Es la técnica original de Hart. Falla si las cargas no tienen firma estable, o si dos cargas se prenden/apagan simultáneamente (el escalón combinado no se puede separar sin ambigüedad).
+* **Técnica A — Clustering por nivel de potencia:** implementada directamente mediante `SegmentadorRegimenesService.segmentar(k > 2)`. Identifica los niveles estables resultantes de combinaciones de cargas concurrentes mediante persistencia topológica sobre bins logarítmicos.
+* **Técnica B — Detección de escalones ($\Delta P$):** se alimenta del cálculo de deltas válidos y filtrado de huecos implementado en la dinámica temporal del segmentador (`_deltas_potencia_validos`). Cada escalón significativo en la serie se asocia a la conexión/desconexión de cargas individuales.
 
 ### 6.3 El conocimiento del proceso reduce el espacio real de estados
 
@@ -128,11 +161,12 @@ El espacio combinatorio teórico (2ⁿ) casi nunca se da completo en la práctic
 
 ---
 
-## 8. Roadmap propuesto (secuencial)
+## 8. Roadmap de implementación (secuencial)
 
-1. **Motor de reglas.** Clasificar cada intervalo en marcha/parada según un umbral de potencia calibrado por máquina (histograma, sección 5), con ventana mínima de persistencia (patrón `FiltroPersistenciaTemporalService`). Cruzar cada intervalo de parada con el calendario externo para resolver programada/no-programada.
-2. **Corrección humana.** Permitir que un operario/supervisor corrija una clasificación puntual. Cada corrección queda guardada como ejemplo etiquetado.
-3. **Modelo de ML supervisado.** Con volumen suficiente de intervalos clasificados y corregidos, entrenar un modelo simple e interpretable, evaluado contra la clasificación por reglas. Se adopta solo si mejora de forma medible y consistente.
+1. **Segmentación modal y calibración de umbrales:** motor `SegmentadorRegimenesService` (bins log, persistencia topológica, barrido de ancho de banda, dinámicas $|\Delta P|$ y estacionariedad). `CalibradorUmbralService` se apoya en este motor para inferir el umbral marcha/parada de máquinas individuales ($k=2$).
+2. **Motor de reglas de disponibilidad:** clasificar eventos instantáneos en marcha/parada según umbral calibrado con filtro anti-transitorios (`FiltroPersistenciaEstadoService`). Cruce con calendario de paradas programadas.
+3. **Corrección humana y feedback loop:** endpoint para corregir clasificaciones erróneas guardando autoría y motivo, construyendo el dataset etiquetado.
+4. **Desagregación NILM y modelos de estados:** extensión con $k > 2$ para medidores agregados y exploración de modelos HSMM supervisados sobre el historial etiquetado.
 
 Para medidores que agregan varias cargas (sección 6), este roadmap aplica **por carga o por línea**, no por medidor — lo que exige primero decidir, caso por caso, si corresponde desagregación algorítmica o submedición dedicada.
 

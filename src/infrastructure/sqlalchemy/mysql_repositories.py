@@ -40,6 +40,7 @@ from src.domain.telemetria.value_objects import (
     EnergiaReactiva,
     EstadoDispositivo,
     FactorPotencia,
+    LecturaPotenciaTemporal,
     MacAddress,
     ModoFreeTier,
     PosicionLayout,
@@ -509,17 +510,25 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
         items = q.order_by(asc(TelemetryEnergyModel.recorded_at)).all()
         return [self._energia_to_entity(m) for m in items]
 
-    def listar_potencias_para_histograma(self, dispositivo_id: str, desde: datetime) -> list[float]:
-        filas = (
-            self.db.query(TelemetryInstantaneousModel.total_active_power)
+    def listar_potencias_para_histograma(
+        self, dispositivo_id: str, desde: datetime, limite: int | None = None
+    ) -> list[LecturaPotenciaTemporal]:
+        q = (
+            self.db.query(
+                TelemetryInstantaneousModel.recorded_at,
+                TelemetryInstantaneousModel.total_active_power,
+            )
             .filter(
                 TelemetryInstantaneousModel.device_id == dispositivo_id,
                 TelemetryInstantaneousModel.recorded_at >= desde,
                 TelemetryInstantaneousModel.total_active_power.isnot(None),
             )
-            .all()
+            .order_by(asc(TelemetryInstantaneousModel.recorded_at))
         )
-        return [float(fila[0]) for fila in filas]
+        if limite is not None:
+            q = q.limit(limite)
+        filas = q.all()
+        return [LecturaPotenciaTemporal(momento=fila[0], potencia_w=float(fila[1])) for fila in filas]
 
     def purgar_instantaneas_anteriores_a(self, fecha_limite: datetime, batch_size: int = 1000) -> int:
         ids = [

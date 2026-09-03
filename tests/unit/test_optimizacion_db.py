@@ -33,6 +33,7 @@ from src.domain.telemetria.ports import (
     RepositorioTelemetriaPort,
 )
 from src.domain.telemetria.value_objects import (
+    LecturaPotenciaTemporal,
     MacAddress,
     ModoFreeTier,
     SeveridadAlerta,
@@ -232,14 +233,20 @@ class MockTelemetriaRepo(RepositorioTelemetriaPort):
             q = [e for e in q if self._gte(e.registrado_en, desde)]
         return q
 
-    def listar_potencias_para_histograma(self, dispositivo_id: str, desde: datetime) -> list[float]:
-        return [
-            i.potencia_activa_total.vatios
+    def listar_potencias_para_histograma(
+        self, dispositivo_id: str, desde: datetime, limite: int | None = None
+    ) -> list[LecturaPotenciaTemporal]:
+        items = [
+            LecturaPotenciaTemporal(momento=i.registrado_en, potencia_w=i.potencia_activa_total.vatios)
             for i in self.instantaneas
             if i.dispositivo_id == dispositivo_id
             and i.potencia_activa_total is not None
             and self._gte(i.registrado_en, desde)
         ]
+        items.sort(key=lambda x: x.momento)
+        if limite is not None:
+            items = items[:limite]
+        return items
 
     def purgar_instantaneas_anteriores_a(self, fecha_limite: datetime, batch_size: int = 1000) -> int:
         prev = len(self.instantaneas)

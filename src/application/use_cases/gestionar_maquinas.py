@@ -2,10 +2,13 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from src.application.dtos.maquina_dto import (
+    DiagnosticoConfianzaModalDTO,
+    DiagnosticoEstacionariedadDTO,
     HistogramaPotenciaResponseDTO,
     MaquinaCreateDTO,
     MaquinaResponseDTO,
     MaquinaUpdateDTO,
+    RegimenOperacionDTO,
 )
 from src.application.mappers.maquina_mapper import MaquinaMapper
 from src.domain.disponibilidad.exceptions import (
@@ -13,11 +16,13 @@ from src.domain.disponibilidad.exceptions import (
     MaquinaNoEncontradaError,
 )
 from src.domain.disponibilidad.ports import RepositorioMaquinasPort
-from src.domain.disponibilidad.services import CalibradorUmbralService
+from src.domain.disponibilidad.services import SegmentadorRegimenesService
 from src.domain.telemetria.ports import RepositorioTelemetriaPort
 
 
 class GestionarMaquinasUseCase:
+    LIMITE_LECTURAS_HISTOGRAMA = 100_000
+
     def __init__(
         self,
         repo_maquinas: RepositorioMaquinasPort,
@@ -62,22 +67,70 @@ class GestionarMaquinasUseCase:
         saved = self.repo_maquinas.guardar(maquina)
         return MaquinaMapper.to_dto(saved)
 
-    def calcular_histograma(self, maquina_id: str, dias: int = 7) -> HistogramaPotenciaResponseDTO:
+    def calcular_histograma(
+        self,
+        maquina_id: str,
+        dias: int = 7,
+        limite: int | None = None,
+    ) -> HistogramaPotenciaResponseDTO:
         maquina = self.repo_maquinas.obtener_por_id(maquina_id)
         if not maquina:
             raise MaquinaNoEncontradaError(f"Máquina '{maquina_id}' no encontrada.")
 
+        limite_efectivo = limite if limite is not None else self.LIMITE_LECTURAS_HISTOGRAMA
         desde = datetime.now(timezone.utc) - timedelta(days=dias)
-        lecturas_w = self.repo_telemetria.listar_potencias_para_histograma(maquina.dispositivo_id, desde)
+        lecturas = self.repo_telemetria.listar_potencias_para_histograma(
+            maquina.dispositivo_id, desde, limite=limite_efectivo
+        )
 
-        bordes, frecuencias = CalibradorUmbralService.construir_histograma(lecturas_w)
-        umbral_sugerido = CalibradorUmbralService.calcular_umbral(lecturas_w)
+        segmentacion = SegmentadorRegimenesService.analizar_serie(lecturas)
+        lecturas_truncadas = len(lecturas) >= limite_efectivo
+
+        regimenes_dto = [
+            RegimenOperacionDTO(
+                indice=r.indice,
+                potencia_tipica_w=r.potencia_tipica_w,
+                limite_inferior_w=r.limite_inferior_w,
+                limite_superior_w=r.limite_superior_w,
+                masa=r.masa,
+                mediana_w=r.mediana_w,
+                mad_w=r.mad_w,
+                persistencia=r.persistencia,
+                variacion_mediana_w_s=r.variacion_mediana_w_s,
+                naturaleza=r.naturaleza,
+            )
+            for r in segmentacion.regimenes
+        ]
+
+        diagnostico_modal = None
+        if segmentacion.diagnostico_modal is not None:
+            diagnostico_modal = DiagnosticoConfianzaModalDTO(
+                num_modas_estable=segmentacion.diagnostico_modal.num_modas_estable,
+                fraccion_ventanas_consistentes=segmentacion.diagnostico_modal.fraccion_ventanas_consistentes,
+                es_multimodal_confiable=segmentacion.diagnostico_modal.es_multimodal_confiable,
+            )
+
+        diagnostico_estacionariedad = None
+        if segmentacion.diagnostico_estacionariedad is not None:
+            diagnostico_estacionariedad = DiagnosticoEstacionariedadDTO(
+                num_subventanas=segmentacion.diagnostico_estacionariedad.num_subventanas,
+                desplazamiento_maximo_w=segmentacion.diagnostico_estacionariedad.desplazamiento_maximo_w,
+                desplazamiento_maximo_relativo=segmentacion.diagnostico_estacionariedad.desplazamiento_maximo_relativo,
+                es_estacionario=segmentacion.diagnostico_estacionariedad.es_estacionario,
+            )
 
         return HistogramaPotenciaResponseDTO(
             dispositivo_id=maquina.dispositivo_id,
             dias_analizados=dias,
-            cantidad_lecturas=len(lecturas_w),
-            bordes_bins_w=bordes,
-            frecuencias=frecuencias,
-            umbral_sugerido_w=umbral_sugerido,
+            cantidad_lecturas=len(lecturas),
+            bordes_bins_w=segmentacion.bordes_bins_w,
+            frecuencias=segmentacion.frecuencias,
+            umbral_sugerido_w=segmentacion.umbral_marcha_sugerido_w,
+            escala=segmentacion.escala,
+            epsilon_w=segmentacion.epsilon_w,
+            lecturas_truncadas=lecturas_truncadas,
+            lecturas_descartadas=segmentacion.lecturas_no_positivas,
+            regimenes=regimenes_dto,
+            diagnostico_modal=diagnostico_modal,
+            diagnostico_estacionariedad=diagnostico_estacionariedad,
         )

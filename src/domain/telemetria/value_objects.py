@@ -1,5 +1,6 @@
 import re
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
 
 from src.domain.telemetria.exceptions import (
@@ -163,3 +164,16 @@ class AnaliticaCalidadEnergia:
     desbalance_corriente_porcentaje: float | None = None
     estado_fp: EstadoFactorPotencia = EstadoFactorPotencia.SIN_DATOS
     estado_tension: EstadoTension = EstadoTension.SIN_DATOS
+
+
+@dataclass(frozen=True)
+class LecturaPotenciaTemporal:
+    """Par (momento, potencia) para análisis de la serie de potencia.
+
+    Deliberadamente liviano: el análisis de regímenes recorre potencialmente millones de
+    filas, y construir una `LecturaInstantanea` completa (fases, THD, tensiones) por cada
+    una sería caro e innecesario.
+    """
+
+    momento: datetime
+    potencia_w: float

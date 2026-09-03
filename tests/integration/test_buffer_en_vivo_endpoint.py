@@ -18,7 +18,7 @@ from fastapi.testclient import TestClient
 from src.application.use_cases.consultar_telemetria import ConsultarTelemetriaUseCase
 from src.domain.telemetria.entities import Dispositivo, LecturaInstantanea, MedicionFase
 from src.domain.telemetria.ports import RepositorioDispositivosPort, RepositorioTelemetriaPort
-from src.domain.telemetria.value_objects import MacAddress, PotenciaActiva
+from src.domain.telemetria.value_objects import LecturaPotenciaTemporal, MacAddress, PotenciaActiva
 from src.infrastructure.fastapi.dependencies import (
     get_telemetria_use_case,
     get_usuario_actual,
@@ -89,7 +89,9 @@ class _RepoTelemetriaFakeSoloDb(RepositorioTelemetriaPort):
     def listar_acumulados_para_agregacion(self, dispositivo_id: str, desde: datetime | None = None) -> list:
         return []
 
-    def listar_potencias_para_histograma(self, dispositivo_id: str, desde: datetime) -> list[float]:
+    def listar_potencias_para_histograma(
+        self, dispositivo_id: str, desde: datetime, limite: int | None = None
+    ) -> list[LecturaPotenciaTemporal]:
         return []
 
     def purgar_instantaneas_anteriores_a(self, fecha_limite: datetime, batch_size: int = 1000) -> int:

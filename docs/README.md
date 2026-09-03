@@ -51,7 +51,7 @@ Bienvenido al centro de documentación técnica del backend de telemetría de en
 ### 4. Analítica de Procesos — Diseño Conceptual (Exploratorio)
 
 * 📄 [`docs/disponibilidad-maquina-diseno-conceptual.md`](file:///home/agustin/proyectos_software/datamaq-telemetry/docs/disponibilidad-maquina-diseno-conceptual.md)
-  *Disponibilidad de Máquina a partir del Comportamiento Energético:* Documento de diseño conceptual (sin tablas ni servicios definidos aún) sobre cómo inferir marcha / parada programada / parada no programada desde las variables eléctricas. Cubre certezas y dudas abiertas, calibración de umbrales por histograma bimodal de potencia (suavizado, escala logarítmica, rol de promedio/mediana), desagregación de cargas para medidores agregados (NILM: clustering por nivel vs. detección de eventos ΔP, decisión algorítmico vs. submedición dedicada), comparación Reglas vs. ML supervisado, y el roadmap secuencial propuesto (reglas → corrección humana → modelo de ML).
+  *Disponibilidad de Máquina a partir del Comportamiento Energético:* Documento de diseño conceptual sobre cómo inferir marcha / parada programada / parada no programada desde las variables eléctricas. Cubre certezas y dudas abiertas, segmentación modal de regímenes de potencia (binning logarítmico, persistencia topológica 1-D, barrido de ancho de banda, dinámica temporal |ΔP| y estacionariedad), calibración de umbrales marcha/parada, desagregación de cargas para medidores agregados (NILM: clustering por nivel vs. detección de eventos ΔP), comparación Reglas vs. ML supervisado, y el roadmap secuencial de implementación.
 
 ---
 
