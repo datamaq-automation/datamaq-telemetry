@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 import paho.mqtt.client as mqtt
 from paho.mqtt.enums import CallbackAPIVersion
 
+from src.application.use_cases.gestionar_disponibilidad import GestionarDisponibilidadUseCase
 from src.application.use_cases.ingestar_telemetria import IngestarTelemetriaUseCase
 from src.domain.telemetria.ports import PublicadorEventosPort
 from src.domain.telemetria.services import FiltroDeduplicacionService
@@ -14,6 +15,9 @@ from src.infrastructure.settings.logger import get_logger
 from src.infrastructure.sqlalchemy.database import get_session_factory
 from src.infrastructure.sqlalchemy.mysql_repositories import (
     MySQLDispositivosRepository,
+    MySQLEventosDisponibilidadRepository,
+    MySQLMaquinasRepository,
+    MySQLParadasProgramadasRepository,
     MySQLTelemetriaRepository,
 )
 
@@ -130,12 +134,18 @@ class MQTTListener:
         try:
             repo_disp = MySQLDispositivosRepository(db)
             repo_telem = MySQLTelemetriaRepository(db)
+            disponibilidad_use_case = GestionarDisponibilidadUseCase(
+                repo_maquinas=MySQLMaquinasRepository(db),
+                repo_eventos=MySQLEventosDisponibilidadRepository(db),
+                repo_paradas=MySQLParadasProgramadasRepository(db),
+            )
             use_case = IngestarTelemetriaUseCase(
                 repo_dispositivos=repo_disp,
                 repo_telemetria=repo_telem,
                 publicador=self.publicador,
                 logger=logger,
                 permitir_auto_registro=self.settings.MQTT_AUTO_REGISTER_DEVICES,
+                disponibilidad_use_case=disponibilidad_use_case,
             )
             use_case.ejecutar(topic, payload)
         except Exception as e:

@@ -232,6 +232,15 @@ class MockTelemetriaRepo(RepositorioTelemetriaPort):
             q = [e for e in q if self._gte(e.registrado_en, desde)]
         return q
 
+    def listar_potencias_para_histograma(self, dispositivo_id: str, desde: datetime) -> list[float]:
+        return [
+            i.potencia_activa_total.vatios
+            for i in self.instantaneas
+            if i.dispositivo_id == dispositivo_id
+            and i.potencia_activa_total is not None
+            and self._gte(i.registrado_en, desde)
+        ]
+
     def purgar_instantaneas_anteriores_a(self, fecha_limite: datetime, batch_size: int = 1000) -> int:
         prev = len(self.instantaneas)
         self.instantaneas = [i for i in self.instantaneas if self._gte(i.registrado_en, fecha_limite)]

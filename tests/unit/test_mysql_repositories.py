@@ -9,6 +9,8 @@ import pytest
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 
+from src.domain.disponibilidad.entities import EventoDisponibilidad, Maquina, ParadaProgramada
+from src.domain.disponibilidad.value_objects import EstadoMaquina, OrigenClasificacion, TipoParada
 from src.domain.telemetria.entities import (
     AcumuladoEnergia,
     AlertaDispositivo,
@@ -45,18 +47,28 @@ from src.infrastructure.sqlalchemy.models import (
     DeviceAlertModel,
     DeviceModel,
     DeviceStatusLogModel,
+    MachineAvailabilityEventModel,
     PlanModel,
     TelemetryEnergyModel,
     TelemetryInstantaneousModel,
 )
 from src.infrastructure.sqlalchemy.mysql_repositories import (
     MySQLDispositivosRepository,
+    MySQLEventosDisponibilidadRepository,
+    MySQLMaquinasRepository,
     MySQLOrganizacionesRepository,
+    MySQLParadasProgramadasRepository,
     MySQLPlanesRepository,
     MySQLTelemetriaRepository,
 )
 
-_MODELOS_PK_AUTO = (TelemetryInstantaneousModel, TelemetryEnergyModel, DeviceStatusLogModel, DeviceAlertModel)
+_MODELOS_PK_AUTO = (
+    TelemetryInstantaneousModel,
+    TelemetryEnergyModel,
+    DeviceStatusLogModel,
+    DeviceAlertModel,
+    MachineAvailabilityEventModel,
+)
 
 _contadores: dict[type, Iterator[int]] = {}
 
@@ -742,3 +754,115 @@ def test_layout_planta_guardar_y_obtener(db: Session) -> None:
     disp_rec = org_repo.obtener_dispositivos_layout("plant-lay")
     assert len(disp_rec) == 1
     assert disp_rec[0].device_id == "dev-lay-1"
+
+
+def test_maquina_guardar_y_obtener_por_id(db: Session) -> None:
+    MySQLDispositivosRepository(db).guardar(_dispositivo())
+    repo = MySQLMaquinasRepository(db)
+
+    repo.guardar(Maquina(id="maq-1", dispositivo_id="dev-1", nombre="Línea 1"))
+
+    obtenida = repo.obtener_por_id("maq-1")
+    assert obtenida is not None
+    assert obtenida.dispositivo_id == "dev-1"
+    assert obtenida.umbral_marcha_w is None
+    assert obtenida.esta_calibrada is False
+    assert repo.obtener_por_dispositivo_id("dev-1") is not None
+    assert repo.obtener_por_id("inexistente") is None
+
+
+def test_maquina_guardar_actualiza_umbral(db: Session) -> None:
+    MySQLDispositivosRepository(db).guardar(_dispositivo())
+    repo = MySQLMaquinasRepository(db)
+    maquina = repo.guardar(Maquina(id="maq-1", dispositivo_id="dev-1", nombre="Línea 1"))
+
+    maquina.umbral_marcha_w = 1500.5
+    repo.guardar(maquina)
+
+    obtenida = repo.obtener_por_id("maq-1")
+    assert obtenida is not None
+    assert obtenida.umbral_marcha_w == 1500.5
+    assert obtenida.esta_calibrada is True
+
+
+def test_maquina_listar(db: Session) -> None:
+    repo_disp = MySQLDispositivosRepository(db)
+    repo_disp.guardar(_dispositivo())
+    otro_disp = _dispositivo(uid="00:11:22:33:44:66")
+    otro_disp.id = "dev-2"
+    repo_disp.guardar(otro_disp)
+
+    repo = MySQLMaquinasRepository(db)
+    repo.guardar(Maquina(id="maq-1", dispositivo_id="dev-1", nombre="Línea 1"))
+    repo.guardar(Maquina(id="maq-2", dispositivo_id="dev-2", nombre="Línea 2"))
+
+    assert {m.id for m in repo.listar()} == {"maq-1", "maq-2"}
+
+
+def test_evento_disponibilidad_guardar_y_obtener_abierto(db: Session) -> None:
+    MySQLDispositivosRepository(db).guardar(_dispositivo())
+    MySQLMaquinasRepository(db).guardar(Maquina(id="maq-1", dispositivo_id="dev-1", nombre="Línea 1"))
+    repo = MySQLEventosDisponibilidadRepository(db)
+
+    guardado = repo.guardar(
+        EventoDisponibilidad(id=None, maquina_id="maq-1", estado=EstadoMaquina.MARCHA, inicio_at=_fecha(1, 8))
+    )
+    assert guardado.id is not None
+
+    abierto = repo.obtener_evento_abierto("maq-1")
+    assert abierto is not None
+    assert abierto.estado == EstadoMaquina.MARCHA
+    assert abierto.esta_abierto is True
+
+
+def test_evento_disponibilidad_cerrar_y_correccion_manual(db: Session) -> None:
+    MySQLDispositivosRepository(db).guardar(_dispositivo())
+    MySQLMaquinasRepository(db).guardar(Maquina(id="maq-1", dispositivo_id="dev-1", nombre="Línea 1"))
+    repo = MySQLEventosDisponibilidadRepository(db)
+
+    evento = repo.guardar(
+        EventoDisponibilidad(
+            id=None,
+            maquina_id="maq-1",
+            estado=EstadoMaquina.PARADA,
+            tipo_parada=TipoParada.SIN_CLASIFICAR,
+            inicio_at=_fecha(1, 8),
+        )
+    )
+    evento.cerrar(_fecha(1, 9), potencia_promedio_w=12.5)
+    repo.guardar(evento)
+    evento.marcar_correccion_manual(
+        TipoParada.PROGRAMADA, usuario_id="user-1", comentario="mantenimiento", ahora=_fecha(1, 10)
+    )
+    repo.guardar(evento)
+
+    recargado = repo.obtener_por_id(evento.id)
+    assert recargado is not None
+    assert recargado.fin_at == _fecha(1, 9)
+    assert recargado.tipo_parada == TipoParada.PROGRAMADA
+    assert recargado.origen == OrigenClasificacion.CORRECCION_HUMANA
+    assert recargado.corregido_por_usuario_id == "user-1"
+    assert recargado.esta_abierto is False
+    assert repo.obtener_evento_abierto("maq-1") is None
+
+
+def test_parada_programada_guardar_y_buscar_vigente(db: Session) -> None:
+    MySQLDispositivosRepository(db).guardar(_dispositivo())
+    MySQLMaquinasRepository(db).guardar(Maquina(id="maq-1", dispositivo_id="dev-1", nombre="Línea 1"))
+    repo = MySQLParadasProgramadasRepository(db)
+
+    repo.guardar(
+        ParadaProgramada(
+            id="parada-1",
+            maquina_id="maq-1",
+            inicio_at=_fecha(1, 8),
+            fin_at=_fecha(1, 10),
+            motivo="Mantenimiento programado",
+        )
+    )
+
+    vigente = repo.buscar_vigente("maq-1", _fecha(1, 9))
+    assert vigente is not None
+    assert vigente.motivo == "Mantenimiento programado"
+    assert repo.buscar_vigente("maq-1", _fecha(1, 11)) is None
+    assert len(repo.listar_por_maquina("maq-1")) == 1

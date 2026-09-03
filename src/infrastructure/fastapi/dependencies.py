@@ -9,9 +9,11 @@ from src.adapters.gateways.in_memory_telemetria_buffer import InMemoryTelemetria
 from src.application.use_cases.autenticar_usuario import AutenticarUsuarioUseCase
 from src.application.use_cases.consultar_telemetria import ConsultarTelemetriaUseCase
 from src.application.use_cases.gestionar_alertas import GestionarAlertasUseCase
+from src.application.use_cases.gestionar_disponibilidad import GestionarDisponibilidadUseCase
 from src.application.use_cases.gestionar_dispositivos import (
     GestionarDispositivosUseCase,
 )
+from src.application.use_cases.gestionar_maquinas import GestionarMaquinasUseCase
 from src.application.use_cases.gestionar_planes import GestionarPlanesUseCase
 from src.application.use_cases.gestionar_planta_estructura import (
     GestionarPlantaEstructuraUseCase,
@@ -25,7 +27,10 @@ from src.infrastructure.settings.logger import get_logger
 from src.infrastructure.sqlalchemy.database import get_db_session
 from src.infrastructure.sqlalchemy.mysql_repositories import (
     MySQLDispositivosRepository,
+    MySQLEventosDisponibilidadRepository,
+    MySQLMaquinasRepository,
     MySQLOrganizacionesRepository,
+    MySQLParadasProgramadasRepository,
     MySQLPlanesRepository,
     MySQLTelemetriaRepository,
     MySQLUsuariosRepository,
@@ -120,6 +125,23 @@ def get_alertas_use_case(
         publicador=global_event_broadcaster,
         repo_dispositivos=repo_disp,
     )
+
+
+def get_maquinas_use_case(
+    db: Annotated[Session, Depends(get_db_session)],
+) -> GestionarMaquinasUseCase:
+    repo_maquinas = MySQLMaquinasRepository(db)
+    repo_telem = MySQLTelemetriaRepository(db)
+    return GestionarMaquinasUseCase(repo_maquinas, repo_telem)
+
+
+def get_disponibilidad_use_case(
+    db: Annotated[Session, Depends(get_db_session)],
+) -> GestionarDisponibilidadUseCase:
+    repo_maquinas = MySQLMaquinasRepository(db)
+    repo_eventos = MySQLEventosDisponibilidadRepository(db)
+    repo_paradas = MySQLParadasProgramadasRepository(db)
+    return GestionarDisponibilidadUseCase(repo_maquinas, repo_eventos, repo_paradas)
 
 
 def get_planta_estructura_use_case(

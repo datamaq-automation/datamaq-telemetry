@@ -6,6 +6,7 @@ from typing import Any, ClassVar
 
 from src.application.mappers.alerta_mapper import AlertaMapper
 from src.application.mappers.telemetria_mapper import TelemetriaMapper
+from src.application.use_cases.gestionar_disponibilidad import GestionarDisponibilidadUseCase
 from src.domain.telemetria.entities import (
     AcumuladoEnergia,
     AlertaDispositivo,
@@ -56,6 +57,7 @@ class IngestarTelemetriaUseCase:
         logger: LoggerPort | None = None,
         granularidad_segundos: int = 300,
         permitir_auto_registro: bool = True,
+        disponibilidad_use_case: GestionarDisponibilidadUseCase | None = None,
     ):
         self.repo_dispositivos = repo_dispositivos
         self.repo_telemetria = repo_telemetria
@@ -63,6 +65,7 @@ class IngestarTelemetriaUseCase:
         self.logger = logger
         self.granularidad_segundos = granularidad_segundos
         self.permitir_auto_registro = permitir_auto_registro
+        self.disponibilidad_use_case = disponibilidad_use_case
 
     def _parse_timestamp(self, ts_val: Any) -> datetime:
         if ts_val:
@@ -522,6 +525,12 @@ class IngestarTelemetriaUseCase:
                 self.publicador.publicar_telemetria_en_vivo(
                     topico, TelemetriaMapper.instantanea_to_dto(lectura).model_dump(mode="json")
                 )
+
+            # Clasificación de disponibilidad de máquina (marcha/parada), si el dispositivo
+            # tiene una Maquina asociada y calibrada — no-op en caso contrario.
+            if self.disponibilidad_use_case is not None and p_tot is not None:
+                self.disponibilidad_use_case.clasificar_lectura(dispositivo.id, float(p_tot), recorded_at)
+
             # Evaluación de alertas de dominio (se evalúa siempre para cada paquete recibido)
             # 1. Tensión y falta de fase con filtro de persistencia temporal (anti-falsos positivos)
             alerta_tension_raw = AnalizadorCalidadEnergiaService.evaluar_alerta_tension(dispositivo.id, lectura)

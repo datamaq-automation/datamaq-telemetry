@@ -11,6 +11,7 @@ erDiagram
     DEVICES ||--o{ DEVICE_ALERTS : "FK_device_id"
     DEVICES ||--o{ DEVICE_STATUS_LOGS : "FK_device_id"
     DEVICES ||--o{ FACILITY_DEVICE_LAYOUTS : "FK_device_id"
+    DEVICES ||--o{ MACHINES : "FK_device_id"
     DEVICES ||--o{ TELEMETRY_ENERGY : "FK_device_id"
     DEVICES ||--o{ TELEMETRY_INSTANTANEOUS : "FK_device_id"
     DEVICES ||--o{ UNIFILAR_NODES : "FK_device_id"
@@ -19,6 +20,8 @@ erDiagram
     FACILITIES ||--o{ FACILITY_ZONES : "FK_facility_id"
     FACILITIES ||--o{ UNIFILAR_NODES : "FK_facility_id"
     FACILITY_ZONES ||--o{ FACILITY_DEVICE_LAYOUTS : "FK_zone_id"
+    MACHINES ||--o{ MACHINE_AVAILABILITY_EVENTS : "FK_machine_id"
+    MACHINES ||--o{ SCHEDULED_STOPS : "FK_machine_id"
     ORGANIZATIONS ||--o{ FACILITIES : "FK_organization_id"
     PLANS ||--o{ ORGANIZATIONS : "FK_plan_id"
 
@@ -105,6 +108,31 @@ erDiagram
         datetime updated_at
     }
 
+    MACHINE_AVAILABILITY_EVENTS {
+        bigint id PK
+        string machine_id FK
+        string state
+        string stop_type
+        datetime start_at
+        datetime end_at
+        decimal avg_power_w
+        string origin
+        string corrected_by_user_id
+        datetime corrected_at
+        string notes
+    }
+
+    MACHINES {
+        string id PK
+        string device_id FK
+        string name
+        decimal on_threshold_w
+        int persistence_readings
+        decimal persistence_seconds
+        datetime created_at
+        datetime updated_at
+    }
+
     ORGANIZATIONS {
         string id PK
         string name
@@ -130,6 +158,16 @@ erDiagram
         json notification_channels
         datetime created_at
         datetime updated_at
+    }
+
+    SCHEDULED_STOPS {
+        string id PK
+        string machine_id FK
+        datetime start_at
+        datetime end_at
+        string reason
+        string created_by_user_id
+        datetime created_at
     }
 
     TELEMETRY_ENERGY {
@@ -328,6 +366,38 @@ erDiagram
 **Índices:**
 - `idx_zone_facility`: (`facility_id`)
 
+### Tabla `machine_availability_events`
+
+| Columna | Tipo SQL | Clave / Restricción | Nullable |
+| :--- | :--- | :--- | :--- |
+| `id` | `BIGINT` | **PRIMARY KEY** | No |
+| `machine_id` | `VARCHAR(36)` | FK -> `machines.id` | No |
+| `state` | `VARCHAR(10)` | - | No |
+| `stop_type` | `VARCHAR(20)` | - | Sí |
+| `start_at` | `DATETIME` | - | No |
+| `end_at` | `DATETIME` | - | Sí |
+| `avg_power_w` | `NUMERIC(10, 2)` | - | Sí |
+| `origin` | `VARCHAR(20)` | - | No |
+| `corrected_by_user_id` | `VARCHAR(36)` | - | Sí |
+| `corrected_at` | `DATETIME` | - | Sí |
+| `notes` | `TEXT` | - | Sí |
+
+**Índices:**
+- `idx_machine_availability_machine_open`: (`machine_id`, `end_at`)
+
+### Tabla `machines`
+
+| Columna | Tipo SQL | Clave / Restricción | Nullable |
+| :--- | :--- | :--- | :--- |
+| `id` | `VARCHAR(36)` | **PRIMARY KEY** | No |
+| `device_id` | `VARCHAR(36)` | FK -> `devices.id`, UNIQUE | No |
+| `name` | `VARCHAR(120)` | - | No |
+| `on_threshold_w` | `NUMERIC(10, 2)` | - | Sí |
+| `persistence_readings` | `INTEGER` | - | No |
+| `persistence_seconds` | `NUMERIC(8, 2)` | - | No |
+| `created_at` | `DATETIME` | - | No |
+| `updated_at` | `DATETIME` | - | No |
+
 ### Tabla `organizations`
 
 | Columna | Tipo SQL | Clave / Restricción | Nullable |
@@ -358,6 +428,21 @@ erDiagram
 | `notification_channels` | `JSON` | - | No |
 | `created_at` | `DATETIME` | - | No |
 | `updated_at` | `DATETIME` | - | No |
+
+### Tabla `scheduled_stops`
+
+| Columna | Tipo SQL | Clave / Restricción | Nullable |
+| :--- | :--- | :--- | :--- |
+| `id` | `VARCHAR(36)` | **PRIMARY KEY** | No |
+| `machine_id` | `VARCHAR(36)` | FK -> `machines.id` | No |
+| `start_at` | `DATETIME` | - | No |
+| `end_at` | `DATETIME` | - | No |
+| `reason` | `VARCHAR(250)` | - | No |
+| `created_by_user_id` | `VARCHAR(36)` | - | Sí |
+| `created_at` | `DATETIME` | - | No |
+
+**Índices:**
+- `idx_scheduled_stops_machine_range`: (`machine_id`, `start_at`, `end_at`)
 
 ### Tabla `telemetry_energy`
 

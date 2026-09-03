@@ -314,6 +314,57 @@ class DeviceAlertModel(Base):
     device: Mapped["DeviceModel"] = relationship(back_populates="alerts")
 
 
+class MachineModel(Base):
+    __tablename__ = "machines"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    device_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("devices.id", ondelete="CASCADE"), unique=True, nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    on_threshold_w: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
+    persistence_readings: Mapped[int] = mapped_column(default=2, nullable=False)
+    persistence_seconds: Mapped[Decimal] = mapped_column(Numeric(8, 2), default=Decimal("60.0"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, onupdate=ahora_utc, nullable=False)
+
+    device: Mapped["DeviceModel"] = relationship()
+
+
+class MachineAvailabilityEventModel(Base):
+    __tablename__ = "machine_availability_events"
+    __table_args__ = (Index("idx_machine_availability_machine_open", "machine_id", "end_at"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    machine_id: Mapped[str] = mapped_column(String(36), ForeignKey("machines.id", ondelete="CASCADE"), nullable=False)
+    state: Mapped[str] = mapped_column(String(10), nullable=False)
+    stop_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    start_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    end_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+    avg_power_w: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
+    origin: Mapped[str] = mapped_column(String(20), default="REGLA", nullable=False)
+    corrected_by_user_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    corrected_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    machine: Mapped["MachineModel"] = relationship()
+
+
+class ScheduledStopModel(Base):
+    __tablename__ = "scheduled_stops"
+    __table_args__ = (Index("idx_scheduled_stops_machine_range", "machine_id", "start_at", "end_at"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    machine_id: Mapped[str] = mapped_column(String(36), ForeignKey("machines.id", ondelete="CASCADE"), nullable=False)
+    start_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    end_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    reason: Mapped[str] = mapped_column(String(250), nullable=False)
+    created_by_user_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
+
+    machine: Mapped["MachineModel"] = relationship()
+
+
 class PlanModel(Base):
     __tablename__ = "plans"
 

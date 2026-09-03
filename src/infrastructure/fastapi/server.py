@@ -26,6 +26,9 @@ from src.infrastructure.fastapi.routes.alertas_router import (
 from src.infrastructure.fastapi.routes.auth_router import (
     router as auth_router,
 )
+from src.infrastructure.fastapi.routes.disponibilidad_router import (
+    router as disponibilidad_router,
+)
 from src.infrastructure.fastapi.routes.dispositivos_router import (
     router as dispositivos_router,
 )
@@ -284,6 +287,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     # Register Routers
     app.include_router(system_router)
+    app.include_router(disponibilidad_router)
     app.include_router(telemetria_router)
     app.include_router(dispositivos_router)
     app.include_router(organizaciones_router)

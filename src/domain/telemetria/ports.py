@@ -91,6 +91,14 @@ class RepositorioTelemetriaPort(ABC):
         pass
 
     @abstractmethod
+    def listar_potencias_para_histograma(
+        self,
+        dispositivo_id: str,
+        desde: datetime,
+    ) -> list[float]:
+        pass
+
+    @abstractmethod
     def purgar_instantaneas_anteriores_a(self, fecha_limite: datetime, batch_size: int = 1000) -> int:
         pass
 

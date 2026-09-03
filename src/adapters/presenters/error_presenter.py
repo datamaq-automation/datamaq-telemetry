@@ -6,6 +6,11 @@ from src.domain.auth.exceptions import (
     NombreUsuarioInvalidoError,
     UsuarioInactivoError,
 )
+from src.domain.disponibilidad.exceptions import (
+    DominioDisponibilidadException,
+    EventoDisponibilidadNoEncontradoError,
+    MaquinaNoEncontradaError,
+)
 from src.domain.telemetria.exceptions import (
     AlertaNoEncontradaError,
     DispositivoNoEncontradoError,
@@ -22,11 +27,20 @@ class ErrorPresenter:
 
     @staticmethod
     def presentar_excepcion(exc: Exception) -> tuple[int, dict[str, Any]]:
-        if isinstance(exc, (DispositivoNoEncontradoError, AlertaNoEncontradaError, PlantaNoEncontradaError)):
+        if isinstance(
+            exc,
+            (
+                DispositivoNoEncontradoError,
+                AlertaNoEncontradaError,
+                PlantaNoEncontradaError,
+                MaquinaNoEncontradaError,
+                EventoDisponibilidadNoEncontradoError,
+            ),
+        ):
             return 404, {"error": "NotFound", "mensaje": exc.mensaje}
         elif isinstance(exc, (MacAddressInvalidaError, TensionInvalidaError, FactorPotenciaInvalidoError)):
             return 400, {"error": "ValidationError", "mensaje": exc.mensaje}
-        elif isinstance(exc, DominioTelemetriaException):
+        elif isinstance(exc, (DominioTelemetriaException, DominioDisponibilidadException)):
             return 422, {"error": "DomainError", "mensaje": exc.mensaje}
         elif isinstance(exc, NombreUsuarioInvalidoError):
             return 422, {"error": "ValidationError", "mensaje": exc.mensaje}

@@ -6,6 +6,7 @@ from fastapi import HTTPException
 from src.infrastructure.fastapi import dependencies as deps
 from src.infrastructure.fastapi.routes import (
     alertas_router,
+    disponibilidad_router,
     dispositivos_router,
     organizaciones_router,
     planes_router,
@@ -48,6 +49,10 @@ def test_endpoints_escritura_exigen_rol_escritura():
         (organizaciones_router.router, "POST", "/api/v1/plantas"),
         (planes_router.router, "POST", "/api/v1/planes"),
         (alertas_router.router, "POST", "/api/v1/alertas/{alerta_id}/resolver"),
+        (disponibilidad_router.router, "POST", "/api/v1/disponibilidad/maquinas"),
+        (disponibilidad_router.router, "PATCH", "/api/v1/disponibilidad/maquinas/{maquina_id}"),
+        (disponibilidad_router.router, "POST", "/api/v1/disponibilidad/eventos/{evento_id}/corregir"),
+        (disponibilidad_router.router, "POST", "/api/v1/disponibilidad/paradas-programadas"),
     ]
     for router, metodo, path in escrituras:
         ruta = _ruta(router, metodo, path)
@@ -63,6 +68,8 @@ def test_endpoints_lectura_no_exigen_rol_escritura():
         (organizaciones_router.router, "GET", "/api/v1/plantas"),
         (planes_router.router, "GET", "/api/v1/planes"),
         (alertas_router.router, "GET", "/api/v1/alertas"),
+        (disponibilidad_router.router, "GET", "/api/v1/disponibilidad/maquinas"),
+        (disponibilidad_router.router, "GET", "/api/v1/disponibilidad/maquinas/{maquina_id}/eventos"),
     ]
     for router, metodo, path in lecturas:
         ruta = _ruta(router, metodo, path)
