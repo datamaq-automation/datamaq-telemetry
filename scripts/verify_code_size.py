@@ -34,17 +34,13 @@ DEFAULT_MAX_FUNC_LINES = 75
 # Al refactorizar y reducir una entidad, su techo debe ajustarse o removerse.
 BASELINE_CEILINGS: dict[str, int] = {
     # Archivos
-    "file:src/application/use_cases/ingestar_telemetria.py": 900,
     "file:src/domain/disponibilidad/services.py": 650,
     # Clases
     "class:src/domain/telemetria/servicios/analizador_calidad_metrologica.py::AnalizadorMetrologicoService": 460,
     "class:src/domain/telemetria/servicios/evaluador_alertas_calidad.py::EvaluadorAlertasCalidadService": 400,
-    "class:src/application/use_cases/ingestar_telemetria.py::IngestarTelemetriaUseCase": 820,
     "class:src/domain/disponibilidad/services.py::SegmentadorRegimenesService": 550,
     "class:src/infrastructure/sqlalchemy/repositories/telemetria_repository.py::MySQLTelemetriaRepository": 450,
     # Métodos y Funciones
-    "func:src/application/use_cases/ingestar_telemetria.py::ejecutar": 550,
-    "func:src/application/use_cases/ingestar_telemetria.py::_parse_fase": 150,
     "func:src/domain/telemetria/servicios/analizador_calidad_metrologica.py::_agregar_grupo_lecturas": 140,
     "func:src/domain/telemetria/servicios/analizador_calidad_metrologica.py::calcular_analitica_completa": 90,
     "func:src/domain/telemetria/servicios/evaluador_alertas_calidad.py::evaluar_alertas_distorsion_armonica": 120,
