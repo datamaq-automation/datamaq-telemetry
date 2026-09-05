@@ -1,0 +1,10 @@
+[Unit]
+Description=Datamaq Telemetry Hourly Load Analysis Timer
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+RandomizedDelaySec=180
+
+[Install]
+WantedBy=timers.target
