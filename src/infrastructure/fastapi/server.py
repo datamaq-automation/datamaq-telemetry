@@ -11,6 +11,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from src.adapters.gateways.mqtt_comando_rafaga import MqttComandoRafagaGateway
+from src.application.use_cases.caracterizar_carga import CaracterizarCargaUseCase
+from src.application.use_cases.ingesta.registro_campanas import registro_campanas_activas
 from src.infrastructure.fastapi.dependencies import (
     get_mqtt_listener,
     global_event_broadcaster,
@@ -26,6 +29,7 @@ from src.infrastructure.fastapi.routes.alertas_router import (
 from src.infrastructure.fastapi.routes.auth_router import (
     router as auth_router,
 )
+from src.infrastructure.fastapi.routes.cargas_router import router as cargas_router
 from src.infrastructure.fastapi.routes.disponibilidad_router import (
     router as disponibilidad_router,
 )
@@ -54,7 +58,11 @@ from src.infrastructure.sqlalchemy.database import (
     get_session_factory,
     verificar_estado_migraciones,
 )
-from src.infrastructure.sqlalchemy.mysql_repositories import MySQLDispositivosRepository
+from src.infrastructure.sqlalchemy.mysql_repositories import (
+    MySQLCampanasRepository,
+    MySQLCargasRepository,
+    MySQLDispositivosRepository,
+)
 
 logger = get_logger("server")
 
@@ -182,6 +190,56 @@ def _renovar_modo_tiempo_real_medidores(listener: Any) -> None:
         logger.warning("realtime_mode_auto_renovacion_fallida", error=str(e))
 
 
+INTERVALO_SOSTEN_CAMPANAS_S = 45.0
+"""Menor que los 120 s de duración de la ráfaga, con margen para un reintento perdido."""
+
+
+def _sostener_campanas() -> tuple[int, int]:
+    """Renueva la ráfaga de las campañas vivas y cierra las vencidas.
+
+    Corre con su propia sesión de base y en un hilo aparte porque `CaracterizarCargaUseCase`
+    es síncrono; el bucle que lo invoca vive en el event loop y no debe bloquearse.
+    """
+    session_factory = get_session_factory()
+    db = session_factory()
+    try:
+        use_case = CaracterizarCargaUseCase(
+            repo_campanas=MySQLCampanasRepository(db),
+            repo_cargas=MySQLCargasRepository(db),
+            repo_dispositivos=MySQLDispositivosRepository(db),
+            registro=registro_campanas_activas,
+            comando_rafaga=MqttComandoRafagaGateway(get_mqtt_listener()),
+        )
+        return use_case.sostener_campanas_activas()
+    finally:
+        db.close()
+
+
+async def _loop_campanas_activas() -> None:
+    """Mantiene vivas las campañas de caracterización.
+
+    Independiente de `_ws_heartbeat_loop`, que solo renueva la ráfaga mientras haya un
+    navegador conectado: una campaña puede correr de madrugada sin nadie mirando, y en
+    ese caso este bucle es lo único que impide que el medidor vuelva a 5 minutos en
+    medio de la medición.
+
+    También cierra las campañas vencidas, para que una olvidada no deje al medidor
+    publicando en ráfaga y escribiendo muestras indefinidamente.
+    """
+    while True:
+        try:
+            await asyncio.sleep(INTERVALO_SOSTEN_CAMPANAS_S)
+            # Se consulta la base aunque el registro en memoria esté vacío: tras un
+            # reinicio del servicio arranca vacío y las campañas siguen vivas en la tabla.
+            renovadas, cerradas = await asyncio.to_thread(_sostener_campanas)
+            if renovadas or cerradas:
+                logger.info("campanas_sostenidas", renovadas=renovadas, cerradas=cerradas)
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.warning("campanas_sosten_fallido", error=str(e))
+
+
 async def _ws_heartbeat_loop() -> None:
     """Mantiene activa la conexión a través de Cloudflare o Nginx ante períodos de inactividad
     y renueva el modo de tiempo real en medidores mientras haya clientes WebSocket conectados."""
@@ -233,6 +291,7 @@ async def lifespan(app: FastAPI):
 
     # Iniciar heartbeat para Cloudflare / proxies
     heartbeat_task = asyncio.create_task(_ws_heartbeat_loop())
+    campanas_task = asyncio.create_task(_loop_campanas_activas())
 
     logger.info("servidor_datamaq_listo", websockets_route="/ws/live", docs_route="/docs")
 
@@ -241,10 +300,12 @@ async def lifespan(app: FastAPI):
     # Clean shutdown
     logger.info("deteniendo_servidor_datamaq")
     heartbeat_task.cancel()
-    try:
-        await heartbeat_task
-    except asyncio.CancelledError:
-        pass
+    campanas_task.cancel()
+    for tarea in (heartbeat_task, campanas_task):
+        try:
+            await tarea
+        except asyncio.CancelledError:
+            pass
     mqtt_listener.stop()
     global_event_broadcaster.desuscribir(websocket_broadcast_callback)
     global_event_broadcaster.desuscribir(global_telemetria_buffer.agregar)
@@ -288,6 +349,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # Register Routers
     app.include_router(system_router)
     app.include_router(disponibilidad_router)
+    app.include_router(cargas_router)
     app.include_router(telemetria_router)
     app.include_router(dispositivos_router)
     app.include_router(organizaciones_router)

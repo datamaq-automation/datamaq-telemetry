@@ -6,9 +6,14 @@ from sqlalchemy.orm import Session
 
 from src.adapters.gateways.in_memory_event_broadcaster import InMemoryEventBroadcaster
 from src.adapters.gateways.in_memory_telemetria_buffer import InMemoryTelemetriaBuffer
+from src.adapters.gateways.mqtt_comando_rafaga import MqttComandoRafagaGateway
+from src.application.use_cases.analizar_consumo import AnalizarConsumoUseCase
+from src.application.use_cases.atribuir_consumo import AtribuirConsumoUseCase
 from src.application.use_cases.autenticar_usuario import AutenticarUsuarioUseCase
+from src.application.use_cases.caracterizar_carga import CaracterizarCargaUseCase
 from src.application.use_cases.consultar_telemetria import ConsultarTelemetriaUseCase
 from src.application.use_cases.gestionar_alertas import GestionarAlertasUseCase
+from src.application.use_cases.gestionar_cargas import GestionarCargasUseCase
 from src.application.use_cases.gestionar_disponibilidad import GestionarDisponibilidadUseCase
 from src.application.use_cases.gestionar_dispositivos import (
     GestionarDispositivosUseCase,
@@ -18,6 +23,7 @@ from src.application.use_cases.gestionar_planes import GestionarPlanesUseCase
 from src.application.use_cases.gestionar_planta_estructura import (
     GestionarPlantaEstructuraUseCase,
 )
+from src.application.use_cases.ingesta.registro_campanas import registro_campanas_activas
 from src.application.use_cases.purgar_telemetria import PurgarTelemetriaExpiradaUseCase
 from src.domain.auth.services import HashContrasenaService, RateLimiterService
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
@@ -26,12 +32,16 @@ from src.infrastructure.settings.config import Settings, get_settings
 from src.infrastructure.settings.logger import get_logger
 from src.infrastructure.sqlalchemy.database import get_db_session
 from src.infrastructure.sqlalchemy.mysql_repositories import (
+    MySQLCampanasRepository,
+    MySQLCargasRepository,
     MySQLDispositivosRepository,
     MySQLEventosDisponibilidadRepository,
+    MySQLIntervalosActividadRepository,
     MySQLMaquinasRepository,
     MySQLOrganizacionesRepository,
     MySQLParadasProgramadasRepository,
     MySQLPlanesRepository,
+    MySQLSeriePotenciaRepository,
     MySQLTelemetriaRepository,
     MySQLUsuariosRepository,
 )
@@ -133,6 +143,40 @@ def get_maquinas_use_case(
     repo_maquinas = MySQLMaquinasRepository(db)
     repo_telem = MySQLTelemetriaRepository(db)
     return GestionarMaquinasUseCase(repo_maquinas, repo_telem)
+
+
+def get_cargas_use_case(
+    db: Annotated[Session, Depends(get_db_session)],
+) -> GestionarCargasUseCase:
+    return GestionarCargasUseCase(MySQLCargasRepository(db))
+
+
+def get_caracterizacion_use_case(
+    db: Annotated[Session, Depends(get_db_session)],
+) -> CaracterizarCargaUseCase:
+    return CaracterizarCargaUseCase(
+        repo_campanas=MySQLCampanasRepository(db),
+        repo_cargas=MySQLCargasRepository(db),
+        repo_dispositivos=MySQLDispositivosRepository(db),
+        registro=registro_campanas_activas,
+        comando_rafaga=MqttComandoRafagaGateway(get_mqtt_listener()),
+    )
+
+
+def get_atribucion_use_case(
+    db: Annotated[Session, Depends(get_db_session)],
+) -> AtribuirConsumoUseCase:
+    return AtribuirConsumoUseCase(
+        repo_serie=MySQLSeriePotenciaRepository(db),
+        repo_cargas=MySQLCargasRepository(db),
+        repo_intervalos=MySQLIntervalosActividadRepository(db),
+    )
+
+
+def get_analisis_consumo_use_case(
+    db: Annotated[Session, Depends(get_db_session)],
+) -> AnalizarConsumoUseCase:
+    return AnalizarConsumoUseCase(MySQLSeriePotenciaRepository(db))
 
 
 def get_disponibilidad_use_case(

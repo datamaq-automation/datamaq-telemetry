@@ -6,6 +6,13 @@ from src.domain.auth.exceptions import (
     NombreUsuarioInvalidoError,
     UsuarioInactivoError,
 )
+from src.domain.cargas.exceptions import (
+    CampanaNoEncontradaError,
+    CargaNoEncontradaError,
+    DominioCargasException,
+    FirmaCargaInvalidaError,
+    IntervaloActividadNoEncontradoError,
+)
 from src.domain.disponibilidad.exceptions import (
     DominioDisponibilidadException,
     EventoDisponibilidadNoEncontradoError,
@@ -35,12 +42,17 @@ class ErrorPresenter:
                 PlantaNoEncontradaError,
                 MaquinaNoEncontradaError,
                 EventoDisponibilidadNoEncontradoError,
+                CargaNoEncontradaError,
+                CampanaNoEncontradaError,
+                IntervaloActividadNoEncontradoError,
             ),
         ):
             return 404, {"error": "NotFound", "mensaje": exc.mensaje}
-        elif isinstance(exc, (MacAddressInvalidaError, TensionInvalidaError, FactorPotenciaInvalidoError)):
+        elif isinstance(
+            exc, (MacAddressInvalidaError, TensionInvalidaError, FactorPotenciaInvalidoError, FirmaCargaInvalidaError)
+        ):
             return 400, {"error": "ValidationError", "mensaje": exc.mensaje}
-        elif isinstance(exc, (DominioTelemetriaException, DominioDisponibilidadException)):
+        elif isinstance(exc, (DominioTelemetriaException, DominioDisponibilidadException, DominioCargasException)):
             return 422, {"error": "DomainError", "mensaje": exc.mensaje}
         elif isinstance(exc, NombreUsuarioInvalidoError):
             return 422, {"error": "ValidationError", "mensaje": exc.mensaje}
