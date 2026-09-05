@@ -14,6 +14,9 @@ from src.application.mappers.telemetria_mapper import TelemetriaMapper
 from src.application.use_cases.gestionar_disponibilidad import (
     GestionarDisponibilidadUseCase,
 )
+from src.application.use_cases.ingesta.capturador_campana import (
+    CapturadorCampanaIngesta,
+)
 from src.application.use_cases.ingesta.procesador_alertas_ingesta import (
     ProcesadorAlertasIngesta,
 )
@@ -48,6 +51,7 @@ class IngestarTelemetriaUseCase:
         granularidad_segundos: int = 300,
         permitir_auto_registro: bool = True,
         disponibilidad_use_case: GestionarDisponibilidadUseCase | None = None,
+        capturador_campana: CapturadorCampanaIngesta | None = None,
     ):
         self.repo_dispositivos = repo_dispositivos
         self.repo_telemetria = repo_telemetria
@@ -56,6 +60,7 @@ class IngestarTelemetriaUseCase:
         self.granularidad_segundos = granularidad_segundos
         self.permitir_auto_registro = permitir_auto_registro
         self.disponibilidad_use_case = disponibilidad_use_case
+        self.capturador_campana = capturador_campana
 
     def _parse_timestamp(self, ts_val: Any) -> datetime:
         return TelemetriaPayloadParser.parse_timestamp(ts_val)
@@ -139,6 +144,12 @@ class IngestarTelemetriaUseCase:
         p_tot = lectura.potencia_activa_total.vatios if lectura.potencia_activa_total else None
         if self.disponibilidad_use_case is not None and p_tot is not None:
             self.disponibilidad_use_case.clasificar_lectura(dispositivo.id, float(p_tot), recorded_at)
+
+        # Sumidero paralelo: si hay una campaña abierta, esta lectura se guarda a caudal
+        # completo en `campaign_samples`. No altera el downsampling de más abajo, que
+        # sigue decidiendo por su cuenta qué va a la serie permanente.
+        if self.capturador_campana is not None:
+            self.capturador_campana.capturar(dispositivo.id, lectura)
 
         ProcesadorAlertasIngesta.procesar_alertas(
             dispositivo=dispositivo,
