@@ -129,6 +129,14 @@ El esquema se gestiona con **Alembic** (fuente de verdad: `src/infrastructure/sq
 | | `POST /api/v1/auth/guest` | Acceso rápido como invitado (stateless, cookie `HttpOnly`, solo lectura) |
 | | `POST /api/v1/auth/logout` | Cerrar sesión (borra la cookie) |
 | | `GET /api/v1/auth/me` | Obtener identidad y rol de la sesión actual |
+| **Desagregación de Cargas** | `GET`/`POST` `/api/v1/cargas` | Catálogo de cargas detrás de un medidor agregado |
+| | `PUT /api/v1/cargas/{id}/firma` | Fijar firma eléctrica a mano (calibración sin campaña) |
+| | `GET /api/v1/cargas/perfil?device_id=...&dias=14` | Línea base, ciclado y regímenes — funciona sin ninguna firma calibrada |
+| | `POST /api/v1/cargas/campanas/activas` \| `/pasivas` | Abrir campaña de caracterización (ráfaga acotada, no altera la cadencia permanente) |
+| | `PATCH /api/v1/cargas/campanas/{id}/finalizar` | Cerrar campaña y calcular la firma medida |
+| | `POST /api/v1/cargas/analisis?device_id=...` | Disparar el batch de detección y atribución (idempotente) |
+| | `GET /api/v1/cargas/atribucion?device_id=...` | kWh por carga del período, con el residual `NO_ATRIBUIDO` explícito |
+| | `PATCH /api/v1/cargas/intervalos/{id}/corregir` | Corrección humana; construye el dataset etiquetado |
 | **Sistema** | `POST /api/v1/system/purge` | Ejecutar purga de telemetría expirada (solo admin) |
 
 
@@ -141,6 +149,7 @@ El esquema se gestiona con **Alembic** (fuente de verdad: `src/infrastructure/sq
 3. **Heartbeat Throttling (60s):** El estado `ONLINE` y `last_seen_at` del medidor se actualiza en la base de datos a lo sumo 1 vez por minuto, evitando escrituras redundantes continuas.
 4. **Caché en Memoria:** La resolución de dirección MAC a identificador interno utiliza una caché en memoria de alta velocidad.
 5. **Purga Segura:** Vía API o CLI por lotes (`python scripts/purge_telemetry.py --days 7 --batch-size 1000`).
+6. **Campañas de Caracterización:** Durante una ventana declarada, las lecturas se guardan además a caudal completo (1-5 s) en `campaign_samples`, un sumidero paralelo que **no altera el downsampling ni la serie permanente**. Es la única forma de medir la firma de una carga cuyo encendido dura menos que el intervalo de muestreo. Ver [`docs/desagregacion-cargas-nilm.md`](file:///home/agustin/proyectos_software/datamaq-telemetry/docs/desagregacion-cargas-nilm.md).
 
 ---
 

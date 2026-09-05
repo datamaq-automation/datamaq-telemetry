@@ -8,9 +8,13 @@
 
 ```mermaid
 erDiagram
+    CHARACTERIZATION_CAMPAIGNS ||--o{ CAMPAIGN_SAMPLES : "FK_campaign_id"
+    DEVICES ||--o{ CHARACTERIZATION_CAMPAIGNS : "FK_device_id"
     DEVICES ||--o{ DEVICE_ALERTS : "FK_device_id"
     DEVICES ||--o{ DEVICE_STATUS_LOGS : "FK_device_id"
     DEVICES ||--o{ FACILITY_DEVICE_LAYOUTS : "FK_device_id"
+    DEVICES ||--o{ LOADS : "FK_device_id"
+    DEVICES ||--o{ LOAD_ACTIVITY_INTERVALS : "FK_device_id"
     DEVICES ||--o{ MACHINES : "FK_device_id"
     DEVICES ||--o{ TELEMETRY_ENERGY : "FK_device_id"
     DEVICES ||--o{ TELEMETRY_INSTANTANEOUS : "FK_device_id"
@@ -20,10 +24,42 @@ erDiagram
     FACILITIES ||--o{ FACILITY_ZONES : "FK_facility_id"
     FACILITIES ||--o{ UNIFILAR_NODES : "FK_facility_id"
     FACILITY_ZONES ||--o{ FACILITY_DEVICE_LAYOUTS : "FK_zone_id"
+    LOADS ||--o{ CHARACTERIZATION_CAMPAIGNS : "FK_load_id"
+    LOADS ||--o{ LOAD_ACTIVITY_INTERVALS : "FK_load_id"
     MACHINES ||--o{ MACHINE_AVAILABILITY_EVENTS : "FK_machine_id"
     MACHINES ||--o{ SCHEDULED_STOPS : "FK_machine_id"
     ORGANIZATIONS ||--o{ FACILITIES : "FK_organization_id"
     PLANS ||--o{ ORGANIZATIONS : "FK_plan_id"
+
+    CAMPAIGN_SAMPLES {
+        bigint id PK
+        string campaign_id FK
+        datetime recorded_at
+        decimal active_power_w
+        decimal reactive_power_var
+        decimal apparent_power_va
+        decimal power_factor
+        decimal voltage_v
+        decimal current_a
+    }
+
+    CHARACTERIZATION_CAMPAIGNS {
+        string id PK
+        string device_id FK
+        string load_id FK
+        string campaign_type
+        string state
+        datetime start_at
+        datetime planned_end_at
+        datetime end_at
+        decimal baseline_w
+        decimal baseline_var
+        int sample_count
+        string discard_reason
+        string notes
+        string created_by_user_id
+        datetime created_at
+    }
 
     DEVICE_ALERTS {
         bigint id PK
@@ -104,6 +140,48 @@ erDiagram
         decimal y_pct
         decimal width_pct
         decimal height_pct
+        datetime created_at
+        datetime updated_at
+    }
+
+    LOAD_ACTIVITY_INTERVALS {
+        bigint id PK
+        string device_id FK
+        string load_id FK
+        datetime start_at
+        datetime end_at
+        decimal avg_power_w
+        decimal delta_reactive_var
+        decimal energy_kwh
+        decimal confidence
+        string origin
+        string corrected_by_user_id
+        datetime corrected_at
+        string notes
+        datetime created_at
+    }
+
+    LOADS {
+        string id PK
+        string device_id FK
+        string name
+        string category
+        string electrical_nature
+        string operation_pattern
+        decimal nameplate_power_w
+        decimal signature_power_w
+        decimal signature_dispersion_w
+        decimal signature_reactive_var
+        decimal signature_power_factor
+        decimal signature_on_seconds
+        decimal signature_on_mad_seconds
+        decimal signature_off_seconds
+        decimal signature_startup_peak_w
+        string signature_source
+        int signature_samples
+        datetime signature_measured_at
+        boolean is_active
+        string notes
         datetime created_at
         datetime updated_at
     }
@@ -252,6 +330,43 @@ erDiagram
 
 ## 2. Detalle de Tablas e Índices
 
+### Tabla `campaign_samples`
+
+| Columna | Tipo SQL | Clave / Restricción | Nullable |
+| :--- | :--- | :--- | :--- |
+| `id` | `BIGINT` | **PRIMARY KEY** | No |
+| `campaign_id` | `VARCHAR(36)` | FK -> `characterization_campaigns.id` | No |
+| `recorded_at` | `DATETIME` | - | No |
+| `active_power_w` | `NUMERIC(12, 2)` | - | Sí |
+| `reactive_power_var` | `NUMERIC(12, 2)` | - | Sí |
+| `apparent_power_va` | `NUMERIC(12, 2)` | - | Sí |
+| `power_factor` | `NUMERIC(4, 3)` | - | Sí |
+| `voltage_v` | `NUMERIC(6, 2)` | - | Sí |
+| `current_a` | `NUMERIC(8, 2)` | - | Sí |
+
+### Tabla `characterization_campaigns`
+
+| Columna | Tipo SQL | Clave / Restricción | Nullable |
+| :--- | :--- | :--- | :--- |
+| `id` | `VARCHAR(36)` | **PRIMARY KEY** | No |
+| `device_id` | `VARCHAR(36)` | FK -> `devices.id` | No |
+| `load_id` | `VARCHAR(36)` | FK -> `loads.id` | Sí |
+| `campaign_type` | `VARCHAR(20)` | - | No |
+| `state` | `VARCHAR(20)` | - | No |
+| `start_at` | `DATETIME` | - | No |
+| `planned_end_at` | `DATETIME` | - | No |
+| `end_at` | `DATETIME` | - | Sí |
+| `baseline_w` | `NUMERIC(10, 2)` | - | Sí |
+| `baseline_var` | `NUMERIC(10, 2)` | - | Sí |
+| `sample_count` | `INTEGER` | - | No |
+| `discard_reason` | `VARCHAR(30)` | - | Sí |
+| `notes` | `TEXT` | - | Sí |
+| `created_by_user_id` | `VARCHAR(36)` | - | Sí |
+| `created_at` | `DATETIME` | - | No |
+
+**Índices:**
+- `idx_campaigns_device_state`: (`device_id`, `state`)
+
 ### Tabla `device_alerts`
 
 | Columna | Tipo SQL | Clave / Restricción | Nullable |
@@ -365,6 +480,59 @@ erDiagram
 
 **Índices:**
 - `idx_zone_facility`: (`facility_id`)
+
+### Tabla `load_activity_intervals`
+
+| Columna | Tipo SQL | Clave / Restricción | Nullable |
+| :--- | :--- | :--- | :--- |
+| `id` | `BIGINT` | **PRIMARY KEY** | No |
+| `device_id` | `VARCHAR(36)` | FK -> `devices.id` | No |
+| `load_id` | `VARCHAR(36)` | FK -> `loads.id` | Sí |
+| `start_at` | `DATETIME` | - | No |
+| `end_at` | `DATETIME` | - | No |
+| `avg_power_w` | `NUMERIC(12, 2)` | - | Sí |
+| `delta_reactive_var` | `NUMERIC(12, 2)` | - | Sí |
+| `energy_kwh` | `NUMERIC(12, 4)` | - | Sí |
+| `confidence` | `NUMERIC(4, 3)` | - | Sí |
+| `origin` | `VARCHAR(20)` | - | No |
+| `corrected_by_user_id` | `VARCHAR(36)` | - | Sí |
+| `corrected_at` | `DATETIME` | - | Sí |
+| `notes` | `TEXT` | - | Sí |
+| `created_at` | `DATETIME` | - | No |
+
+**Índices:**
+- `idx_load_intervals_device_time`: (`device_id`, `start_at`)
+- `idx_load_intervals_load_time`: (`load_id`, `start_at`)
+
+### Tabla `loads`
+
+| Columna | Tipo SQL | Clave / Restricción | Nullable |
+| :--- | :--- | :--- | :--- |
+| `id` | `VARCHAR(36)` | **PRIMARY KEY** | No |
+| `device_id` | `VARCHAR(36)` | FK -> `devices.id` | No |
+| `name` | `VARCHAR(120)` | - | No |
+| `category` | `VARCHAR(30)` | - | No |
+| `electrical_nature` | `VARCHAR(20)` | - | No |
+| `operation_pattern` | `VARCHAR(30)` | - | No |
+| `nameplate_power_w` | `NUMERIC(10, 2)` | - | Sí |
+| `signature_power_w` | `NUMERIC(10, 2)` | - | Sí |
+| `signature_dispersion_w` | `NUMERIC(10, 2)` | - | Sí |
+| `signature_reactive_var` | `NUMERIC(10, 2)` | - | Sí |
+| `signature_power_factor` | `NUMERIC(4, 3)` | - | Sí |
+| `signature_on_seconds` | `NUMERIC(10, 1)` | - | Sí |
+| `signature_on_mad_seconds` | `NUMERIC(10, 1)` | - | Sí |
+| `signature_off_seconds` | `NUMERIC(10, 1)` | - | Sí |
+| `signature_startup_peak_w` | `NUMERIC(10, 2)` | - | Sí |
+| `signature_source` | `VARCHAR(20)` | - | Sí |
+| `signature_samples` | `INTEGER` | - | Sí |
+| `signature_measured_at` | `DATETIME` | - | Sí |
+| `is_active` | `BOOLEAN` | - | No |
+| `notes` | `TEXT` | - | Sí |
+| `created_at` | `DATETIME` | - | No |
+| `updated_at` | `DATETIME` | - | No |
+
+**Índices:**
+- `idx_loads_device`: (`device_id`)
 
 ### Tabla `machine_availability_events`
 

@@ -1,7 +1,7 @@
 # Índice Maestro de Documentación Técnica — Datamaq Telemetry
 
 > **Repositorio:** `datamaq-telemetry` (Backend FastAPI, Ingestión MQTT y Motor de Analítica)  
-> **Última Actualización:** 2026-09-03  
+> **Última Actualización:** 2026-09-04  
 > **Estado:** Documentación Centralizada y Sincronizada
 
 Bienvenido al centro de documentación técnica del backend de telemetría de energía DataMaq. Los documentos canónicos vivos están organizados temáticamente según el área técnica:
@@ -52,6 +52,9 @@ Bienvenido al centro de documentación técnica del backend de telemetría de en
 
 * 📄 [`docs/disponibilidad-maquina-diseno-conceptual.md`](file:///home/agustin/proyectos_software/datamaq-telemetry/docs/disponibilidad-maquina-diseno-conceptual.md)
   *Disponibilidad de Máquina a partir del Comportamiento Energético:* Documento de diseño conceptual sobre cómo inferir marcha / parada programada / parada no programada desde las variables eléctricas. Cubre certezas y dudas abiertas, segmentación modal de regímenes de potencia (binning logarítmico, persistencia topológica 1-D, barrido de ancho de banda, dinámica temporal |ΔP| y estacionariedad), calibración de umbrales marcha/parada, desagregación de cargas para medidores agregados (NILM: clustering por nivel vs. detección de eventos ΔP), comparación Reglas vs. ML supervisado, y el roadmap secuencial de implementación.
+
+* 📄 [`docs/desagregacion-cargas-nilm.md`](file:///home/agustin/proyectos_software/datamaq-telemetry/docs/desagregacion-cargas-nilm.md)
+  *Desagregación de Cargas (NILM) sobre un Medidor Agregado:* Implementación del paso 4 del roadmap anterior. Cubre qué es y qué no es inferible a 300 s de cadencia (tabla por aparato), el catálogo genérico de `Carga`, las campañas de caracterización activa y pasiva que miden firmas reales poniendo el medidor en ráfaga sin tocar la cadencia permanente, la detección de escalones (ΔP, ΔQ) y su emparejado en episodios, la desambiguación por duración de cargas resistivas indistinguibles en potencia, el motor batch idempotente de atribución de kWh contra el contador acumulado, el residual `NO_ATRIBUIDO` como salida de primera clase, y el bucle de corrección humana que construye el dataset etiquetado.
 
 ---
 
