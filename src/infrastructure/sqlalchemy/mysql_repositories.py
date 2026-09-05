@@ -5,6 +5,13 @@ Las implementaciones concretas han sido modularizadas en el paquete
 Single Responsibility (SRP) y Screaming Architecture.
 """
 
+from src.infrastructure.sqlalchemy.repositories.campanas_repository import (
+    MySQLCampanasRepository,
+)
+from src.infrastructure.sqlalchemy.repositories.cargas_repository import (
+    MySQLCargasRepository,
+    MySQLSeriePotenciaRepository,
+)
 from src.infrastructure.sqlalchemy.repositories.disponibilidad_repository import (
     MySQLEventosDisponibilidadRepository,
     MySQLMaquinasRepository,
@@ -12,6 +19,9 @@ from src.infrastructure.sqlalchemy.repositories.disponibilidad_repository import
 )
 from src.infrastructure.sqlalchemy.repositories.dispositivos_repository import (
     MySQLDispositivosRepository,
+)
+from src.infrastructure.sqlalchemy.repositories.intervalos_repository import (
+    MySQLIntervalosActividadRepository,
 )
 from src.infrastructure.sqlalchemy.repositories.organizaciones_repository import (
     MySQLOrganizacionesRepository,
@@ -27,12 +37,16 @@ from src.infrastructure.sqlalchemy.repositories.usuarios_repository import (
 )
 
 __all__ = [
+    "MySQLCampanasRepository",
+    "MySQLCargasRepository",
     "MySQLDispositivosRepository",
     "MySQLEventosDisponibilidadRepository",
+    "MySQLIntervalosActividadRepository",
     "MySQLMaquinasRepository",
     "MySQLOrganizacionesRepository",
     "MySQLParadasProgramadasRepository",
     "MySQLPlanesRepository",
+    "MySQLSeriePotenciaRepository",
     "MySQLTelemetriaRepository",
     "MySQLUsuariosRepository",
 ]

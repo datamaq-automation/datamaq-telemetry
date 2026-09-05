@@ -7,6 +7,9 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
+# `models_cargas` se importa aunque no se use por nombre: registra las tablas del
+# contexto de cargas en `Base.metadata`. Mismo motivo que en `alembic/env.py`.
+from src.infrastructure.sqlalchemy import models_cargas  # noqa: E402,F401
 from src.infrastructure.sqlalchemy.models import Base  # noqa: E402
 
 
