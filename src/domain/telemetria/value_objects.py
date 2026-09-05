@@ -173,7 +173,15 @@ class LecturaPotenciaTemporal:
     Deliberadamente liviano: el análisis de regímenes recorre potencialmente millones de
     filas, y construir una `LecturaInstantanea` completa (fases, THD, tensiones) por cada
     una sería caro e innecesario.
+
+    `potencia_reactiva_var` y `factor_potencia` son opcionales y solo los completa quien
+    los necesita: la desagregación de cargas los usa para separar una carga resistiva
+    (FP≈1, Q≈0) de una con motor (FP 0.5-0.8, Q alta), que es el eje de firmas de Hart.
+    La segmentación de regímenes los ignora, y por eso llegan con default en vez de
+    obligar a todos los productores de la serie a leer dos columnas más.
     """
 
     momento: datetime
     potencia_w: float
+    potencia_reactiva_var: float | None = None
+    factor_potencia: float | None = None
