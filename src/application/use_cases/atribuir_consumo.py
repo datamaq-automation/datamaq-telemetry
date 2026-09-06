@@ -20,9 +20,14 @@ from src.domain.cargas.ports import (
     RepositorioSeriePotenciaPort,
 )
 from src.domain.cargas.servicios.atribuidor_consumo import AtribuidorConsumoService
+from src.domain.cargas.servicios.clasificador_reglas import ClasificadorCargasReglasService
 from src.domain.cargas.servicios.detector_escalones import DetectorEscalonesService
 from src.domain.cargas.servicios.emparejador_firmas import EmparejadorFirmasService
-from src.domain.cargas.value_objects import AtribucionConsumo, EpisodioCarga
+from src.domain.cargas.servicios.presets_cargas import CatalogoPresetsCargas
+from src.domain.cargas.value_objects import (
+    AtribucionConsumo,
+    EpisodioCarga,
+)
 
 ZONA_POR_DEFECTO = "America/Argentina/Buenos_Aires"
 
@@ -63,20 +68,53 @@ class AtribuirConsumoUseCase:
         return (desde or fin - timedelta(days=dias)), fin
 
     def _a_intervalo(
-        self, dispositivo_id: str, episodio: EpisodioCarga, cargas: list[Carga], zona: ZoneInfo
+        self,
+        dispositivo_id: str,
+        episodio: EpisodioCarga,
+        cargas: list[Carga],
+        zona: ZoneInfo,
+        todas_las_cargas: list[Carga] | None = None,
     ) -> IntervaloActividadCarga:
         decision = EmparejadorFirmasService.decidir(episodio, cargas, zona)
+        carga_id = decision.carga_id
+        confianza = round(decision.confianza, 3) if decision.confianza is not None else None
+        notas = decision.motivo
+
+        if carga_id is None:
+            diag = ClasificadorCargasReglasService.clasificar_episodio(episodio)
+            if diag.aparato_sugerido != "Carga no clasificada" and diag.confianza >= 0.70:
+                confianza = round(diag.confianza, 3)
+                coincidente = None
+                if todas_las_cargas:
+                    sugerido_norm = diag.aparato_sugerido.strip().lower()
+                    for c in todas_las_cargas:
+                        nom = c.nombre.strip().lower()
+                        if nom == sugerido_norm or sugerido_norm in nom or nom in sugerido_norm:
+                            coincidente = c
+                            break
+                if coincidente is not None:
+                    carga_id = coincidente.id
+                    notas = (
+                        f"Atribuido por regla a {coincidente.nombre} ({diag.aparato_sugerido}): "
+                        f"{', '.join(diag.reglas_aplicadas)}"
+                    )
+                else:
+                    notas = (
+                        f"Sugerido por regla: {diag.aparato_sugerido} "
+                        f"({diag.confianza:.0%}) - {', '.join(diag.reglas_aplicadas)}"
+                    )
+
         return IntervaloActividadCarga(
             id=None,
             dispositivo_id=dispositivo_id,
-            carga_id=decision.carga_id,
+            carga_id=carga_id,
             inicio_at=episodio.inicio,
             fin_at=episodio.fin,
             potencia_media_w=episodio.potencia_media_w,
             delta_reactiva_var=episodio.delta_reactiva_var,
             energia_kwh=episodio.energia_kwh,
-            confianza=round(decision.confianza, 3),
-            notas=decision.motivo,
+            confianza=confianza,
+            notas=notas,
         )
 
     def analizar(
@@ -97,7 +135,9 @@ class AtribuirConsumoUseCase:
 
         umbral = DetectorEscalonesService.umbral_escalon(lecturas) if lecturas else None
         episodios = DetectorEscalonesService.detectar_episodios(lecturas, umbral)
-        intervalos = [self._a_intervalo(dispositivo_id, e, con_firma, zona_info) for e in episodios]
+        intervalos = [
+            self._a_intervalo(dispositivo_id, e, con_firma, zona_info, todas_las_cargas=cargas) for e in episodios
+        ]
         escritos = self.repo_intervalos.reemplazar_ventana(dispositivo_id, inicio, fin, intervalos)
 
         return AnalisisConsumoResponseDTO(
@@ -172,3 +212,18 @@ class AtribuirConsumoUseCase:
 
         intervalo.corregir(dto.carga_id, usuario_id=usuario_id, notas=dto.notas)
         return IntervaloActividadMapper.to_dto(self.repo_intervalos.guardar(intervalo))
+
+    def inicializar_presets_catalogo(self, dispositivo_id: str) -> list[Carga]:
+        """Inicializa en el repositorio las cargas con firmas estándar de catálogo que no existan."""
+        existentes = {c.nombre.strip().lower(): c for c in self.repo_cargas.listar_por_dispositivo(dispositivo_id)}
+        presets = CatalogoPresetsCargas.obtener_todas(dispositivo_id)
+        resultado: list[Carga] = []
+        for preset in presets:
+            clave = preset.nombre.strip().lower()
+            if clave in existentes:
+                resultado.append(existentes[clave])
+            else:
+                self.repo_cargas.guardar(preset)
+                resultado.append(preset)
+                existentes[clave] = preset
+        return resultado
