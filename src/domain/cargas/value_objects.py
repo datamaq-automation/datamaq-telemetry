@@ -292,6 +292,8 @@ class EpisodioCarga:
     duracion_s: float
     potencia_media_w: float
     muestras: int
+    dispersion_w: float | None = None
+    factor_potencia: float | None = None
 
     @property
     def energia_kwh(self) -> float:
@@ -303,6 +305,19 @@ class EpisodioCarga:
         if self.delta_reactiva_var is None or self.delta_w == 0:
             return None
         return abs(self.delta_reactiva_var / self.delta_w)
+
+
+@dataclass(frozen=True)
+class DiagnosticoReglasCarga:
+    """Diagnóstico emitido por el clasificador determinista de reglas físicas."""
+
+    aparato_sugerido: str
+    categoria: CategoriaCarga
+    naturaleza_electrica: NaturalezaElectrica
+    confianza: float
+    reglas_aplicadas: tuple[str, ...]
+    es_ambiguo: bool = False
+    alternativas: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
