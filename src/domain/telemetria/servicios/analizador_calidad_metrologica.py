@@ -1,20 +1,15 @@
 import cmath
 import math
-from datetime import datetime, timezone
 
 from src.domain.telemetria.analizador_reactiva import DimensionadorCompensacionService
 from src.domain.telemetria.entities import LecturaInstantanea, MedicionFase
-from src.domain.telemetria.servicios.calculos_potencia import CalculadoraPotenciaService
+from src.domain.telemetria.servicios.agregador_lecturas import AgregadorLecturasService
 from src.domain.telemetria.value_objects import (
     AnaliticaCalidadEnergia,
     Corriente,
     EstadoFactorPotencia,
     EstadoTension,
-    FactorPotencia,
     PotenciaActiva,
-    PotenciaAparente,
-    PotenciaReactiva,
-    Tension,
 )
 
 
@@ -166,172 +161,14 @@ class AnalizadorMetrologicoService:
         vn_rms = round(abs(v_n), 2)
         return vn_rms
 
-    @classmethod
-    def _agregar_grupo_lecturas(
-        cls,
-        items: list[LecturaInstantanea],
-        bucket_dt: datetime,
-        es_monofasico: bool = False,
-    ) -> LecturaInstantanea:
-        dispositivo_id = items[0].dispositivo_id
-
-        def _avg(vals: list[float | None]) -> float | None:
-            non_none = [v for v in vals if v is not None]
-            if not non_none:
-                return None
-            return round(sum(non_none) / len(non_none), 2)
-
-        def _fase_agregada(fases: list[MedicionFase]) -> MedicionFase:
-            v = _avg([f.tension.voltios for f in fases if f.tension])
-            i = _avg([f.corriente.amperios for f in fases if f.corriente])
-            p = _avg([f.potencia_activa.vatios for f in fases if f.potencia_activa])
-            q = _avg([f.potencia_reactiva.var for f in fases if f.potencia_reactiva])
-            s = CalculadoraPotenciaService.calcular_potencia_aparente(v, i)
-            if s is None:
-                s = _avg([f.potencia_aparente.va for f in fases if f.potencia_aparente])
-            fp = CalculadoraPotenciaService.calcular_factor_potencia(p, s)
-            if fp is None:
-                fp = _avg([f.factor_potencia.valor for f in fases if f.factor_potencia])
-            thd_v = _avg([f.thd_v_porcentaje for f in fases if f.thd_v_porcentaje is not None])
-            thd_i = _avg([f.thd_i_porcentaje for f in fases if f.thd_i_porcentaje is not None])
-            return MedicionFase(
-                tension=Tension(voltios=v) if v is not None else None,
-                corriente=Corriente(amperios=i) if i is not None else None,
-                potencia_activa=PotenciaActiva(vatios=p) if p is not None else None,
-                potencia_reactiva=PotenciaReactiva(var=q) if q is not None else None,
-                potencia_aparente=PotenciaAparente(va=s) if s is not None else None,
-                factor_potencia=FactorPotencia(valor=fp) if fp is not None else None,
-                thd_v_porcentaje=thd_v,
-                thd_i_porcentaje=thd_i,
-            )
-
-        fase_r = _fase_agregada([it.fase_r for it in items])
-        fase_s = _fase_agregada([it.fase_s for it in items])
-        fase_t = _fase_agregada([it.fase_t for it in items])
-
-        p_tot = _avg([it.potencia_activa_total.vatios for it in items if it.potencia_activa_total])
-        if p_tot is None:
-            p_sub = [f.potencia_activa.vatios for f in (fase_r, fase_s, fase_t) if f.potencia_activa]
-            if p_sub:
-                p_tot = round(sum(p_sub), 2)
-
-        q_tot = _avg([it.potencia_reactiva_total.var for it in items if it.potencia_reactiva_total])
-        if q_tot is None:
-            q_sub = [f.potencia_reactiva.var for f in (fase_r, fase_s, fase_t) if f.potencia_reactiva]
-            if q_sub:
-                q_tot = round(sum(q_sub), 2)
-
-        s_tot = CalculadoraPotenciaService.calcular_potencia_aparente_total(
-            *(f.potencia_aparente.va if f.potencia_aparente else None for f in (fase_r, fase_s, fase_t))
-        )
-        if s_tot is None:
-            s_tot = _avg([it.potencia_aparente_total.va for it in items if it.potencia_aparente_total])
-
-        fp_tot = CalculadoraPotenciaService.calcular_factor_potencia(p_tot, s_tot)
-        if fp_tot is None:
-            fp_tot = _avg([it.factor_potencia_total.valor for it in items if it.factor_potencia_total])
-
-        vr = fase_r.tension.voltios if fase_r.tension else None
-        vs = fase_s.tension.voltios if fase_s.tension else None
-        vt = fase_t.tension.voltios if fase_t.tension else None
-        desbalance_v = cls.calcular_desbalance_tension(vr, vs, vt)
-
-        tensiones_fase = [v for v in (vr, vs, vt) if v is not None]
-        voltage_linea_V = None
-        if tensiones_fase:
-            promedio_fase = sum(tensiones_fase) / len(tensiones_fase)
-            voltage_linea_V = round(promedio_fase * 1.7320508075688772, 2)
-
-        ir_val = fase_r.corriente.amperios if fase_r.corriente else None
-        is_val = fase_s.corriente.amperios if fase_s.corriente else None
-        it_val = fase_t.corriente.amperios if fase_t.corriente else None
-        pr_val = fase_r.potencia_activa.vatios if fase_r.potencia_activa else None
-        ps_val = fase_s.potencia_activa.vatios if fase_s.potencia_activa else None
-        pt_val = fase_t.potencia_activa.vatios if fase_t.potencia_activa else None
-        qr_val = fase_r.potencia_reactiva.var if fase_r.potencia_reactiva else None
-        qs_val = fase_s.potencia_reactiva.var if fase_s.potencia_reactiva else None
-        qt_val = fase_t.potencia_reactiva.var if fase_t.potencia_reactiva else None
-
-        i_neutro = cls.calcular_corriente_neutro(ir_val, is_val, it_val, pr_val, ps_val, pt_val, qr_val, qs_val, qt_val)
-        v_neutro = cls.calcular_tension_neutro(
-            vr, vs, vt, ir_val, is_val, it_val, pr_val, ps_val, pt_val, qr_val, qs_val, qt_val
-        )
-
-        if es_monofasico:
-            desbalance_v = None
-            voltage_linea_V = None
-            i_neutro = None
-            v_neutro = None
-
-        thd_v_prom = _avg([it.thd_v_promedio_porcentaje for it in items if it.thd_v_promedio_porcentaje is not None])
-        if thd_v_prom is None:
-            thd_v_vals = [
-                (f.thd_v_porcentaje if f.thd_v_porcentaje is not None else f.thd_v_pct)
-                for f in (fase_r, fase_s, fase_t)
-                if (f.thd_v_porcentaje is not None or f.thd_v_pct is not None)
-            ]
-            if thd_v_vals:
-                thd_v_prom = _avg(thd_v_vals)
-
-        thd_i_tot = _avg([it.thd_i_total_porcentaje for it in items if it.thd_i_total_porcentaje is not None])
-        if thd_i_tot is None:
-            thd_i_vals = [
-                (f.thd_i_porcentaje if f.thd_i_porcentaje is not None else f.thd_i_pct)
-                for f in (fase_r, fase_s, fase_t)
-                if (f.thd_i_porcentaje is not None or f.thd_i_pct is not None)
-            ]
-            if thd_i_vals:
-                thd_i_tot = _avg(thd_i_vals)
-
-        return LecturaInstantanea(
-            id=None,
-            dispositivo_id=dispositivo_id,
-            registrado_en=bucket_dt,
-            fase_r=fase_r,
-            fase_s=fase_s,
-            fase_t=fase_t,
-            potencia_activa_total=PotenciaActiva(vatios=p_tot) if p_tot is not None else None,
-            potencia_reactiva_total=PotenciaReactiva(var=q_tot) if q_tot is not None else None,
-            potencia_aparente_total=PotenciaAparente(va=s_tot) if s_tot is not None else None,
-            factor_potencia_total=FactorPotencia(valor=fp_tot) if fp_tot is not None else None,
-            desbalance_tension_porcentaje=desbalance_v,
-            corriente_neutro_estimada=i_neutro,
-            voltage_linea_V=voltage_linea_V,
-            tension_neutro_estimada=v_neutro,
-            thd_v_promedio_porcentaje=thd_v_prom,
-            thd_i_total_porcentaje=thd_i_tot,
-        )
-
-    @classmethod
-    def agregar_lecturas_en_intervalo(
-        cls,
-        lecturas: list[LecturaInstantanea],
-        intervalo_segundos: int,
-        es_monofasico: bool = False,
-    ) -> list[LecturaInstantanea]:
-        """Agrupa y remuestrea una lista de LecturaInstantanea en buckets de tiempo fijos."""
-        if intervalo_segundos <= 0 or not lecturas:
-            return lecturas
-
-        buckets: dict[int, list[LecturaInstantanea]] = {}
-        for item in lecturas:
-            reg = item.registrado_en
-            if reg.tzinfo is None:
-                reg = reg.replace(tzinfo=timezone.utc)
-            ts = reg.timestamp()
-            bucket_ts = int(ts // intervalo_segundos) * intervalo_segundos
-            if bucket_ts not in buckets:
-                buckets[bucket_ts] = []
-            buckets[bucket_ts].append(item)
-
-        resultado = []
-        for bucket_ts in sorted(buckets.keys(), reverse=True):
-            bucket_items = buckets[bucket_ts]
-            bucket_dt = datetime.fromtimestamp(bucket_ts, tz=timezone.utc)
-            agregada = cls._agregar_grupo_lecturas(bucket_items, bucket_dt, es_monofasico=es_monofasico)
-            resultado.append(agregada)
-
-        return resultado
+    # Remuestreo y agregación temporal de lecturas
+    _promedio_valores = AgregadorLecturasService._promedio_valores
+    _calcular_fase_agregada = AgregadorLecturasService._calcular_fase_agregada
+    _calcular_totales_potencia = AgregadorLecturasService._calcular_totales_potencia
+    _calcular_red_electrica = AgregadorLecturasService._calcular_red_electrica
+    _calcular_thd_agregado = AgregadorLecturasService._calcular_thd_agregado
+    _agregar_grupo_lecturas = AgregadorLecturasService._agregar_grupo_lecturas
+    agregar_lecturas_en_intervalo = AgregadorLecturasService.agregar_lecturas_en_intervalo
 
     @staticmethod
     def calcular_desbalance_corriente(

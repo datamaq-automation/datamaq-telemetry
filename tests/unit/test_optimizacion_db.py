@@ -586,7 +586,7 @@ def test_consultar_telemetria_modo_pro_y_free_bifurcado():
     repo_disp = MockDispositivosRepo()
     repo_org = MockOrganizacionesRepo()
 
-    ahora = datetime(2026, 8, 23, 12, 0, 0, tzinfo=timezone.utc)
+    ahora = datetime.now(timezone.utc)
 
     # 1. Caso PRO: Organización con PRO activo vence en 40 días
     org_pro = Organizacion(
