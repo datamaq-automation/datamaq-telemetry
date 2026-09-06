@@ -51,9 +51,14 @@ class AutenticarUsuarioUseCase:
         if self.rate_limiter is not None:
             self.rate_limiter.resetear(clave)
 
+        if usuario.totp_enabled:
+            expira_mfa = PoliticaExpiracionService.calcular_expiracion(ahora_utc(), 5)
+            mfa_token = self.token_service.generar_mfa(usuario.id, usuario.usuario, expira_mfa)
+            return LoginResponseDTO(token=None, expira_en=expira_mfa, require_2fa=True, mfa_token=mfa_token)
+
         expira_en = PoliticaExpiracionService.calcular_expiracion(ahora_utc(), self.minutos_validez)
         token = self.token_service.generar(usuario.id, usuario.usuario, expira_en, rol=usuario.rol)
-        return LoginResponseDTO(token=token, expira_en=expira_en)
+        return LoginResponseDTO(token=token, expira_en=expira_en, require_2fa=False)
 
     def guest(self, clave_limite: str) -> LoginResponseDTO:
         if self.rate_limiter is not None:

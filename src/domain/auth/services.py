@@ -114,3 +114,34 @@ class RateLimiterService:
         mas_antiguo = min(intentos)
         edad = (ahora - mas_antiguo).total_seconds()
         return max(1, math.ceil(self.ventana_segundos - edad))
+
+
+class CodigosRespaldoService:
+    CARACTERES_VALIDOS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+    @classmethod
+    def generar_codigo(cls) -> str:
+        parte1 = "".join(secrets.choice(cls.CARACTERES_VALIDOS) for _ in range(4))
+        parte2 = "".join(secrets.choice(cls.CARACTERES_VALIDOS) for _ in range(4))
+        return f"{parte1}-{parte2}"
+
+    @classmethod
+    def generar_codigos(cls, cantidad: int = 8) -> list[str]:
+        return [cls.generar_codigo() for _ in range(cantidad)]
+
+    @classmethod
+    def normalizar(cls, codigo: str) -> str:
+        return codigo.strip().upper().replace(" ", "")
+
+    @classmethod
+    def hashear(cls, codigo: str) -> str:
+        return HashContrasenaService.generar_hash(cls.normalizar(codigo))
+
+    @classmethod
+    def verificar_y_consumir(cls, codigo: str, hashes: list[str]) -> tuple[bool, list[str]]:
+        codigo_norm = cls.normalizar(codigo)
+        for i, h in enumerate(hashes):
+            if HashContrasenaService.verificar(codigo_norm, h):
+                restantes = hashes[:i] + hashes[i + 1 :]
+                return True, restantes
+        return False, hashes

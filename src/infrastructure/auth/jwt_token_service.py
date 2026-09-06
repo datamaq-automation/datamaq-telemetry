@@ -75,12 +75,41 @@ class JwtTokenService(GeneradorTokenPort):
 
         return payload
 
+    def generar_mfa(self, usuario_id: str, usuario: str, expira_en: datetime) -> str:
+        encabezado = _b64url(json.dumps({"alg": self.ALGORITMO, "typ": "JWT"}, separators=(",", ":")).encode("utf-8"))
+        ahora = datetime.now(timezone.utc)
+        cuerpo = _b64url(
+            json.dumps(
+                {
+                    "sub": usuario_id,
+                    "usuario": usuario,
+                    "mfa_pending": True,
+                    "exp": int(expira_en.timestamp()),
+                    "iat": int(ahora.timestamp()),
+                },
+                separators=(",", ":"),
+            ).encode("utf-8")
+        )
+        mensaje = f"{encabezado}.{cuerpo}".encode("ascii")
+        firma = _b64url(self._firmar(mensaje))
+        return f"{encabezado}.{cuerpo}.{firma}"
+
     def verificar(self, token: str, secretos_adicionales: list[str] | None = None) -> dict[str, Any] | None:
         payload = self._verificar_con_secreto(token, self.secreto)
         if payload is not None:
+            if payload.get("mfa_pending"):
+                return None
             return payload
         for secreto in secretos_adicionales or []:
             payload = self._verificar_con_secreto(token, secreto)
             if payload is not None:
+                if payload.get("mfa_pending"):
+                    return None
                 return payload
+        return None
+
+    def verificar_mfa(self, token: str) -> dict[str, Any] | None:
+        payload = self._verificar_con_secreto(token, self.secreto)
+        if payload is not None and payload.get("mfa_pending") is True:
+            return payload
         return None

@@ -41,6 +41,12 @@ class TokenServiceCapturaRol(GeneradorTokenPort):
     def verificar(self, token: str) -> dict | None:
         return None
 
+    def generar_mfa(self, usuario_id: str, usuario: str, expira_en: datetime) -> str:
+        return f"mfa-{usuario_id}"
+
+    def verificar_mfa(self, token: str) -> dict | None:
+        return None
+
 
 def test_obtener_contrasena_respeta_env(capsys):
     contrasena = obtener_contrasena({"GUEST_PASSWORD": "clave-invitado-123"})

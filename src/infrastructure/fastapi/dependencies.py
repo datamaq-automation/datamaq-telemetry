@@ -12,6 +12,12 @@ from src.application.use_cases.atribuir_consumo import AtribuirConsumoUseCase
 from src.application.use_cases.autenticar_usuario import AutenticarUsuarioUseCase
 from src.application.use_cases.caracterizar_carga import CaracterizarCargaUseCase
 from src.application.use_cases.consultar_telemetria import ConsultarTelemetriaUseCase
+from src.application.use_cases.gestionar_2fa import (
+    Activar2FAUseCase,
+    Desactivar2FAUseCase,
+    Setup2FAUseCase,
+    Verificar2FAUseCase,
+)
 from src.application.use_cases.gestionar_alertas import GestionarAlertasUseCase
 from src.application.use_cases.gestionar_cargas import GestionarCargasUseCase
 from src.application.use_cases.gestionar_disponibilidad import GestionarDisponibilidadUseCase
@@ -25,8 +31,11 @@ from src.application.use_cases.gestionar_planta_estructura import (
 )
 from src.application.use_cases.ingesta.registro_campanas import registro_campanas_activas
 from src.application.use_cases.purgar_telemetria import PurgarTelemetriaExpiradaUseCase
+from src.domain.auth.ports import CifradorSecreto2FAPort, ServicioTOTPPort
 from src.domain.auth.services import HashContrasenaService, RateLimiterService
+from src.infrastructure.auth.cifrador_2fa import CifradorSecreto2FA
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
+from src.infrastructure.auth.totp_service import PyOtpService
 from src.infrastructure.paho_mqtt.mqtt_listener import MQTTListener
 from src.infrastructure.settings.config import Settings, get_settings
 from src.infrastructure.settings.logger import get_logger
@@ -207,6 +216,70 @@ def get_auth_use_case(
         token_service=JwtTokenService(settings.API_SECRET_KEY),
         minutos_validez=settings.AUTH_TOKEN_EXPIRA_MINUTOS,
         rate_limiter=rate_limiter,
+    )
+
+
+@lru_cache
+def get_totp_service() -> ServicioTOTPPort:
+    return PyOtpService()
+
+
+@lru_cache
+def get_cifrador_2fa() -> CifradorSecreto2FAPort:
+    settings = get_settings()
+    return CifradorSecreto2FA(settings.API_SECRET_KEY)
+
+
+def get_verificar_2fa_use_case(
+    db: Annotated[Session, Depends(get_db_session)],
+    totp_service: Annotated[ServicioTOTPPort, Depends(get_totp_service)],
+    cifrador_service: Annotated[CifradorSecreto2FAPort, Depends(get_cifrador_2fa)],
+) -> Verificar2FAUseCase:
+    repo_usuarios = MySQLUsuariosRepository(db)
+    settings = get_settings()
+    rate_limiter = get_rate_limiter()
+    return Verificar2FAUseCase(
+        repo_usuarios=repo_usuarios,
+        token_service=JwtTokenService(settings.API_SECRET_KEY),
+        totp_service=totp_service,
+        cifrador_service=cifrador_service,
+        minutos_validez=settings.AUTH_TOKEN_EXPIRA_MINUTOS,
+        rate_limiter=rate_limiter,
+    )
+
+
+def get_setup_2fa_use_case(
+    db: Annotated[Session, Depends(get_db_session)],
+    totp_service: Annotated[ServicioTOTPPort, Depends(get_totp_service)],
+) -> Setup2FAUseCase:
+    return Setup2FAUseCase(
+        repo_usuarios=MySQLUsuariosRepository(db),
+        totp_service=totp_service,
+    )
+
+
+def get_activar_2fa_use_case(
+    db: Annotated[Session, Depends(get_db_session)],
+    totp_service: Annotated[ServicioTOTPPort, Depends(get_totp_service)],
+    cifrador_service: Annotated[CifradorSecreto2FAPort, Depends(get_cifrador_2fa)],
+) -> Activar2FAUseCase:
+    return Activar2FAUseCase(
+        repo_usuarios=MySQLUsuariosRepository(db),
+        totp_service=totp_service,
+        cifrador_service=cifrador_service,
+    )
+
+
+def get_desactivar_2fa_use_case(
+    db: Annotated[Session, Depends(get_db_session)],
+    totp_service: Annotated[ServicioTOTPPort, Depends(get_totp_service)],
+    cifrador_service: Annotated[CifradorSecreto2FAPort, Depends(get_cifrador_2fa)],
+) -> Desactivar2FAUseCase:
+    return Desactivar2FAUseCase(
+        repo_usuarios=MySQLUsuariosRepository(db),
+        hash_service=HashContrasenaService(),
+        totp_service=totp_service,
+        cifrador_service=cifrador_service,
     )
 
 

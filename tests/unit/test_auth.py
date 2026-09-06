@@ -51,6 +51,16 @@ class MockTokenService(GeneradorTokenPort):
     def verificar(self, token: str) -> dict | None:
         return {"sub": token} if token.startswith("token-") else None
 
+    def generar_mfa(self, usuario_id: str, usuario: str, expira_en: datetime) -> str:
+        return f"mfa-{usuario_id}"
+
+    def verificar_mfa(self, token: str) -> dict | None:
+        return (
+            {"sub": token.removeprefix("mfa-"), "usuario": token.removeprefix("mfa-"), "mfa_pending": True}
+            if token.startswith("mfa-")
+            else None
+        )
+
 
 def _usuario_activo(
     contrasena: str = "secreto123",

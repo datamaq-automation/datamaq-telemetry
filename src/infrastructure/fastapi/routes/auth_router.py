@@ -3,9 +3,32 @@ from typing import Annotated, Any
 import structlog
 from fastapi import APIRouter, Depends, Request, Response
 
-from src.application.dtos.auth_dto import LoginRequestDTO, LoginResponseDTO, MeResponseDTO
+from src.application.dtos.auth_dto import (
+    Activar2FARequestDTO,
+    Desactivar2FARequestDTO,
+    LoginRequestDTO,
+    LoginResponseDTO,
+    MeResponseDTO,
+    Operacion2FAResponseDTO,
+    Setup2FAResponseDTO,
+    Verificar2FARequestDTO,
+)
 from src.application.use_cases.autenticar_usuario import AutenticarUsuarioUseCase
-from src.infrastructure.fastapi.dependencies import get_auth_use_case, get_settings_dep, get_usuario_actual
+from src.application.use_cases.gestionar_2fa import (
+    Activar2FAUseCase,
+    Desactivar2FAUseCase,
+    Setup2FAUseCase,
+    Verificar2FAUseCase,
+)
+from src.infrastructure.fastapi.dependencies import (
+    get_activar_2fa_use_case,
+    get_auth_use_case,
+    get_desactivar_2fa_use_case,
+    get_settings_dep,
+    get_setup_2fa_use_case,
+    get_usuario_actual,
+    get_verificar_2fa_use_case,
+)
 from src.infrastructure.fastapi.error_handler import manejar_error_http
 from src.infrastructure.settings.config import Settings
 
@@ -39,7 +62,8 @@ def login(
             usuario=dto.usuario,
             request_id=structlog.contextvars.get_contextvars().get("request_id"),
         )
-        _fijar_cookie(response, settings, resultado.token)
+        if resultado.token:
+            _fijar_cookie(response, settings, resultado.token)
         return resultado
     except Exception as e:
         manejar_error_http(e)
@@ -60,7 +84,8 @@ def guest(
             usuario="invitado",
             request_id=structlog.contextvars.get_contextvars().get("request_id"),
         )
-        _fijar_cookie(response, settings, resultado.token)
+        if resultado.token:
+            _fijar_cookie(response, settings, resultado.token)
         return resultado
     except Exception as e:
         manejar_error_http(e)
@@ -79,5 +104,59 @@ def me(
 ) -> MeResponseDTO:
     try:
         return use_case.me(claims)
+    except Exception as e:
+        manejar_error_http(e)
+
+
+@router.post("/2fa/verificar", response_model=LoginResponseDTO)
+def verificar_2fa(
+    dto: Verificar2FARequestDTO,
+    use_case: Annotated[Verificar2FAUseCase, Depends(get_verificar_2fa_use_case)],
+    response: Response,
+    settings: Annotated[Settings, Depends(get_settings_dep)],
+) -> LoginResponseDTO:
+    try:
+        resultado = use_case.verificar(dto)
+        if resultado.token:
+            _fijar_cookie(response, settings, resultado.token)
+        return resultado
+    except Exception as e:
+        manejar_error_http(e)
+
+
+@router.post("/2fa/setup", response_model=Setup2FAResponseDTO)
+def setup_2fa(
+    claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
+    use_case: Annotated[Setup2FAUseCase, Depends(get_setup_2fa_use_case)],
+) -> Setup2FAResponseDTO:
+    try:
+        usuario = str(claims.get("usuario") or claims.get("sub"))
+        return use_case.ejecutar(usuario)
+    except Exception as e:
+        manejar_error_http(e)
+
+
+@router.post("/2fa/activar", response_model=Operacion2FAResponseDTO)
+def activar_2fa(
+    dto: Activar2FARequestDTO,
+    claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
+    use_case: Annotated[Activar2FAUseCase, Depends(get_activar_2fa_use_case)],
+) -> Operacion2FAResponseDTO:
+    try:
+        usuario = str(claims.get("usuario") or claims.get("sub"))
+        return use_case.ejecutar(usuario, dto)
+    except Exception as e:
+        manejar_error_http(e)
+
+
+@router.post("/2fa/desactivar", response_model=Operacion2FAResponseDTO)
+def desactivar_2fa(
+    dto: Desactivar2FARequestDTO,
+    claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
+    use_case: Annotated[Desactivar2FAUseCase, Depends(get_desactivar_2fa_use_case)],
+) -> Operacion2FAResponseDTO:
+    try:
+        usuario = str(claims.get("usuario") or claims.get("sub"))
+        return use_case.ejecutar(usuario, dto)
     except Exception as e:
         manejar_error_http(e)

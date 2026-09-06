@@ -23,5 +23,17 @@ class DemasiadosIntentosError(DominioAuthException):
     """Lanzada cuando se excede el límite de intentos de inicio de sesión."""
 
     def __init__(self, mensaje: str, usuario: str | None = None, retry_after_seg: int | None = None):
-        super().__init__(mensaje, usuario)
+        super().__init__(mensaje, usuario=usuario)
         self.retry_after_seg = retry_after_seg
+
+
+class Codigo2FAInvalidoError(DominioAuthException):
+    """Lanzada cuando el código TOTP o código de respaldo no es válido."""
+
+
+class TokenMFAPendienteInvalidoError(DominioAuthException):
+    """Lanzada cuando el token efímero de MFA es inválido o ha expirado."""
+
+
+class Setup2FAInvalidoError(DominioAuthException):
+    """Lanzada cuando no se puede configurar o activar 2FA."""

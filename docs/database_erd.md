@@ -322,6 +322,9 @@ erDiagram
         string password_hash
         string role
         boolean is_active
+        string totp_secret
+        boolean totp_enabled
+        json totp_backup_codes
         datetime created_at
         datetime updated_at
     }
@@ -707,6 +710,9 @@ erDiagram
 | `password_hash` | `VARCHAR(255)` | - | No |
 | `role` | `VARCHAR(20)` | - | No |
 | `is_active` | `BOOLEAN` | - | No |
+| `totp_secret` | `VARCHAR(255)` | - | Sí |
+| `totp_enabled` | `BOOLEAN` | - | No |
+| `totp_backup_codes` | `JSON` | - | Sí |
 | `created_at` | `DATETIME` | - | No |
 | `updated_at` | `DATETIME` | - | No |
 

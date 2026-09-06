@@ -16,6 +16,9 @@ class MySQLUsuariosRepository(RepositorioUsuariosPort):
             hash_contrasena=model.password_hash,
             esta_activo=model.is_active,
             rol=model.role,
+            totp_secret=model.totp_secret,
+            totp_enabled=model.totp_enabled,
+            totp_backup_codes=model.totp_backup_codes,
             creado_en=model.created_at,
             actualizado_en=model.updated_at,
         )
@@ -33,6 +36,9 @@ class MySQLUsuariosRepository(RepositorioUsuariosPort):
                 password_hash=usuario.hash_contrasena,
                 role=usuario.rol,
                 is_active=usuario.esta_activo,
+                totp_secret=usuario.totp_secret,
+                totp_enabled=usuario.totp_enabled,
+                totp_backup_codes=usuario.totp_backup_codes,
             )
             self.db.add(model)
         else:
@@ -40,6 +46,9 @@ class MySQLUsuariosRepository(RepositorioUsuariosPort):
             model.password_hash = usuario.hash_contrasena
             model.role = usuario.rol
             model.is_active = usuario.esta_activo
+            model.totp_secret = usuario.totp_secret
+            model.totp_enabled = usuario.totp_enabled
+            model.totp_backup_codes = usuario.totp_backup_codes
 
         self.db.commit()
         self.db.refresh(model)
