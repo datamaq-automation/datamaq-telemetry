@@ -31,3 +31,13 @@ API FastAPI y Worker MQTT para la ingesta y persistencia de telemetría de medid
 - **Todos los `__init__.py` (`src/` y `tests/`) deben ser de 0 bytes.**
 - **El LSP del editor (Pylance) debe alinear su exclusión con `pyrightconfig.json` vía `.vscode/settings.json` (`python.analysis.exclude`). Los `tests/` están excluidos del análisis de tipos por diseño; prohibido "corregirlos" con `cast`/`# type: ignore`.**
 - Commits: Conventional Commits (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`).
+
+## Optimización de Tokens y Hardware Local (CPU, RAM, iGPU)
+
+- **Hardware Local Primero ($0 tokens):** Aprovechar la CPU Ryzen multi-hilo, 32GB RAM e iGPU para realizar el trabajo pesado (AST, linters, tests) antes y después de interactuar con el modelo.
+- **Poda AST de Contexto Obligatoria:** Prohibido leer archivos completos >100 líneas con `view_file` sin acotar (`StartLine`/`EndLine` ≤ 150). Usar poda AST local:
+  `python3 /home/agustin/.agents/skills/token-optimizer/scripts/prune_python_ast.py <archivo.py>`
+- **Herramientas MCP Locales:** Usar `tokenix-filter` (`tokenix_read`, `tokenix_symbols`, `tokenix_callers`) y `codebase-memory` (`search_graph`, `get_code_snippet`) para navegar código con mínimo consumo de tokens.
+- **Auto-reparación Local en CPU:** Ejecutar `ruff check --fix && ruff format` y `pytest` en local antes de pedir correcciones al modelo remoto.
+- **Diffs Quirúrgicos:** Usar `replace_file_content` con bloques mínimos de contexto (2-3 líneas).
+- **Orquestador `agy-opt`:** Utilizar utilidades de `agy-opt` (`agy-opt inject`, `agy-opt heal`, `agy-opt stats`) para acelerar el desarrollo.

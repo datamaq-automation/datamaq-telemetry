@@ -383,15 +383,16 @@ def test_me_rol_admin():
     assert dto.rol == "admin"
 
 
-def test_me_roles_operador_e_invitado():
+def test_me_roles_operador_invitado_y_superadmin():
     use_case = _use_case_me()
     assert use_case.me({"usuario": "u1", "rol": "operador"}).rol == "operador"
     assert use_case.me({"usuario": "u1", "rol": "invitado"}).rol == "invitado"
+    assert use_case.me({"usuario": "u1", "rol": "superadmin"}).rol == "superadmin"
 
 
 def test_me_rol_ausente_o_invalido():
     use_case = _use_case_me()
-    for claims in ({"usuario": "u1"}, {"usuario": "u1", "rol": "superadmin"}):
+    for claims in ({"usuario": "u1"}, {"usuario": "u1", "rol": "root"}):
         try:
             use_case.me(claims)
             raise AssertionError("Se esperaba CredencialesInvalidasError")
@@ -421,7 +422,7 @@ def test_me_handler_exitoso():
 def test_me_handler_rol_invalido():
     use_case = _use_case_me()
     try:
-        me_handler({"usuario": "u1", "rol": "superadmin"}, use_case)
+        me_handler({"usuario": "u1", "rol": "root"}, use_case)
         raise AssertionError("Se esperaba HTTPException 401")
     except HTTPException as e:
         assert e.status_code == 401

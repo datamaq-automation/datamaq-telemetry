@@ -251,8 +251,14 @@ def get_usuario_actual(
     return claims
 
 
+def requiere_rol_superadmin(claims: Annotated[dict[str, Any], Depends(get_usuario_actual)]) -> dict[str, Any]:
+    if claims.get("rol") != "superadmin":
+        raise HTTPException(status_code=403, detail="forbidden")
+    return claims
+
+
 def requiere_rol_admin(claims: Annotated[dict[str, Any], Depends(get_usuario_actual)]) -> dict[str, Any]:
-    if claims.get("rol") != "admin":
+    if claims.get("rol") not in ("admin", "superadmin"):
         raise HTTPException(status_code=403, detail="forbidden")
     return claims
 

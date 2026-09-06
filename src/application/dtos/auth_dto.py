@@ -17,4 +17,4 @@ class LoginResponseDTO(BaseModel):
 
 class MeResponseDTO(BaseModel):
     usuario: str
-    rol: Literal["admin", "operador", "invitado"]
+    rol: Literal["superadmin", "admin", "operador", "invitado"]
