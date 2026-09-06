@@ -199,6 +199,24 @@ class AtribuirConsumoUseCase:
         intervalos = self.repo_intervalos.listar_por_carga(carga_id, limite=limite)
         return [IntervaloActividadMapper.to_dto(i) for i in intervalos]
 
+    def listar_intervalos_dispositivo(
+        self,
+        dispositivo_id: str,
+        desde: datetime | None = None,
+        hasta: datetime | None = None,
+        dias: int = 7,
+        solo_no_atribuidos: bool = False,
+        limite: int = 200,
+    ) -> list[IntervaloActividadResponseDTO]:
+        """Lista intervalos del dispositivo en la ventana, con opción de ver solo los no atribuidos."""
+        inicio, fin = self._ventana(desde, hasta, dias)
+        intervalos = self.repo_intervalos.listar_por_dispositivo(dispositivo_id, inicio, fin)
+        if solo_no_atribuidos:
+            intervalos = [i for i in intervalos if not i.esta_atribuido]
+        if limite:
+            intervalos = intervalos[:limite]
+        return [IntervaloActividadMapper.to_dto(i) for i in intervalos]
+
     def corregir_intervalo(
         self, intervalo_id: int, dto: CorregirIntervaloRequestDTO, usuario_id: str
     ) -> IntervaloActividadResponseDTO:

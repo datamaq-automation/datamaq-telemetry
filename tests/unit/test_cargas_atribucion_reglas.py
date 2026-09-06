@@ -106,3 +106,22 @@ def test_inicializar_presets_en_catalogo_crea_cargas_precalibradas():
     segunda_vez = uc.inicializar_presets_catalogo(MEDIDOR)
     assert len(segunda_vez) == 9
     assert len(repo_cargas.listar_por_dispositivo(MEDIDOR)) == 9
+
+
+def test_listar_intervalos_dispositivo_filtra_no_atribuidos():
+    """El caso de uso permite listar intervalos del medidor filtrando solo los no atribuidos."""
+    repo_cargas = MockCargasRepo()
+    repo_serie = MockSerieRepo(lecturas=_serie_ciclo_heladera(), energia_kwh=0.2)
+    repo_intervalos = MockIntervalosRepo()
+
+    uc = AtribuirConsumoUseCase(repo_serie, repo_cargas, repo_intervalos)
+    uc.analizar(MEDIDOR, desde=INICIO, hasta=INICIO + timedelta(hours=2))
+
+    todos = uc.listar_intervalos_dispositivo(MEDIDOR, desde=INICIO, hasta=INICIO + timedelta(hours=2))
+    assert len(todos) >= 1
+
+    no_atribuidos = uc.listar_intervalos_dispositivo(
+        MEDIDOR, desde=INICIO, hasta=INICIO + timedelta(hours=2), solo_no_atribuidos=True
+    )
+    assert len(no_atribuidos) == len(todos)
+    assert all(not i.esta_atribuido for i in no_atribuidos)

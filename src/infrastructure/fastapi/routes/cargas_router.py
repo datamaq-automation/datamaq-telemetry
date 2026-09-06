@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
@@ -15,10 +16,12 @@ from src.application.dtos.carga_dto import (
     IntervaloActividadResponseDTO,
     PerfilConsumoResponseDTO,
 )
+from src.application.mappers.carga_mapper import CargaMapper
 from src.application.use_cases.analizar_consumo import ZONA_POR_DEFECTO, AnalizarConsumoUseCase
 from src.application.use_cases.atribuir_consumo import AtribuirConsumoUseCase
 from src.application.use_cases.caracterizar_carga import CaracterizarCargaUseCase
 from src.application.use_cases.gestionar_cargas import GestionarCargasUseCase
+from src.domain.cargas.servicios.presets_cargas import CatalogoPresetsCargas
 from src.infrastructure.fastapi.dependencies import (
     get_analisis_consumo_use_case,
     get_atribucion_use_case,
@@ -114,6 +117,57 @@ def corregir_intervalo(
     """
     try:
         return use_case.corregir_intervalo(intervalo_id, dto, usuario_id=usuario.get("sub", ""))
+    except Exception as e:
+        manejar_error_http(e)
+
+
+@router.get("/presets", response_model=list[CargaResponseDTO])
+def obtener_presets_catalogo():
+    """Catálogo de presets estándar con firmas de fábrica de referencia."""
+    try:
+        presets = CatalogoPresetsCargas.obtener_todas("preset-catalogo")
+        return [CargaMapper.to_dto(p) for p in presets]
+    except Exception as e:
+        manejar_error_http(e)
+
+
+@router.post(
+    "/presets/inicializar",
+    response_model=list[CargaResponseDTO],
+    dependencies=[Depends(requiere_rol_escritura)],
+)
+def inicializar_presets_catalogo(
+    use_case: Annotated[AtribuirConsumoUseCase, Depends(get_atribucion_use_case)],
+    device_id: Annotated[str, Query(description="Dispositivo al que inicializar catálogo.")],
+):
+    """Crea en el catálogo del medidor las 9 cargas precalibradas estándar que no existan."""
+    try:
+        cargas = use_case.inicializar_presets_catalogo(device_id)
+        return [CargaMapper.to_dto(c) for c in cargas]
+    except Exception as e:
+        manejar_error_http(e)
+
+
+@router.get("/intervalos", response_model=list[IntervaloActividadResponseDTO])
+def listar_intervalos(
+    use_case: Annotated[AtribuirConsumoUseCase, Depends(get_atribucion_use_case)],
+    device_id: Annotated[str, Query(description="Dispositivo a consultar (UUID).")],
+    desde: datetime | None = None,
+    hasta: datetime | None = None,
+    dias: Annotated[int, Query(ge=1, le=365)] = 7,
+    solo_no_atribuidos: bool = False,
+    limite: Annotated[int, Query(ge=1, le=1000)] = 200,
+):
+    """Lista intervalos de actividad del dispositivo, permitiendo filtrar solo los no atribuidos."""
+    try:
+        return use_case.listar_intervalos_dispositivo(
+            dispositivo_id=device_id,
+            desde=desde,
+            hasta=hasta,
+            dias=dias,
+            solo_no_atribuidos=solo_no_atribuidos,
+            limite=limite,
+        )
     except Exception as e:
         manejar_error_http(e)
 
