@@ -42,19 +42,24 @@ class SmtpEmailService(ServicioEmailPort):
         msg = EmailMessage()
         msg["Subject"] = "Recuperación de contraseña - Datamaq Telemetry"
         msg["From"] = formataddr(("Datamaq Telemetry", self.from_email))
-        msg["To"] = formataddr(("", destinatario))
+        msg["To"] = destinatario
         msg["Date"] = formatdate(localtime=True)
         msg["Message-ID"] = make_msgid(domain="datamaq.com.ar")
+        msg["X-Mailer"] = "Datamaq Telemetry Mailer 1.0"
 
         texto_plano = (
-            f"Hola,\n\n"
-            f"Has solicitado restablecer tu contraseña en Datamaq Telemetry.\n"
-            f"Para definir una nueva contraseña, haz clic en el siguiente enlace o cópialo en tu navegador:\n\n"
+            f"Estimado usuario,\n\n"
+            f"Hemos recibido una solicitud para restablecer la contraseña asociada a su cuenta "
+            f"en la plataforma Datamaq Telemetry.\n\n"
+            f"Para definir una nueva contraseña de acceso segura, ingrese al siguiente enlace:\n"
             f"{enlace_restablecimiento}\n\n"
-            f"Este enlace tiene una validez de 15 minutos y es de un solo uso.\n"
-            f"Si no has solicitado este restablecimiento, puedes ignorar este correo de forma segura.\n\n"
+            f"Información de seguridad importante:\n"
+            f"- Este enlace es de un solo uso y caduca automáticamente a los 15 minutos de su emisión.\n"
+            f"- Si usted no realizó esta solicitud, puede desestimar este mensaje de forma segura. "
+            f"Su contraseña actual no ha sido modificada y su cuenta permanece protegida.\n"
+            f"- Ante cualquier duda o inconveniente técnico, comuníquese con el administrador del sistema.\n\n"
             f"Atentamente,\n"
-            f"El equipo de Datamaq"
+            f"El equipo de Soporte y Seguridad de Datamaq Telemetry"
         )
         msg.set_content(texto_plano)
 
@@ -62,18 +67,22 @@ class SmtpEmailService(ServicioEmailPort):
             f"<!DOCTYPE html>\n"
             f"<html lang='es'>\n"
             f"<head><meta charset='utf-8'></head>\n"
-            f"<body style='font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; padding: 20px;'>\n"
-            f"  <div style='max-width: 540px; margin: 0 auto; background: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; padding: 32px;'>\n"
-            f"    <div style='font-size: 20px; font-weight: bold; color: #0284c7; margin-bottom: 24px;'>⚡ Datamaq Telemetry</div>\n"
-            f"    <h2 style='font-size: 18px; margin-bottom: 16px;'>Restablecimiento de Contraseña</h2>\n"
-            f"    <p>Hola,</p>\n"
-            f"    <p>Hemos recibido una solicitud para restablecer la contraseña de tu cuenta.</p>\n"
+            f"<body style='font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; padding: 24px;'>\n"
+            f"  <div style='max-width: 560px; margin: 0 auto; background: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; padding: 32px;'>\n"
+            f"    <div style='font-size: 22px; font-weight: bold; color: #0284c7; margin-bottom: 20px;'>⚡ Datamaq Telemetry</div>\n"
+            f"    <h2 style='font-size: 18px; margin-bottom: 16px; color: #0f172a;'>Solicitud de Restablecimiento de Contraseña</h2>\n"
+            f"    <p>Estimado usuario,</p>\n"
+            f"    <p>Hemos recibido una solicitud para restablecer la contraseña asociada a su cuenta en la plataforma de telemetría y gestión energética Datamaq.</p>\n"
+            f"    <p>Para definir una nueva contraseña de acceso segura, haga clic en el botón a continuación:</p>\n"
             f"    <div style='text-align: center; margin: 28px 0;'>\n"
-            f"      <a href='{enlace_restablecimiento}' style='display: inline-block; background-color: #0284c7; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600;' target='_blank'>Restablecer mi Contraseña</a>\n"
+            f"      <a href='{enlace_restablecimiento}' style='display: inline-block; background-color: #0284c7; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: 600;' target='_blank'>Restablecer Contraseña</a>\n"
             f"    </div>\n"
-            f"    <p style='font-size: 13px; color: #64748b;'>O copia y pega el siguiente enlace en tu navegador:<br><a href='{enlace_restablecimiento}' style='color: #0284c7; word-break: break-all;'>{enlace_restablecimiento}</a></p>\n"
-            f"    <hr style='border: none; border-top: 1px solid #e2e8f0; margin-top: 32px;'>\n"
-            f"    <p style='font-size: 12px; color: #64748b;'>Este enlace tiene una validez de <strong>15 minutos</strong> y puede usarse una única vez.<br>Si no has solicitado este cambio, puedes ignorar este correo de forma segura.</p>\n"
+            f"    <p style='font-size: 13px; color: #64748b;'>Si el botón no funciona, copie y pegue la siguiente dirección en la barra de su navegador:<br><span style='word-break: break-all; color: #0284c7;'>{enlace_restablecimiento}</span></p>\n"
+            f"    <hr style='border: none; border-top: 1px solid #e2e8f0; margin: 28px 0;'>\n"
+            f"    <p style='font-size: 12px; color: #64748b; line-height: 1.5;'>\n"
+            f"      <strong>Aviso de seguridad:</strong> Este enlace tiene una vigencia de <strong>15 minutos</strong> y quedará invalidado automáticamente tras su primer uso.<br>\n"
+            f"      Si usted no solicitó este cambio, ignore este correo. Su contraseña actual no ha sido modificada y su cuenta permanece protegida con todas sus medidas de seguridad habituales.\n"
+            f"    </p>\n"
             f"  </div>\n"
             f"</body>\n"
             f"</html>"
@@ -82,8 +91,10 @@ class SmtpEmailService(ServicioEmailPort):
 
         try:
             with smtplib.SMTP(self.host, self.port, local_hostname="datamaq.com.ar", timeout=10) as server:
+                server.ehlo("datamaq.com.ar")
                 if self.use_tls:
                     server.starttls()
+                    server.ehlo("datamaq.com.ar")
                 if self.user and self.password:
                     server.login(self.user, self.password)
                 server.send_message(msg)
