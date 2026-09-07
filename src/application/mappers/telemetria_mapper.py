@@ -1,6 +1,9 @@
+from datetime import datetime, timezone
+
 from src.application.dtos.telemetria_dto import (
     AcumuladoEnergiaDTO,
     AnaliticaCalidadEnergiaDTO,
+    DiagnosticoFasesDispositivoDTO,
     EnergiaAgregadaDTO,
     LecturaInstantaneaDTO,
     LogEstadoDispositivoDTO,
@@ -13,7 +16,10 @@ from src.domain.telemetria.entities import (
     LogEstadoDispositivo,
     MedicionFase,
 )
-from src.domain.telemetria.services import AnalizadorCalidadEnergiaService
+from src.domain.telemetria.services import (
+    AnalizadorCalidadEnergiaService,
+    DiagnosticoFasorialRed,
+)
 from src.domain.telemetria.value_objects import AnaliticaCalidadEnergia
 
 
@@ -125,4 +131,34 @@ class TelemetriaMapper:
             direccion_ip=log.direccion_ip,
             tiempo_activo_segundos=log.tiempo_activo_segundos,
             payload_bruto=log.payload_bruto,
+        )
+
+    @staticmethod
+    def diagnostico_fasorial_to_dto(
+        diag: DiagnosticoFasorialRed,
+    ) -> DiagnosticoFasesDispositivoDTO:
+        from src.application.dtos.telemetria_dto import DiagnosticoFaseDTO
+
+        def _map_fase(fase_diag: object) -> DiagnosticoFaseDTO:
+            return DiagnosticoFaseDTO(
+                fp_original=getattr(fase_diag, "fp_original", None),
+                angulo_phi_grados=getattr(fase_diag, "phi_deg_original", None),
+                potencia_activa_w=getattr(fase_diag, "potencia_activa_w", None),
+                potencia_reactiva_var=getattr(fase_diag, "potencia_reactiva_var", None),
+                rotacion_optima_sugerida=getattr(fase_diag, "rotacion_optima_sugerida", None),
+                fp_con_rotacion_optima=getattr(fase_diag, "fp_con_rotacion_optima", None),
+                potencia_activa_con_rotacion_optima_w=getattr(fase_diag, "p_con_rotacion_optima_w", None),
+                potencia_reactiva_con_rotacion_optima_var=getattr(fase_diag, "q_con_rotacion_optima_var", None),
+                rotaciones_evaluadas=getattr(fase_diag, "rotaciones_evaluadas", None),
+            )
+
+        evaluado = diag.evaluado_en or datetime.now(timezone.utc)
+        return DiagnosticoFasesDispositivoDTO(
+            dispositivo_id=diag.dispositivo_id,
+            evaluado_en=evaluado,
+            fase_r=_map_fase(diag.fase_r),
+            fase_s=_map_fase(diag.fase_s),
+            fase_t=_map_fase(diag.fase_t),
+            diagnostico_general=diag.diagnostico_general,
+            recomendacion_hardware=diag.recomendacion_hardware,
         )

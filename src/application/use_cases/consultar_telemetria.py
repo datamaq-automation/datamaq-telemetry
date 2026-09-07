@@ -3,6 +3,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from src.application.dtos.telemetria_dto import (
     AcumuladoEnergiaDTO,
+    DiagnosticoFasesDispositivoDTO,
     EnergiaAgregadaDTO,
     LecturaInstantaneaDTO,
     TelemetriaLatestResponseDTO,
@@ -220,3 +221,23 @@ class ConsultarTelemetriaUseCase:
         acumulados = self.repo_telemetria.listar_acumulados_para_agregacion(dev.id, desde_efectivo)
         agregados = AgregacionEnergiaService.agregar_por_periodo(acumulados, granularidad_enum, zona_info)
         return [TelemetriaMapper.energia_agregada_to_dto(a) for a in agregados]
+
+    def diagnosticar_fases(self, id_o_uid: str) -> DiagnosticoFasesDispositivoDTO:
+        from src.domain.telemetria.servicios.analizador_fasorial import AnalizadorFasorialService
+
+        dev = self._resolver_dispositivo(id_o_uid)
+        lectura = self.repo_telemetria.obtener_ultima_instantanea(dev.id)
+        if lectura is None:
+            from src.domain.telemetria.entities import LecturaInstantanea, MedicionFase
+
+            lectura = LecturaInstantanea(
+                id=None,
+                dispositivo_id=dev.id,
+                registrado_en=datetime.now(timezone.utc),
+                fase_r=MedicionFase(),
+                fase_s=MedicionFase(),
+                fase_t=MedicionFase(),
+            )
+
+        diag = AnalizadorFasorialService.diagnosticar_lectura(dev.id, lectura)
+        return TelemetriaMapper.diagnostico_fasorial_to_dto(diag)

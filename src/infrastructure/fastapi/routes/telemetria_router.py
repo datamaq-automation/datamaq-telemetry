@@ -8,6 +8,7 @@ from fastapi.responses import StreamingResponse
 from src.application.dtos.alerta_dto import AlertaResponseDTO
 from src.application.dtos.telemetria_dto import (
     AcumuladoEnergiaDTO,
+    DiagnosticoFasesDispositivoDTO,
     EnergiaAgregadaDTO,
     LecturaInstantaneaDTO,
     TelemetriaLatestResponseDTO,
@@ -38,6 +39,18 @@ def get_latest_telemetry(
 ):
     try:
         return use_case.obtener_ultima_telemetria(device_id)
+    except Exception as e:
+        manejar_error_http(e)
+
+
+@router.get("/fases-diagnostico/{device_id}", response_model=DiagnosticoFasesDispositivoDTO)
+def get_phase_diagnostic(
+    device_id: str,
+    use_case: Annotated[ConsultarTelemetriaUseCase, Depends(get_telemetria_use_case)],
+):
+    """Diagnóstico metrológico fasorial y evaluación de rotación/desfasaje de canales."""
+    try:
+        return use_case.diagnosticar_fases(device_id)
     except Exception as e:
         manejar_error_http(e)
 

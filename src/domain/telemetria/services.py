@@ -12,6 +12,11 @@ Los servicios han sido modularizados en submódulos especializados dentro del pa
 from src.domain.telemetria.servicios.analizador_calidad_metrologica import (
     AnalizadorMetrologicoService,
 )
+from src.domain.telemetria.servicios.analizador_fasorial import (
+    AnalizadorFasorialService,
+    DiagnosticoFasorialRed,
+    EvaluacionRotacionFase,
+)
 from src.domain.telemetria.servicios.calculos_potencia import (
     AgregacionEnergiaService,
     CalculadoraPotenciaService,
@@ -48,9 +53,12 @@ class AnalizadorCalidadEnergiaService(
 __all__ = [
     "AgregacionEnergiaService",
     "AnalizadorCalidadEnergiaService",
+    "AnalizadorFasorialService",
     "AnalizadorMetrologicoService",
     "CalculadoraPotenciaService",
     "CooldownNotificacionesAlertasService",
+    "DiagnosticoFasorialRed",
+    "EvaluacionRotacionFase",
     "EvaluadorAlertasCalidadService",
     "EvaluadorAnomaliasFasesService",
     "FiltroDeduplicacionService",

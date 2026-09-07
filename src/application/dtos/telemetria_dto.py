@@ -92,3 +92,25 @@ class TelemetriaLatestResponseDTO(BaseModel):
     instantanea: LecturaInstantaneaDTO | None = None
     energia: AcumuladoEnergiaDTO | None = None
     analitica: AnaliticaCalidadEnergiaDTO | None = None
+
+
+class DiagnosticoFaseDTO(BaseModel):
+    fp_original: float | None = None
+    angulo_phi_grados: float | None = None
+    potencia_activa_w: float | None = None
+    potencia_reactiva_var: float | None = None
+    rotacion_optima_sugerida: str | None = None
+    fp_con_rotacion_optima: float | None = None
+    potencia_activa_con_rotacion_optima_w: float | None = None
+    potencia_reactiva_con_rotacion_optima_var: float | None = None
+    rotaciones_evaluadas: dict[str, dict[str, float]] | None = None
+
+
+class DiagnosticoFasesDispositivoDTO(BaseModel):
+    dispositivo_id: str
+    evaluado_en: FechaHoraUTC
+    fase_r: DiagnosticoFaseDTO
+    fase_s: DiagnosticoFaseDTO
+    fase_t: DiagnosticoFaseDTO
+    diagnostico_general: str
+    recomendacion_hardware: str
