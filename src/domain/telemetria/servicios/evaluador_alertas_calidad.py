@@ -4,10 +4,13 @@ from src.domain.telemetria.entities import AlertaDispositivo, LecturaInstantanea
 from src.domain.telemetria.servicios.analizador_calidad_metrologica import (
     AnalizadorMetrologicoService,
 )
+from src.domain.telemetria.servicios.evaluador_anomalias_fases import (
+    EvaluadorAnomaliasFasesService,
+)
 from src.domain.telemetria.value_objects import SeveridadAlerta
 
 
-class EvaluadorAlertasCalidadService:
+class EvaluadorAlertasCalidadService(EvaluadorAnomaliasFasesService):
     """Evaluación pura de reglas normativas y generación de alertas de calidad de red."""
 
     @staticmethod

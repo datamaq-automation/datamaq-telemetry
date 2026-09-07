@@ -20,6 +20,9 @@ from src.domain.telemetria.servicios.calculos_potencia import (
 from src.domain.telemetria.servicios.evaluador_alertas_calidad import (
     EvaluadorAlertasCalidadService,
 )
+from src.domain.telemetria.servicios.evaluador_anomalias_fases import (
+    EvaluadorAnomaliasFasesService,
+)
 from src.domain.telemetria.servicios.persistencia_alertas import (
     FiltroPersistenciaTemporalService,
 )
@@ -29,7 +32,11 @@ from src.domain.telemetria.servicios.politicas_suscripcion import (
 )
 
 
-class AnalizadorCalidadEnergiaService(AnalizadorMetrologicoService, EvaluadorAlertasCalidadService):
+class AnalizadorCalidadEnergiaService(
+    AnalizadorMetrologicoService,
+    EvaluadorAlertasCalidadService,
+    EvaluadorAnomaliasFasesService,
+):
     """Servicio compuesto de analítica metrológica y evaluación de alertas normativas."""
 
     pass
@@ -41,6 +48,7 @@ __all__ = [
     "AnalizadorMetrologicoService",
     "CalculadoraPotenciaService",
     "EvaluadorAlertasCalidadService",
+    "EvaluadorAnomaliasFasesService",
     "FiltroDeduplicacionService",
     "FiltroPersistenciaTemporalService",
     "PoliticaRetencionService",
