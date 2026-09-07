@@ -42,3 +42,21 @@ class ParadaProgramadaResponseDTO(BaseModel):
     motivo: str
     creado_por_usuario_id: str | None = None
     creado_en: FechaHoraUTC
+
+
+class MetricasDisponibilidadOEEResponseDTO(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    maquina_id: str
+    periodo_inicio: FechaHoraUTC
+    periodo_fin: FechaHoraUTC
+    tiempo_total_segundos: float
+    tiempo_marcha_segundos: float
+    tiempo_parada_programada_segundos: float
+    tiempo_parada_no_programada_segundos: float
+    disponibilidad_oee_porcentaje: float
+    mtbf_horas: float | None = None
+    mttr_horas: float | None = None
+    cantidad_paradas_no_programadas: int = 0
+    cantidad_paradas_programadas: int = 0
+    cantidad_ciclos_marcha: int = 0

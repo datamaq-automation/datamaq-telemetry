@@ -1,5 +1,8 @@
 """Servicios de dominio para disponibilidad y regímenes de operación."""
 
+from src.domain.disponibilidad.servicios.calculador_metricas_oee import (
+    CalculadorMetricasOEEService,
+)
 from src.domain.disponibilidad.servicios.calibrador_umbral import (
     CalibradorUmbralService,
 )
@@ -14,6 +17,7 @@ from src.domain.disponibilidad.servicios.segmentador_regimenes import (
 )
 
 __all__ = [
+    "CalculadorMetricasOEEService",
     "CalibradorUmbralService",
     "ClasificadorDisponibilidadService",
     "FiltroPersistenciaEstadoService",

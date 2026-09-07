@@ -1,10 +1,11 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import ClassVar
 
 from src.application.dtos.disponibilidad_dto import (
     CorregirClasificacionRequestDTO,
     EventoDisponibilidadResponseDTO,
+    MetricasDisponibilidadOEEResponseDTO,
     ParadaProgramadaCreateDTO,
     ParadaProgramadaResponseDTO,
 )
@@ -15,6 +16,7 @@ from src.application.mappers.disponibilidad_mapper import (
 from src.domain.disponibilidad.entities import EventoDisponibilidad, ParadaProgramada
 from src.domain.disponibilidad.exceptions import (
     EventoDisponibilidadNoEncontradoError,
+    MaquinaNoEncontradaError,
     RangoParadaProgramadaInvalidoError,
 )
 from src.domain.disponibilidad.ports import (
@@ -23,6 +25,7 @@ from src.domain.disponibilidad.ports import (
     RepositorioParadasProgramadasPort,
 )
 from src.domain.disponibilidad.services import (
+    CalculadorMetricasOEEService,
     ClasificadorDisponibilidadService,
     FiltroPersistenciaEstadoService,
 )
@@ -133,3 +136,36 @@ class GestionarDisponibilidadUseCase:
     def listar_paradas_programadas(self, maquina_id: str) -> list[ParadaProgramadaResponseDTO]:
         paradas = self.repo_paradas.listar_por_maquina(maquina_id)
         return [ParadaProgramadaMapper.to_dto(p) for p in paradas]
+
+    def calcular_metricas_oee(
+        self,
+        maquina_id: str,
+        desde: datetime | None = None,
+        hasta: datetime | None = None,
+        dias: int = 7,
+    ) -> MetricasDisponibilidadOEEResponseDTO:
+        maquina = self.repo_maquinas.obtener_por_id(maquina_id)
+        if not maquina:
+            raise MaquinaNoEncontradaError(f"Máquina '{maquina_id}' no encontrada.")
+
+        fin = hasta or datetime.now(timezone.utc)
+        inicio = desde or (fin - timedelta(days=dias))
+
+        eventos = self.repo_eventos.listar_por_rango(maquina_id, inicio, fin)
+        metricas = CalculadorMetricasOEEService.calcular_metricas(eventos, inicio=inicio, fin=fin)
+
+        return MetricasDisponibilidadOEEResponseDTO(
+            maquina_id=maquina_id,
+            periodo_inicio=inicio,
+            periodo_fin=fin,
+            tiempo_total_segundos=metricas.tiempo_total_s,
+            tiempo_marcha_segundos=metricas.tiempo_marcha_s,
+            tiempo_parada_programada_segundos=metricas.tiempo_parada_programada_s,
+            tiempo_parada_no_programada_segundos=metricas.tiempo_parada_no_programada_s,
+            disponibilidad_oee_porcentaje=metricas.disponibilidad_oee_pct,
+            mtbf_horas=metricas.mtbf_horas,
+            mttr_horas=metricas.mttr_horas,
+            cantidad_paradas_no_programadas=metricas.cantidad_paradas_no_programadas,
+            cantidad_paradas_programadas=metricas.cantidad_paradas_programadas,
+            cantidad_ciclos_marcha=metricas.cantidad_ciclos_marcha,
+        )

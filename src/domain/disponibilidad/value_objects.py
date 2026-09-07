@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
 
 
@@ -121,3 +122,21 @@ class SegmentacionPotencia:
         if len(self.regimenes) < 2:
             return None
         return round(self.regimenes[0].limite_superior_w, 2)
+
+
+@dataclass(frozen=True)
+class MetricasDisponibilidadOEE:
+    """Métricas de disponibilidad industrial (OEE / TPM) inferidas de la telemetría."""
+
+    periodo_inicio: datetime
+    periodo_fin: datetime
+    tiempo_total_s: float
+    tiempo_marcha_s: float
+    tiempo_parada_programada_s: float
+    tiempo_parada_no_programada_s: float
+    disponibilidad_oee_pct: float
+    mtbf_horas: float | None = None
+    mttr_horas: float | None = None
+    cantidad_paradas_no_programadas: int = 0
+    cantidad_paradas_programadas: int = 0
+    cantidad_ciclos_marcha: int = 0

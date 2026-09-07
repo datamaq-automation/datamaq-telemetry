@@ -13,6 +13,7 @@ from src.application.use_cases.gestionar_disponibilidad import GestionarDisponib
 from src.domain.disponibilidad.entities import EventoDisponibilidad, Maquina, ParadaProgramada
 from src.domain.disponibilidad.exceptions import (
     EventoDisponibilidadNoEncontradoError,
+    MaquinaNoEncontradaError,
     RangoParadaProgramadaInvalidoError,
 )
 from src.domain.disponibilidad.ports import (
@@ -56,6 +57,14 @@ class _FakeEventosRepo(RepositorioEventosDisponibilidadPort):
     def listar_por_maquina(self, maquina_id, limite=100):
         items = [e for e in self.eventos.values() if e.maquina_id == maquina_id]
         return sorted(items, key=lambda e: e.inicio_at, reverse=True)[:limite]
+
+    def listar_por_rango(self, maquina_id, desde, hasta):
+        items = [
+            e
+            for e in self.eventos.values()
+            if e.maquina_id == maquina_id and e.inicio_at <= hasta and (e.fin_at is None or e.fin_at >= desde)
+        ]
+        return sorted(items, key=lambda e: e.inicio_at)
 
     def guardar(self, evento):
         if evento.id is None:
@@ -250,3 +259,36 @@ def test_registrar_parada_programada_ok():
     assert resultado.maquina_id == "maq-1"
     assert resultado.motivo == "Mantenimiento preventivo"
     assert resultado.creado_por_usuario_id == "user-1"
+
+
+def test_calcular_metricas_oee_maquina_inexistente_lanza_excepcion():
+    use_case, *_ = _use_case()
+    with pytest.raises(MaquinaNoEncontradaError):
+        use_case.calcular_metricas_oee("maquina-fantasma")
+
+
+def test_calcular_metricas_oee_calculo_correcto():
+    use_case, repo_maq, repo_eventos, _ = _use_case()
+    repo_maq.guardar(Maquina(id="maq-1", dispositivo_id="dev-1", nombre="Línea 1"))
+    inicio = _fecha(0)
+    fin = _fecha(3600)
+
+    repo_eventos.guardar(
+        EventoDisponibilidad(
+            id=None,
+            maquina_id="maq-1",
+            estado=EstadoMaquina.MARCHA,
+            inicio_at=inicio,
+            fin_at=fin,
+            potencia_promedio_w=5000.0,
+            origen=OrigenClasificacion.REGLA,
+        )
+    )
+
+    metricas = use_case.calcular_metricas_oee("maq-1", desde=inicio, hasta=fin)
+    assert metricas.maquina_id == "maq-1"
+    assert metricas.tiempo_total_segundos == 3600.0
+    assert metricas.tiempo_marcha_segundos == 3600.0
+    assert metricas.tiempo_parada_no_programada_segundos == 0.0
+    assert metricas.disponibilidad_oee_porcentaje == 100.0
+    assert metricas.cantidad_ciclos_marcha == 1

@@ -36,6 +36,10 @@ class RepositorioEventosDisponibilidadPort(ABC):
         pass
 
     @abstractmethod
+    def listar_por_rango(self, maquina_id: str, desde: datetime, hasta: datetime) -> list[EventoDisponibilidad]:
+        pass
+
+    @abstractmethod
     def guardar(self, evento: EventoDisponibilidad) -> EventoDisponibilidad:
         pass
 

@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
@@ -5,6 +6,7 @@ from fastapi import APIRouter, Depends, Query
 from src.application.dtos.disponibilidad_dto import (
     CorregirClasificacionRequestDTO,
     EventoDisponibilidadResponseDTO,
+    MetricasDisponibilidadOEEResponseDTO,
     ParadaProgramadaCreateDTO,
     ParadaProgramadaResponseDTO,
 )
@@ -97,6 +99,20 @@ def listar_eventos(
 ):
     try:
         return use_case.listar_eventos(maquina_id, limite=limite)
+    except Exception as e:
+        manejar_error_http(e)
+
+
+@router.get("/maquinas/{maquina_id}/metricas-oee", response_model=MetricasDisponibilidadOEEResponseDTO)
+def obtener_metricas_oee(
+    maquina_id: str,
+    use_case: Annotated[GestionarDisponibilidadUseCase, Depends(get_disponibilidad_use_case)],
+    desde: Annotated[datetime | None, Query(description="Fecha inicio ISO8601")] = None,
+    hasta: Annotated[datetime | None, Query(description="Fecha fin ISO8601")] = None,
+    dias: Annotated[int, Query(ge=1, le=90, description="Días hacia atrás si no se especifica desde")] = 7,
+):
+    try:
+        return use_case.calcular_metricas_oee(maquina_id, desde=desde, hasta=hasta, dias=dias)
     except Exception as e:
         manejar_error_http(e)
 

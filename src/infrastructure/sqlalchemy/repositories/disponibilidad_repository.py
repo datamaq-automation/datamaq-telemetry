@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import desc
+from sqlalchemy import desc, or_
 from sqlalchemy.orm import Session
 
 from src.domain.disponibilidad.entities import EventoDisponibilidad, Maquina, ParadaProgramada
@@ -113,6 +113,22 @@ class MySQLEventosDisponibilidadRepository(RepositorioEventosDisponibilidadPort)
             .filter(MachineAvailabilityEventModel.machine_id == maquina_id)
             .order_by(desc(MachineAvailabilityEventModel.start_at))
             .limit(limite)
+            .all()
+        )
+        return [self._to_entity(m) for m in modelos]
+
+    def listar_por_rango(self, maquina_id: str, desde: datetime, hasta: datetime) -> list[EventoDisponibilidad]:
+        modelos = (
+            self.db.query(MachineAvailabilityEventModel)
+            .filter(
+                MachineAvailabilityEventModel.machine_id == maquina_id,
+                MachineAvailabilityEventModel.start_at <= hasta,
+                or_(
+                    MachineAvailabilityEventModel.end_at.is_(None),
+                    MachineAvailabilityEventModel.end_at >= desde,
+                ),
+            )
+            .order_by(MachineAvailabilityEventModel.start_at.asc())
             .all()
         )
         return [self._to_entity(m) for m in modelos]
