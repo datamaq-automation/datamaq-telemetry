@@ -1,5 +1,6 @@
 import smtplib
 from email.message import EmailMessage
+from email.utils import formataddr, formatdate, make_msgid
 
 import structlog
 
@@ -40,8 +41,10 @@ class SmtpEmailService(ServicioEmailPort):
 
         msg = EmailMessage()
         msg["Subject"] = "Recuperación de contraseña - Datamaq Telemetry"
-        msg["From"] = self.from_email
-        msg["To"] = destinatario
+        msg["From"] = formataddr(("Datamaq Telemetry", self.from_email))
+        msg["To"] = formataddr(("", destinatario))
+        msg["Date"] = formatdate(localtime=True)
+        msg["Message-ID"] = make_msgid(domain="datamaq.com.ar")
 
         texto_plano = (
             f"Hola,\n\n"
@@ -78,7 +81,7 @@ class SmtpEmailService(ServicioEmailPort):
         msg.add_alternative(html_content, subtype="html")
 
         try:
-            with smtplib.SMTP(self.host, self.port, timeout=10) as server:
+            with smtplib.SMTP(self.host, self.port, local_hostname="datamaq.com.ar", timeout=10) as server:
                 if self.use_tls:
                     server.starttls()
                 if self.user and self.password:
