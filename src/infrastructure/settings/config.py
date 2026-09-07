@@ -63,7 +63,8 @@ class Settings(BaseSettings):
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
     SMTP_TLS: bool = False
-    SMTP_FROM: str = "noreply@datamaq.com.ar"
+    SMTP_FROM: str = "no-reply@datamaq.com.ar"
+
     FRONTEND_URL: str = "https://www.datamaq.com.ar"
     RECUPERACION_TOKEN_EXPIRA_MINUTOS: int = 15
 

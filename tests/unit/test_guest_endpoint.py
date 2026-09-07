@@ -136,9 +136,9 @@ def test_login_bloqueado_adjunta_retry_after():
     )
 
     with pytest.raises(CredencialesInvalidasError):
-        use_case.login(LoginRequestDTO(usuario="nadie", contrasena="x"))
+        use_case.login(LoginRequestDTO(usuario="nadie@datamaq.com.ar", contrasena="x"))
     with pytest.raises(DemasiadosIntentosError) as e:
-        use_case.login(LoginRequestDTO(usuario="nadie", contrasena="x"))
+        use_case.login(LoginRequestDTO(usuario="nadie@datamaq.com.ar", contrasena="x"))
 
     assert e.value.retry_after_seg is not None
     assert e.value.retry_after_seg >= 1

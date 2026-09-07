@@ -16,6 +16,7 @@ from src.domain.auth.ports import (
     ServicioEmailPort,
 )
 from src.domain.auth.services import HashContrasenaService
+from src.domain.auth.value_objects import NombreUsuario
 
 
 class SolicitarRecuperacionContrasenaUseCase:
@@ -36,7 +37,7 @@ class SolicitarRecuperacionContrasenaUseCase:
         self.minutos_expiracion = minutos_expiracion
 
     def ejecutar(self, dto: SolicitarRecuperacionDTO) -> Operacion2FAResponseDTO:
-        usuario_str = dto.usuario.strip()
+        usuario_str = NombreUsuario(dto.usuario).valor
         usuario = self.repositorio_usuarios.obtener_por_usuario(usuario_str)
 
         if usuario and usuario.esta_activo:

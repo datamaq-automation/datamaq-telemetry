@@ -2,6 +2,7 @@
 
 from datetime import datetime, timedelta, timezone
 
+import pytest
 from fastapi import HTTPException, Response
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
@@ -11,7 +12,11 @@ from src.application.dtos.auth_dto import LoginRequestDTO, MeResponseDTO
 from src.application.use_cases.autenticar_usuario import AutenticarUsuarioUseCase
 from src.application.use_cases.gestionar_usuarios import GestionarUsuariosUseCase
 from src.domain.auth.entities import UsuarioAuth
-from src.domain.auth.exceptions import CredencialesInvalidasError, UsuarioInactivoError
+from src.domain.auth.exceptions import (
+    CredencialesInvalidasError,
+    NombreUsuarioInvalidoError,
+    UsuarioInactivoError,
+)
 from src.domain.auth.ports import GeneradorTokenPort, RepositorioUsuariosPort
 from src.domain.auth.services import HashContrasenaService, PoliticaExpiracionService
 from src.domain.auth.value_objects import NombreUsuario
@@ -105,6 +110,12 @@ def _use_case_login(repo: RepositorioUsuariosPort) -> tuple[AutenticarUsuarioUse
 def test_nombre_usuario_normaliza():
     nombre = NombreUsuario("  Operador@PLANTA.LOCAL  ")
     assert nombre.valor == "operador@planta.local"
+
+
+def test_nombre_usuario_rechaza_no_email():
+    with pytest.raises(NombreUsuarioInvalidoError) as exc_info:
+        NombreUsuario("admin")
+    assert "correo electrónico válido" in str(exc_info.value)
 
 
 def test_hash_scrypt_genera_y_verifica():

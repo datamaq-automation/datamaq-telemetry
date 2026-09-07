@@ -10,7 +10,7 @@ from src.domain.auth.services import HashContrasenaService
 from src.infrastructure.sqlalchemy.database import get_session_factory
 from src.infrastructure.sqlalchemy.mysql_repositories import MySQLUsuariosRepository
 
-USUARIO_INVITADO = "invitado"
+USUARIO_INVITADO = "invitado@datamaq.com.ar"
 CONTRASENA_DEFAULT = "invitado"
 
 

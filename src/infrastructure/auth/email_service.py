@@ -18,7 +18,7 @@ class SmtpEmailService(ServicioEmailPort):
         user: str = "",
         password: str = "",
         use_tls: bool = False,
-        from_email: str = "noreply@datamaq.com.ar",
+        from_email: str = "no-reply@datamaq.com.ar",
         app_env: str = "production",
     ):
         self.host = host
