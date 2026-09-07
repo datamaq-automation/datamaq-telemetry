@@ -17,6 +17,9 @@ from src.domain.telemetria.servicios.calculos_potencia import (
     CalculadoraPotenciaService,
     FiltroDeduplicacionService,
 )
+from src.domain.telemetria.servicios.cooldown_notificaciones import (
+    CooldownNotificacionesAlertasService,
+)
 from src.domain.telemetria.servicios.evaluador_alertas_calidad import (
     EvaluadorAlertasCalidadService,
 )
@@ -47,6 +50,7 @@ __all__ = [
     "AnalizadorCalidadEnergiaService",
     "AnalizadorMetrologicoService",
     "CalculadoraPotenciaService",
+    "CooldownNotificacionesAlertasService",
     "EvaluadorAlertasCalidadService",
     "EvaluadorAnomaliasFasesService",
     "FiltroDeduplicacionService",

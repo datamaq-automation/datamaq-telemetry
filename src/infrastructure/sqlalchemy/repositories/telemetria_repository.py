@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 from datetime import datetime
 from decimal import Decimal
 
@@ -9,20 +10,10 @@ from src.domain.telemetria.entities import (
     AlertaDispositivo,
     LecturaInstantanea,
     LogEstadoDispositivo,
-    MedicionFase,
 )
 from src.domain.telemetria.ports import RepositorioTelemetriaPort
 from src.domain.telemetria.value_objects import (
-    Corriente,
-    EnergiaActiva,
-    EnergiaReactiva,
-    FactorPotencia,
     LecturaPotenciaTemporal,
-    PotenciaActiva,
-    PotenciaAparente,
-    PotenciaReactiva,
-    SeveridadAlerta,
-    Tension,
 )
 from src.infrastructure.sqlalchemy.models import (
     DeviceAlertModel,
@@ -30,132 +21,20 @@ from src.infrastructure.sqlalchemy.models import (
     TelemetryEnergyModel,
     TelemetryInstantaneousModel,
 )
+from src.infrastructure.sqlalchemy.repositories.telemetria_mappers import (
+    alerta_to_entity,
+    energia_to_entity,
+    instantanea_to_entity,
+)
 
 
 class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
+    _instantanea_to_entity = staticmethod(instantanea_to_entity)
+    _energia_to_entity = staticmethod(energia_to_entity)
+    _alerta_to_entity = staticmethod(alerta_to_entity)
+
     def __init__(self, db: Session):
         self.db = db
-
-    def _to_fase(self, v, i, p, q, s, fp, thd_v=None, thd_i=None) -> MedicionFase:
-        return MedicionFase(
-            tension=Tension(voltios=float(v)) if v is not None else None,
-            corriente=Corriente(amperios=float(i)) if i is not None else None,
-            potencia_activa=PotenciaActiva(vatios=float(p)) if p is not None else None,
-            potencia_reactiva=PotenciaReactiva(var=float(q)) if q is not None else None,
-            potencia_aparente=PotenciaAparente(va=float(s)) if s is not None else None,
-            factor_potencia=FactorPotencia(valor=float(fp)) if fp is not None else None,
-            thd_v_porcentaje=float(thd_v) if thd_v is not None else None,
-            thd_i_porcentaje=float(thd_i) if thd_i is not None else None,
-        )
-
-    def _instantanea_to_entity(self, m: TelemetryInstantaneousModel) -> LecturaInstantanea:
-        fase_r = self._to_fase(
-            m.voltage_r,
-            m.current_r,
-            m.active_power_r,
-            m.reactive_power_r,
-            m.apparent_power_r,
-            m.power_factor_r,
-            getattr(m, "thd_v_r", None),
-            getattr(m, "thd_i_r", None),
-        )
-        fase_s = self._to_fase(
-            m.voltage_s,
-            m.current_s,
-            m.active_power_s,
-            m.reactive_power_s,
-            m.apparent_power_s,
-            m.power_factor_s,
-            getattr(m, "thd_v_s", None),
-            getattr(m, "thd_i_s", None),
-        )
-        fase_t = self._to_fase(
-            m.voltage_t,
-            m.current_t,
-            m.active_power_t,
-            m.reactive_power_t,
-            m.apparent_power_t,
-            m.power_factor_t,
-            getattr(m, "thd_v_t", None),
-            getattr(m, "thd_i_t", None),
-        )
-
-        in_obj = None
-        if hasattr(m, "current_n") and m.current_n is not None:
-            in_obj = Corriente(amperios=float(m.current_n))
-
-        vl_val = float(m.voltage_linea_V) if hasattr(m, "voltage_linea_V") and m.voltage_linea_V is not None else None
-
-        vn_val = (
-            float(m.tension_neutro_estimada)
-            if hasattr(m, "tension_neutro_estimada") and m.tension_neutro_estimada is not None
-            else None
-        )
-
-        thd_v_prom_val = (
-            float(m.thd_v_promedio_porcentaje)
-            if hasattr(m, "thd_v_promedio_porcentaje") and m.thd_v_promedio_porcentaje is not None
-            else None
-        )
-        thd_i_tot_val = (
-            float(m.thd_i_total_porcentaje)
-            if hasattr(m, "thd_i_total_porcentaje") and m.thd_i_total_porcentaje is not None
-            else None
-        )
-
-        return LecturaInstantanea(
-            id=m.id,
-            dispositivo_id=m.device_id,
-            registrado_en=m.recorded_at,
-            fase_r=fase_r,
-            fase_s=fase_s,
-            fase_t=fase_t,
-            potencia_activa_total=PotenciaActiva(vatios=float(m.total_active_power))
-            if m.total_active_power is not None
-            else None,
-            potencia_reactiva_total=PotenciaReactiva(var=float(m.total_reactive_power))
-            if m.total_reactive_power is not None
-            else None,
-            potencia_aparente_total=PotenciaAparente(va=float(m.total_apparent_power))
-            if m.total_apparent_power is not None
-            else None,
-            factor_potencia_total=FactorPotencia(valor=float(m.total_power_factor))
-            if m.total_power_factor is not None
-            else None,
-            desbalance_tension_porcentaje=float(m.desbalance_tension_porcentaje)
-            if m.desbalance_tension_porcentaje is not None
-            else None,
-            corriente_neutro_estimada=in_obj,
-            voltage_linea_V=vl_val,
-            tension_neutro_estimada=vn_val,
-            thd_v_promedio_porcentaje=thd_v_prom_val,
-            thd_i_total_porcentaje=thd_i_tot_val,
-        )
-
-    def _energia_to_entity(self, m: TelemetryEnergyModel) -> AcumuladoEnergia:
-        return AcumuladoEnergia(
-            id=m.id,
-            dispositivo_id=m.device_id,
-            registrado_en=m.recorded_at,
-            energia_activa_neta=EnergiaActiva(kwh=float(m.net_active_energy_kwh))
-            if m.net_active_energy_kwh is not None
-            else None,
-            energia_reactiva_neta=EnergiaReactiva(kvarh=float(m.net_reactive_energy_kvarh))
-            if m.net_reactive_energy_kvarh is not None
-            else None,
-            energia_activa_importada=EnergiaActiva(kwh=float(m.imported_active_energy_kwh))
-            if m.imported_active_energy_kwh is not None
-            else None,
-            energia_activa_exportada=EnergiaActiva(kwh=float(m.exported_active_energy_kwh))
-            if m.exported_active_energy_kwh is not None
-            else None,
-            energia_reactiva_importada=EnergiaReactiva(kvarh=float(m.imported_reactive_energy_kvarh))
-            if m.imported_reactive_energy_kvarh is not None
-            else None,
-            energia_reactiva_exportada=EnergiaReactiva(kvarh=float(m.exported_reactive_energy_kvarh))
-            if m.exported_reactive_energy_kvarh is not None
-            else None,
-        )
 
     def guardar_instantanea(self, lectura: LecturaInstantanea) -> None:
         model = TelemetryInstantaneousModel(
@@ -252,26 +131,6 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
         self.db.add(model)
         self.db.commit()
 
-    def _alerta_to_entity(self, m: DeviceAlertModel) -> AlertaDispositivo:
-        return AlertaDispositivo(
-            id=m.id,
-            dispositivo_id=m.device_id,
-            tipo_alerta=m.alert_type,
-            severidad=SeveridadAlerta(m.severity)
-            if m.severity in SeveridadAlerta._value2member_map_
-            else SeveridadAlerta.WARNING,
-            mensaje=m.message,
-            esta_resuelta=m.is_resolved,
-            disparada_en=m.triggered_at,
-            resuelta_en=m.resolved_at,
-            fase=m.phase,
-            valor_medido=float(m.measured_value) if m.measured_value is not None else None,
-            valor_umbral=float(m.threshold_value) if m.threshold_value is not None else None,
-            unidad=m.unit,
-            categoria=m.category,
-            observaciones=m.notes,
-        )
-
     def guardar_alerta(self, alerta: AlertaDispositivo) -> None:
         if alerta.id is not None:
             model = self.db.query(DeviceAlertModel).filter(DeviceAlertModel.id == alerta.id).first()
@@ -365,6 +224,34 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
             q = q.filter(TelemetryInstantaneousModel.recorded_at >= desde)
         items = q.order_by(desc(TelemetryInstantaneousModel.recorded_at)).limit(limite).all()
         return [self._instantanea_to_entity(m) for m in items]
+
+    def iterar_instantaneas(
+        self,
+        dispositivo_id: str,
+        desde: datetime | None = None,
+        hasta: datetime | None = None,
+        limite: int = 10000,
+        chunk_size: int = 500,
+    ) -> Iterator[LecturaInstantanea]:
+        offset, emitidos = 0, 0
+        while emitidos < limite:
+            lote = min(chunk_size, limite - emitidos)
+            q = self.db.query(TelemetryInstantaneousModel).filter(
+                TelemetryInstantaneousModel.device_id == dispositivo_id
+            )
+            if desde:
+                q = q.filter(TelemetryInstantaneousModel.recorded_at >= desde)
+            if hasta:
+                q = q.filter(TelemetryInstantaneousModel.recorded_at <= hasta)
+            items = q.order_by(asc(TelemetryInstantaneousModel.recorded_at)).offset(offset).limit(lote).all()
+            if not items:
+                break
+            for m in items:
+                yield self._instantanea_to_entity(m)
+                emitidos += 1
+            offset += len(items)
+            if len(items) < lote:
+                break
 
     def listar_energias(
         self, dispositivo_id: str, limite: int, desde: datetime | None = None

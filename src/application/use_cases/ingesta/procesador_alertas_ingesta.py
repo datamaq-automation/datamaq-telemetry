@@ -9,13 +9,29 @@ from src.domain.telemetria.entities import (
 )
 from src.domain.telemetria.ports import (
     LoggerPort,
+    NotificadorAlertasPort,
     PublicadorEventosPort,
     RepositorioTelemetriaPort,
 )
 from src.domain.telemetria.services import (
     AnalizadorCalidadEnergiaService,
+    CooldownNotificacionesAlertasService,
     FiltroPersistenciaTemporalService,
 )
+from src.domain.telemetria.value_objects import SeveridadAlerta
+
+
+def _notificar_alerta_si_corresponde(
+    alerta: AlertaDispositivo,
+    dispositivo: Dispositivo | None,
+) -> None:
+    notif = ProcesadorAlertasIngesta._notificador
+    dests = ProcesadorAlertasIngesta._destinatarios
+    if alerta.severidad == SeveridadAlerta.CRITICAL and notif is not None and dispositivo is not None and dests:
+        cd = ProcesadorAlertasIngesta._cooldown_notificaciones
+        if cd.debe_notificar(alerta.dispositivo_id, alerta.tipo_alerta):
+            notif.notificar_alerta_critica(alerta, dispositivo, dests)
+            cd.registrar_notificacion(alerta.dispositivo_id, alerta.tipo_alerta)
 
 
 def _despachar_alerta_fn(
@@ -24,6 +40,7 @@ def _despachar_alerta_fn(
     repo_telemetria: RepositorioTelemetriaPort,
     publicador: PublicadorEventosPort | None,
     logger: LoggerPort | None,
+    dispositivo: Dispositivo | None = None,
 ) -> None:
     repo_telemetria.guardar_alerta(alerta)
     if publicador:
@@ -39,6 +56,7 @@ def _despachar_alerta_fn(
             severidad=alerta.severidad.value,
             mensaje=alerta.mensaje,
         )
+    _notificar_alerta_si_corresponde(alerta, dispositivo)
 
 
 def _auto_resolver_alertas_fn(
@@ -61,6 +79,7 @@ def _auto_resolver_alertas_fn(
                 observaciones="Despeje automático: la variable normalizó su valor dentro del rango admisible.",
             )
             repo_telemetria.guardar_alerta(a)
+            ProcesadorAlertasIngesta._cooldown_notificaciones.resetear(dispositivo_id, a.tipo_alerta)
             if publicador:
                 publicador.publicar_telemetria_en_vivo(
                     f"m/wifi/{mac_raw}/alertas",
@@ -79,11 +98,23 @@ class ProcesadorAlertasIngesta:
     """Orquesta la evaluación, persistencia temporal y auto-resolución de alertas normativas."""
 
     _filtro_persistencia: ClassVar[FiltroPersistenciaTemporalService] = FiltroPersistenciaTemporalService()
+    _cooldown_notificaciones: ClassVar[CooldownNotificacionesAlertasService] = CooldownNotificacionesAlertasService()
+    _notificador: ClassVar[NotificadorAlertasPort | None] = None
+    _destinatarios: ClassVar[list[str]] = []
+
+    @classmethod
+    def configurar_notificador(
+        cls,
+        notificador: NotificadorAlertasPort | None,
+        destinatarios: list[str] | None = None,
+    ) -> None:
+        cls._notificador = notificador
+        cls._destinatarios = destinatarios or []
 
     @classmethod
     def _evaluar_tension(
         cls,
-        dispositivo_id: str,
+        dispositivo: Dispositivo,
         mac_raw: str,
         lectura: LecturaInstantanea,
         recorded_at: datetime,
@@ -91,18 +122,18 @@ class ProcesadorAlertasIngesta:
         pub: PublicadorEventosPort | None,
         log: LoggerPort | None,
     ) -> AlertaDispositivo | None:
-        alerta_raw = AnalizadorCalidadEnergiaService.evaluar_alerta_tension(dispositivo_id, lectura)
+        alerta_raw = AnalizadorCalidadEnergiaService.evaluar_alerta_tension(dispositivo.id, lectura)
         alerta = cls._filtro_persistencia.procesar_alerta(
-            dispositivo_id, alerta_raw, categoria="TENSION", ahora=recorded_at
+            dispositivo.id, alerta_raw, categoria="TENSION", ahora=recorded_at
         )
         if alerta:
-            cls._despachar_alerta(alerta, mac_raw, repo, pub, log)
+            cls._despachar_alerta(alerta, mac_raw, repo, pub, log, dispositivo)
         return alerta_raw
 
     @classmethod
     def _evaluar_desbalance(
         cls,
-        dispositivo_id: str,
+        dispositivo: Dispositivo,
         mac_raw: str,
         lectura: LecturaInstantanea,
         es_monofasico: bool,
@@ -112,28 +143,28 @@ class ProcesadorAlertasIngesta:
         log: LoggerPort | None,
     ) -> tuple[AlertaDispositivo | None, AlertaDispositivo | None]:
         alerta_v_raw = (
-            AnalizadorCalidadEnergiaService.evaluar_alerta_desbalance(dispositivo_id, lectura)
+            AnalizadorCalidadEnergiaService.evaluar_alerta_desbalance(dispositivo.id, lectura)
             if not es_monofasico
             else None
         )
         alerta_v = cls._filtro_persistencia.procesar_alerta(
-            dispositivo_id, alerta_v_raw, categoria="DESBALANCE_TENSION", ahora=recorded_at
+            dispositivo.id, alerta_v_raw, categoria="DESBALANCE_TENSION", ahora=recorded_at
         )
         if alerta_v:
-            cls._despachar_alerta(alerta_v, mac_raw, repo, pub, log)
+            cls._despachar_alerta(alerta_v, mac_raw, repo, pub, log, dispositivo)
 
         alerta_i_raw = (
             AnalizadorCalidadEnergiaService.evaluar_alerta_desbalance_corriente(
-                dispositivo_id, lectura, es_monofasico=es_monofasico
+                dispositivo.id, lectura, es_monofasico=es_monofasico
             )
             if not es_monofasico
             else None
         )
         alerta_i = cls._filtro_persistencia.procesar_alerta(
-            dispositivo_id, alerta_i_raw, categoria="DESBALANCE_CORRIENTE", ahora=recorded_at
+            dispositivo.id, alerta_i_raw, categoria="DESBALANCE_CORRIENTE", ahora=recorded_at
         )
         if alerta_i:
-            cls._despachar_alerta(alerta_i, mac_raw, repo, pub, log)
+            cls._despachar_alerta(alerta_i, mac_raw, repo, pub, log, dispositivo)
 
         return alerta_v_raw, alerta_i_raw
 
@@ -161,7 +192,7 @@ class ProcesadorAlertasIngesta:
                 dispositivo.id, a_ti, categoria=f"TI_INVERTIDO_{a_ti.mensaje[:50]}", ahora=recorded_at
             )
             if a_filtrada:
-                cls._despachar_alerta(a_filtrada, mac_raw, repo, pub, log)
+                cls._despachar_alerta(a_filtrada, mac_raw, repo, pub, log, dispositivo)
 
         alertas_cruce_raw = AnalizadorCalidadEnergiaService.evaluar_alerta_cruce_ti(
             dispositivo_id=dispositivo.id,
@@ -174,14 +205,14 @@ class ProcesadorAlertasIngesta:
                 dispositivo.id, a_cruce, categoria=f"CRUCE_TI_{a_cruce.fase}", ahora=recorded_at
             )
             if a_filtrada:
-                cls._despachar_alerta(a_filtrada, mac_raw, repo, pub, log)
+                cls._despachar_alerta(a_filtrada, mac_raw, repo, pub, log, dispositivo)
 
         return alertas_ti_raw, alertas_cruce_raw
 
     @classmethod
     def _evaluar_fp(
         cls,
-        dispositivo_id: str,
+        dispositivo: Dispositivo,
         mac_raw: str,
         lectura: LecturaInstantanea,
         recorded_at: datetime,
@@ -189,28 +220,28 @@ class ProcesadorAlertasIngesta:
         pub: PublicadorEventosPort | None,
         log: LoggerPort | None,
     ) -> tuple[AlertaDispositivo | None, AlertaDispositivo | None]:
-        alerta_raw = AnalizadorCalidadEnergiaService.evaluar_alerta_factor_potencia(dispositivo_id, lectura)
+        alerta_raw = AnalizadorCalidadEnergiaService.evaluar_alerta_factor_potencia(dispositivo.id, lectura)
         alerta = cls._filtro_persistencia.procesar_alerta(
-            dispositivo_id, alerta_raw, categoria="FACTOR_POTENCIA", ahora=recorded_at
+            dispositivo.id, alerta_raw, categoria="FACTOR_POTENCIA", ahora=recorded_at
         )
         if alerta:
-            cls._despachar_alerta(alerta, mac_raw, repo, pub, log)
+            cls._despachar_alerta(alerta, mac_raw, repo, pub, log, dispositivo)
 
         alerta_cap_raw = AnalizadorCalidadEnergiaService.evaluar_alerta_sobrecompensacion_reactiva(
-            dispositivo_id, lectura
+            dispositivo.id, lectura
         )
         alerta_cap = cls._filtro_persistencia.procesar_alerta(
-            dispositivo_id, alerta_cap_raw, categoria="SOBRECOMPENSACION_REACTIVA", ahora=recorded_at
+            dispositivo.id, alerta_cap_raw, categoria="SOBRECOMPENSACION_REACTIVA", ahora=recorded_at
         )
         if alerta_cap:
-            cls._despachar_alerta(alerta_cap, mac_raw, repo, pub, log)
+            cls._despachar_alerta(alerta_cap, mac_raw, repo, pub, log, dispositivo)
 
         return alerta_raw, alerta_cap_raw
 
     @classmethod
     def _evaluar_thd(
         cls,
-        dispositivo_id: str,
+        dispositivo: Dispositivo,
         mac_raw: str,
         lectura: LecturaInstantanea,
         recorded_at: datetime,
@@ -218,16 +249,16 @@ class ProcesadorAlertasIngesta:
         pub: PublicadorEventosPort | None,
         log: LoggerPort | None,
     ) -> list[AlertaDispositivo]:
-        alertas_raw = AnalizadorCalidadEnergiaService.evaluar_alertas_distorsion_armonica(dispositivo_id, lectura)
+        alertas_raw = AnalizadorCalidadEnergiaService.evaluar_alertas_distorsion_armonica(dispositivo.id, lectura)
         for a_thd in alertas_raw:
             a_filtrada = cls._filtro_persistencia.procesar_alerta(
-                dispositivo.id if (dispositivo := None) else dispositivo_id,
+                dispositivo.id,
                 a_thd,
                 categoria=f"DISTORSION_ARMONICA_{a_thd.tipo_alerta}_{a_thd.fase or 'ALL'}",
                 ahora=recorded_at,
             )
             if a_filtrada:
-                cls._despachar_alerta(a_filtrada, mac_raw, repo, pub, log)
+                cls._despachar_alerta(a_filtrada, mac_raw, repo, pub, log, dispositivo)
         return alertas_raw
 
     @classmethod
@@ -305,13 +336,13 @@ class ProcesadorAlertasIngesta:
         fases_con_ti_raw = getattr(dispositivo, "fases_con_ti", "R,S,T")
         es_monofasico = AnalizadorCalidadEnergiaService.es_instalacion_monofasica(tipo_instalacion, fases_con_ti_raw)
 
-        t_raw = cls._evaluar_tension(dispositivo.id, mac_raw, lectura, recorded_at, repo_telemetria, publicador, logger)
+        t_raw = cls._evaluar_tension(dispositivo, mac_raw, lectura, recorded_at, repo_telemetria, publicador, logger)
         d_raw = cls._evaluar_desbalance(
-            dispositivo.id, mac_raw, lectura, es_monofasico, recorded_at, repo_telemetria, publicador, logger
+            dispositivo, mac_raw, lectura, es_monofasico, recorded_at, repo_telemetria, publicador, logger
         )
         ti_raw = cls._evaluar_ti(dispositivo, mac_raw, lectura, recorded_at, repo_telemetria, publicador, logger)
-        fp_raw = cls._evaluar_fp(dispositivo.id, mac_raw, lectura, recorded_at, repo_telemetria, publicador, logger)
-        thd_raw = cls._evaluar_thd(dispositivo.id, mac_raw, lectura, recorded_at, repo_telemetria, publicador, logger)
+        fp_raw = cls._evaluar_fp(dispositivo, mac_raw, lectura, recorded_at, repo_telemetria, publicador, logger)
+        thd_raw = cls._evaluar_thd(dispositivo, mac_raw, lectura, recorded_at, repo_telemetria, publicador, logger)
 
         cls._auto_resolver_todas_normalizadas(
             dispositivo.id,

@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import StreamingResponse
 
 from src.application.dtos.carga_dto import (
     AnalisisConsumoResponseDTO,
@@ -20,6 +21,7 @@ from src.application.mappers.carga_mapper import CargaMapper
 from src.application.use_cases.analizar_consumo import ZONA_POR_DEFECTO, AnalizarConsumoUseCase
 from src.application.use_cases.atribuir_consumo import AtribuirConsumoUseCase
 from src.application.use_cases.caracterizar_carga import CaracterizarCargaUseCase
+from src.application.use_cases.exportar_cargas import ExportarCargasUseCase
 from src.application.use_cases.gestionar_cargas import GestionarCargasUseCase
 from src.domain.cargas.servicios.presets_cargas import CatalogoPresetsCargas
 from src.infrastructure.fastapi.dependencies import (
@@ -27,6 +29,7 @@ from src.infrastructure.fastapi.dependencies import (
     get_atribucion_use_case,
     get_caracterizacion_use_case,
     get_cargas_use_case,
+    get_exportar_cargas_use_case,
     get_usuario_actual,
     requiere_rol_escritura,
 )
@@ -321,5 +324,30 @@ def listar_intervalos_de_carga(
 ):
     try:
         return use_case.listar_intervalos(carga_id, limite=limite)
+    except Exception as e:
+        manejar_error_http(e)
+
+
+@router.get("/exportar/csv")
+def exportar_cargas_csv(
+    dispositivo_id: Annotated[str, Query(description="Dispositivo a consultar (UUID).")],
+    use_case: Annotated[ExportarCargasUseCase, Depends(get_exportar_cargas_use_case)],
+    desde: datetime | None = None,
+    hasta: datetime | None = None,
+    dias: Annotated[int, Query(ge=1, le=365)] = 30,
+    solo_no_atribuidos: bool = False,
+):
+    try:
+        stream = use_case.ejecutar(
+            dispositivo_id=dispositivo_id,
+            desde=desde,
+            hasta=hasta,
+            dias=dias,
+            solo_no_atribuidos=solo_no_atribuidos,
+        )
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"cargas_{dispositivo_id}_{ts}.csv"
+        headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+        return StreamingResponse(stream, media_type="text/csv; charset=utf-8", headers=headers)
     except Exception as e:
         manejar_error_http(e)

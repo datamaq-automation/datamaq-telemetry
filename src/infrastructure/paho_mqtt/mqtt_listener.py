@@ -64,6 +64,27 @@ class MQTTListener:
         self._esta_conectado = False
         self.is_running = False
 
+        if self.settings.ALERTAS_EMAIL_HABILITADAS:
+            self._configurar_notificador_alertas()
+
+    def _configurar_notificador_alertas(self) -> None:
+        from src.application.use_cases.ingesta.procesador_alertas_ingesta import (
+            ProcesadorAlertasIngesta,
+        )
+        from src.infrastructure.auth.email_service import SmtpEmailService
+
+        notificador = SmtpEmailService(
+            host=self.settings.SMTP_HOST,
+            port=self.settings.SMTP_PORT,
+            user=self.settings.SMTP_USER,
+            password=self.settings.SMTP_PASSWORD,
+            use_tls=self.settings.SMTP_TLS,
+            from_email=self.settings.SMTP_FROM,
+            app_env=self.settings.APP_ENV,
+        )
+        dests = [d.strip() for d in self.settings.ALERTAS_EMAIL_DESTINATARIOS.split(",") if d.strip()]
+        ProcesadorAlertasIngesta.configurar_notificador(notificador, dests)
+
     def _on_connect(self, client, userdata, flags, reason_code, properties=None):
         if reason_code == 0:
             self._esta_conectado = True

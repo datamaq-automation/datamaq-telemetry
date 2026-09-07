@@ -68,6 +68,11 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = "https://www.datamaq.com.ar"
     RECUPERACION_TOKEN_EXPIRA_MINUTOS: int = 15
 
+    # Notificaciones de Alertas Críticas por Email
+    ALERTAS_EMAIL_HABILITADAS: bool = True
+    ALERTAS_EMAIL_DESTINATARIOS: str = ""
+    ALERTAS_EMAIL_COOLDOWN_MINUTOS: int = 30
+
     # Logging
     LOG_FORMAT: str | None = None  # "console" (clean CLI) o "json" (VPS production)
     LOG_LEVEL: str | None = None

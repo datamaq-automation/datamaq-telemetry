@@ -3,6 +3,7 @@ from datetime import timezone as tz
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import StreamingResponse
 
 from src.application.dtos.alerta_dto import AlertaResponseDTO
 from src.application.dtos.telemetria_dto import (
@@ -13,9 +14,11 @@ from src.application.dtos.telemetria_dto import (
 )
 from src.application.dtos.tipos import FechaHoraUTC
 from src.application.use_cases.consultar_telemetria import ConsultarTelemetriaUseCase
+from src.application.use_cases.exportar_telemetria import ExportarTelemetriaUseCase
 from src.application.use_cases.gestionar_alertas import GestionarAlertasUseCase
 from src.infrastructure.fastapi.dependencies import (
     get_alertas_use_case,
+    get_exportar_telemetria_use_case,
     get_telemetria_use_case,
     get_usuario_actual,
 )
@@ -97,5 +100,28 @@ def get_alerts_history(
             desde=desde,
             hasta=hasta,
         )
+    except Exception as e:
+        manejar_error_http(e)
+
+
+@router.get("/exportar/csv")
+def exportar_telemetria_csv(
+    dispositivo_id: str = Query(..., description="ID del dispositivo a exportar"),
+    use_case: Annotated[ExportarTelemetriaUseCase, Depends(get_exportar_telemetria_use_case)] = None,  # type: ignore
+    desde: FechaHoraUTC | None = Query(None, description="Fecha de inicio ISO8601 UTC"),
+    hasta: FechaHoraUTC | None = Query(None, description="Fecha de fin ISO8601 UTC"),
+    limite: int = Query(10000, ge=1, le=50000, description="Límite máximo de lecturas"),
+):
+    try:
+        stream = use_case.ejecutar(
+            dispositivo_id=dispositivo_id,
+            desde=desde,
+            hasta=hasta,
+            limite=limite,
+        )
+        ts = datetime.now(tz.utc).strftime("%Y%m%d_%H%M%S")
+        filename = f"telemetria_{dispositivo_id}_{ts}.csv"
+        headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+        return StreamingResponse(stream, media_type="text/csv; charset=utf-8", headers=headers)
     except Exception as e:
         manejar_error_http(e)

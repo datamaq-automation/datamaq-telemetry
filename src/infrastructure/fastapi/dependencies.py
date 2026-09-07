@@ -12,6 +12,13 @@ from src.application.use_cases.atribuir_consumo import AtribuirConsumoUseCase
 from src.application.use_cases.autenticar_usuario import AutenticarUsuarioUseCase
 from src.application.use_cases.caracterizar_carga import CaracterizarCargaUseCase
 from src.application.use_cases.consultar_telemetria import ConsultarTelemetriaUseCase
+from src.application.use_cases.exportar_cargas import ExportarCargasUseCase
+from src.application.use_cases.exportar_disponibilidad import (
+    ExportarDisponibilidadUseCase,
+)
+from src.application.use_cases.exportar_telemetria import (
+    ExportarTelemetriaUseCase,
+)
 from src.application.use_cases.gestionar_2fa import (
     Activar2FAUseCase,
     Desactivar2FAUseCase,
@@ -122,6 +129,33 @@ def get_telemetria_use_case(
     repo_planes = MySQLPlanesRepository(db)
     return ConsultarTelemetriaUseCase(
         repo_telem, repo_disp, repo_org, repo_planes, buffer_en_vivo=global_telemetria_buffer
+    )
+
+
+def get_exportar_telemetria_use_case(
+    db: Annotated[Session, Depends(get_db_session)],
+) -> ExportarTelemetriaUseCase:
+    return ExportarTelemetriaUseCase(
+        repo_telemetria=MySQLTelemetriaRepository(db),
+        repo_dispositivos=MySQLDispositivosRepository(db),
+    )
+
+
+def get_exportar_disponibilidad_use_case(
+    db: Annotated[Session, Depends(get_db_session)],
+) -> ExportarDisponibilidadUseCase:
+    return ExportarDisponibilidadUseCase(
+        repo_maquinas=MySQLMaquinasRepository(db),
+        repo_eventos=MySQLEventosDisponibilidadRepository(db),
+    )
+
+
+def get_exportar_cargas_use_case(
+    db: Annotated[Session, Depends(get_db_session)],
+) -> ExportarCargasUseCase:
+    return ExportarCargasUseCase(
+        repo_cargas=MySQLCargasRepository(db),
+        repo_intervalos=MySQLIntervalosActividadRepository(db),
     )
 
 

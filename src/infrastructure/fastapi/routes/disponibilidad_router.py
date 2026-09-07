@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import StreamingResponse
 
 from src.application.dtos.disponibilidad_dto import (
     CorregirClasificacionRequestDTO,
@@ -16,10 +17,14 @@ from src.application.dtos.maquina_dto import (
     MaquinaResponseDTO,
     MaquinaUpdateDTO,
 )
+from src.application.use_cases.exportar_disponibilidad import (
+    ExportarDisponibilidadUseCase,
+)
 from src.application.use_cases.gestionar_disponibilidad import GestionarDisponibilidadUseCase
 from src.application.use_cases.gestionar_maquinas import GestionarMaquinasUseCase
 from src.infrastructure.fastapi.dependencies import (
     get_disponibilidad_use_case,
+    get_exportar_disponibilidad_use_case,
     get_maquinas_use_case,
     get_usuario_actual,
     requiere_rol_escritura,
@@ -164,5 +169,23 @@ def registrar_parada_programada(
     try:
         usuario_id = claims.get("sub")
         return use_case.registrar_parada_programada(dto, usuario_id=usuario_id)
+    except Exception as e:
+        manejar_error_http(e)
+
+
+@router.get("/maquinas/{maquina_id}/exportar/csv")
+def exportar_disponibilidad_csv(
+    maquina_id: str,
+    use_case: Annotated[ExportarDisponibilidadUseCase, Depends(get_exportar_disponibilidad_use_case)],
+    desde: Annotated[datetime | None, Query(description="Fecha inicio ISO8601")] = None,
+    hasta: Annotated[datetime | None, Query(description="Fecha fin ISO8601")] = None,
+    dias: Annotated[int, Query(ge=1, le=90, description="Días hacia atrás si no se especifica desde")] = 30,
+):
+    try:
+        stream = use_case.ejecutar(maquina_id=maquina_id, desde=desde, hasta=hasta, dias=dias)
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"disponibilidad_{maquina_id}_{ts}.csv"
+        headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+        return StreamingResponse(stream, media_type="text/csv; charset=utf-8", headers=headers)
     except Exception as e:
         manejar_error_http(e)

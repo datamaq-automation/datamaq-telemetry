@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 from datetime import datetime
 
 from src.domain.telemetria.entities import (
@@ -72,6 +73,19 @@ class RepositorioTelemetriaPort(ABC):
         desde: datetime | None = None,
     ) -> list[LecturaInstantanea]:
         pass
+
+    def iterar_instantaneas(
+        self,
+        dispositivo_id: str,
+        desde: datetime | None = None,
+        hasta: datetime | None = None,
+        limite: int = 10000,
+        chunk_size: int = 500,
+    ) -> Iterator[LecturaInstantanea]:
+        items = self.listar_instantaneas(dispositivo_id, limite=limite, desde=desde)
+        if hasta:
+            items = [i for i in items if i.registrado_en <= hasta]
+        yield from items
 
     @abstractmethod
     def listar_energias(
@@ -225,4 +239,15 @@ class LoggerPort(ABC):
 
     @abstractmethod
     def debug(self, evento: str, **kwargs: object) -> None:
+        pass
+
+
+class NotificadorAlertasPort(ABC):
+    @abstractmethod
+    def notificar_alerta_critica(
+        self,
+        alerta: AlertaDispositivo,
+        dispositivo: Dispositivo,
+        destinatarios: list[str],
+    ) -> bool:
         pass
