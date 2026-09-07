@@ -150,7 +150,12 @@ def test_token_revocation_service():
 
 @pytest.mark.asyncio
 async def test_security_headers_middleware_defensivos():
-    settings = Settings(DEBUG=False)
+    settings = Settings(
+        _env_file=None,
+        DEBUG=False,
+        API_SECRET_KEY="secreto-fuerte-super-seguro-123456",
+        DB_PASSWORD="clave-segura",
+    )
     app_mock = MagicMock()
 
     async def mock_call_next(request):
