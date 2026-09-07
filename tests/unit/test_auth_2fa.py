@@ -421,3 +421,47 @@ def test_handlers_http_2fa_flujo_completo(totp_service, cifrador, token_service)
     )
     assert res.token is not None
     assert "set-cookie" in response.headers
+
+
+def test_me_retorna_totp_enabled_true_cuando_usuario_lo_tiene_activo(token_service):
+    usuario = UsuarioAuth(
+        id="usr-totp-1",
+        usuario="admin@datamaq.com.ar",
+        hash_contrasena=HashContrasenaService.generar_hash("secreto123"),
+        rol="superadmin",
+        totp_enabled=True,
+    )
+    repo = MockRepoUsuarios([usuario])
+    use_case = AutenticarUsuarioUseCase(
+        repo_usuarios=repo,
+        hash_service=HashContrasenaService(),
+        token_service=token_service,
+        minutos_validez=60,
+    )
+
+    dto = use_case.me({"sub": "usr-totp-1", "usuario": "admin@datamaq.com.ar", "rol": "superadmin"})
+    assert dto.usuario == "admin@datamaq.com.ar"
+    assert dto.rol == "superadmin"
+    assert dto.totp_enabled is True
+
+
+def test_me_retorna_totp_enabled_false_cuando_usuario_no_lo_tiene(token_service):
+    usuario = UsuarioAuth(
+        id="usr-totp-2",
+        usuario="operador@datamaq.com.ar",
+        hash_contrasena=HashContrasenaService.generar_hash("secreto123"),
+        rol="operador",
+        totp_enabled=False,
+    )
+    repo = MockRepoUsuarios([usuario])
+    use_case = AutenticarUsuarioUseCase(
+        repo_usuarios=repo,
+        hash_service=HashContrasenaService(),
+        token_service=token_service,
+        minutos_validez=60,
+    )
+
+    dto = use_case.me({"sub": "usr-totp-2", "usuario": "operador@datamaq.com.ar", "rol": "operador"})
+    assert dto.usuario == "operador@datamaq.com.ar"
+    assert dto.rol == "operador"
+    assert dto.totp_enabled is False

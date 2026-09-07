@@ -3,6 +3,7 @@ import hashlib
 import hmac
 import math
 import secrets
+import time
 from datetime import datetime, timedelta, timezone
 
 
@@ -82,10 +83,11 @@ class RateLimiterService:
         limite = ahora - timedelta(seconds=self.ventana_segundos)
         self._intentos[clave] = [t for t in self._intentos.get(clave, []) if t > limite]
 
-    def permitir(self, clave: str) -> bool:
+    def permitir(self, clave: str, max_intentos: int | None = None) -> bool:
         ahora = datetime.now(timezone.utc)
         self._purgar(clave, ahora)
-        return len(self._intentos.get(clave, [])) < self.max_intentos
+        limite = max_intentos if max_intentos is not None else self.max_intentos
+        return len(self._intentos.get(clave, [])) < limite
 
     def registrar_intento(self, clave: str) -> None:
         ahora = datetime.now(timezone.utc)
@@ -104,16 +106,35 @@ class RateLimiterService:
     def resetear(self, clave: str) -> None:
         self._intentos.pop(clave, None)
 
-    def segundos_restantes(self, clave: str) -> int:
+    def segundos_restantes(self, clave: str, max_intentos: int | None = None) -> int:
         """Segundos restantes de bloqueo; 0 si la clave aún está permitida."""
         ahora = datetime.now(timezone.utc)
         self._purgar(clave, ahora)
         intentos = self._intentos.get(clave, [])
-        if len(intentos) < self.max_intentos:
+        limite = max_intentos if max_intentos is not None else self.max_intentos
+        if len(intentos) < limite:
             return 0
         mas_antiguo = min(intentos)
         edad = (ahora - mas_antiguo).total_seconds()
         return max(1, math.ceil(self.ventana_segundos - edad))
+
+
+class TokenRevocationService:
+    """Mantiene en memoria el registro de timestamps de revocación de sesiones por usuario."""
+
+    def __init__(self, ventana_retencion_segundos: int = 7200):
+        self.ventana_retencion_segundos = ventana_retencion_segundos
+        self._revocaciones: dict[str, int] = {}
+
+    def revocar_usuario(self, usuario_id: str, timestamp: int | None = None) -> None:
+        ts = timestamp if timestamp is not None else int(time.time())
+        self._revocaciones[usuario_id] = ts
+
+    def esta_revocado(self, usuario_id: str, iat: int) -> bool:
+        ts_revocacion = self._revocaciones.get(usuario_id)
+        if ts_revocacion is None:
+            return False
+        return iat < ts_revocacion
 
 
 class CodigosRespaldoService:

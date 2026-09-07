@@ -29,9 +29,25 @@ class AutenticarUsuarioUseCase:
         if self.rate_limiter is not None:
             self.rate_limiter.registrar_intento(clave)
 
-    def login(self, dto: LoginRequestDTO, clave_limite: str | None = None) -> LoginResponseDTO:
+    def login(
+        self,
+        dto: LoginRequestDTO,
+        clave_limite: str | None = None,
+        clave_ip: str | None = None,
+    ) -> LoginResponseDTO:
         nombre = NombreUsuario(dto.usuario).valor
         clave = clave_limite if clave_limite is not None else nombre
+
+        # Mitigación de Password Spraying horizontal por IP (máx 20 intentos en 5 min)
+        if clave_ip and self.rate_limiter is not None:
+            k_ip = f"ip:{clave_ip}"
+            if not self.rate_limiter.permitir(k_ip, max_intentos=20):
+                raise DemasiadosIntentosError(
+                    "Demasiados intentos fallidos desde esta dirección IP. Intente más tarde.",
+                    usuario=nombre,
+                    retry_after_seg=self.rate_limiter.segundos_restantes(k_ip, max_intentos=20),
+                )
+
         if self.rate_limiter is not None and not self.rate_limiter.permitir(clave):
             raise DemasiadosIntentosError(
                 "Demasiados intentos de inicio de sesión. Intente más tarde.",
@@ -41,9 +57,13 @@ class AutenticarUsuarioUseCase:
         usuario = self.repo_usuarios.obtener_por_usuario(nombre)
         if usuario is None:
             self._registrar_intento(clave)
+            if clave_ip and self.rate_limiter is not None:
+                self.rate_limiter.registrar_intento(f"ip:{clave_ip}")
             raise CredencialesInvalidasError("Credenciales inválidas.", usuario=nombre)
         if not self.hash_service.verificar(dto.contrasena, usuario.hash_contrasena):
             self._registrar_intento(clave)
+            if clave_ip and self.rate_limiter is not None:
+                self.rate_limiter.registrar_intento(f"ip:{clave_ip}")
             raise CredencialesInvalidasError("Credenciales inválidas.", usuario=nombre)
         if not usuario.esta_activo:
             raise UsuarioInactivoError("El usuario se encuentra inactivo.", usuario=nombre)
@@ -79,4 +99,16 @@ class AutenticarUsuarioUseCase:
         if rol not in ROLES_VALIDOS:
             raise CredencialesInvalidasError("Rol inválido en los claims del token.")
         usuario = str(claims.get("usuario") or claims.get("sub") or "anon")
-        return MeResponseDTO(usuario=usuario, rol=rol)
+
+        # Obtener el estado real de 2FA desde el repositorio
+        totp_enabled = False
+        sub = str(claims.get("sub") or "")
+        user = None
+        if sub and sub != "anon":
+            user = self.repo_usuarios.obtener_por_id(sub)
+        if user is None and usuario != "anon":
+            user = self.repo_usuarios.obtener_por_usuario(usuario)
+        if user is not None:
+            totp_enabled = bool(user.totp_enabled)
+
+        return MeResponseDTO(usuario=usuario, rol=rol, totp_enabled=totp_enabled)

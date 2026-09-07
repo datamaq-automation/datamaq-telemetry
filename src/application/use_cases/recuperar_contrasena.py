@@ -8,6 +8,7 @@ from src.application.dtos.auth_dto import (
 )
 from src.domain.auth.exceptions import (
     ContrasenaDebilError,
+    DemasiadosIntentosError,
     TokenRecuperacionInvalidoError,
 )
 from src.domain.auth.ports import (
@@ -15,7 +16,11 @@ from src.domain.auth.ports import (
     RepositorioUsuariosPort,
     ServicioEmailPort,
 )
-from src.domain.auth.services import HashContrasenaService
+from src.domain.auth.services import (
+    HashContrasenaService,
+    RateLimiterService,
+    TokenRevocationService,
+)
 from src.domain.auth.value_objects import NombreUsuario
 
 
@@ -29,15 +34,53 @@ class SolicitarRecuperacionContrasenaUseCase:
         servicio_email: ServicioEmailPort,
         frontend_url: str = "https://www.datamaq.com.ar",
         minutos_expiracion: int = 15,
+        rate_limiter: RateLimiterService | None = None,
+        max_solicitudes_usuario: int = 3,
+        max_solicitudes_ip: int = 10,
     ):
         self.repositorio_usuarios = repositorio_usuarios
         self.generador_token = generador_token
         self.servicio_email = servicio_email
         self.frontend_url = frontend_url
         self.minutos_expiracion = minutos_expiracion
+        self.rate_limiter = rate_limiter
+        self.max_solicitudes_usuario = max_solicitudes_usuario
+        self.max_solicitudes_ip = max_solicitudes_ip
 
-    def ejecutar(self, dto: SolicitarRecuperacionDTO) -> Operacion2FAResponseDTO:
+    def ejecutar(
+        self,
+        dto: SolicitarRecuperacionDTO,
+        clave_ip: str | None = None,
+    ) -> Operacion2FAResponseDTO:
         usuario_str = NombreUsuario(dto.usuario).valor
+
+        # Rate limiting anti-flooding por IP
+        if clave_ip and self.rate_limiter is not None:
+            k_ip = f"recup:ip:{clave_ip}"
+            if not self.rate_limiter.permitir(k_ip, max_intentos=self.max_solicitudes_ip):
+                raise DemasiadosIntentosError(
+                    "Demasiadas solicitudes de recuperación desde esta dirección IP. Intente más tarde.",
+                    usuario=usuario_str,
+                    retry_after_seg=self.rate_limiter.segundos_restantes(k_ip, max_intentos=self.max_solicitudes_ip),
+                )
+
+        # Rate limiting anti-flooding por usuario
+        if self.rate_limiter is not None:
+            k_usr = f"recup:usr:{usuario_str}"
+            if not self.rate_limiter.permitir(k_usr, max_intentos=self.max_solicitudes_usuario):
+                raise DemasiadosIntentosError(
+                    "Demasiadas solicitudes de recuperación para este usuario. Intente más tarde.",
+                    usuario=usuario_str,
+                    retry_after_seg=self.rate_limiter.segundos_restantes(
+                        k_usr, max_intentos=self.max_solicitudes_usuario
+                    ),
+                )
+
+        # Registrar intento en ambas dimensiones
+        if self.rate_limiter is not None:
+            self.rate_limiter.registrar_intento(f"recup:usr:{usuario_str}")
+            if clave_ip:
+                self.rate_limiter.registrar_intento(f"recup:ip:{clave_ip}")
         usuario = self.repositorio_usuarios.obtener_por_usuario(usuario_str)
 
         if usuario and usuario.esta_activo:
@@ -67,10 +110,12 @@ class RestablecerContrasenaUseCase:
         repositorio_usuarios: RepositorioUsuariosPort,
         generador_token: GeneradorTokenPort,
         hash_service: HashContrasenaService,
+        revocation_service: TokenRevocationService | None = None,
     ):
         self.repositorio_usuarios = repositorio_usuarios
         self.generador_token = generador_token
         self.hash_service = hash_service
+        self.revocation_service = revocation_service
 
     def ejecutar(self, dto: RestablecerContrasenaDTO) -> Operacion2FAResponseDTO:
         payload = self.generador_token.verificar_recuperacion(dto.token)
@@ -96,6 +141,10 @@ class RestablecerContrasenaUseCase:
         usuario.hash_contrasena = self.hash_service.generar_hash(dto.nueva_contrasena)
         usuario.actualizado_en = datetime.now(timezone.utc)
         self.repositorio_usuarios.guardar(usuario)
+
+        # Revocación inmediata de todas las sesiones activas previas
+        if self.revocation_service is not None:
+            self.revocation_service.revocar_usuario(usuario.id)
 
         return Operacion2FAResponseDTO(
             exito=True,

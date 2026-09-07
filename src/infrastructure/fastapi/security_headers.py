@@ -21,11 +21,24 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+        response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+        response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
 
         if not self._settings.DEBUG:
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
 
-        if self._settings.CSP_HEADER:
-            response.headers["Content-Security-Policy"] = self._settings.CSP_HEADER
+        csp = self._settings.CSP_HEADER
+        if not csp:
+            path = request.scope.get("path", "")
+            if path in ("/docs", "/redoc", "/openapi.json"):
+                csp = (
+                    "default-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                    "img-src 'self' data: https://fastapi.tiangolo.com; "
+                    "frame-ancestors 'none';"
+                )
+            else:
+                csp = "default-src 'none'; frame-ancestors 'none';"
+        response.headers["Content-Security-Policy"] = csp
 
         return response

@@ -42,7 +42,11 @@ from src.domain.auth.ports import (
     ServicioEmailPort,
     ServicioTOTPPort,
 )
-from src.domain.auth.services import HashContrasenaService, RateLimiterService
+from src.domain.auth.services import (
+    HashContrasenaService,
+    RateLimiterService,
+    TokenRevocationService,
+)
 from src.infrastructure.auth.cifrador_2fa import CifradorSecreto2FA
 from src.infrastructure.auth.email_service import SmtpEmailService
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
@@ -340,6 +344,11 @@ def get_token_service(
     return JwtTokenService(settings.API_SECRET_KEY)
 
 
+@lru_cache(maxsize=1)
+def get_token_revocation_service() -> TokenRevocationService:
+    return TokenRevocationService()
+
+
 def get_solicitar_recuperacion_use_case(
     usuarios_repo: Annotated[RepositorioUsuariosPort, Depends(get_usuarios_repository)],
     token_service: Annotated[GeneradorTokenPort, Depends(get_token_service)],
@@ -352,6 +361,7 @@ def get_solicitar_recuperacion_use_case(
         servicio_email=email_service,
         frontend_url=settings.FRONTEND_URL,
         minutos_expiracion=settings.RECUPERACION_TOKEN_EXPIRA_MINUTOS,
+        rate_limiter=get_rate_limiter(),
     )
 
 
@@ -363,6 +373,7 @@ def get_restablecer_contrasena_use_case(
         repositorio_usuarios=usuarios_repo,
         generador_token=token_service,
         hash_service=HashContrasenaService(),
+        revocation_service=get_token_revocation_service(),
     )
 
 
@@ -404,6 +415,12 @@ def get_usuario_actual(
     claims = token_service.verificar(token, adicionales)
     if claims is None:
         raise HTTPException(status_code=401, detail="credenciales_invalidas")
+
+    # Verificación de revocación de sesión por cambio de contraseña o logout
+    revocation = get_token_revocation_service()
+    if revocation.esta_revocado(str(claims.get("sub", "")), int(claims.get("iat", 0))):
+        raise HTTPException(status_code=401, detail="credenciales_invalidas")
+
     return claims
 
 

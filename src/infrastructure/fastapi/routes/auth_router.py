@@ -62,9 +62,15 @@ def login(
     use_case: Annotated[AutenticarUsuarioUseCase, Depends(get_auth_use_case)],
     response: Response,
     settings: Annotated[Settings, Depends(get_settings_dep)],
+    request: Request = None,  # type: ignore[assignment]
 ):
     try:
-        resultado = use_case.login(dto)
+        ip = "desconocida"
+        if request is not None:
+            ip = request.headers.get("X-Forwarded-For", "").split(",")[0].strip() or (
+                request.client.host if request.client else "desconocida"
+            )
+        resultado = use_case.login(dto, clave_ip=ip)
         logger.info(
             "login_exitoso",
             usuario=dto.usuario,
@@ -177,9 +183,15 @@ def solicitar_recuperacion(
         SolicitarRecuperacionContrasenaUseCase,
         Depends(get_solicitar_recuperacion_use_case),
     ],
+    request: Request = None,  # type: ignore[assignment]
 ) -> Operacion2FAResponseDTO:
     try:
-        return use_case.ejecutar(dto)
+        ip = "desconocida"
+        if request is not None:
+            ip = request.headers.get("X-Forwarded-For", "").split(",")[0].strip() or (
+                request.client.host if request.client else "desconocida"
+            )
+        return use_case.ejecutar(dto, clave_ip=ip)
     except Exception as e:
         manejar_error_http(e)
 

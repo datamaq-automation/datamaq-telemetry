@@ -54,11 +54,20 @@ def test_hsts_ausente_en_debug():
     assert "Strict-Transport-Security" not in respuesta.headers
 
 
-def test_csp_ausente_si_header_vacio():
+def test_headers_owasp_adicionales_presentes():
     client = TestClient(_app_con_headers(_settings_prod()))
     respuesta = client.get("/ping")
 
-    assert "Content-Security-Policy" not in respuesta.headers
+    assert "Permissions-Policy" in respuesta.headers
+    assert respuesta.headers["Cross-Origin-Opener-Policy"] == "same-origin"
+    assert respuesta.headers["Cross-Origin-Resource-Policy"] == "same-origin"
+
+
+def test_csp_por_defecto_en_api():
+    client = TestClient(_app_con_headers(_settings_prod()))
+    respuesta = client.get("/ping")
+
+    assert respuesta.headers["Content-Security-Policy"] == "default-src 'none'; frame-ancestors 'none';"
 
 
 def test_csp_presente_si_configurado():

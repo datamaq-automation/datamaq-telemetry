@@ -20,6 +20,7 @@ class LoginResponseDTO(BaseModel):
 class MeResponseDTO(BaseModel):
     usuario: str
     rol: Literal["superadmin", "admin", "operador", "invitado"]
+    totp_enabled: bool = False
 
 
 class Verificar2FARequestDTO(BaseModel):
