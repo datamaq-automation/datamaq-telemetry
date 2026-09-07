@@ -1,33 +1,24 @@
 #!/usr/bin/env python3
-"""Script de diagnóstico metrológico para simulación de rotación y permutación fasorial.
+"""Script delgado de diagnóstico metrológico para simulación de rotación fasorial.
 
-Analiza lecturas eléctricas trifásicas para detectar transposiciones físicas entre
-canales de tensión (V) y corriente (I), evaluando la convergencia del Factor de Potencia.
+Delega 100% de la lógica fasorial a src.domain.telemetria.services.AnalizadorFasorialService.
 """
 
 from __future__ import annotations
 
 import argparse
 import csv
-import math
 import sys
 from pathlib import Path
 
+# Garantizar PYTHONPATH para importar desde src/
+ROOT_DIR = Path(__file__).resolve().parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
 
-def calcular_fasor_fase(p: float, q: float) -> tuple[float, float]:
-    s = math.sqrt(p**2 + q**2)
-    fp = p / s if s > 0 else 0.0
-    phi_rad = math.atan2(q, p)
-    return fp, math.degrees(phi_rad)
-
-
-def rotar_fasor(p: float, q: float, shift_deg: float) -> tuple[float, float, float]:
-    s = math.sqrt(p**2 + q**2)
-    phi = math.atan2(q, p) + math.radians(shift_deg)
-    p_rot = s * math.cos(phi)
-    q_rot = s * math.sin(phi)
-    fp_rot = p_rot / s if s > 0 else 0.0
-    return fp_rot, p_rot, q_rot
+from src.domain.telemetria.entities import MedicionFase  # noqa: E402
+from src.domain.telemetria.services import AnalizadorFasorialService  # noqa: E402
+from src.domain.telemetria.value_objects import PotenciaActiva, PotenciaReactiva  # noqa: E402
 
 
 def analizar_archivo_csv(ruta_csv: Path, filtro_fecha: str | None = None) -> None:
@@ -37,19 +28,15 @@ def analizar_archivo_csv(ruta_csv: Path, filtro_fecha: str | None = None) -> Non
 
     with open(ruta_csv, encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
-        rows = list(reader)
-
-    if filtro_fecha:
-        rows = [r for r in rows if filtro_fecha in r.get("timestamp_LOCAL", "")]
+        rows = [r for r in reader if not filtro_fecha or filtro_fecha in r.get("timestamp_LOCAL", "")]
 
     if not rows:
         print("No se encontraron registros con el filtro indicado.", file=sys.stderr)
         return
 
     print(f"=== ANÁLISIS DE ROTACIÓN FASORIAL METROLÓGICA ({len(rows)} muestras) ===")
-    angulos_prueba = [-120, -60, +60, +120, 180]
 
-    for fase, col_p, col_q in [
+    for fase_nombre, col_p, col_q in [
         ("Fase R", "Potencia Activa Por Fase (P_R) [W]", "Potencia Reactiva Por Fase (Q_R) [VAr]"),
         ("Fase S", "Potencia Activa Por Fase (P_S) [W]", "Potencia Reactiva Por Fase (Q_S) [VAr]"),
         ("Fase T", "Potencia Activa Por Fase (P_T) [W]", "Potencia Reactiva Por Fase (Q_T) [VAr]"),
@@ -61,15 +48,23 @@ def analizar_archivo_csv(ruta_csv: Path, filtro_fecha: str | None = None) -> Non
 
         p_prom = sum(p_vals) / len(p_vals)
         q_prom = sum(q_vals) / len(q_vals)
-        fp_orig, phi_orig = calcular_fasor_fase(p_prom, q_prom)
+
+        fase = MedicionFase(
+            potencia_activa=PotenciaActiva(p_prom),
+            potencia_reactiva=PotenciaReactiva(q_prom),
+        )
+        res = AnalizadorFasorialService.evaluar_fase(fase)
 
         print(
-            f"\n[{fase}] Promedio Original: FP={fp_orig:+.3f} | Phi={phi_orig:+.1f}° | P={p_prom:+.0f}W | Q={q_prom:+.0f}VAr"
+            f"\n[{fase_nombre}] Promedio Original: FP={res.fp_original:+.3f} | Phi={res.phi_deg_original:+.1f}° | P={res.potencia_activa_w:+.0f}W | Q={res.potencia_reactiva_var:+.0f}VAr"
         )
-        for shift in angulos_prueba:
-            fp_rot, p_rot, q_rot = rotar_fasor(p_prom, q_prom, shift)
-            marcador = " <<< ÓPTIMO (>0.85)" if fp_rot >= 0.85 else ""
-            print(f"  Rotación {shift:+4d}°: FP={fp_rot:+.3f} | P={p_rot:+8.0f}W | Q={q_rot:+8.0f}VAr{marcador}")
+        for angulo, m in res.rotaciones_evaluadas.items():
+            if angulo == "0°":
+                continue
+            marcador = " <<< ÓPTIMO (>0.85)" if m["fp"] >= 0.85 and m["p_w"] > 0 else ""
+            print(
+                f"  Rotación {angulo:>5s}: FP={m['fp']:+.3f} | P={m['p_w']:+8.0f}W | Q={m['q_var']:+8.0f}VAr{marcador}"
+            )
 
 
 if __name__ == "__main__":
