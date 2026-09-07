@@ -1,5 +1,6 @@
 import cmath
 import math
+from datetime import datetime
 
 from src.domain.telemetria.analizador_reactiva import DimensionadorCompensacionService
 from src.domain.telemetria.entities import LecturaInstantanea, MedicionFase
@@ -95,24 +96,14 @@ class AnalizadorMetrologicoService:
         qs: float | None = None,
         qt: float | None = None,
     ) -> Corriente | None:
-        """Calcula la corriente de neutro estimada (RMS) mediante suma fasorial de Kirchhoff.
-
-        I_N = - (I_R + I_S + I_T)
-        Con desfase angular de 120° entre fases y ángulo de carga phi = atan2(Q, P).
-        """
+        """Calcula la corriente de neutro estimada (RMS) mediante suma fasorial de Kirchhoff."""
         if ir is None or is_ is None or it is None:
             return None
 
-        th_vr = 0.0
-        th_vs = -2.0 * math.pi / 3.0  # -120°
-        th_vt = 2.0 * math.pi / 3.0  # +120°
+        th_vr, th_vs, th_vt = 0.0, -2.0 * math.pi / 3.0, 2.0 * math.pi / 3.0
 
         def _calc_phi(p: float | None, q: float | None) -> float:
-            if p is None or q is None:
-                return 0.0
-            if p == 0.0 and q == 0.0:
-                return 0.0
-            return math.atan2(q, p)
+            return math.atan2(q, p) if p and q else 0.0
 
         phi_r = _calc_phi(pr, qr)
         phi_s = _calc_phi(ps, qs)
@@ -123,8 +114,7 @@ class AnalizadorMetrologicoService:
         i_t = cmath.rect(it, th_vt - phi_t)
 
         i_n = -(i_r + i_s + i_t)
-        in_rms = round(abs(i_n), 2)
-        return Corriente(amperios=in_rms)
+        return Corriente(amperios=round(abs(i_n), 2))
 
     @staticmethod
     def calcular_tension_neutro(
@@ -141,33 +131,16 @@ class AnalizadorMetrologicoService:
         qs: float | None = None,
         qt: float | None = None,
     ) -> float | None:
-        """Calcula la tensión de neutro estimada (RMS) mediante suma fasorial de Kirchhoff.
-
-        V_N = - (V_R + V_S + V_T) / 3
-        Considerando desfase angular de 120° entre fases y ángulo de carga phi = atan2(Q, P).
-        """
+        """Calcula la tensión de neutro estimada (RMS) mediante suma fasorial de Kirchhoff."""
         if vr is None or vs is None or vt is None:
             return None
 
-        th_vr = 0.0
-        th_vs = -2.0 * math.pi / 3.0  # -120°
-        th_vt = 2.0 * math.pi / 3.0  # +120°
-
+        th_vr, th_vs, th_vt = 0.0, -2.0 * math.pi / 3.0, 2.0 * math.pi / 3.0
         v_r = cmath.rect(vr, th_vr)
         v_s = cmath.rect(vs, th_vs)
         v_t = cmath.rect(vt, th_vt)
+        return round(abs(-(v_r + v_s + v_t) / 3.0), 2)
 
-        v_n = -(v_r + v_s + v_t) / 3.0
-        vn_rms = round(abs(v_n), 2)
-        return vn_rms
-
-    # Remuestreo y agregación temporal de lecturas
-    _promedio_valores = AgregadorLecturasService._promedio_valores
-    _calcular_fase_agregada = AgregadorLecturasService._calcular_fase_agregada
-    _calcular_totales_potencia = AgregadorLecturasService._calcular_totales_potencia
-    _calcular_red_electrica = AgregadorLecturasService._calcular_red_electrica
-    _calcular_thd_agregado = AgregadorLecturasService._calcular_thd_agregado
-    _agregar_grupo_lecturas = AgregadorLecturasService._agregar_grupo_lecturas
     agregar_lecturas_en_intervalo = AgregadorLecturasService.agregar_lecturas_en_intervalo
 
     @staticmethod
@@ -221,24 +194,33 @@ class AnalizadorMetrologicoService:
         return EstadoTension.NORMAL
 
     @classmethod
-    def calcular_analitica_completa(
-        cls,
-        lectura: LecturaInstantanea,
-        fp_objetivo: float = 0.96,
-        potencia_minima_w: float = 500.0,
-    ) -> AnaliticaCalidadEnergia:
-        """Calcula el bloque analítico completo de calidad de energía y compensación de reactiva."""
+    def _evaluar_abstencion_enre(cls, dispositivo: object | None) -> str | None:
+        if dispositivo is None:
+            return None
+        tipo_inst = getattr(dispositivo, "tipo_instalacion", None)
+        fases_ti = getattr(dispositivo, "fases_con_ti", None)
+        es_monofasico = tipo_inst == "MONOFASICO" or (fases_ti and len(cls.fases_con_ti_como_lista(fases_ti)) == 1)
+        potencia_contratada_kw = getattr(dispositivo, "potencia_contratada_kw", None)
+        tarifa = getattr(dispositivo, "tarifa", None)
+
+        if es_monofasico:
+            return "Instalación monofásica exenta de penalización por reactiva (Res. ENRE 184/2000)"
+        if tarifa and (tarifa.upper().startswith("T1") or "RESIDENCIAL" in tarifa.upper()):
+            return "Tarifa residencial exenta de penalización por reactiva (Res. ENRE 184/2000)"
+        if potencia_contratada_kw is not None and potencia_contratada_kw < 10.0:
+            return "Potencia contratada menor a 10 kW exenta de penalización (Res. ENRE 184/2000)"
+        return None
+
+    @classmethod
+    def _obtener_potencia_y_fp(cls, lectura: LecturaInstantanea) -> tuple[float | None, float | None, float | None]:
         p_activa_w: float | None = None
         if lectura.potencia_activa_total is not None:
             p_activa_w = lectura.potencia_activa_total.vatios
         else:
             p_vals = [
-                f.potencia_activa.vatios
-                for f in (lectura.fase_r, lectura.fase_s, lectura.fase_t)
-                if f.potencia_activa is not None
+                f.potencia_activa.vatios for f in (lectura.fase_r, lectura.fase_s, lectura.fase_t) if f.potencia_activa
             ]
-            if p_vals:
-                p_activa_w = sum(p_vals)
+            p_activa_w = sum(p_vals) if p_vals else None
 
         p_activa_kw = (p_activa_w / 1000.0) if p_activa_w is not None else None
 
@@ -247,40 +229,67 @@ class AnalizadorMetrologicoService:
             fp_val = lectura.factor_potencia_total.valor
         else:
             fp_vals = [
-                f.factor_potencia.valor
-                for f in (lectura.fase_r, lectura.fase_s, lectura.fase_t)
-                if f.factor_potencia is not None
+                f.factor_potencia.valor for f in (lectura.fase_r, lectura.fase_s, lectura.fase_t) if f.factor_potencia
             ]
-            if fp_vals:
-                fp_val = sum(fp_vals) / len(fp_vals)
+            fp_val = (sum(fp_vals) / len(fp_vals)) if fp_vals else None
 
-        requiere_comp = False
-        qc_kvar: float | None = None
-        banco_sug: float | None = None
-        penalizacion_ars: float | None = None
+        return p_activa_w, p_activa_kw, fp_val
 
+    @classmethod
+    def _evaluar_compensacion_reactiva(
+        cls,
+        p_activa_w: float | None,
+        p_activa_kw: float | None,
+        fp_val: float | None,
+        fp_objetivo: float,
+        potencia_minima_w: float,
+    ) -> tuple[bool, float | None, float | None, float | None, float | None]:
         supera_minimo = p_activa_w is not None and p_activa_w >= potencia_minima_w
-        if supera_minimo and p_activa_kw is not None and fp_val is not None and fp_val > 0.0:
-            qc_calc = DimensionadorCompensacionService.calcular_potencia_compensacion(
-                p_activa_kw, fp_val, fp_objetivo=fp_objetivo
-            )
-            if qc_calc is not None and qc_calc > 0.0:
-                requiere_comp = True
-                qc_kvar = qc_calc
-                banco_sug = DimensionadorCompensacionService.sugerir_banco_comercial(qc_kvar)
-            else:
-                qc_kvar = 0.0
-                requiere_comp = False
+        if not (supera_minimo and p_activa_kw is not None and fp_val is not None and fp_val > 0.0):
+            return False, None, None, None, 0.0
 
-            penalizacion_ars = DimensionadorCompensacionService.estimar_penalizacion_mensual_ars(p_activa_kw, fp_val)
+        qc_calc = DimensionadorCompensacionService.calcular_potencia_compensacion(
+            p_activa_kw, fp_val, fp_objetivo=fp_objetivo
+        )
+        if qc_calc is not None and qc_calc > 0.0:
+            requiere_comp = True
+            qc_kvar = qc_calc
+            banco_sug = DimensionadorCompensacionService.sugerir_banco_comercial(qc_kvar)
+        else:
+            qc_kvar = 0.0
+            requiere_comp = False
+            banco_sug = None
+
+        penalizacion_ars = DimensionadorCompensacionService.estimar_penalizacion_mensual_ars(p_activa_kw, fp_val)
+        recargo_pct = round(((0.95 / fp_val) - 1.0) * 100.0, 2) if fp_val < 0.95 else 0.0
+        return requiere_comp, qc_kvar, banco_sug, penalizacion_ars, recargo_pct
+
+    @classmethod
+    def calcular_analitica_completa(
+        cls,
+        lectura: LecturaInstantanea,
+        fp_objetivo: float = 0.96,
+        potencia_minima_w: float = 500.0,
+        dispositivo: object | None = None,
+        ventana_evaluacion_min: int = 15,
+        vigente_desde: datetime | None = None,
+    ) -> AnaliticaCalidadEnergia:
+        """Calcula el bloque analítico completo de calidad de energía y compensación de reactiva."""
+        p_activa_w, p_activa_kw, fp_val = cls._obtener_potencia_y_fp(lectura)
+        motivo_abstencion = cls._evaluar_abstencion_enre(dispositivo)
+
+        if motivo_abstencion is not None:
+            requiere_comp, qc_kvar, banco_sug, penalizacion_ars, recargo_pct = False, None, None, None, 0.0
+        else:
+            requiere_comp, qc_kvar, banco_sug, penalizacion_ars, recargo_pct = cls._evaluar_compensacion_reactiva(
+                p_activa_w, p_activa_kw, fp_val, fp_objetivo, potencia_minima_w
+            )
 
         vr = lectura.fase_r.tension.voltios if lectura.fase_r.tension else None
         vs = lectura.fase_s.tension.voltios if lectura.fase_s.tension else None
         vt = lectura.fase_t.tension.voltios if lectura.fase_t.tension else None
 
-        vur = lectura.desbalance_tension_porcentaje
-        if vur is None:
-            vur = cls.calcular_desbalance_tension(vr, vs, vt)
+        vur = lectura.desbalance_tension_porcentaje or cls.calcular_desbalance_tension(vr, vs, vt)
 
         ir = lectura.fase_r.corriente.amperios if lectura.fase_r.corriente else None
         is_ = lectura.fase_s.corriente.amperios if lectura.fase_s.corriente else None
@@ -299,4 +308,9 @@ class AnalizadorMetrologicoService:
             desbalance_corriente_porcentaje=iur,
             estado_fp=estado_fp,
             estado_tension=estado_tension,
+            recargo_porcentaje=recargo_pct,
+            motivo_abstencion=motivo_abstencion,
+            ventana_evaluacion_min=ventana_evaluacion_min,
+            vigente_desde=vigente_desde,
+            factor_potencia_integrado=fp_val,
         )

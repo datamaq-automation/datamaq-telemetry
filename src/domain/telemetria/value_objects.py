@@ -164,6 +164,11 @@ class AnaliticaCalidadEnergia:
     desbalance_corriente_porcentaje: float | None = None
     estado_fp: EstadoFactorPotencia = EstadoFactorPotencia.SIN_DATOS
     estado_tension: EstadoTension = EstadoTension.SIN_DATOS
+    recargo_porcentaje: float | None = 0.0
+    motivo_abstencion: str | None = None
+    ventana_evaluacion_min: int | None = 15
+    vigente_desde: datetime | None = None
+    factor_potencia_integrado: float | None = None
 
 
 @dataclass(frozen=True)

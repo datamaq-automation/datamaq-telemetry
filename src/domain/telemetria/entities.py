@@ -137,6 +137,8 @@ class Dispositivo:
     visto_por_ultima_vez: datetime | None = None
     tipo_instalacion: str = "CONSUMO"
     fases_con_ti: str = "R,S,T"
+    potencia_contratada_kw: float | None = None
+    tarifa: str | None = None
     creado_en: datetime = field(default_factory=ahora_utc)
     actualizado_en: datetime = field(default_factory=ahora_utc)
 

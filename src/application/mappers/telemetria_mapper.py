@@ -31,6 +31,11 @@ class TelemetriaMapper:
             desbalance_corriente_porcentaje=analitica.desbalance_corriente_porcentaje,
             estado_fp=analitica.estado_fp,
             estado_tension=analitica.estado_tension,
+            recargo_porcentaje=analitica.recargo_porcentaje,
+            motivo_abstencion=analitica.motivo_abstencion,
+            ventana_evaluacion_min=analitica.ventana_evaluacion_min,
+            vigente_desde=analitica.vigente_desde,
+            factor_potencia_integrado=analitica.factor_potencia_integrado,
         )
 
     @staticmethod
