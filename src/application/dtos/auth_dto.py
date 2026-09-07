@@ -48,3 +48,12 @@ class Desactivar2FARequestDTO(BaseModel):
 class Operacion2FAResponseDTO(BaseModel):
     exito: bool = True
     mensaje: str = "Operación exitosa"
+
+
+class SolicitarRecuperacionDTO(BaseModel):
+    usuario: str = Field(min_length=1, max_length=128)
+
+
+class RestablecerContrasenaDTO(BaseModel):
+    token: str = Field(min_length=1)
+    nueva_contrasena: str = Field(min_length=1, max_length=128)

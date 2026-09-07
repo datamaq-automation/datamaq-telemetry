@@ -27,6 +27,10 @@ class MySQLUsuariosRepository(RepositorioUsuariosPort):
         model = self.db.query(UserModel).filter(UserModel.username == usuario).first()
         return self._to_entity(model) if model else None
 
+    def obtener_por_id(self, usuario_id: str) -> UsuarioAuth | None:
+        model = self.db.query(UserModel).filter(UserModel.id == usuario_id).first()
+        return self._to_entity(model) if model else None
+
     def guardar(self, usuario: UsuarioAuth) -> UsuarioAuth:
         model = self.db.query(UserModel).filter(UserModel.id == usuario.id).first()
         if not model:

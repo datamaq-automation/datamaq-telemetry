@@ -57,6 +57,16 @@ class Settings(BaseSettings):
     LOGIN_MAX_INTENTOS: int = 5
     LOGIN_VENTANA_SEGUNDOS: int = 300
 
+    # SMTP / Email de recuperación
+    SMTP_HOST: str = "127.0.0.1"
+    SMTP_PORT: int = 25
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_TLS: bool = False
+    SMTP_FROM: str = "noreply@datamaq.com.ar"
+    FRONTEND_URL: str = "https://www.datamaq.com.ar"
+    RECUPERACION_TOKEN_EXPIRA_MINUTOS: int = 15
+
     # Logging
     LOG_FORMAT: str | None = None  # "console" (clean CLI) o "json" (VPS production)
     LOG_LEVEL: str | None = None

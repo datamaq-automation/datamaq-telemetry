@@ -37,3 +37,11 @@ class TokenMFAPendienteInvalidoError(DominioAuthException):
 
 class Setup2FAInvalidoError(DominioAuthException):
     """Lanzada cuando no se puede configurar o activar 2FA."""
+
+
+class TokenRecuperacionInvalidoError(DominioAuthException):
+    """Lanzada cuando el token de recuperación de contraseña es inválido, expiró o ya fue usado."""
+
+
+class ContrasenaDebilError(DominioAuthException):
+    """Lanzada cuando la nueva contraseña no cumple con los requisitos mínimos de seguridad."""

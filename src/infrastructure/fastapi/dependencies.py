@@ -31,9 +31,20 @@ from src.application.use_cases.gestionar_planta_estructura import (
 )
 from src.application.use_cases.ingesta.registro_campanas import registro_campanas_activas
 from src.application.use_cases.purgar_telemetria import PurgarTelemetriaExpiradaUseCase
-from src.domain.auth.ports import CifradorSecreto2FAPort, ServicioTOTPPort
+from src.application.use_cases.recuperar_contrasena import (
+    RestablecerContrasenaUseCase,
+    SolicitarRecuperacionContrasenaUseCase,
+)
+from src.domain.auth.ports import (
+    CifradorSecreto2FAPort,
+    GeneradorTokenPort,
+    RepositorioUsuariosPort,
+    ServicioEmailPort,
+    ServicioTOTPPort,
+)
 from src.domain.auth.services import HashContrasenaService, RateLimiterService
 from src.infrastructure.auth.cifrador_2fa import CifradorSecreto2FA
+from src.infrastructure.auth.email_service import SmtpEmailService
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
 from src.infrastructure.auth.totp_service import PyOtpService
 from src.infrastructure.paho_mqtt.mqtt_listener import MQTTListener
@@ -204,10 +215,15 @@ def get_planta_estructura_use_case(
     return GestionarPlantaEstructuraUseCase(repo_org)
 
 
-def get_auth_use_case(
+def get_usuarios_repository(
     db: Annotated[Session, Depends(get_db_session)],
+) -> RepositorioUsuariosPort:
+    return MySQLUsuariosRepository(db)
+
+
+def get_auth_use_case(
+    repo_usuarios: Annotated[RepositorioUsuariosPort, Depends(get_usuarios_repository)],
 ) -> AutenticarUsuarioUseCase:
-    repo_usuarios = MySQLUsuariosRepository(db)
     settings = get_settings()
     rate_limiter = get_rate_limiter()
     return AutenticarUsuarioUseCase(
@@ -280,6 +296,73 @@ def get_desactivar_2fa_use_case(
         hash_service=HashContrasenaService(),
         totp_service=totp_service,
         cifrador_service=cifrador_service,
+    )
+
+
+@lru_cache(maxsize=1)
+def get_email_service_singleton(
+    host: str,
+    port: int,
+    user: str,
+    password: str,
+    use_tls: bool,
+    from_email: str,
+    app_env: str,
+) -> SmtpEmailService:
+    return SmtpEmailService(
+        host=host,
+        port=port,
+        user=user,
+        password=password,
+        use_tls=use_tls,
+        from_email=from_email,
+        app_env=app_env,
+    )
+
+
+def get_email_service(
+    settings: Annotated[Settings, Depends(get_settings_dep)],
+) -> ServicioEmailPort:
+    return get_email_service_singleton(
+        settings.SMTP_HOST,
+        settings.SMTP_PORT,
+        settings.SMTP_USER,
+        settings.SMTP_PASSWORD,
+        settings.SMTP_TLS,
+        settings.SMTP_FROM,
+        settings.APP_ENV,
+    )
+
+
+def get_token_service(
+    settings: Annotated[Settings, Depends(get_settings_dep)],
+) -> GeneradorTokenPort:
+    return JwtTokenService(settings.API_SECRET_KEY)
+
+
+def get_solicitar_recuperacion_use_case(
+    usuarios_repo: Annotated[RepositorioUsuariosPort, Depends(get_usuarios_repository)],
+    token_service: Annotated[GeneradorTokenPort, Depends(get_token_service)],
+    email_service: Annotated[ServicioEmailPort, Depends(get_email_service)],
+    settings: Annotated[Settings, Depends(get_settings_dep)],
+) -> SolicitarRecuperacionContrasenaUseCase:
+    return SolicitarRecuperacionContrasenaUseCase(
+        repositorio_usuarios=usuarios_repo,
+        generador_token=token_service,
+        servicio_email=email_service,
+        frontend_url=settings.FRONTEND_URL,
+        minutos_expiracion=settings.RECUPERACION_TOKEN_EXPIRA_MINUTOS,
+    )
+
+
+def get_restablecer_contrasena_use_case(
+    usuarios_repo: Annotated[RepositorioUsuariosPort, Depends(get_usuarios_repository)],
+    token_service: Annotated[GeneradorTokenPort, Depends(get_token_service)],
+) -> RestablecerContrasenaUseCase:
+    return RestablecerContrasenaUseCase(
+        repositorio_usuarios=usuarios_repo,
+        generador_token=token_service,
+        hash_service=HashContrasenaService(),
     )
 
 

@@ -10,6 +10,9 @@ class RepositorioUsuariosPort(ABC):
     def obtener_por_usuario(self, usuario: str) -> UsuarioAuth | None:
         pass
 
+    def obtener_por_id(self, usuario_id: str) -> UsuarioAuth | None:
+        return None
+
     @abstractmethod
     def guardar(self, usuario: UsuarioAuth) -> UsuarioAuth:
         pass
@@ -31,6 +34,12 @@ class GeneradorTokenPort(ABC):
     @abstractmethod
     def verificar_mfa(self, token: str) -> dict[str, Any] | None:
         pass
+
+    def generar_recuperacion(self, usuario_id: str, usuario: str, expira_en: datetime, hash_actual: str) -> str:
+        return ""
+
+    def verificar_recuperacion(self, token: str) -> dict[str, Any] | None:
+        return None
 
 
 class ServicioTOTPPort(ABC):
@@ -58,4 +67,10 @@ class CifradorSecreto2FAPort(ABC):
 
     @abstractmethod
     def descifrar(self, texto_cifrado: str) -> str:
+        pass
+
+
+class ServicioEmailPort(ABC):
+    @abstractmethod
+    def enviar_email_recuperacion(self, destinatario: str, enlace_restablecimiento: str) -> bool:
         pass

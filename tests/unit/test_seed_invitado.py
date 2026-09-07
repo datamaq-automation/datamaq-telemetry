@@ -25,6 +25,12 @@ class MockRepositorioUsuarios(RepositorioUsuariosPort):
                 return u
         return None
 
+    def obtener_por_id(self, usuario_id: str) -> UsuarioAuth | None:
+        for u in self.usuarios:
+            if u.id == usuario_id:
+                return u
+        return None
+
     def guardar(self, usuario: UsuarioAuth) -> UsuarioAuth:
         self.usuarios.append(usuario)
         return usuario
@@ -45,6 +51,12 @@ class TokenServiceCapturaRol(GeneradorTokenPort):
         return f"mfa-{usuario_id}"
 
     def verificar_mfa(self, token: str) -> dict | None:
+        return None
+
+    def generar_recuperacion(self, usuario_id: str, usuario: str, expira_en: datetime, hash_actual: str) -> str:
+        return f"reset-{usuario_id}"
+
+    def verificar_recuperacion(self, token: str) -> dict | None:
         return None
 
 

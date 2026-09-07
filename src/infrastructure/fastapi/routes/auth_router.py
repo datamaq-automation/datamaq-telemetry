@@ -10,7 +10,9 @@ from src.application.dtos.auth_dto import (
     LoginResponseDTO,
     MeResponseDTO,
     Operacion2FAResponseDTO,
+    RestablecerContrasenaDTO,
     Setup2FAResponseDTO,
+    SolicitarRecuperacionDTO,
     Verificar2FARequestDTO,
 )
 from src.application.use_cases.autenticar_usuario import AutenticarUsuarioUseCase
@@ -20,12 +22,18 @@ from src.application.use_cases.gestionar_2fa import (
     Setup2FAUseCase,
     Verificar2FAUseCase,
 )
+from src.application.use_cases.recuperar_contrasena import (
+    RestablecerContrasenaUseCase,
+    SolicitarRecuperacionContrasenaUseCase,
+)
 from src.infrastructure.fastapi.dependencies import (
     get_activar_2fa_use_case,
     get_auth_use_case,
     get_desactivar_2fa_use_case,
+    get_restablecer_contrasena_use_case,
     get_settings_dep,
     get_setup_2fa_use_case,
+    get_solicitar_recuperacion_use_case,
     get_usuario_actual,
     get_verificar_2fa_use_case,
 )
@@ -158,5 +166,33 @@ def desactivar_2fa(
     try:
         usuario = str(claims.get("usuario") or claims.get("sub"))
         return use_case.ejecutar(usuario, dto)
+    except Exception as e:
+        manejar_error_http(e)
+
+
+@router.post("/recuperar-contrasena", response_model=Operacion2FAResponseDTO)
+def solicitar_recuperacion(
+    dto: SolicitarRecuperacionDTO,
+    use_case: Annotated[
+        SolicitarRecuperacionContrasenaUseCase,
+        Depends(get_solicitar_recuperacion_use_case),
+    ],
+) -> Operacion2FAResponseDTO:
+    try:
+        return use_case.ejecutar(dto)
+    except Exception as e:
+        manejar_error_http(e)
+
+
+@router.post("/restablecer-contrasena", response_model=Operacion2FAResponseDTO)
+def restablecer_contrasena(
+    dto: RestablecerContrasenaDTO,
+    use_case: Annotated[
+        RestablecerContrasenaUseCase,
+        Depends(get_restablecer_contrasena_use_case),
+    ],
+) -> Operacion2FAResponseDTO:
+    try:
+        return use_case.ejecutar(dto)
     except Exception as e:
         manejar_error_http(e)

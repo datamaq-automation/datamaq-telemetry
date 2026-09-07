@@ -2,11 +2,13 @@ from typing import Any
 
 from src.domain.auth.exceptions import (
     Codigo2FAInvalidoError,
+    ContrasenaDebilError,
     CredencialesInvalidasError,
     DemasiadosIntentosError,
     NombreUsuarioInvalidoError,
     Setup2FAInvalidoError,
     TokenMFAPendienteInvalidoError,
+    TokenRecuperacionInvalidoError,
     UsuarioInactivoError,
 )
 from src.domain.cargas.exceptions import (
@@ -67,6 +69,10 @@ class ErrorPresenter:
             return 400, {"error": "ValidationError", "mensaje": "codigo_2fa_invalido"}
         elif isinstance(exc, Setup2FAInvalidoError):
             return 400, {"error": "ValidationError", "mensaje": "setup_2fa_invalido"}
+        elif isinstance(exc, TokenRecuperacionInvalidoError):
+            return 400, {"error": "ValidationError", "mensaje": "token_recuperacion_invalido"}
+        elif isinstance(exc, ContrasenaDebilError):
+            return 400, {"error": "ValidationError", "mensaje": "contrasena_debil"}
         elif isinstance(exc, UsuarioInactivoError):
             return 403, {"error": "Forbidden", "mensaje": "usuario_inactivo"}
         elif isinstance(exc, DemasiadosIntentosError):
