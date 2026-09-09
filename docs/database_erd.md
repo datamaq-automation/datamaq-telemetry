@@ -29,6 +29,7 @@ erDiagram
     MACHINES ||--o{ MACHINE_AVAILABILITY_EVENTS : "FK_machine_id"
     MACHINES ||--o{ SCHEDULED_STOPS : "FK_machine_id"
     ORGANIZATIONS ||--o{ FACILITIES : "FK_organization_id"
+    ORGANIZATIONS ||--o{ USERS : "FK_organization_id"
     PLANS ||--o{ ORGANIZATIONS : "FK_plan_id"
 
     CAMPAIGN_SAMPLES {
@@ -325,6 +326,7 @@ erDiagram
         string totp_secret
         boolean totp_enabled
         json totp_backup_codes
+        string organization_id FK
         datetime created_at
         datetime updated_at
     }
@@ -713,6 +715,7 @@ erDiagram
 | `totp_secret` | `VARCHAR(255)` | - | Sí |
 | `totp_enabled` | `BOOLEAN` | - | No |
 | `totp_backup_codes` | `JSON` | - | Sí |
+| `organization_id` | `VARCHAR(36)` | FK -> `organizations.id` | Sí |
 | `created_at` | `DATETIME` | - | No |
 | `updated_at` | `DATETIME` | - | No |
 

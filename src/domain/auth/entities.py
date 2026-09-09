@@ -13,6 +13,7 @@ class UsuarioAuth:
     hash_contrasena: str
     esta_activo: bool = True
     rol: str = "operador"
+    organizacion_id: str | None = None
     totp_secret: str | None = None
     totp_enabled: bool = False
     totp_backup_codes: list[str] | None = None

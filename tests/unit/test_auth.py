@@ -55,7 +55,14 @@ class MockTokenService(GeneradorTokenPort):
     def __init__(self):
         self.generados = 0
 
-    def generar(self, usuario_id: str, usuario: str, expira_en: datetime, rol: str = "operador") -> str:
+    def generar(
+        self,
+        usuario_id: str,
+        usuario: str,
+        expira_en: datetime,
+        rol: str = "operador",
+        organizacion_id: str | None = None,
+    ) -> str:
         self.generados += 1
         return f"token-{usuario_id}"
 

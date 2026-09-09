@@ -40,7 +40,14 @@ class TokenServiceCapturaRol(GeneradorTokenPort):
     def __init__(self):
         self.rol = None
 
-    def generar(self, usuario_id: str, usuario: str, expira_en: datetime, rol: str = "operador") -> str:
+    def generar(
+        self,
+        usuario_id: str,
+        usuario: str,
+        expira_en: datetime,
+        rol: str = "operador",
+        organizacion_id: str | None = None,
+    ) -> str:
         self.rol = rol
         return f"token-{usuario_id}-{rol}"
 

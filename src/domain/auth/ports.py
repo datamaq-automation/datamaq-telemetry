@@ -20,7 +20,14 @@ class RepositorioUsuariosPort(ABC):
 
 class GeneradorTokenPort(ABC):
     @abstractmethod
-    def generar(self, usuario_id: str, usuario: str, expira_en: datetime, rol: str = "operador") -> str:
+    def generar(
+        self,
+        usuario_id: str,
+        usuario: str,
+        expira_en: datetime,
+        rol: str = "operador",
+        organizacion_id: str | None = None,
+    ) -> str:
         pass
 
     @abstractmethod

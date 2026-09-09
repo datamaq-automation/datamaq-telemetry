@@ -56,8 +56,10 @@ class GestionarDispositivosUseCase:
                 f"La organización '{org.nombre}' alcanzó el límite de {max_permitido} dispositivos permitidos por su plan."
             )
 
-    def listar_dispositivos(self, planta_id: str | None = None) -> list[DispositivoResponseDTO]:
-        dispositivos = self.repo_dispositivos.listar(planta_id)
+    def listar_dispositivos(
+        self, planta_id: str | None = None, organizacion_id: str | None = None
+    ) -> list[DispositivoResponseDTO]:
+        dispositivos = self.repo_dispositivos.listar(planta_id, organizacion_id=organizacion_id)
         return [DispositivoMapper.to_dto(d) for d in dispositivos]
 
     def obtener_dispositivo(self, id_o_uid: str) -> DispositivoResponseDTO:

@@ -16,6 +16,7 @@ class MySQLUsuariosRepository(RepositorioUsuariosPort):
             hash_contrasena=model.password_hash,
             esta_activo=model.is_active,
             rol=model.role,
+            organizacion_id=model.organization_id,
             totp_secret=model.totp_secret,
             totp_enabled=model.totp_enabled,
             totp_backup_codes=model.totp_backup_codes,
@@ -40,6 +41,7 @@ class MySQLUsuariosRepository(RepositorioUsuariosPort):
                 password_hash=usuario.hash_contrasena,
                 role=usuario.rol,
                 is_active=usuario.esta_activo,
+                organization_id=usuario.organizacion_id,
                 totp_secret=usuario.totp_secret,
                 totp_enabled=usuario.totp_enabled,
                 totp_backup_codes=usuario.totp_backup_codes,
@@ -50,6 +52,7 @@ class MySQLUsuariosRepository(RepositorioUsuariosPort):
             model.password_hash = usuario.hash_contrasena
             model.role = usuario.rol
             model.is_active = usuario.esta_activo
+            model.organization_id = usuario.organizacion_id
             model.totp_secret = usuario.totp_secret
             model.totp_enabled = usuario.totp_enabled
             model.totp_backup_codes = usuario.totp_backup_codes

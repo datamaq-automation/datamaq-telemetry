@@ -40,8 +40,12 @@ class MySQLDispositivosRepository(RepositorioDispositivosPort):
         model = self.db.query(DeviceModel).filter(DeviceModel.device_uid == uid.valor).first()
         return self._to_entity(model) if model else None
 
-    def listar(self, planta_id: str | None = None) -> list[Dispositivo]:
+    def listar(self, planta_id: str | None = None, organizacion_id: str | None = None) -> list[Dispositivo]:
         query = self.db.query(DeviceModel)
+        if organizacion_id:
+            query = query.join(FacilityModel, DeviceModel.facility_id == FacilityModel.id).filter(
+                FacilityModel.organization_id == organizacion_id
+            )
         if planta_id:
             query = query.filter(DeviceModel.facility_id == planta_id)
         return [self._to_entity(m) for m in query.all()]

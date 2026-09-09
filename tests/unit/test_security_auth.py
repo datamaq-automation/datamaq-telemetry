@@ -28,7 +28,14 @@ class _RepoUsuarios(RepositorioUsuariosPort):
 
 
 class _TokenServiceFake:
-    def generar(self, usuario_id: str, usuario: str, expira_en: datetime, rol: str = "operador") -> str:
+    def generar(
+        self,
+        usuario_id: str,
+        usuario: str,
+        expira_en: datetime,
+        rol: str = "operador",
+        organizacion_id: str | None = None,
+    ) -> str:
         return f"token-{usuario_id}-{rol}"
 
     def verificar(self, token: str) -> dict | None:

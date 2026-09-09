@@ -26,9 +26,11 @@ router = APIRouter(
 @router.get("", response_model=list[DispositivoResponseDTO])
 def list_dispositivos(
     use_case: Annotated[GestionarDispositivosUseCase, Depends(get_dispositivos_use_case)],
+    claims: Annotated[dict, Depends(get_usuario_actual)],
     planta_id: str | None = None,
 ):
-    return use_case.listar_dispositivos(planta_id)
+    organizacion_id = None if claims.get("rol") == "superadmin" else claims.get("org")
+    return use_case.listar_dispositivos(planta_id, organizacion_id=organizacion_id)
 
 
 @router.get("/{device_id}", response_model=DispositivoResponseDTO)

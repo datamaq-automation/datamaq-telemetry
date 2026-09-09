@@ -28,7 +28,7 @@ class RepositorioDispositivosPort(ABC):
         pass
 
     @abstractmethod
-    def listar(self, planta_id: str | None = None) -> list[Dispositivo]:
+    def listar(self, planta_id: str | None = None, organizacion_id: str | None = None) -> list[Dispositivo]:
         pass
 
     @abstractmethod

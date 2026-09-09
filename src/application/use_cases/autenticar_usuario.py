@@ -77,7 +77,9 @@ class AutenticarUsuarioUseCase:
             return LoginResponseDTO(token=None, expira_en=expira_mfa, require_2fa=True, mfa_token=mfa_token)
 
         expira_en = PoliticaExpiracionService.calcular_expiracion(ahora_utc(), self.minutos_validez)
-        token = self.token_service.generar(usuario.id, usuario.usuario, expira_en, rol=usuario.rol)
+        token = self.token_service.generar(
+            usuario.id, usuario.usuario, expira_en, rol=usuario.rol, organizacion_id=usuario.organizacion_id
+        )
         return LoginResponseDTO(token=token, expira_en=expira_en, require_2fa=False)
 
     def guest(self, clave_limite: str) -> LoginResponseDTO:
