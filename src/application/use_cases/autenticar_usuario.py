@@ -113,4 +113,15 @@ class AutenticarUsuarioUseCase:
         if user is not None:
             totp_enabled = bool(user.totp_enabled)
 
-        return MeResponseDTO(usuario=usuario, rol=rol, totp_enabled=totp_enabled)
+        org_id = claims.get("org") or (user.organizacion_id if user else None)
+        org_nombre = None
+        if user and user.organizacion_id:
+            org_id = user.organizacion_id
+
+        return MeResponseDTO(
+            usuario=usuario,
+            rol=rol,
+            totp_enabled=totp_enabled,
+            organizacion_id=org_id,
+            organizacion_nombre=org_nombre,
+        )

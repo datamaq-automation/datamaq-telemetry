@@ -21,6 +21,8 @@ class MeResponseDTO(BaseModel):
     usuario: str
     rol: Literal["superadmin", "admin", "operador", "invitado"]
     totp_enabled: bool = False
+    organizacion_id: str | None = None
+    organizacion_nombre: str | None = None
 
 
 class Verificar2FARequestDTO(BaseModel):
