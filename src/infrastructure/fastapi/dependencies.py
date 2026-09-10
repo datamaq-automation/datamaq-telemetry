@@ -11,6 +11,7 @@ from src.application.use_cases.analizar_consumo import AnalizarConsumoUseCase
 from src.application.use_cases.atribuir_consumo import AtribuirConsumoUseCase
 from src.application.use_cases.autenticar_usuario import AutenticarUsuarioUseCase
 from src.application.use_cases.caracterizar_carga import CaracterizarCargaUseCase
+from src.application.use_cases.consultar_grupo_dispositivos import ConsultarGrupoDispositivosUseCase
 from src.application.use_cases.consultar_telemetria import ConsultarTelemetriaUseCase
 from src.application.use_cases.exportar_cargas import ExportarCargasUseCase
 from src.application.use_cases.exportar_disponibilidad import (
@@ -31,6 +32,7 @@ from src.application.use_cases.gestionar_disponibilidad import GestionarDisponib
 from src.application.use_cases.gestionar_dispositivos import (
     GestionarDispositivosUseCase,
 )
+from src.application.use_cases.gestionar_grupos_dispositivos import GestionarGruposDispositivosUseCase
 from src.application.use_cases.gestionar_maquinas import GestionarMaquinasUseCase
 from src.application.use_cases.gestionar_planes import GestionarPlanesUseCase
 from src.application.use_cases.gestionar_planta_estructura import (
@@ -67,6 +69,7 @@ from src.infrastructure.sqlalchemy.mysql_repositories import (
     MySQLCargasRepository,
     MySQLDispositivosRepository,
     MySQLEventosDisponibilidadRepository,
+    MySQLGruposDispositivosRepository,
     MySQLIntervalosActividadRepository,
     MySQLMaquinasRepository,
     MySQLOrganizacionesRepository,
@@ -166,6 +169,22 @@ def get_dispositivos_use_case(
     repo_org = MySQLOrganizacionesRepository(db)
     repo_planes = MySQLPlanesRepository(db)
     return GestionarDispositivosUseCase(repo_disp, repo_org, repo_planes)
+
+
+def get_grupos_dispositivos_use_case(
+    db: Annotated[Session, Depends(get_db_session)],
+) -> GestionarGruposDispositivosUseCase:
+    repo_grupos = MySQLGruposDispositivosRepository(db)
+    repo_disp = MySQLDispositivosRepository(db)
+    return GestionarGruposDispositivosUseCase(repo_grupos, repo_disp)
+
+
+def get_consultar_grupo_dispositivos_use_case(
+    db: Annotated[Session, Depends(get_db_session)],
+) -> ConsultarGrupoDispositivosUseCase:
+    repo_grupos = MySQLGruposDispositivosRepository(db)
+    repo_telem = MySQLTelemetriaRepository(db)
+    return ConsultarGrupoDispositivosUseCase(repo_grupos, repo_telem, get_telemetria_use_case(db))
 
 
 def get_planes_use_case(

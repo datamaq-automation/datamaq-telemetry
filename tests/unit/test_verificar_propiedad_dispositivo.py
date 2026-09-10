@@ -5,7 +5,10 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi import HTTPException
 
-from src.infrastructure.fastapi.device_ownership import verificar_propiedad_dispositivo
+from src.infrastructure.fastapi.device_ownership import (
+    verificar_propiedad_dispositivo,
+    verificar_propiedad_grupo_dispositivos,
+)
 
 
 class _FakeDispositivo:
@@ -145,3 +148,88 @@ class TestVerificarPropiedadDispositivo:
             verificar_propiedad_dispositivo(
                 claims={"rol": "operador", "org": "org-a"}, db=MagicMock(), dispositivo_id="dev-1"
             )
+
+
+class _FakeGrupoDispositivos:
+    def __init__(self, planta_id: str) -> None:
+        self.planta_id = planta_id
+
+
+def _mock_grupos_repo(monkeypatch, repo_grupos=None, repo_organizaciones=None):
+    monkeypatch.setattr(
+        "src.infrastructure.fastapi.device_ownership.MySQLGruposDispositivosRepository",
+        lambda db: repo_grupos or MagicMock(),
+    )
+    monkeypatch.setattr(
+        "src.infrastructure.fastapi.device_ownership.MySQLOrganizacionesRepository",
+        lambda db: repo_organizaciones or MagicMock(),
+    )
+
+
+class TestVerificarPropiedadGrupoDispositivos:
+    def test_superadmin_pasa_sin_consultar_repos(self, monkeypatch):
+        repo_grupos = MagicMock()
+        _mock_grupos_repo(monkeypatch, repo_grupos=repo_grupos)
+        with patch(
+            "src.infrastructure.fastapi.device_ownership.get_settings",
+            return_value=_FakeSettings(auth_required=True),
+        ):
+            verificar_propiedad_grupo_dispositivos(claims={"rol": "superadmin"}, db=MagicMock(), grupo_id="g1")
+        repo_grupos.obtener_por_id.assert_not_called()
+
+    def test_invitado_global_pasa_sin_consultar_repos(self, monkeypatch):
+        repo_grupos = MagicMock()
+        _mock_grupos_repo(monkeypatch, repo_grupos=repo_grupos)
+        with patch(
+            "src.infrastructure.fastapi.device_ownership.get_settings",
+            return_value=_FakeSettings(auth_required=True),
+        ):
+            verificar_propiedad_grupo_dispositivos(claims={"rol": "invitado_global"}, db=MagicMock(), grupo_id="g1")
+        repo_grupos.obtener_por_id.assert_not_called()
+
+    def test_usuario_de_org_a_ve_grupo_de_org_a(self, monkeypatch):
+        repo_grupos = MagicMock()
+        repo_grupos.obtener_por_id.return_value = _FakeGrupoDispositivos(planta_id="planta-1")
+        repo_organizaciones = MagicMock()
+        repo_organizaciones.obtener_planta_por_id.return_value = _FakePlanta(organizacion_id="org-a")
+        _mock_grupos_repo(monkeypatch, repo_grupos, repo_organizaciones)
+
+        with patch(
+            "src.infrastructure.fastapi.device_ownership.get_settings",
+            return_value=_FakeSettings(auth_required=True),
+        ):
+            verificar_propiedad_grupo_dispositivos(
+                claims={"rol": "operador", "org": "org-a"}, db=MagicMock(), grupo_id="g1"
+            )
+
+    def test_usuario_de_org_a_no_ve_grupo_de_org_b(self, monkeypatch):
+        repo_grupos = MagicMock()
+        repo_grupos.obtener_por_id.return_value = _FakeGrupoDispositivos(planta_id="planta-2")
+        repo_organizaciones = MagicMock()
+        repo_organizaciones.obtener_planta_por_id.return_value = _FakePlanta(organizacion_id="org-b")
+        _mock_grupos_repo(monkeypatch, repo_grupos, repo_organizaciones)
+
+        with patch(
+            "src.infrastructure.fastapi.device_ownership.get_settings",
+            return_value=_FakeSettings(auth_required=True),
+        ):
+            with pytest.raises(HTTPException) as exc_info:
+                verificar_propiedad_grupo_dispositivos(
+                    claims={"rol": "operador", "org": "org-a"}, db=MagicMock(), grupo_id="g2"
+                )
+        assert exc_info.value.status_code == 404
+
+    def test_grupo_inexistente_devuelve_404(self, monkeypatch):
+        repo_grupos = MagicMock()
+        repo_grupos.obtener_por_id.return_value = None
+        _mock_grupos_repo(monkeypatch, repo_grupos=repo_grupos)
+
+        with patch(
+            "src.infrastructure.fastapi.device_ownership.get_settings",
+            return_value=_FakeSettings(auth_required=True),
+        ):
+            with pytest.raises(HTTPException) as exc_info:
+                verificar_propiedad_grupo_dispositivos(
+                    claims={"rol": "operador", "org": "org-a"}, db=MagicMock(), grupo_id="no-existe"
+                )
+        assert exc_info.value.status_code == 404

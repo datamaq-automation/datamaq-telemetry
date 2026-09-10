@@ -70,6 +70,16 @@ class Planta:
 
 
 @dataclass
+class GrupoDispositivos:
+    id: str
+    planta_id: str
+    nombre: str
+    dispositivos_ids: list[str] = field(default_factory=list)
+    creado_en: datetime = field(default_factory=ahora_utc)
+    actualizado_en: datetime = field(default_factory=ahora_utc)
+
+
+@dataclass
 class NodoUnifilar:
     id: str
     planta_id: str

@@ -43,6 +43,9 @@ from src.infrastructure.fastapi.routes.disponibilidad_router import (
 from src.infrastructure.fastapi.routes.dispositivos_router import (
     router as dispositivos_router,
 )
+from src.infrastructure.fastapi.routes.grupos_dispositivos_router import (
+    router as grupos_dispositivos_router,
+)
 from src.infrastructure.fastapi.routes.organizaciones_router import (
     router as organizaciones_router,
 )
@@ -468,6 +471,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(cargas_router)
     app.include_router(telemetria_router)
     app.include_router(dispositivos_router)
+    app.include_router(grupos_dispositivos_router)
     app.include_router(organizaciones_router)
     app.include_router(planta_estructura_router)
     app.include_router(planes_router)
