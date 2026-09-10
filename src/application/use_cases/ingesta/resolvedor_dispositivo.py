@@ -62,7 +62,7 @@ class ResolvedorDispositivoIngesta:
                     repo_dispositivos.actualizar_heartbeat(
                         dispositivo.id,
                         dispositivo.estado,
-                        dispositivo.visto_por_ultima_vez,
+                        dispositivo.visto_por_ultima_vez or ahora,
                         numero_serie=dispositivo.numero_serie,
                         version_fw=dispositivo.version_fw,
                         version_hw=dispositivo.version_hw,
