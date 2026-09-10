@@ -20,16 +20,14 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "users",
-        sa.Column(
-            "organization_id",
-            sa.String(36),
-            sa.ForeignKey("organizations.id", ondelete="SET NULL"),
-            nullable=True,
-        ),
-    )
+    with op.batch_alter_table("users") as batch_op:
+        batch_op.add_column(sa.Column("organization_id", sa.String(36), nullable=True))
+        batch_op.create_foreign_key(
+            "fk_users_organization_id", "organizations", ["organization_id"], ["id"], ondelete="SET NULL"
+        )
 
 
 def downgrade() -> None:
-    op.drop_column("users", "organization_id")
+    with op.batch_alter_table("users") as batch_op:
+        batch_op.drop_constraint("fk_users_organization_id", type_="foreignkey")
+        batch_op.drop_column("organization_id")

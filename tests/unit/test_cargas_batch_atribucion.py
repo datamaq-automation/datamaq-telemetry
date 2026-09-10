@@ -26,6 +26,7 @@ from tests.unit.test_cargas_catalogo import MockCargasRepo
 
 MEDIDOR = "dev-casa"
 INICIO = datetime(2026, 9, 1, 0, 0, tzinfo=timezone.utc)
+HASTA = INICIO + timedelta(days=1)
 
 
 class MockSerieRepo(RepositorioSeriePotenciaPort):
@@ -126,7 +127,7 @@ def _use_case(lecturas=None, cargas=None, energia=None):
 def test_sin_cargas_con_firma_todo_queda_sin_atribuir_y_se_avisa():
     use_case, _, _ = _use_case(_serie_con_termotanque())
 
-    resultado = use_case.analizar(MEDIDOR)
+    resultado = use_case.analizar(MEDIDOR, desde=INICIO, hasta=HASTA)
 
     assert resultado.cargas_con_firma == 0
     assert resultado.atribuidos == 0
@@ -137,7 +138,7 @@ def test_sin_cargas_con_firma_todo_queda_sin_atribuir_y_se_avisa():
 def test_el_batch_detecta_y_atribuye_los_episodios():
     use_case, intervalos, _ = _use_case(_serie_con_termotanque(), [_termotanque()])
 
-    resultado = use_case.analizar(MEDIDOR)
+    resultado = use_case.analizar(MEDIDOR, desde=INICIO, hasta=HASTA)
 
     assert resultado.episodios_detectados == 2
     assert resultado.atribuidos == 2
@@ -148,8 +149,8 @@ def test_re_correr_la_misma_ventana_no_duplica_intervalos():
     """Los límites del episodio son deterministas: reprocesar debe reescribir, no sumar."""
     use_case, intervalos, _ = _use_case(_serie_con_termotanque(), [_termotanque()])
 
-    use_case.analizar(MEDIDOR)
-    use_case.analizar(MEDIDOR)
+    use_case.analizar(MEDIDOR, desde=INICIO, hasta=HASTA)
+    use_case.analizar(MEDIDOR, desde=INICIO, hasta=HASTA)
 
     assert len(intervalos.intervalos) == 2
 
@@ -157,11 +158,11 @@ def test_re_correr_la_misma_ventana_no_duplica_intervalos():
 def test_el_batch_no_pisa_una_correccion_humana():
     """Esas filas son el dataset etiquetado: es lo único que ninguna regla puede regenerar."""
     use_case, intervalos, _ = _use_case(_serie_con_termotanque(), [_termotanque()])
-    use_case.analizar(MEDIDOR)
+    use_case.analizar(MEDIDOR, desde=INICIO, hasta=HASTA)
     corregido = intervalos.intervalos[0]
     corregido.corregir("carga-termo", usuario_id="u1", notas="confirmado a mano")
 
-    use_case.analizar(MEDIDOR)
+    use_case.analizar(MEDIDOR, desde=INICIO, hasta=HASTA)
 
     sobreviviente = next(i for i in intervalos.intervalos if i.inicio_at == corregido.inicio_at)
     assert sobreviviente.es_correccion_humana is True
@@ -170,7 +171,7 @@ def test_el_batch_no_pisa_una_correccion_humana():
 
 def test_la_atribucion_reparte_los_kwh_contra_el_contador():
     use_case, _, _ = _use_case(_serie_con_termotanque(), [_termotanque()], energia=5.0)
-    use_case.analizar(MEDIDOR)
+    use_case.analizar(MEDIDOR, desde=INICIO, hasta=HASTA)
 
     atribucion = use_case.atribucion(MEDIDOR)
 
@@ -182,7 +183,7 @@ def test_la_atribucion_reparte_los_kwh_contra_el_contador():
 
 def test_corregir_un_intervalo_lo_reimputa_y_lo_marca():
     use_case, intervalos, _ = _use_case(_serie_con_termotanque(), [_termotanque()])
-    use_case.analizar(MEDIDOR)
+    use_case.analizar(MEDIDOR, desde=INICIO, hasta=HASTA)
     intervalo_id = intervalos.intervalos[0].id
 
     dto = use_case.corregir_intervalo(
@@ -196,7 +197,7 @@ def test_corregir_un_intervalo_lo_reimputa_y_lo_marca():
 
 def test_corregir_hacia_una_carga_inexistente_falla():
     use_case, intervalos, _ = _use_case(_serie_con_termotanque(), [_termotanque()])
-    use_case.analizar(MEDIDOR)
+    use_case.analizar(MEDIDOR, desde=INICIO, hasta=HASTA)
 
     with pytest.raises(CargaNoEncontradaError):
         use_case.corregir_intervalo(
@@ -214,7 +215,7 @@ def test_corregir_un_intervalo_inexistente_falla():
 def test_sin_datos_el_batch_no_falla_ni_escribe():
     use_case, intervalos, _ = _use_case([])
 
-    resultado = use_case.analizar(MEDIDOR)
+    resultado = use_case.analizar(MEDIDOR, desde=INICIO, hasta=HASTA)
 
     assert resultado.cantidad_lecturas == 0
     assert resultado.episodios_detectados == 0
