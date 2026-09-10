@@ -108,6 +108,14 @@ class IngestarTelemetriaUseCase:
         mac_raw = partes[2]
         subtopico = partes[3]
 
+        if subtopico == "conf" and len(partes) >= 5 and partes[4] == "com":
+            # Eco del propio comando saliente del backend (el broker reenvía al backend
+            # sus propias publicaciones en un tópico al que también está suscripto).
+            # No es actividad genuina del dispositivo: no marcar online ni retransmitir.
+            if self.logger:
+                self.logger.debug("mqtt_eco_comando_propio_ignorado", topico=topico)
+            return
+
         if self.publicador and subtopico != "inst":
             self.publicador.publicar_telemetria_en_vivo(topico, payload)
 
