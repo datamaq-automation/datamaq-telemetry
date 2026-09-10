@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy.orm import Session
 
 from src.domain.telemetria.entities import Dispositivo
@@ -95,3 +97,25 @@ class MySQLDispositivosRepository(RepositorioDispositivosPort):
         self.db.commit()
         self.db.refresh(model)
         return self._to_entity(model)
+
+    def actualizar_heartbeat(
+        self,
+        dispositivo_id: str,
+        estado: EstadoDispositivo,
+        visto_por_ultima_vez: datetime,
+        numero_serie: str | None = None,
+        version_fw: str | None = None,
+        version_hw: str | None = None,
+    ) -> None:
+        model = self.db.query(DeviceModel).filter(DeviceModel.id == dispositivo_id).first()
+        if not model:
+            return
+        model.estado = estado.value
+        model.last_seen_at = visto_por_ultima_vez
+        if numero_serie:
+            model.serial_number = numero_serie
+        if version_fw:
+            model.fw_version = version_fw
+        if version_hw:
+            model.hw_version = version_hw
+        self.db.commit()

@@ -30,6 +30,14 @@ class _RepoDisp:
         self.dispositivos[dispositivo.id] = dispositivo
         return dispositivo
 
+    def actualizar_heartbeat(
+        self, dispositivo_id, estado, visto_por_ultima_vez, numero_serie=None, version_fw=None, version_hw=None
+    ) -> None:
+        d = self.dispositivos.get(dispositivo_id)
+        if d:
+            d.estado = estado
+            d.visto_por_ultima_vez = visto_por_ultima_vez
+
     def listar(self, planta_id: str | None = None) -> list[Dispositivo]:
         return list(self.dispositivos.values())
 

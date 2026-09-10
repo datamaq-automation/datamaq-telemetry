@@ -71,6 +71,20 @@ class MockDispositivosRepo(RepositorioDispositivosPort):
         self.dispositivos[dispositivo.id] = dispositivo
         return dispositivo
 
+    def actualizar_heartbeat(
+        self, dispositivo_id, estado, visto_por_ultima_vez, numero_serie=None, version_fw=None, version_hw=None
+    ) -> None:
+        d = self.dispositivos.get(dispositivo_id)
+        if d:
+            d.estado = estado
+            d.visto_por_ultima_vez = visto_por_ultima_vez
+            if numero_serie:
+                d.numero_serie = numero_serie
+            if version_fw:
+                d.version_fw = version_fw
+            if version_hw:
+                d.version_hw = version_hw
+
 
 class MockPublicadorEventos(PublicadorEventosPort):
     def __init__(self):

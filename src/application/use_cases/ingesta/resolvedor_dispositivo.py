@@ -20,6 +20,17 @@ class ResolvedorDispositivoIngesta:
     _organizacion_cache: ClassVar[dict[str, str | None]] = {}
     _lock: ClassVar[threading.Lock] = threading.Lock()
 
+    @staticmethod
+    def _aplicar_dev_info(dispositivo: Dispositivo, dev_info: dict[str, Any] | None) -> None:
+        if not dev_info:
+            return
+        if dev_info.get("serial_number"):
+            dispositivo.numero_serie = dev_info.get("serial_number")
+        if dev_info.get("device_fw"):
+            dispositivo.version_fw = dev_info.get("device_fw")
+        if dev_info.get("hw_model"):
+            dispositivo.version_hw = dev_info.get("hw_model")
+
     @classmethod
     def obtener_o_crear_dispositivo(
         cls,
@@ -40,17 +51,22 @@ class ResolvedorDispositivoIngesta:
                 dispositivo = cls._device_cache[mac_vo.valor]
                 ultimo_hb = cls._ultimos_heartbeats.get(dispositivo.id)
 
-                # Si venció la ventana de amortiguación (60s), persistir estado en DB
+                # Si venció la ventana de amortiguación (60s), persistir estado en DB.
+                # Usa actualizar_heartbeat() (UPDATE parcial: solo estado/last_seen_at/firmware)
+                # en vez de guardar() a propósito: `dispositivo` viene de la caché en memoria y
+                # puede tener planta_id desactualizado si alguien reasignó el equipo por fuera
+                # mientras el proceso de ingesta seguía vivo; guardar() pisaría esa reasignación.
                 if ultimo_hb is None or (ahora - ultimo_hb).total_seconds() >= 60:
                     dispositivo.marcar_online(ahora)
-                    if dev_info:
-                        if dev_info.get("serial_number"):
-                            dispositivo.numero_serie = dev_info.get("serial_number")
-                        if dev_info.get("device_fw"):
-                            dispositivo.version_fw = dev_info.get("device_fw")
-                        if dev_info.get("hw_model"):
-                            dispositivo.version_hw = dev_info.get("hw_model")
-                    dispositivo = repo_dispositivos.guardar(dispositivo)
+                    cls._aplicar_dev_info(dispositivo, dev_info)
+                    repo_dispositivos.actualizar_heartbeat(
+                        dispositivo.id,
+                        dispositivo.estado,
+                        dispositivo.visto_por_ultima_vez,
+                        numero_serie=dispositivo.numero_serie,
+                        version_fw=dispositivo.version_fw,
+                        version_hw=dispositivo.version_hw,
+                    )
                     cls._device_cache[mac_vo.valor] = dispositivo
                     cls._ultimos_heartbeats[dispositivo.id] = ahora
 
@@ -82,13 +98,7 @@ class ResolvedorDispositivoIngesta:
                 return saved
             else:
                 dispositivo.marcar_online(ahora)
-                if dev_info:
-                    if dev_info.get("serial_number"):
-                        dispositivo.numero_serie = dev_info.get("serial_number")
-                    if dev_info.get("device_fw"):
-                        dispositivo.version_fw = dev_info.get("device_fw")
-                    if dev_info.get("hw_model"):
-                        dispositivo.version_hw = dev_info.get("hw_model")
+                cls._aplicar_dev_info(dispositivo, dev_info)
                 saved = repo_dispositivos.guardar(dispositivo)
                 cls._device_cache[mac_vo.valor] = saved
                 cls._ultimos_heartbeats[saved.id] = ahora

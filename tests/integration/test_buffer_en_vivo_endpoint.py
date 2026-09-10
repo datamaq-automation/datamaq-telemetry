@@ -47,6 +47,13 @@ class _RepoDispositivosFake(RepositorioDispositivosPort):
     def guardar(self, dispositivo: Dispositivo) -> Dispositivo:
         return dispositivo
 
+    def actualizar_heartbeat(
+        self, dispositivo_id, estado, visto_por_ultima_vez, numero_serie=None, version_fw=None, version_hw=None
+    ) -> None:
+        if dispositivo_id == self._dispositivo.id:
+            self._dispositivo.estado = estado
+            self._dispositivo.visto_por_ultima_vez = visto_por_ultima_vez
+
 
 class _RepoTelemetriaFakeSoloDb(RepositorioTelemetriaPort):
     """Simula la BD: solo contiene lo que ya se persistió, nunca lo que llega por el buffer."""

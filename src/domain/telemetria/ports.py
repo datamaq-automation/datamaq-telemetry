@@ -15,7 +15,7 @@ from src.domain.telemetria.entities import (
     PlanTelemetria,
     ZonaPlanta,
 )
-from src.domain.telemetria.value_objects import LecturaPotenciaTemporal, MacAddress
+from src.domain.telemetria.value_objects import EstadoDispositivo, LecturaPotenciaTemporal, MacAddress
 
 
 class RepositorioDispositivosPort(ABC):
@@ -37,6 +37,24 @@ class RepositorioDispositivosPort(ABC):
 
     @abstractmethod
     def guardar(self, dispositivo: Dispositivo) -> Dispositivo:
+        pass
+
+    @abstractmethod
+    def actualizar_heartbeat(
+        self,
+        dispositivo_id: str,
+        estado: EstadoDispositivo,
+        visto_por_ultima_vez: datetime,
+        numero_serie: str | None = None,
+        version_fw: str | None = None,
+        version_hw: str | None = None,
+    ) -> None:
+        """Actualiza solo el estado operativo del heartbeat (online + último visto + firmware
+        opcional). Nunca toca campos administrativos como planta_id/nombre/modelo: a diferencia
+        de `guardar()`, este método existe justamente para que el refresco de heartbeat de alta
+        frecuencia no pueda pisar una reasignación de planta hecha por fuera del proceso de
+        ingesta mientras el dispositivo sigue transmitiendo.
+        """
         pass
 
 

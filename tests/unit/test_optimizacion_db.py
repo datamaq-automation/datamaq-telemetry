@@ -138,6 +138,20 @@ class MockDispositivosRepo(RepositorioDispositivosPort):
         self.dispositivos[dispositivo.id] = dispositivo
         return dispositivo
 
+    def actualizar_heartbeat(
+        self, dispositivo_id, estado, visto_por_ultima_vez, numero_serie=None, version_fw=None, version_hw=None
+    ) -> None:
+        d = self.dispositivos.get(dispositivo_id)
+        if d:
+            d.estado = estado
+            d.visto_por_ultima_vez = visto_por_ultima_vez
+            if numero_serie:
+                d.numero_serie = numero_serie
+            if version_fw:
+                d.version_fw = version_fw
+            if version_hw:
+                d.version_hw = version_hw
+
 
 class MockTelemetriaRepo(RepositorioTelemetriaPort):
     def __init__(self):
@@ -543,10 +557,15 @@ def test_heartbeat_throttling_60s():
         def __init__(self):
             super().__init__()
             self.guardar_calls = 0
+            self.actualizar_heartbeat_calls = 0
 
         def guardar(self, dispositivo: Dispositivo) -> Dispositivo:
             self.guardar_calls += 1
             return super().guardar(dispositivo)
+
+        def actualizar_heartbeat(self, *args, **kwargs) -> None:
+            self.actualizar_heartbeat_calls += 1
+            return super().actualizar_heartbeat(*args, **kwargs)
 
     repo_disp = SpyDispositivosRepo()
     repo_telem = MockTelemetriaRepo()
@@ -554,12 +573,13 @@ def test_heartbeat_throttling_60s():
 
     t0 = datetime(2026, 8, 14, 12, 0, 0, tzinfo=timezone.utc)
 
-    # 1. Primer mensaje (crea el dispositivo en DB)
+    # 1. Primer mensaje (crea el dispositivo en DB, vía guardar())
     use_case.ejecutar(
         "m/wifi/AABB11223344/inst",
         {"timestamp": t0.isoformat(), "phase_r": {"voltage_V": 220.0}},
     )
     assert repo_disp.guardar_calls == 1
+    assert repo_disp.actualizar_heartbeat_calls == 0
 
     # 2. Enviar 10 mensajes seguidos en los primeros 30 segundos
     for i in range(1, 11):
@@ -570,6 +590,7 @@ def test_heartbeat_throttling_60s():
 
     # El guardado en la tabla devices NO debe repetirse en cada frame (se mantiene en 1)
     assert repo_disp.guardar_calls == 1
+    assert repo_disp.actualizar_heartbeat_calls == 0
 
     # 3. Enviar un mensaje luego de 65 segundos (ventana vencida)
     use_case.ejecutar(
@@ -577,8 +598,10 @@ def test_heartbeat_throttling_60s():
         {"timestamp": (t0 + timedelta(seconds=65)).isoformat(), "phase_r": {"voltage_V": 220.0}},
     )
 
-    # Ahora sí debe haberse actualizado el heartbeat en DB
-    assert repo_disp.guardar_calls == 2
+    # El refresco de heartbeat se persiste vía actualizar_heartbeat() (UPDATE parcial), no
+    # guardar() -- así una reasignación de planta hecha por fuera no se pisa con el heartbeat.
+    assert repo_disp.guardar_calls == 1
+    assert repo_disp.actualizar_heartbeat_calls == 1
 
 
 def test_consultar_telemetria_modo_pro_y_free_bifurcado():
