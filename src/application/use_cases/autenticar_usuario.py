@@ -18,12 +18,14 @@ class AutenticarUsuarioUseCase:
         token_service: GeneradorTokenPort,
         minutos_validez: int,
         rate_limiter: RateLimiterService | None = None,
+        guest_organizacion_id: str | None = None,
     ):
         self.repo_usuarios = repo_usuarios
         self.hash_service = hash_service
         self.token_service = token_service
         self.minutos_validez = minutos_validez
         self.rate_limiter = rate_limiter
+        self.guest_organizacion_id = guest_organizacion_id
 
     def _registrar_intento(self, clave: str) -> None:
         if self.rate_limiter is not None:
@@ -93,7 +95,9 @@ class AutenticarUsuarioUseCase:
             self.rate_limiter.registrar_intento(clave_limite)
 
         expira_en = PoliticaExpiracionService.calcular_expiracion(ahora_utc(), self.minutos_validez)
-        token = self.token_service.generar("invitado", "invitado", expira_en, rol="invitado")
+        token = self.token_service.generar(
+            "invitado", "invitado", expira_en, rol="invitado", organizacion_id=self.guest_organizacion_id
+        )
         return LoginResponseDTO(token=token, expira_en=expira_en)
 
     def me(self, claims: dict[str, Any]) -> MeResponseDTO:

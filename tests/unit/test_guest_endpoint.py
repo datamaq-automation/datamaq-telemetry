@@ -66,6 +66,44 @@ def test_guest_genera_token_sin_bd():
     assert claims["exp"] > datetime.now(timezone.utc).timestamp()
 
 
+# G1b — con GUEST_ORGANIZATION_ID configurado, el token queda acotado a esa organización
+# (el invitado sin contraseña solo debe ver el medidor doméstico, no todas las organizaciones).
+def test_guest_con_organizacion_configurada_incluye_org_en_el_token():
+    token_service = JwtTokenService("clave-secreta")
+    use_case = AutenticarUsuarioUseCase(
+        repo_usuarios=_RepoVacio(),
+        hash_service=HashContrasenaService(),
+        token_service=token_service,
+        minutos_validez=120,
+        guest_organizacion_id="org-hogar-123",
+    )
+
+    response = use_case.guest("ip:1.2.3.4")
+
+    claims = token_service.verificar(response.token)
+    assert claims is not None
+    assert claims["rol"] == "invitado"
+    assert claims["org"] == "org-hogar-123"
+
+
+# G1c — sin GUEST_ORGANIZATION_ID configurado, se preserva el comportamiento anterior
+# (sin organización en el token; fail-closed: ve 0 dispositivos, no todos).
+def test_guest_sin_organizacion_configurada_no_incluye_org_en_el_token():
+    token_service = JwtTokenService("clave-secreta")
+    use_case = AutenticarUsuarioUseCase(
+        repo_usuarios=_RepoVacio(),
+        hash_service=HashContrasenaService(),
+        token_service=token_service,
+        minutos_validez=120,
+    )
+
+    response = use_case.guest("ip:1.2.3.4")
+
+    claims = token_service.verificar(response.token)
+    assert claims is not None
+    assert "org" not in claims
+
+
 # G2 — handler guest fija la cookie HttpOnly
 def test_guest_handler_fija_cookie():
     use_case = _use_case_guest()

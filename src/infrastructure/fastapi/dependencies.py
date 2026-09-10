@@ -293,6 +293,7 @@ def get_auth_use_case(
         token_service=JwtTokenService(settings.API_SECRET_KEY),
         minutos_validez=settings.AUTH_TOKEN_EXPIRA_MINUTOS,
         rate_limiter=rate_limiter,
+        guest_organizacion_id=settings.GUEST_ORGANIZATION_ID,
     )
 
 

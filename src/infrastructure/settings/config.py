@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     API_SECRET_KEY_ANTERIOR: str = ""
     AUTH_TOKEN_EXPIRA_MINUTOS: int = 120
     AUTH_REQUIRED: bool = True
+    GUEST_ORGANIZATION_ID: str | None = None
     AUTH_COOKIE_NOMBRE: str = "datamaq_token"
     AUTH_COOKIE_HTTPONLY: bool = True
     AUTH_COOKIE_SAMESITE: Literal["lax", "strict", "none"] = "strict"
