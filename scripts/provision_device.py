@@ -261,7 +261,15 @@ def apply_profile(
 
     # 2. Enviar Certificado CA (solo si tenemos uno: un POST vacío BORRA el CA del equipo)
     if ca_cert:
-        ca_payload = {"ca_certificate": ca_cert}
+        # El equipo exige username/password en TODOS los POST de endpoints mqtt_*, no solo en
+        # mqtt_config.json (protección propia del firmware contra tampering sin credenciales;
+        # así lo hace la UI web oficial, ver home.html: "Agrego el username y el password a
+        # todos los posteos a los endpoints de mqtt"). Sin esto, el equipo devuelve 422.
+        ca_payload = {
+            "ca_certificate": ca_cert,
+            "username": mqtt_cfg.get("username", ""),
+            "password": mqtt_cfg.get("password", ""),
+        }
         code_ca, res_ca = make_request(
             f"http://{host}/mqtt_ca_certificate_config.json",
             method="POST",
