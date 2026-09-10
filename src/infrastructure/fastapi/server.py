@@ -391,7 +391,7 @@ async def _autenticar_cliente_ws(websocket: WebSocket, settings: Settings, clien
         await websocket.close(code=WS_CLOSE_TOKEN_INVALIDO, reason="token_invalido")
         return None
 
-    es_superadmin = claims.get("rol") == "superadmin"
+    es_superadmin = claims.get("rol") in ("superadmin", "invitado_global")
     organizacion_id = None if es_superadmin else claims.get("org")
     return ConnectedClient(websocket=websocket, organizacion_id=organizacion_id, es_superadmin=es_superadmin)
 

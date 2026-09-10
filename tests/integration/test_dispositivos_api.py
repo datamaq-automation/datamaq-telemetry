@@ -64,7 +64,7 @@ def test_listar_dispositivos_end_to_end():
     mock_use_case = MagicMock()
     mock_use_case.listar_dispositivos.return_value = [mock_dto]
 
-    app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "user-test", "rol": "operador"}
+    app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "user-test", "rol": "operador", "org": "org-test"}
     app.dependency_overrides[get_dispositivos_use_case] = lambda: mock_use_case
 
     client = TestClient(app)

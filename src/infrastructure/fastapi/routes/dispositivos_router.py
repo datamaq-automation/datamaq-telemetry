@@ -30,7 +30,14 @@ def list_dispositivos(
     claims: Annotated[dict, Depends(get_usuario_actual)],
     planta_id: str | None = None,
 ):
-    organizacion_id = None if claims.get("rol") == "superadmin" else claims.get("org")
+    rol = claims.get("rol")
+    if rol in ("superadmin", "invitado_global"):
+        organizacion_id = None
+    else:
+        organizacion_id = claims.get("org")
+        if organizacion_id is None:
+            # Sin organización asignada: no hay nada que listar (fail-closed).
+            return []
     return use_case.listar_dispositivos(planta_id, organizacion_id=organizacion_id)
 
 

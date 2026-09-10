@@ -7,7 +7,7 @@ from src.domain.auth.ports import GeneradorTokenPort, RepositorioUsuariosPort
 from src.domain.auth.services import HashContrasenaService, PoliticaExpiracionService, RateLimiterService
 from src.domain.auth.value_objects import NombreUsuario
 
-ROLES_VALIDOS = frozenset({"superadmin", "admin", "operador", "invitado"})
+ROLES_VALIDOS = frozenset({"superadmin", "admin", "operador", "invitado", "invitado_global"})
 
 
 class AutenticarUsuarioUseCase:

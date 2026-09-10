@@ -471,6 +471,6 @@ def requiere_rol_admin(claims: Annotated[dict[str, Any], Depends(get_usuario_act
 
 
 def requiere_rol_escritura(claims: Annotated[dict[str, Any], Depends(get_usuario_actual)]) -> dict[str, Any]:
-    if claims.get("rol") == "invitado":
+    if claims.get("rol") in ("invitado", "invitado_global"):
         raise HTTPException(status_code=403, detail="forbidden")
     return claims
