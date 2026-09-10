@@ -219,7 +219,9 @@ def get_maquinas_use_case(
 ) -> GestionarMaquinasUseCase:
     repo_maquinas = MySQLMaquinasRepository(db)
     repo_telem = MySQLTelemetriaRepository(db)
-    return GestionarMaquinasUseCase(repo_maquinas, repo_telem)
+    repo_disp = MySQLDispositivosRepository(db)
+    repo_org = MySQLOrganizacionesRepository(db)
+    return GestionarMaquinasUseCase(repo_maquinas, repo_telem, repo_disp, repo_org)
 
 
 def get_cargas_use_case(
@@ -262,7 +264,9 @@ def get_disponibilidad_use_case(
     repo_maquinas = MySQLMaquinasRepository(db)
     repo_eventos = MySQLEventosDisponibilidadRepository(db)
     repo_paradas = MySQLParadasProgramadasRepository(db)
-    return GestionarDisponibilidadUseCase(repo_maquinas, repo_eventos, repo_paradas)
+    repo_disp = MySQLDispositivosRepository(db)
+    repo_org = MySQLOrganizacionesRepository(db)
+    return GestionarDisponibilidadUseCase(repo_maquinas, repo_eventos, repo_paradas, repo_disp, repo_org)
 
 
 def get_planta_estructura_use_case(

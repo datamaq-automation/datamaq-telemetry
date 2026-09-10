@@ -12,12 +12,18 @@ from src.application.dtos.maquina_dto import (
 )
 from src.application.mappers.maquina_mapper import MaquinaMapper
 from src.domain.disponibilidad.exceptions import (
+    DispositivoDeOrganizacionDistintaError,
     DispositivoYaAsociadoAMaquinaError,
     MaquinaNoEncontradaError,
 )
 from src.domain.disponibilidad.ports import RepositorioMaquinasPort
 from src.domain.disponibilidad.services import SegmentadorRegimenesService
-from src.domain.telemetria.ports import RepositorioTelemetriaPort
+from src.domain.telemetria.exceptions import DispositivoNoEncontradoError
+from src.domain.telemetria.ports import (
+    RepositorioDispositivosPort,
+    RepositorioOrganizacionesPort,
+    RepositorioTelemetriaPort,
+)
 
 
 class GestionarMaquinasUseCase:
@@ -27,12 +33,16 @@ class GestionarMaquinasUseCase:
         self,
         repo_maquinas: RepositorioMaquinasPort,
         repo_telemetria: RepositorioTelemetriaPort,
+        repo_dispositivos: RepositorioDispositivosPort | None = None,
+        repo_organizaciones: RepositorioOrganizacionesPort | None = None,
     ):
         self.repo_maquinas = repo_maquinas
         self.repo_telemetria = repo_telemetria
+        self.repo_dispositivos = repo_dispositivos
+        self.repo_organizaciones = repo_organizaciones
 
-    def listar_maquinas(self) -> list[MaquinaResponseDTO]:
-        return [MaquinaMapper.to_dto(m) for m in self.repo_maquinas.listar()]
+    def listar_maquinas(self, organizacion_id: str | None = None) -> list[MaquinaResponseDTO]:
+        return [MaquinaMapper.to_dto(m) for m in self.repo_maquinas.listar(organizacion_id=organizacion_id)]
 
     def obtener_maquina(self, maquina_id: str) -> MaquinaResponseDTO:
         maquina = self.repo_maquinas.obtener_por_id(maquina_id)
@@ -40,7 +50,23 @@ class GestionarMaquinasUseCase:
             raise MaquinaNoEncontradaError(f"Máquina '{maquina_id}' no encontrada.")
         return MaquinaMapper.to_dto(maquina)
 
-    def registrar_maquina(self, dto: MaquinaCreateDTO) -> MaquinaResponseDTO:
+    def _validar_dispositivo_en_organizacion(self, dispositivo_id: str, organizacion_id: str) -> None:
+        if not self.repo_dispositivos or not self.repo_organizaciones:
+            return
+        dispositivo = self.repo_dispositivos.obtener_por_id(dispositivo_id)
+        if dispositivo is None:
+            raise DispositivoNoEncontradoError(f"Dispositivo '{dispositivo_id}' no encontrado.")
+        planta = (
+            self.repo_organizaciones.obtener_planta_por_id(dispositivo.planta_id) if dispositivo.planta_id else None
+        )
+        if not planta or planta.organizacion_id != organizacion_id:
+            raise DispositivoDeOrganizacionDistintaError(
+                f"El dispositivo '{dispositivo_id}' no pertenece a la organización del usuario."
+            )
+
+    def registrar_maquina(self, dto: MaquinaCreateDTO, organizacion_id: str | None = None) -> MaquinaResponseDTO:
+        if organizacion_id is not None:
+            self._validar_dispositivo_en_organizacion(dto.dispositivo_id, organizacion_id)
         existente = self.repo_maquinas.obtener_por_dispositivo_id(dto.dispositivo_id)
         if existente:
             raise DispositivoYaAsociadoAMaquinaError(

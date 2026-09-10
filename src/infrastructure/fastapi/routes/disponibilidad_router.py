@@ -1,7 +1,7 @@
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
 from src.application.dtos.disponibilidad_dto import (
@@ -29,6 +29,10 @@ from src.infrastructure.fastapi.dependencies import (
     get_usuario_actual,
     requiere_rol_escritura,
 )
+from src.infrastructure.fastapi.device_ownership import (
+    verificar_propiedad_evento_disponibilidad,
+    verificar_propiedad_maquina,
+)
 from src.infrastructure.fastapi.error_handler import manejar_error_http
 
 router = APIRouter(
@@ -38,17 +42,30 @@ router = APIRouter(
 )
 
 
+def _organizacion_de_claims(claims: dict[str, Any]) -> str | None:
+    if claims.get("rol") in ("superadmin", "invitado_global"):
+        return None
+    return claims.get("org")
+
+
 @router.get("/maquinas", response_model=list[MaquinaResponseDTO])
 def listar_maquinas(
     use_case: Annotated[GestionarMaquinasUseCase, Depends(get_maquinas_use_case)],
+    claims: Annotated[dict, Depends(get_usuario_actual)],
 ):
+    if claims.get("rol") not in ("superadmin", "invitado_global") and not claims.get("org"):
+        return []
     try:
-        return use_case.listar_maquinas()
+        return use_case.listar_maquinas(_organizacion_de_claims(claims))
     except Exception as e:
         manejar_error_http(e)
 
 
-@router.get("/maquinas/{maquina_id}", response_model=MaquinaResponseDTO)
+@router.get(
+    "/maquinas/{maquina_id}",
+    response_model=MaquinaResponseDTO,
+    dependencies=[Depends(verificar_propiedad_maquina)],
+)
 def obtener_maquina(
     maquina_id: str,
     use_case: Annotated[GestionarMaquinasUseCase, Depends(get_maquinas_use_case)],
@@ -63,15 +80,21 @@ def obtener_maquina(
 def registrar_maquina(
     dto: MaquinaCreateDTO,
     use_case: Annotated[GestionarMaquinasUseCase, Depends(get_maquinas_use_case)],
+    claims: Annotated[dict, Depends(get_usuario_actual)],
 ):
+    organizacion_id = _organizacion_de_claims(claims)
+    if claims.get("rol") not in ("superadmin", "invitado_global") and not organizacion_id:
+        raise HTTPException(status_code=403, detail="sin_organizacion_asignada")
     try:
-        return use_case.registrar_maquina(dto)
+        return use_case.registrar_maquina(dto, organizacion_id)
     except Exception as e:
         manejar_error_http(e)
 
 
 @router.patch(
-    "/maquinas/{maquina_id}", response_model=MaquinaResponseDTO, dependencies=[Depends(requiere_rol_escritura)]
+    "/maquinas/{maquina_id}",
+    response_model=MaquinaResponseDTO,
+    dependencies=[Depends(requiere_rol_escritura), Depends(verificar_propiedad_maquina)],
 )
 def actualizar_maquina(
     maquina_id: str,
@@ -84,7 +107,11 @@ def actualizar_maquina(
         manejar_error_http(e)
 
 
-@router.get("/maquinas/{maquina_id}/histograma", response_model=HistogramaPotenciaResponseDTO)
+@router.get(
+    "/maquinas/{maquina_id}/histograma",
+    response_model=HistogramaPotenciaResponseDTO,
+    dependencies=[Depends(verificar_propiedad_maquina)],
+)
 def obtener_histograma(
     maquina_id: str,
     use_case: Annotated[GestionarMaquinasUseCase, Depends(get_maquinas_use_case)],
@@ -96,7 +123,11 @@ def obtener_histograma(
         manejar_error_http(e)
 
 
-@router.get("/maquinas/{maquina_id}/eventos", response_model=list[EventoDisponibilidadResponseDTO])
+@router.get(
+    "/maquinas/{maquina_id}/eventos",
+    response_model=list[EventoDisponibilidadResponseDTO],
+    dependencies=[Depends(verificar_propiedad_maquina)],
+)
 def listar_eventos(
     maquina_id: str,
     use_case: Annotated[GestionarDisponibilidadUseCase, Depends(get_disponibilidad_use_case)],
@@ -108,7 +139,11 @@ def listar_eventos(
         manejar_error_http(e)
 
 
-@router.get("/maquinas/{maquina_id}/metricas-oee", response_model=MetricasDisponibilidadOEEResponseDTO)
+@router.get(
+    "/maquinas/{maquina_id}/metricas-oee",
+    response_model=MetricasDisponibilidadOEEResponseDTO,
+    dependencies=[Depends(verificar_propiedad_maquina)],
+)
 def obtener_metricas_oee(
     maquina_id: str,
     use_case: Annotated[GestionarDisponibilidadUseCase, Depends(get_disponibilidad_use_case)],
@@ -125,12 +160,12 @@ def obtener_metricas_oee(
 @router.post(
     "/eventos/{evento_id}/corregir",
     response_model=EventoDisponibilidadResponseDTO,
-    dependencies=[Depends(requiere_rol_escritura)],
+    dependencies=[Depends(requiere_rol_escritura), Depends(verificar_propiedad_evento_disponibilidad)],
 )
 @router.patch(
     "/eventos/{evento_id}/corregir",
     response_model=EventoDisponibilidadResponseDTO,
-    dependencies=[Depends(requiere_rol_escritura)],
+    dependencies=[Depends(requiere_rol_escritura), Depends(verificar_propiedad_evento_disponibilidad)],
 )
 def corregir_clasificacion(
     evento_id: int,
@@ -145,7 +180,11 @@ def corregir_clasificacion(
         manejar_error_http(e)
 
 
-@router.get("/paradas-programadas", response_model=list[ParadaProgramadaResponseDTO])
+@router.get(
+    "/paradas-programadas",
+    response_model=list[ParadaProgramadaResponseDTO],
+    dependencies=[Depends(verificar_propiedad_maquina)],
+)
 def listar_paradas_programadas(
     use_case: Annotated[GestionarDisponibilidadUseCase, Depends(get_disponibilidad_use_case)],
     maquina_id: Annotated[str, Query()],
@@ -166,14 +205,20 @@ def registrar_parada_programada(
     use_case: Annotated[GestionarDisponibilidadUseCase, Depends(get_disponibilidad_use_case)],
     claims: Annotated[dict, Depends(requiere_rol_escritura)],
 ):
+    organizacion_id = _organizacion_de_claims(claims)
+    if claims.get("rol") not in ("superadmin", "invitado_global") and not organizacion_id:
+        raise HTTPException(status_code=403, detail="sin_organizacion_asignada")
     try:
         usuario_id = claims.get("sub")
-        return use_case.registrar_parada_programada(dto, usuario_id=usuario_id)
+        return use_case.registrar_parada_programada(dto, usuario_id=usuario_id, organizacion_id=organizacion_id)
     except Exception as e:
         manejar_error_http(e)
 
 
-@router.get("/maquinas/{maquina_id}/exportar/csv")
+@router.get(
+    "/maquinas/{maquina_id}/exportar/csv",
+    dependencies=[Depends(verificar_propiedad_maquina)],
+)
 def exportar_disponibilidad_csv(
     maquina_id: str,
     use_case: Annotated[ExportarDisponibilidadUseCase, Depends(get_exportar_disponibilidad_use_case)],

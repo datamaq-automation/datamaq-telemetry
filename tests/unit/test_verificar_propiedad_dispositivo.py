@@ -7,7 +7,9 @@ from fastapi import HTTPException
 
 from src.infrastructure.fastapi.device_ownership import (
     verificar_propiedad_dispositivo,
+    verificar_propiedad_evento_disponibilidad,
     verificar_propiedad_grupo_dispositivos,
+    verificar_propiedad_maquina,
 )
 
 
@@ -231,5 +233,172 @@ class TestVerificarPropiedadGrupoDispositivos:
             with pytest.raises(HTTPException) as exc_info:
                 verificar_propiedad_grupo_dispositivos(
                     claims={"rol": "operador", "org": "org-a"}, db=MagicMock(), grupo_id="no-existe"
+                )
+        assert exc_info.value.status_code == 404
+
+
+class _FakeMaquina:
+    def __init__(self, dispositivo_id: str) -> None:
+        self.dispositivo_id = dispositivo_id
+
+
+class _FakeEvento:
+    def __init__(self, maquina_id: str) -> None:
+        self.maquina_id = maquina_id
+
+
+def _mock_maquinas_repos(monkeypatch, repo_maquinas=None, repo_dispositivos=None, repo_organizaciones=None):
+    monkeypatch.setattr(
+        "src.infrastructure.fastapi.device_ownership.MySQLMaquinasRepository",
+        lambda db: repo_maquinas or MagicMock(),
+    )
+    monkeypatch.setattr(
+        "src.infrastructure.fastapi.device_ownership.MySQLDispositivosRepository",
+        lambda db: repo_dispositivos or MagicMock(),
+    )
+    monkeypatch.setattr(
+        "src.infrastructure.fastapi.device_ownership.MySQLOrganizacionesRepository",
+        lambda db: repo_organizaciones or MagicMock(),
+    )
+
+
+class TestVerificarPropiedadMaquina:
+    def test_superadmin_pasa_sin_consultar_repos(self, monkeypatch):
+        repo_maquinas = MagicMock()
+        _mock_maquinas_repos(monkeypatch, repo_maquinas=repo_maquinas)
+        with patch(
+            "src.infrastructure.fastapi.device_ownership.get_settings",
+            return_value=_FakeSettings(auth_required=True),
+        ):
+            verificar_propiedad_maquina(claims={"rol": "superadmin"}, db=MagicMock(), maquina_id="m1")
+        repo_maquinas.obtener_por_id.assert_not_called()
+
+    def test_usuario_de_org_a_ve_maquina_de_org_a(self, monkeypatch):
+        repo_maquinas = MagicMock()
+        repo_maquinas.obtener_por_id.return_value = _FakeMaquina(dispositivo_id="dev-1")
+        repo_dispositivos = MagicMock()
+        repo_dispositivos.obtener_por_id.return_value = _FakeDispositivo(planta_id="planta-1")
+        repo_organizaciones = MagicMock()
+        repo_organizaciones.obtener_planta_por_id.return_value = _FakePlanta(organizacion_id="org-a")
+        _mock_maquinas_repos(monkeypatch, repo_maquinas, repo_dispositivos, repo_organizaciones)
+
+        with patch(
+            "src.infrastructure.fastapi.device_ownership.get_settings",
+            return_value=_FakeSettings(auth_required=True),
+        ):
+            verificar_propiedad_maquina(claims={"rol": "operador", "org": "org-a"}, db=MagicMock(), maquina_id="m1")
+
+    def test_usuario_de_org_a_no_ve_maquina_de_org_b(self, monkeypatch):
+        repo_maquinas = MagicMock()
+        repo_maquinas.obtener_por_id.return_value = _FakeMaquina(dispositivo_id="dev-2")
+        repo_dispositivos = MagicMock()
+        repo_dispositivos.obtener_por_id.return_value = _FakeDispositivo(planta_id="planta-2")
+        repo_organizaciones = MagicMock()
+        repo_organizaciones.obtener_planta_por_id.return_value = _FakePlanta(organizacion_id="org-b")
+        _mock_maquinas_repos(monkeypatch, repo_maquinas, repo_dispositivos, repo_organizaciones)
+
+        with patch(
+            "src.infrastructure.fastapi.device_ownership.get_settings",
+            return_value=_FakeSettings(auth_required=True),
+        ):
+            with pytest.raises(HTTPException) as exc_info:
+                verificar_propiedad_maquina(claims={"rol": "operador", "org": "org-a"}, db=MagicMock(), maquina_id="m2")
+        assert exc_info.value.status_code == 404
+
+    def test_maquina_inexistente_devuelve_404(self, monkeypatch):
+        repo_maquinas = MagicMock()
+        repo_maquinas.obtener_por_id.return_value = None
+        _mock_maquinas_repos(monkeypatch, repo_maquinas=repo_maquinas)
+
+        with patch(
+            "src.infrastructure.fastapi.device_ownership.get_settings",
+            return_value=_FakeSettings(auth_required=True),
+        ):
+            with pytest.raises(HTTPException) as exc_info:
+                verificar_propiedad_maquina(
+                    claims={"rol": "operador", "org": "org-a"}, db=MagicMock(), maquina_id="no-existe"
+                )
+        assert exc_info.value.status_code == 404
+
+
+class TestVerificarPropiedadEventoDisponibilidad:
+    def test_superadmin_pasa_sin_consultar_repos(self, monkeypatch):
+        repo_eventos = MagicMock()
+        monkeypatch.setattr(
+            "src.infrastructure.fastapi.device_ownership.MySQLEventosDisponibilidadRepository",
+            lambda db: repo_eventos,
+        )
+        with patch(
+            "src.infrastructure.fastapi.device_ownership.get_settings",
+            return_value=_FakeSettings(auth_required=True),
+        ):
+            verificar_propiedad_evento_disponibilidad(claims={"rol": "superadmin"}, db=MagicMock(), evento_id=1)
+        repo_eventos.obtener_por_id.assert_not_called()
+
+    def test_usuario_de_org_a_ve_evento_de_org_a(self, monkeypatch):
+        repo_eventos = MagicMock()
+        repo_eventos.obtener_por_id.return_value = _FakeEvento(maquina_id="m1")
+        repo_maquinas = MagicMock()
+        repo_maquinas.obtener_por_id.return_value = _FakeMaquina(dispositivo_id="dev-1")
+        repo_dispositivos = MagicMock()
+        repo_dispositivos.obtener_por_id.return_value = _FakeDispositivo(planta_id="planta-1")
+        repo_organizaciones = MagicMock()
+        repo_organizaciones.obtener_planta_por_id.return_value = _FakePlanta(organizacion_id="org-a")
+
+        monkeypatch.setattr(
+            "src.infrastructure.fastapi.device_ownership.MySQLEventosDisponibilidadRepository",
+            lambda db: repo_eventos,
+        )
+        _mock_maquinas_repos(monkeypatch, repo_maquinas, repo_dispositivos, repo_organizaciones)
+
+        with patch(
+            "src.infrastructure.fastapi.device_ownership.get_settings",
+            return_value=_FakeSettings(auth_required=True),
+        ):
+            verificar_propiedad_evento_disponibilidad(
+                claims={"rol": "operador", "org": "org-a"}, db=MagicMock(), evento_id=1
+            )
+
+    def test_usuario_de_org_a_no_ve_evento_de_org_b(self, monkeypatch):
+        repo_eventos = MagicMock()
+        repo_eventos.obtener_por_id.return_value = _FakeEvento(maquina_id="m2")
+        repo_maquinas = MagicMock()
+        repo_maquinas.obtener_por_id.return_value = _FakeMaquina(dispositivo_id="dev-2")
+        repo_dispositivos = MagicMock()
+        repo_dispositivos.obtener_por_id.return_value = _FakeDispositivo(planta_id="planta-2")
+        repo_organizaciones = MagicMock()
+        repo_organizaciones.obtener_planta_por_id.return_value = _FakePlanta(organizacion_id="org-b")
+
+        monkeypatch.setattr(
+            "src.infrastructure.fastapi.device_ownership.MySQLEventosDisponibilidadRepository",
+            lambda db: repo_eventos,
+        )
+        _mock_maquinas_repos(monkeypatch, repo_maquinas, repo_dispositivos, repo_organizaciones)
+
+        with patch(
+            "src.infrastructure.fastapi.device_ownership.get_settings",
+            return_value=_FakeSettings(auth_required=True),
+        ):
+            with pytest.raises(HTTPException) as exc_info:
+                verificar_propiedad_evento_disponibilidad(
+                    claims={"rol": "operador", "org": "org-a"}, db=MagicMock(), evento_id=2
+                )
+        assert exc_info.value.status_code == 404
+
+    def test_evento_inexistente_devuelve_404(self, monkeypatch):
+        repo_eventos = MagicMock()
+        repo_eventos.obtener_por_id.return_value = None
+        monkeypatch.setattr(
+            "src.infrastructure.fastapi.device_ownership.MySQLEventosDisponibilidadRepository",
+            lambda db: repo_eventos,
+        )
+
+        with patch(
+            "src.infrastructure.fastapi.device_ownership.get_settings",
+            return_value=_FakeSettings(auth_required=True),
+        ):
+            with pytest.raises(HTTPException) as exc_info:
+                verificar_propiedad_evento_disponibilidad(
+                    claims={"rol": "operador", "org": "org-a"}, db=MagicMock(), evento_id=999
                 )
         assert exc_info.value.status_code == 404

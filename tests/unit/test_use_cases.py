@@ -40,7 +40,7 @@ class MockMaquinasRepo(RepositorioMaquinasPort):
     def obtener_por_dispositivo_id(self, dispositivo_id: str) -> Maquina | None:
         return next((m for m in self.maquinas.values() if m.dispositivo_id == dispositivo_id), None)
 
-    def listar(self) -> list[Maquina]:
+    def listar(self, organizacion_id: str | None = None) -> list[Maquina]:
         return list(self.maquinas.values())
 
     def guardar(self, maquina: Maquina) -> Maquina:

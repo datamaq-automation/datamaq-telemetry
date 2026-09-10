@@ -20,3 +20,7 @@ class DispositivoYaAsociadoAMaquinaError(DominioDisponibilidadException):
 
 class RangoParadaProgramadaInvalidoError(DominioDisponibilidadException):
     """Lanzada cuando el fin de una parada programada es anterior o igual a su inicio."""
+
+
+class DispositivoDeOrganizacionDistintaError(DominioDisponibilidadException):
+    """Lanzada al intentar asociar a una Maquina/ParadaProgramada un dispositivo de otra organización."""

@@ -10,7 +10,7 @@ from src.infrastructure.fastapi.dependencies import (
     get_exportar_telemetria_use_case,
     get_usuario_actual,
 )
-from src.infrastructure.fastapi.device_ownership import verificar_propiedad_dispositivo
+from src.infrastructure.fastapi.device_ownership import verificar_propiedad_dispositivo, verificar_propiedad_maquina
 from src.infrastructure.fastapi.server import create_app
 
 
@@ -56,6 +56,7 @@ def test_exportar_disponibilidad_csv_streaming_end_to_end():
     )
 
     app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "user-test", "rol": "operador"}
+    app.dependency_overrides[verificar_propiedad_maquina] = lambda: None
     app.dependency_overrides[get_exportar_disponibilidad_use_case] = lambda: mock_use_case
 
     client = TestClient(app)

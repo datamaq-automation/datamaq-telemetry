@@ -15,6 +15,7 @@ from src.application.mappers.disponibilidad_mapper import (
 )
 from src.domain.disponibilidad.entities import EventoDisponibilidad, ParadaProgramada
 from src.domain.disponibilidad.exceptions import (
+    DispositivoDeOrganizacionDistintaError,
     EventoDisponibilidadNoEncontradoError,
     MaquinaNoEncontradaError,
     RangoParadaProgramadaInvalidoError,
@@ -30,6 +31,7 @@ from src.domain.disponibilidad.services import (
     FiltroPersistenciaEstadoService,
 )
 from src.domain.disponibilidad.value_objects import EstadoMaquina, TipoParada
+from src.domain.telemetria.ports import RepositorioDispositivosPort, RepositorioOrganizacionesPort
 
 
 class GestionarDisponibilidadUseCase:
@@ -49,10 +51,31 @@ class GestionarDisponibilidadUseCase:
         repo_maquinas: RepositorioMaquinasPort,
         repo_eventos: RepositorioEventosDisponibilidadPort,
         repo_paradas: RepositorioParadasProgramadasPort,
+        repo_dispositivos: RepositorioDispositivosPort | None = None,
+        repo_organizaciones: RepositorioOrganizacionesPort | None = None,
     ):
         self.repo_maquinas = repo_maquinas
         self.repo_eventos = repo_eventos
         self.repo_paradas = repo_paradas
+        self.repo_dispositivos = repo_dispositivos
+        self.repo_organizaciones = repo_organizaciones
+
+    def _validar_maquina_en_organizacion(self, maquina_id: str, organizacion_id: str) -> None:
+        if not self.repo_dispositivos or not self.repo_organizaciones:
+            return
+        maquina = self.repo_maquinas.obtener_por_id(maquina_id)
+        if maquina is None:
+            raise MaquinaNoEncontradaError(f"Máquina '{maquina_id}' no encontrada.")
+        dispositivo = self.repo_dispositivos.obtener_por_id(maquina.dispositivo_id)
+        planta = (
+            self.repo_organizaciones.obtener_planta_por_id(dispositivo.planta_id)
+            if dispositivo and dispositivo.planta_id
+            else None
+        )
+        if not planta or planta.organizacion_id != organizacion_id:
+            raise DispositivoDeOrganizacionDistintaError(
+                f"La máquina '{maquina_id}' no pertenece a la organización del usuario."
+            )
 
     def clasificar_lectura(self, dispositivo_id: str, potencia_w: float, recorded_at: datetime) -> None:
         """No-op si el dispositivo no tiene una `Maquina` asociada o no está calibrada todavía."""
@@ -117,8 +140,10 @@ class GestionarDisponibilidadUseCase:
         return EventoDisponibilidadMapper.to_dto(saved)
 
     def registrar_parada_programada(
-        self, dto: ParadaProgramadaCreateDTO, usuario_id: str | None
+        self, dto: ParadaProgramadaCreateDTO, usuario_id: str | None, organizacion_id: str | None = None
     ) -> ParadaProgramadaResponseDTO:
+        if organizacion_id is not None:
+            self._validar_maquina_en_organizacion(dto.maquina_id, organizacion_id)
         if dto.fin_at <= dto.inicio_at:
             raise RangoParadaProgramadaInvalidoError("El fin de la parada programada debe ser posterior al inicio.")
 

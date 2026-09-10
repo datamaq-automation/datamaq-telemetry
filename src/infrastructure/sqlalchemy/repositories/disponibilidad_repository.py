@@ -12,6 +12,8 @@ from src.domain.disponibilidad.ports import (
 )
 from src.domain.disponibilidad.value_objects import EstadoMaquina, OrigenClasificacion, TipoParada
 from src.infrastructure.sqlalchemy.models import (
+    DeviceModel,
+    FacilityModel,
     MachineAvailabilityEventModel,
     MachineModel,
     ScheduledStopModel,
@@ -42,8 +44,15 @@ class MySQLMaquinasRepository(RepositorioMaquinasPort):
         model = self.db.query(MachineModel).filter(MachineModel.device_id == dispositivo_id).first()
         return self._to_entity(model) if model else None
 
-    def listar(self) -> list[Maquina]:
-        return [self._to_entity(m) for m in self.db.query(MachineModel).all()]
+    def listar(self, organizacion_id: str | None = None) -> list[Maquina]:
+        query = self.db.query(MachineModel)
+        if organizacion_id:
+            query = (
+                query.join(DeviceModel, MachineModel.device_id == DeviceModel.id)
+                .join(FacilityModel, DeviceModel.facility_id == FacilityModel.id)
+                .filter(FacilityModel.organization_id == organizacion_id)
+            )
+        return [self._to_entity(m) for m in query.all()]
 
     def guardar(self, maquina: Maquina) -> Maquina:
         model = self.db.query(MachineModel).filter(MachineModel.id == maquina.id).first()

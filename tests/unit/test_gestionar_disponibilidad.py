@@ -34,7 +34,7 @@ class _FakeMaquinasRepo(RepositorioMaquinasPort):
     def obtener_por_dispositivo_id(self, dispositivo_id):
         return next((m for m in self.maquinas.values() if m.dispositivo_id == dispositivo_id), None)
 
-    def listar(self):
+    def listar(self, organizacion_id=None):
         return list(self.maquinas.values())
 
     def guardar(self, maquina):
