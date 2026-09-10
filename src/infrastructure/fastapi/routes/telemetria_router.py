@@ -23,6 +23,7 @@ from src.infrastructure.fastapi.dependencies import (
     get_telemetria_use_case,
     get_usuario_actual,
 )
+from src.infrastructure.fastapi.device_ownership import verificar_propiedad_dispositivo
 from src.infrastructure.fastapi.error_handler import manejar_error_http
 
 router = APIRouter(
@@ -32,7 +33,11 @@ router = APIRouter(
 )
 
 
-@router.get("/latest/{device_id}", response_model=TelemetriaLatestResponseDTO)
+@router.get(
+    "/latest/{device_id}",
+    response_model=TelemetriaLatestResponseDTO,
+    dependencies=[Depends(verificar_propiedad_dispositivo)],
+)
 def get_latest_telemetry(
     device_id: str,
     use_case: Annotated[ConsultarTelemetriaUseCase, Depends(get_telemetria_use_case)],
@@ -43,7 +48,11 @@ def get_latest_telemetry(
         manejar_error_http(e)
 
 
-@router.get("/fases-diagnostico/{device_id}", response_model=DiagnosticoFasesDispositivoDTO)
+@router.get(
+    "/fases-diagnostico/{device_id}",
+    response_model=DiagnosticoFasesDispositivoDTO,
+    dependencies=[Depends(verificar_propiedad_dispositivo)],
+)
 def get_phase_diagnostic(
     device_id: str,
     use_case: Annotated[ConsultarTelemetriaUseCase, Depends(get_telemetria_use_case)],
@@ -55,7 +64,11 @@ def get_phase_diagnostic(
         manejar_error_http(e)
 
 
-@router.get("/instantaneous/{device_id}", response_model=list[LecturaInstantaneaDTO])
+@router.get(
+    "/instantaneous/{device_id}",
+    response_model=list[LecturaInstantaneaDTO],
+    dependencies=[Depends(verificar_propiedad_dispositivo)],
+)
 def get_instantaneous_history(
     device_id: str,
     use_case: Annotated[ConsultarTelemetriaUseCase, Depends(get_telemetria_use_case)],
@@ -76,7 +89,11 @@ def get_instantaneous_history(
         manejar_error_http(e)
 
 
-@router.get("/energy/{device_id}", response_model=list[AcumuladoEnergiaDTO | EnergiaAgregadaDTO])
+@router.get(
+    "/energy/{device_id}",
+    response_model=list[AcumuladoEnergiaDTO | EnergiaAgregadaDTO],
+    dependencies=[Depends(verificar_propiedad_dispositivo)],
+)
 def get_energy_history(
     device_id: str,
     use_case: Annotated[ConsultarTelemetriaUseCase, Depends(get_telemetria_use_case)],
@@ -94,7 +111,11 @@ def get_energy_history(
         manejar_error_http(e)
 
 
-@router.get("/alerts/{device_id}", response_model=list[AlertaResponseDTO])
+@router.get(
+    "/alerts/{device_id}",
+    response_model=list[AlertaResponseDTO],
+    dependencies=[Depends(verificar_propiedad_dispositivo)],
+)
 def get_alerts_history(
     device_id: str,
     use_case: Annotated[GestionarAlertasUseCase, Depends(get_alertas_use_case)],
@@ -117,7 +138,7 @@ def get_alerts_history(
         manejar_error_http(e)
 
 
-@router.get("/exportar/csv")
+@router.get("/exportar/csv", dependencies=[Depends(verificar_propiedad_dispositivo)])
 def exportar_telemetria_csv(
     dispositivo_id: str = Query(..., description="ID del dispositivo a exportar"),
     use_case: Annotated[ExportarTelemetriaUseCase, Depends(get_exportar_telemetria_use_case)] = None,  # type: ignore

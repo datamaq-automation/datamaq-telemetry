@@ -14,6 +14,7 @@ from src.infrastructure.fastapi.dependencies import (
     get_usuario_actual,
     requiere_rol_escritura,
 )
+from src.infrastructure.fastapi.device_ownership import verificar_propiedad_dispositivo
 from src.infrastructure.fastapi.error_handler import manejar_error_http
 
 router = APIRouter(
@@ -33,7 +34,11 @@ def list_dispositivos(
     return use_case.listar_dispositivos(planta_id, organizacion_id=organizacion_id)
 
 
-@router.get("/{device_id}", response_model=DispositivoResponseDTO)
+@router.get(
+    "/{device_id}",
+    response_model=DispositivoResponseDTO,
+    dependencies=[Depends(verificar_propiedad_dispositivo)],
+)
 def get_dispositivo(
     device_id: str,
     use_case: Annotated[GestionarDispositivosUseCase, Depends(get_dispositivos_use_case)],
