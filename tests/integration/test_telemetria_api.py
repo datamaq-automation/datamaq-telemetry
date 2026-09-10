@@ -14,6 +14,7 @@ from src.infrastructure.fastapi.dependencies import (
     get_telemetria_use_case,
     get_usuario_actual,
 )
+from src.infrastructure.fastapi.device_ownership import verificar_propiedad_dispositivo
 from src.infrastructure.fastapi.server import create_app
 
 
@@ -87,6 +88,7 @@ def test_get_latest_telemetry_end_to_end_con_thd():
     mock_use_case.obtener_ultima_telemetria.return_value = mock_dto
 
     app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "user-test", "rol": "operador"}
+    app.dependency_overrides[verificar_propiedad_dispositivo] = lambda: None
     app.dependency_overrides[get_telemetria_use_case] = lambda: mock_use_case
 
     client = TestClient(app)
@@ -119,6 +121,7 @@ def test_get_instantaneous_history_end_to_end():
     mock_use_case.listar_instantaneas.return_value = [mock_item]
 
     app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "user-test", "rol": "operador"}
+    app.dependency_overrides[verificar_propiedad_dispositivo] = lambda: None
     app.dependency_overrides[get_telemetria_use_case] = lambda: mock_use_case
 
     client = TestClient(app)
@@ -138,6 +141,7 @@ def test_get_instantaneous_history_empty_result_returns_200_empty_list():
     mock_use_case.listar_instantaneas.return_value = []
 
     app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "user-test", "rol": "invitado"}
+    app.dependency_overrides[verificar_propiedad_dispositivo] = lambda: None
     app.dependency_overrides[get_telemetria_use_case] = lambda: mock_use_case
 
     client = TestClient(app)
@@ -166,6 +170,7 @@ def test_get_energy_history_end_to_end():
     mock_use_case.listar_energias.return_value = [mock_energy]
 
     app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "user-test", "rol": "invitado"}
+    app.dependency_overrides[verificar_propiedad_dispositivo] = lambda: None
     app.dependency_overrides[get_telemetria_use_case] = lambda: mock_use_case
 
     client = TestClient(app)
@@ -215,6 +220,7 @@ def test_get_latest_telemetry_end_to_end_con_analitica_calidad_energia():
     mock_use_case.obtener_ultima_telemetria.return_value = mock_dto
 
     app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "user-test", "rol": "operador"}
+    app.dependency_overrides[verificar_propiedad_dispositivo] = lambda: None
     app.dependency_overrides[get_telemetria_use_case] = lambda: mock_use_case
 
     client = TestClient(app)

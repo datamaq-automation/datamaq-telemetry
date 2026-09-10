@@ -25,6 +25,7 @@ from src.infrastructure.fastapi.dependencies import (
     global_event_broadcaster,
     global_telemetria_buffer,
 )
+from src.infrastructure.fastapi.device_ownership import verificar_propiedad_dispositivo
 from src.infrastructure.fastapi.server import create_app
 
 
@@ -132,6 +133,7 @@ def test_recarga_de_pagina_recupera_lectura_en_vivo_no_persistida_todavia():
 
     app = create_app()
     app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "user-test", "rol": "operador"}
+    app.dependency_overrides[verificar_propiedad_dispositivo] = lambda: None
     app.dependency_overrides[get_telemetria_use_case] = lambda: ConsultarTelemetriaUseCase(
         repo_telem, repo_disp, buffer_en_vivo=global_telemetria_buffer
     )
