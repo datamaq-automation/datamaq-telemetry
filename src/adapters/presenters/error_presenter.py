@@ -28,6 +28,7 @@ from src.domain.telemetria.exceptions import (
     DispositivoNoEncontradoError,
     DominioTelemetriaException,
     FactorPotenciaInvalidoError,
+    GrupoDispositivosNoEncontradoError,
     MacAddressInvalidaError,
     PlantaNoEncontradaError,
     TensionInvalidaError,
@@ -50,6 +51,7 @@ class ErrorPresenter:
                 CargaNoEncontradaError,
                 CampanaNoEncontradaError,
                 IntervaloActividadNoEncontradoError,
+                GrupoDispositivosNoEncontradoError,
             ),
         ):
             return 404, {"error": "NotFound", "mensaje": exc.mensaje}

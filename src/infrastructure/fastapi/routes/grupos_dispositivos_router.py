@@ -6,6 +6,7 @@ from src.application.dtos.grupo_dispositivos_dto import (
     AgregarMiembroGrupoDTO,
     GrupoDispositivosCreateDTO,
     GrupoDispositivosResponseDTO,
+    PuntoPotenciaGrupoDTO,
     ResumenGrupoDispositivosDTO,
 )
 from src.application.use_cases.consultar_grupo_dispositivos import ConsultarGrupoDispositivosUseCase
@@ -121,5 +122,22 @@ def resumen_grupo(
 ):
     try:
         return use_case.resumen(grupo_id, granularity, timezone, dias)
+    except Exception as e:
+        manejar_error_http(e)
+
+
+@router.get(
+    "/{grupo_id}/resumen/historico",
+    response_model=list[PuntoPotenciaGrupoDTO],
+    dependencies=[Depends(verificar_propiedad_grupo_dispositivos)],
+)
+def historico_grupo(
+    grupo_id: str,
+    use_case: Annotated[ConsultarGrupoDispositivosUseCase, Depends(get_consultar_grupo_dispositivos_use_case)],
+    hours: int = 24,
+    granularity: str = "5m",
+):
+    try:
+        return use_case.historico(grupo_id, granularity, hours)
     except Exception as e:
         manejar_error_http(e)

@@ -29,3 +29,9 @@ class ResumenGrupoDispositivosDTO(BaseModel):
     potencia_activa_total_w: float | None = None
     dispositivos_sin_dato: list[str] = []
     energia_agregada: list[EnergiaAgregadaDTO] = []
+
+
+class PuntoPotenciaGrupoDTO(BaseModel):
+    momento: FechaHoraUTC
+    potencia_activa_total_w: float | None = None
+    dispositivos_sin_dato: list[str] = []

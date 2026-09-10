@@ -6,9 +6,11 @@ from fastapi.testclient import TestClient
 
 from src.application.dtos.grupo_dispositivos_dto import (
     GrupoDispositivosResponseDTO,
+    PuntoPotenciaGrupoDTO,
     ResumenGrupoDispositivosDTO,
 )
 from src.application.dtos.telemetria_dto import EnergiaAgregadaDTO
+from src.domain.telemetria.exceptions import GrupoDispositivosNoEncontradoError
 from src.infrastructure.fastapi.dependencies import (
     get_consultar_grupo_dispositivos_use_case,
     get_grupos_dispositivos_use_case,
@@ -101,3 +103,40 @@ def test_resumen_grupo_suma_potencia_y_energia_end_to_end():
     data = response.json()
     assert data["potencia_activa_total_w"] == 2500.0
     assert data["energia_agregada"][0]["energia_activa_neta_kwh"] == 15.0
+
+
+def test_historico_grupo_end_to_end():
+    app = create_app()
+    mock_use_case = MagicMock()
+    mock_use_case.historico.return_value = [
+        PuntoPotenciaGrupoDTO(momento="2026-09-10T12:00:00Z", potencia_activa_total_w=2500.0, dispositivos_sin_dato=[]),
+        PuntoPotenciaGrupoDTO(momento="2026-09-10T12:05:00Z", potencia_activa_total_w=2700.0, dispositivos_sin_dato=[]),
+    ]
+
+    app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "user-test", "rol": "operador", "org": "org-a"}
+    app.dependency_overrides[verificar_propiedad_grupo_dispositivos] = lambda: None
+    app.dependency_overrides[get_consultar_grupo_dispositivos_use_case] = lambda: mock_use_case
+
+    client = TestClient(app)
+    response = client.get("/api/v1/grupos-dispositivos/g1/resumen/historico?hours=24&granularity=5m")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 2
+    assert data[0]["potencia_activa_total_w"] == 2500.0
+    assert data[1]["potencia_activa_total_w"] == 2700.0
+
+
+def test_resumen_grupo_inexistente_devuelve_404():
+    app = create_app()
+    mock_use_case = MagicMock()
+    mock_use_case.resumen.side_effect = GrupoDispositivosNoEncontradoError("no-existe")
+
+    app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "user-test", "rol": "operador", "org": "org-a"}
+    app.dependency_overrides[verificar_propiedad_grupo_dispositivos] = lambda: None
+    app.dependency_overrides[get_consultar_grupo_dispositivos_use_case] = lambda: mock_use_case
+
+    client = TestClient(app)
+    response = client.get("/api/v1/grupos-dispositivos/no-existe/resumen")
+
+    assert response.status_code == 404

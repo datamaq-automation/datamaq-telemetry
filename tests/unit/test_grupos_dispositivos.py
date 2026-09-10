@@ -147,6 +147,21 @@ class TestGestionarGruposDispositivosUseCase:
         with pytest.raises(GrupoDispositivosNoEncontradoError):
             use_case.obtener_grupo("g1")
 
+    def test_crear_grupo_rechaza_al_superar_el_cupo_por_planta(self):
+        from src.application.dtos.grupo_dispositivos_dto import GrupoDispositivosCreateDTO
+        from src.application.use_cases.gestionar_grupos_dispositivos import MAX_GRUPOS_POR_PLANTA
+        from src.domain.telemetria.exceptions import LimiteGruposExcedidoError
+
+        repo_grupos = MockGruposDispositivosRepo()
+        repo_dispositivos = MockDispositivosRepo()
+        for i in range(MAX_GRUPOS_POR_PLANTA):
+            repo_grupos.crear(GrupoDispositivos(id=f"g{i}", planta_id="planta-durax", nombre=f"Grupo {i}"))
+        use_case = GestionarGruposDispositivosUseCase(repo_grupos, repo_dispositivos)
+
+        dto = GrupoDispositivosCreateDTO(planta_id="planta-durax", nombre="Uno de más")
+        with pytest.raises(LimiteGruposExcedidoError):
+            use_case.crear_grupo(dto)
+
 
 def _lectura(dispositivo_id: str, vatios: float) -> LecturaInstantanea:
     from datetime import datetime, timezone
@@ -208,3 +223,48 @@ class TestAgregadorGrupoDispositivosService:
         }
         resultado = AgregadorGrupoDispositivosService.sumar_energia_agregada(agregados)
         assert resultado[0].energia_activa_neta_kwh == 10.0
+
+    def test_sumar_potencia_en_el_tiempo_alinea_por_bucket_pese_a_desalineamiento(self):
+        from datetime import datetime, timezone
+
+        base = datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc)
+        lecturas = {
+            "trafo-01": [(base, 1000.0), (base.replace(minute=5), 1100.0)],
+            # Mismo bucket de 5 minutos que el primero, pero con timestamp corrido 40s.
+            "trafo-02": [(base.replace(second=40), 500.0), (base.replace(minute=5, second=10), 600.0)],
+        }
+
+        resultado = AgregadorGrupoDispositivosService.sumar_potencia_en_el_tiempo(lecturas, intervalo_segundos=300)
+
+        assert len(resultado) == 2
+        assert resultado[0].potencia_activa_total_w == 1500.0
+        assert resultado[0].dispositivos_sin_dato == []
+        assert resultado[1].potencia_activa_total_w == 1700.0
+
+    def test_sumar_potencia_en_el_tiempo_marca_dispositivo_sin_dato_en_un_bucket(self):
+        from datetime import datetime, timezone
+
+        base = datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc)
+        lecturas = {
+            "trafo-01": [(base, 1000.0)],
+            "trafo-02": [],
+        }
+
+        resultado = AgregadorGrupoDispositivosService.sumar_potencia_en_el_tiempo(lecturas, intervalo_segundos=300)
+
+        assert len(resultado) == 1
+        assert resultado[0].potencia_activa_total_w == 1000.0
+        assert resultado[0].dispositivos_sin_dato == ["trafo-02"]
+
+    def test_sumar_potencia_en_el_tiempo_sin_ningun_dato_en_bucket_es_none(self):
+        from datetime import datetime, timezone
+
+        base = datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc)
+        lecturas = {
+            "trafo-01": [(base, None)],
+        }
+
+        resultado = AgregadorGrupoDispositivosService.sumar_potencia_en_el_tiempo(lecturas, intervalo_segundos=300)
+
+        assert len(resultado) == 1
+        assert resultado[0].potencia_activa_total_w is None

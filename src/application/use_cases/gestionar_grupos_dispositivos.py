@@ -9,11 +9,14 @@ from src.domain.telemetria.exceptions import (
     DispositivoDePlantaDistintaError,
     DispositivoNoEncontradoError,
     GrupoDispositivosNoEncontradoError,
+    LimiteGruposExcedidoError,
 )
 from src.domain.telemetria.ports import (
     RepositorioDispositivosPort,
     RepositorioGruposDispositivosPort,
 )
+
+MAX_GRUPOS_POR_PLANTA = 20
 
 
 class GestionarGruposDispositivosUseCase:
@@ -44,7 +47,15 @@ class GestionarGruposDispositivosUseCase:
                 f"El dispositivo {dispositivo_id} no pertenece a la planta {planta_id}"
             )
 
+    def _validar_cupo_grupos(self, planta_id: str) -> None:
+        actual = len(self.repo_grupos.listar_por_planta(planta_id))
+        if actual >= MAX_GRUPOS_POR_PLANTA:
+            raise LimiteGruposExcedidoError(
+                f"La planta {planta_id} alcanzó el límite de {MAX_GRUPOS_POR_PLANTA} grupos de dispositivos."
+            )
+
     def crear_grupo(self, dto: GrupoDispositivosCreateDTO) -> GrupoDispositivosResponseDTO:
+        self._validar_cupo_grupos(dto.planta_id)
         for dispositivo_id in dto.dispositivos_ids:
             self._validar_dispositivo_en_planta(dispositivo_id, dto.planta_id)
 

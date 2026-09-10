@@ -1,4 +1,7 @@
-from src.application.dtos.grupo_dispositivos_dto import ResumenGrupoDispositivosDTO
+from src.application.dtos.grupo_dispositivos_dto import (
+    PuntoPotenciaGrupoDTO,
+    ResumenGrupoDispositivosDTO,
+)
 from src.application.dtos.telemetria_dto import EnergiaAgregadaDTO
 from src.application.use_cases.consultar_telemetria import ConsultarTelemetriaUseCase
 from src.domain.telemetria.entities import EnergiaAgregada
@@ -53,3 +56,38 @@ class ConsultarGrupoDispositivosUseCase:
                 for e in energia_sumada
             ],
         )
+
+    def historico(
+        self,
+        grupo_id: str,
+        granularidad: str = "5m",
+        horas: int = 24,
+    ) -> list[PuntoPotenciaGrupoDTO]:
+        grupo = self.repo_grupos.obtener_por_id(grupo_id)
+        if grupo is None:
+            raise GrupoDispositivosNoEncontradoError(grupo_id)
+
+        intervalo_segundos = ConsultarTelemetriaUseCase._resolver_intervalo_segundos(granularidad, horas)
+        if intervalo_segundos <= 0:
+            intervalo_segundos = 300
+
+        lecturas_por_dispositivo: dict[str, list[tuple]] = {}
+        for dispositivo_id in grupo.dispositivos_ids:
+            lecturas_dto = self.consultar_telemetria.listar_instantaneas(
+                dispositivo_id, limite=2000, granularidad=granularidad, horas=horas
+            )
+            lecturas_por_dispositivo[dispositivo_id] = [
+                (lectura.registrado_en, lectura.potencia_activa_total_W) for lectura in lecturas_dto
+            ]
+
+        puntos = AgregadorGrupoDispositivosService.sumar_potencia_en_el_tiempo(
+            lecturas_por_dispositivo, intervalo_segundos
+        )
+        return [
+            PuntoPotenciaGrupoDTO(
+                momento=p.momento,
+                potencia_activa_total_w=p.potencia_activa_total_w,
+                dispositivos_sin_dato=p.dispositivos_sin_dato,
+            )
+            for p in puntos
+        ]
