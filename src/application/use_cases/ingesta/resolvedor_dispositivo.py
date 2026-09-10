@@ -4,7 +4,11 @@ from datetime import datetime, timezone
 from typing import Any, ClassVar
 
 from src.domain.telemetria.entities import Dispositivo
-from src.domain.telemetria.ports import LoggerPort, RepositorioDispositivosPort
+from src.domain.telemetria.ports import (
+    LoggerPort,
+    RepositorioDispositivosPort,
+    RepositorioOrganizacionesPort,
+)
 from src.domain.telemetria.value_objects import EstadoDispositivo, MacAddress
 
 
@@ -13,6 +17,7 @@ class ResolvedorDispositivoIngesta:
 
     _device_cache: ClassVar[dict[str, Dispositivo]] = {}
     _ultimos_heartbeats: ClassVar[dict[str, datetime]] = {}
+    _organizacion_cache: ClassVar[dict[str, str | None]] = {}
     _lock: ClassVar[threading.Lock] = threading.Lock()
 
     @classmethod
@@ -90,8 +95,38 @@ class ResolvedorDispositivoIngesta:
                 return saved
 
     @classmethod
+    def resolver_organizacion_id(
+        cls,
+        mac_raw: str,
+        repo_organizaciones: RepositorioOrganizacionesPort,
+    ) -> str | None:
+        """Resuelve la organizacion_id de un dispositivo a partir de su MAC, vía device -> planta -> org.
+
+        Usa la caché de dispositivos ya poblada por `obtener_o_crear_dispositivo` (no hace lookup
+        de dispositivo por su cuenta) y cachea la resolución planta->org para evitar ir a la DB
+        en cada mensaje. Devuelve None si el dispositivo no está en caché, no tiene planta asignada,
+        o la planta no tiene organización.
+        """
+        mac_vo = MacAddress(mac_raw)
+        dispositivo = cls._device_cache.get(mac_vo.valor)
+        if dispositivo is None or not dispositivo.planta_id:
+            return None
+
+        planta_id = dispositivo.planta_id
+        with cls._lock:
+            if planta_id in cls._organizacion_cache:
+                return cls._organizacion_cache[planta_id]
+
+        planta = repo_organizaciones.obtener_planta_por_id(planta_id)
+        organizacion_id = planta.organizacion_id if planta else None
+        with cls._lock:
+            cls._organizacion_cache[planta_id] = organizacion_id
+        return organizacion_id
+
+    @classmethod
     def limpiar_cache(cls) -> None:
         """Limpia la caché de dispositivos en memoria (útil para pruebas)."""
         with cls._lock:
             cls._device_cache.clear()
             cls._ultimos_heartbeats.clear()
+            cls._organizacion_cache.clear()

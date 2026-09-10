@@ -2,6 +2,7 @@ import asyncio
 import json
 import time
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
@@ -14,12 +15,18 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from src.adapters.gateways.mqtt_comando_rafaga import MqttComandoRafagaGateway
 from src.application.use_cases.caracterizar_carga import CaracterizarCargaUseCase
 from src.application.use_cases.ingesta.registro_campanas import registro_campanas_activas
+from src.application.use_cases.ingesta.resolvedor_dispositivo import (
+    ResolvedorDispositivoIngesta,
+)
+from src.domain.telemetria.services import debe_recibir_evento
+from src.domain.telemetria.value_objects import MacAddress
+from src.infrastructure.auth.jwt_token_service import JwtTokenService
 from src.infrastructure.fastapi.dependencies import (
+    extraer_token,
     get_mqtt_listener,
     global_event_broadcaster,
     global_telemetria_buffer,
     registrar_mqtt_listener,
-    token_valido,
 )
 from src.infrastructure.fastapi.error_handler import manejar_404
 from src.infrastructure.fastapi.middleware import RequestIdMiddleware
@@ -62,11 +69,27 @@ from src.infrastructure.sqlalchemy.mysql_repositories import (
     MySQLCampanasRepository,
     MySQLCargasRepository,
     MySQLDispositivosRepository,
+    MySQLOrganizacionesRepository,
 )
 
 logger = get_logger("server")
 
-active_websockets: list[WebSocket] = []
+
+@dataclass
+class ConnectedClient:
+    """Cliente WebSocket conectado a /ws/live, con el contexto de organización de su token.
+
+    `organizacion_id` es None para superadmin (ve todo) o cuando el usuario no tiene
+    organización asociada (en ese caso, `es_superadmin` decide si ve algo: ver
+    `debe_recibir_evento`).
+    """
+
+    websocket: WebSocket
+    organizacion_id: str | None
+    es_superadmin: bool
+
+
+active_websockets: list[ConnectedClient] = []
 async_loop = None
 
 # Código de cierre de aplicación que distingue "token inválido" en /ws/live.
@@ -126,6 +149,38 @@ def obtener_metricas_ws() -> dict[str, Any]:
     return ws_metrics.to_dict(len(active_websockets))
 
 
+def _resolver_organizacion_evento(topico: str) -> str | None:
+    """Resuelve la organizacion_id del dispositivo que originó `topico` (formato `.../{mac}/{subtopico}`).
+
+    Usa la caché en memoria de `ResolvedorDispositivoIngesta` (poblada por el worker de ingesta,
+    mismo proceso) y solo abre una sesión de DB en el cache-miss de planta->organización.
+    Cualquier fallo se trata como "sin organización resuelta" (fail-closed: solo superadmin la ve).
+    """
+    try:
+        partes = topico.split("/")
+        if len(partes) < 3:
+            return None
+        mac_raw = partes[2]
+        mac_vo = MacAddress(mac_raw)
+        dispositivo = ResolvedorDispositivoIngesta._device_cache.get(mac_vo.valor)
+        if dispositivo is None or not dispositivo.planta_id:
+            return None
+        planta_id = dispositivo.planta_id
+        if planta_id in ResolvedorDispositivoIngesta._organizacion_cache:
+            return ResolvedorDispositivoIngesta._organizacion_cache[planta_id]
+
+        session_factory = get_session_factory()
+        db = session_factory()
+        try:
+            repo = MySQLOrganizacionesRepository(db)
+            return ResolvedorDispositivoIngesta.resolver_organizacion_id(mac_raw, repo)
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.warning("resolver_organizacion_evento_fallido", topico=topico, error=str(exc))
+        return None
+
+
 def websocket_broadcast_callback(topico: str, datos: dict):
     recibido_en = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     msg = json.dumps({"topic": topico, "data": datos, "received_at": recibido_en})
@@ -144,17 +199,23 @@ def websocket_broadcast_callback(topico: str, datos: dict):
         logger.warning("ws_broadcast_sin_loop", topico=topico)
         return
 
+    organizacion_evento = _resolver_organizacion_evento(topico)
+
     enviados_ok = 0
     fallidos = 0
-    for ws in list(active_websockets):
+    omitidos_aislamiento = 0
+    for cliente in list(active_websockets):
+        if not debe_recibir_evento(cliente.es_superadmin, cliente.organizacion_id, organizacion_evento):
+            omitidos_aislamiento += 1
+            continue
         try:
-            asyncio.run_coroutine_threadsafe(ws.send_text(msg), async_loop)
+            asyncio.run_coroutine_threadsafe(cliente.websocket.send_text(msg), async_loop)
             enviados_ok += 1
         except Exception as exc:
             fallidos += 1
             logger.warning("ws_broadcast_error_cliente", error=str(exc), topico=topico)
-            if ws in active_websockets:
-                active_websockets.remove(ws)
+            if cliente in active_websockets:
+                active_websockets.remove(cliente)
 
     ws_metrics.total_broadcasts += 1
     ws_metrics.ultimo_broadcast_en = recibido_en
@@ -170,6 +231,7 @@ def websocket_broadcast_callback(topico: str, datos: dict):
         clientes_activos=total_clientes,
         enviados_ok=enviados_ok,
         fallidos=fallidos,
+        omitidos_aislamiento=omitidos_aislamiento,
     )
 
 
@@ -250,12 +312,12 @@ async def _ws_heartbeat_loop() -> None:
             if active_websockets:
                 ahora = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
                 ping_msg = json.dumps({"topic": "system/heartbeat", "data": {"status": "ok"}, "received_at": ahora})
-                for ws in list(active_websockets):
+                for cliente in list(active_websockets):
                     try:
-                        await ws.send_text(ping_msg)
+                        await cliente.websocket.send_text(ping_msg)
                     except Exception:
-                        if ws in active_websockets:
-                            active_websockets.remove(ws)
+                        if cliente in active_websockets:
+                            active_websockets.remove(cliente)
 
                 # Renovación periódica de sampleo rápido (cada 60 segundos si hay clientes activos)
                 ahora_ts = time.time()
@@ -311,6 +373,60 @@ async def lifespan(app: FastAPI):
     global_event_broadcaster.desuscribir(global_telemetria_buffer.agregar)
 
 
+async def _autenticar_cliente_ws(websocket: WebSocket, settings: Settings, client_host: str) -> ConnectedClient | None:
+    """Valida el token (si aplica) y arma el `ConnectedClient` con su contexto de organización.
+
+    Devuelve None (y ya cerró la conexión) si el token es inválido/falta con AUTH_REQUIRED activo.
+    """
+    if not settings.AUTH_REQUIRED:
+        return ConnectedClient(websocket=websocket, organizacion_id=None, es_superadmin=True)
+
+    cookie_token = websocket.cookies.get(settings.AUTH_COOKIE_NOMBRE)
+    auth_header = websocket.headers.get("authorization")
+    token = extraer_token(cookie_token, auth_header)
+    adicionales = [settings.API_SECRET_KEY_ANTERIOR] if settings.API_SECRET_KEY_ANTERIOR else None
+    claims = JwtTokenService(settings.API_SECRET_KEY).verificar(token, adicionales) if token else None
+    if claims is None:
+        logger.warning("ws_auth_rechazada", client=client_host, razon="token_invalido")
+        await websocket.close(code=WS_CLOSE_TOKEN_INVALIDO, reason="token_invalido")
+        return None
+
+    es_superadmin = claims.get("rol") == "superadmin"
+    organizacion_id = None if es_superadmin else claims.get("org")
+    return ConnectedClient(websocket=websocket, organizacion_id=organizacion_id, es_superadmin=es_superadmin)
+
+
+def _registrar_cliente_ws(cliente: ConnectedClient, client_host: str) -> None:
+    active_websockets.append(cliente)
+    ws_metrics.total_conexiones += 1
+    logger.info(
+        "ws_cliente_conectado",
+        client=client_host,
+        total_activos=len(active_websockets),
+        organizacion_id=cliente.organizacion_id,
+        es_superadmin=cliente.es_superadmin,
+    )
+    if len(active_websockets) == 1:
+        listener = get_mqtt_listener()
+        if listener and listener.esta_conectado():
+            _renovar_modo_tiempo_real_medidores(listener)
+
+
+async def _bucle_recepcion_ws(websocket: WebSocket) -> None:
+    while True:
+        data = await websocket.receive_text()
+        if data in ("ping", '{"type":"ping"}'):
+            await websocket.send_text(json.dumps({"type": "pong", "timestamp": datetime.now(timezone.utc).isoformat()}))
+
+
+def _desconectar_cliente_ws(cliente: ConnectedClient, client_host: str, evento: str, **detalle: Any) -> None:
+    if cliente in active_websockets:
+        active_websockets.remove(cliente)
+    ws_metrics.total_desconexiones += 1
+    log_fn = logger.info if evento == "ws_cliente_desconectado" else logger.warning
+    log_fn(evento, client=client_host, total_activos=len(active_websockets), **detalle)
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     app = FastAPI(
@@ -363,40 +479,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def websocket_stream(websocket: WebSocket):
         client_host = websocket.client.host if websocket.client else "desconocido"
         await websocket.accept()
-        if settings.AUTH_REQUIRED:
-            cookie_token = websocket.cookies.get(settings.AUTH_COOKIE_NOMBRE)
-            auth_header = websocket.headers.get("authorization")
-            if not token_valido(cookie_token, auth_header, settings.API_SECRET_KEY, settings.API_SECRET_KEY_ANTERIOR):
-                logger.warning("ws_auth_rechazada", client=client_host, razon="token_invalido")
-                await websocket.close(code=WS_CLOSE_TOKEN_INVALIDO, reason="token_invalido")
-                return
-        active_websockets.append(websocket)
-        ws_metrics.total_conexiones += 1
-        logger.info("ws_cliente_conectado", client=client_host, total_activos=len(active_websockets))
-        if len(active_websockets) == 1:
-            listener = get_mqtt_listener()
-            if listener and listener.esta_conectado():
-                _renovar_modo_tiempo_real_medidores(listener)
+        cliente = await _autenticar_cliente_ws(websocket, settings, client_host)
+        if cliente is None:
+            return
+        _registrar_cliente_ws(cliente, client_host)
         try:
-            while True:
-                data = await websocket.receive_text()
-                if data in ("ping", '{"type":"ping"}'):
-                    await websocket.send_text(
-                        json.dumps({"type": "pong", "timestamp": datetime.now(timezone.utc).isoformat()})
-                    )
+            await _bucle_recepcion_ws(websocket)
         except WebSocketDisconnect as e:
-            if websocket in active_websockets:
-                active_websockets.remove(websocket)
-            ws_metrics.total_desconexiones += 1
-            logger.info(
-                "ws_cliente_desconectado", client=client_host, code=e.code, total_activos=len(active_websockets)
-            )
+            _desconectar_cliente_ws(cliente, client_host, "ws_cliente_desconectado", code=e.code)
         except Exception as e:
-            if websocket in active_websockets:
-                active_websockets.remove(websocket)
-            ws_metrics.total_desconexiones += 1
-            logger.warning(
-                "ws_cliente_error_conexion", client=client_host, error=str(e), total_activos=len(active_websockets)
-            )
+            _desconectar_cliente_ws(cliente, client_host, "ws_cliente_error_conexion", error=str(e))
 
     return app
