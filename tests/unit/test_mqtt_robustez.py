@@ -229,7 +229,7 @@ def test_payload_json_lista_descartado(monkeypatch):
     logger_fake = _LoggerFake()
     listener = _listener(monkeypatch, settings, logger_fake)
 
-    listener._on_message(None, None, _Msg("m/wifi/AABBCCDDEEFF/inst", b"[1, 2, 3]"))
+    listener._on_message(None, None, _Msg("m/wifi/AABBCCDDEEFF/inst", b"123.45"))
 
     assert any(e[0] == "mqtt_payload_no_dict" for e in logger_fake.eventos)
 

@@ -13,30 +13,27 @@ Este documento **no define** todavía tablas, servicios ni endpoints — es inte
 
 ---
 
-## 2. Punto de partida: qué existe hoy en la plataforma
+## 2. Punto de partida: qué existe en la plataforma
 
-Relevado sobre el modelo de datos y el código de ingesta (`src/infrastructure/sqlalchemy/models.py`, `src/application/use_cases/ingestar_telemetria.py`):
+Relevado sobre el modelo de datos y el código de dominio (`src/domain/disponibilidad/entities.py`, `src/infrastructure/sqlalchemy/models.py`):
 
-- **`telemetry_instantaneous`**: potencia activa/reactiva/aparente, corriente y tensión por fase y totales, cada ~5 minutos en modo estándar (soporta modo ráfaga de 1-5s vía `realtime_sync_mode` para una máquina puntual).
-- **`telemetry_energy`**: contadores acumulados de energía activa/reactiva.
-- **`device_status_logs` / `EstadoDispositivo`**: conectividad del medidor (ONLINE/OFFLINE/WARNING) — **no** es un estado de proceso productivo.
-- **`device_alerts`**: alertas de calidad eléctrica (desbalance, THD, factor de potencia) — no de disponibilidad de máquina.
-- **No existe** ninguna entidad "Máquina/Equipo" separada del medidor, ningún estado de marcha/parada, ni calendario de paradas programadas o turnos dentro del sistema.
-- La relación medidor↔máquina en la planta real es **mixta**: algunos medidores miden una única máquina; otros agregan una línea/tablero con varias cargas juntas.
-- El calendario de paradas programadas (mantenimiento, cambios de turno) existe hoy **fuera del sistema** (ERP/mantenimiento externo) — se podría cruzar por fecha/hora, pero no hay integración.
-- Ya existe en el dominio un patrón reutilizable para filtrar ruido temporal: `FiltroPersistenciaTemporalService`, que exige N lecturas consecutivas o M segundos antes de confirmar una alerta (evita reaccionar a un transitorio puntual). El mismo principio aplica conceptualmente a la detección de cambios de estado de marcha/parada.
+- **`Maquina`**: Entidad de dominio vinculada 1:1 a un `Dispositivo` (ej: SmartPlus), con umbral de marcha calibrable (`on_threshold_w`) y filtros de persistencia temporal (`persistence_readings`, `persistence_seconds`).
+- **`EventoDisponibilidad`**: Registro de intervalos de disponibilidad con estado (`MARCHA`, `PARADA`), tipo de parada (`PROGRAMADA`, `NO_PROGRAMADA`), potencia promedio y origen de clasificación (`REGLA`, `MANUAL`, `AUTOMATA`).
+- **`ParadaProgramada`**: Calendario de paradas planificadas (mantenimiento, turnos) vinculable a cada máquina por intervalo de tiempo.
+- **`telemetry_instantaneous`**: Potencia activa/reactiva/aparente, corriente y tensión por fase y totales cada 5 minutos (o 1-5s en modo ráfaga `realtime_sync_mode`).
+- **Arquitectura Híbrida (Energía + PLC Automate 24V-4M)**: Coexisten en la misma máquina el medidor Smart Plus (dimensión energética) y el PLC Automate (dimensión de maniobra/control vía E/S discretas por Ethernet).
 
 ---
 
 ## 3. Certezas
 
-1. **La disponibilidad es un estado de 3 valores, no 2:** marcha / parada programada / parada no programada. La señal eléctrica **nunca** alcanza sola para distinguir "programada" de "no programada" — eso es información de planificación (calendario, turnos, órdenes de mantenimiento), no de energía. Requiere cruzar la clasificación eléctrica con una fuente externa por fecha/hora.
-2. **Un enfoque por reglas (umbrales de potencia) es el punto de partida correcto**, no un atajo inferior al aprendizaje automático. Es interpretable, auditable, no requiere datos históricos etiquetados, y es el estándar de la industria (OEE/TPM) antes de cualquier capa de ML.
-3. **El ML supervisado necesita "verdad de terreno" (ground truth) para entrenar, y hoy no existe.** Las reglas son la forma de generar las primeras etiquetas (con ruido) para arrancar un dataset histórico; el ML no reemplaza a las reglas, se apoya en ellas.
-4. **La cadencia real de datos (5 min estándar) define el piso de resolución temporal.** Un micro-paro de 30 segundos no se puede detectar como evento propio salvo activar el modo ráfaga para esa máquina puntual.
-5. **El umbral marcha/parada se puede calibrar empíricamente, no adivinado**, a partir del histograma de potencia de cada máquina (ver sección 5).
-6. **Cuando un medidor agrega varias cargas independientes**, el problema deja de ser "marcha vs. parada" (2 estados) y pasa a ser un problema de **desagregación de cargas** (ver sección 6), con su propia complejidad y límites de confiabilidad.
-7. **El conocimiento físico del proceso reduce el espacio de estados posible** y debe inyectarse como restricción de diseño, no esperarse que un algoritmo lo "descubra" solo (ej.: si una línea de producción depende neumáticamente del compresor, el estado "línea activa sin compresor" no es un estado válido a considerar).
+1. **La disponibilidad es un estado de 3 valores:** marcha / parada programada / parada no programada. La señal eléctrica se cruza con las `ParadaProgramada` cargadas en el sistema para determinar si la parada fue planificada.
+2. **Fusión Sensorial (Smart Plus + Automate 24V-4M):** La combinación de la potencia activa $P(t)$ (Smart Plus) con las entradas digitales discretas (Automate 24V-4M) elimina la ambigüedad en paradas, permitiendo asignar automáticamente el `origen: AUTOMATA` y la causa raíz exacta cuando se activa un contacto de falla o paro de emergencia.
+3. **Un enfoque por reglas (umbrales de potencia) es el punto de partida correcto**, no un atajo inferior al aprendizaje automático. Es interpretable, auditable, no requiere datos históricos etiquetados, y es el estándar de la industria (OEE/TPM) antes de cualquier capa de ML.
+4. **El ML supervisado necesita "verdad de terreno" (ground truth) para entrenar, y hoy no existe.** Las reglas y las señales del PLC son la forma de generar las primeras etiquetas (con ruido controlado) para arrancar un dataset histórico.
+5. **La cadencia real de datos (5 min estándar) define el piso de resolución temporal.** Un micro-paro de 30 segundos no se puede detectar como evento propio salvo activar el modo ráfaga para esa máquina puntual.
+6. **El umbral marcha/parada se puede calibrar empíricamente**, a partir del histograma de potencia de cada máquina (`/api/v1/disponibilidad/maquinas/{id}/histograma`).
+7. **Cuando un medidor mide exclusivamente una máquina (submedición pura)**, no hay problemas de desagregación de cargas (NILM); el 100% de la señal $P(t)$ corresponde al proceso activo de esa máquina.
 
 ---
 

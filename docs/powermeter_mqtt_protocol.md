@@ -174,3 +174,37 @@ Para optimizar el uso de la base de datos MySQL manteniendo alta fidelidad visua
 
 4. **Acumulados de Energía (`/acc` / `/energyio`):**
    * Se registran en la tabla `telemetry_energy` con valores acumulados monótonos crecientes de kWh y kVARh para cálculos de consumo y facturación.
+
+---
+
+## 6. Protocolo MQTT de Autómatas (Powermeter Automate 24V-4M)
+
+El **Powermeter Automate 24V-4M** (PLC industrial con procesador dual-core ESP32, 12 E/S digitales y 12 analógicas) utiliza una jerarquía de tópicos propia bajo el prefijo `auto24v4m/{id}/`:
+
+### A. Mapa de Tópicos del Automate
+
+| Tópico | Dirección | Descripción | Payload |
+|---|---|---|---|
+| `auto24v4m/{id}/status/v1` | Automate ➔ Servidor | Estado de conectividad, IP, RSSI, uptime y memoria | JSON de status |
+| `auto24v4m/{id}/onoff/v1` | Automate ➔ Servidor | Notificación LWT (Online / Offline) | JSON con timestamp |
+| `auto24v4m/{id}/inst/io/v1` | Automate ➔ Servidor | Lectura instantánea de E/S digitales (P1-P12) y analógicas (A1-A2) | JSON estructurado por puerto |
+| `auto24v4m/{id}/inst/block/v1` | Automate ➔ Servidor | Lectura instantánea de bloques de función lógica | JSON de bloques de control |
+| `auto24v4m/{id}/rt/io/v1` | Automate ➔ Servidor | Ráfaga / Tiempo real de E/S discretas y analógicas | JSON de ráfaga (1-5s) |
+| `auto24v4m/{id}/conf/com` | Servidor ➔ Automate | Comandos de configuración remota (salidas, setpoints) | JSON de comando |
+| `auto24v4m/{id}/conf/rta` | Automate ➔ Servidor | Respuesta a comandos de configuración | JSON de confirmación |
+| `auto24v4m/{id}/ka` | Automate ➔ Servidor | Latido periódico (Keep-Alive) | JSON compacto |
+| `auto24v4m/{id}/datalogger/v1` | Automate ➔ Servidor | Descarga de buffer histórico local de la MicroSD | JSON de buffer |
+
+### B. Esquema de Payload `inst/io/v1` (Entradas / Salidas)
+
+```json
+{
+  "id": 1,
+  "t": "2026-09-11 11:00:00",
+  "v": 1
+}
+```
+* `id`: Identificador numérico del puerto (1-12 para digitales P1..P12, 13-14 para analógicos A1..A2).
+* `t`: Timestamp en formato ISO/string.
+* `v`: Valor leído (0 o 1 en digitales; flotante 0-10V / 4-20mA en analógicos).
+

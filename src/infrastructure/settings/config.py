@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     MQTT_USERNAME: str = ""
     MQTT_PASSWORD: str = ""
     MQTT_CLIENT_ID: str = "datamaq-telemetry-backend"
-    MQTT_TOPIC_PREFIX: str = "m/wifi/#"
+    MQTT_TOPIC_PREFIX: str = "m/wifi/#,auto24v4m/#"
     MQTT_TLS_ENABLED: bool = False
     MQTT_TLS_CA_CERTS: str = ""
     MQTT_TLS_CERTFILE: str = ""
@@ -93,15 +93,17 @@ class Settings(BaseSettings):
             raise ValueError("MQTT_TOPIC_PREFIX no puede estar vacío")
         if any(c.isspace() for c in v):
             raise ValueError("MQTT_TOPIC_PREFIX no puede contener espacios")
-        niveles = v.split("/")
-        for i, nivel in enumerate(niveles):
-            if "#" in nivel:
-                if nivel != "#" or i != len(niveles) - 1:
-                    raise ValueError("'#' debe ser el último nivel completo del filtro MQTT")
-            elif "+" in nivel and nivel != "+":
-                raise ValueError("'+' debe ocupar un nivel completo del filtro MQTT")
-        if "#" not in v and "+" not in v:
-            raise ValueError("MQTT_TOPIC_PREFIX debe contener al menos un comodín (+ o #)")
+        subtopicos = [s.strip() for s in v.split(",") if s.strip()]
+        for subt in subtopicos:
+            niveles = subt.split("/")
+            for i, nivel in enumerate(niveles):
+                if "#" in nivel:
+                    if nivel != "#" or i != len(niveles) - 1:
+                        raise ValueError("'#' debe ser el último nivel completo del filtro MQTT")
+                elif "+" in nivel and nivel != "+":
+                    raise ValueError("'+' debe ocupar un nivel completo del filtro MQTT")
+            if "#" not in subt and "+" not in subt:
+                raise ValueError("MQTT_TOPIC_PREFIX debe contener al menos un comodín (+ o #)")
         return v
 
     @model_validator(mode="after")
@@ -148,6 +150,10 @@ class Settings(BaseSettings):
     @property
     def auth_cookie_max_age(self) -> int:
         return self.AUTH_TOKEN_EXPIRA_MINUTOS * 60
+
+    @property
+    def topic_prefixes(self) -> list[str]:
+        return [p.strip() for p in self.MQTT_TOPIC_PREFIX.split(",") if p.strip()]
 
 
 @lru_cache(maxsize=1)

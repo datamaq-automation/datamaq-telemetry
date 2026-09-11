@@ -93,8 +93,9 @@ class MQTTListener:
                 broker_host=self.settings.MQTT_BROKER_HOST,
                 broker_port=self.settings.MQTT_BROKER_PORT,
             )
-            client.subscribe(self.settings.MQTT_TOPIC_PREFIX, qos=1)
-            logger.info("mqtt_suscrito", topico=self.settings.MQTT_TOPIC_PREFIX)
+            for topico in self.settings.topic_prefixes:
+                client.subscribe(topico, qos=1)
+                logger.info("mqtt_suscrito", topico=topico)
         else:
             self._esta_conectado = False
             logger.error("mqtt_error_conexion", codigo=str(reason_code))
@@ -137,7 +138,7 @@ class MQTTListener:
             logger.error("mqtt_payload_invalido", topico=topic, error=str(e))
             return
 
-        if not isinstance(payload, dict):
+        if not isinstance(payload, (dict, list)):
             logger.warning("mqtt_payload_no_dict", topico=topic)
             return
 
@@ -160,15 +161,27 @@ class MQTTListener:
                 repo_eventos=MySQLEventosDisponibilidadRepository(db),
                 repo_paradas=MySQLParadasProgramadasRepository(db),
             )
-            use_case = IngestarTelemetriaUseCase(
-                repo_dispositivos=repo_disp,
-                repo_telemetria=repo_telem,
-                publicador=self.publicador,
-                logger=logger,
-                permitir_auto_registro=self.settings.MQTT_AUTO_REGISTER_DEVICES,
-                disponibilidad_use_case=disponibilidad_use_case,
-            )
-            use_case.ejecutar(topic, payload)
+
+            if topic.startswith("auto24v4m/"):
+                from src.application.use_cases.ingesta.ingestar_automate import IngestarAutomateUseCase
+
+                automate_use_case = IngestarAutomateUseCase(
+                    repo_dispositivos=repo_disp,
+                    disponibilidad_use_case=disponibilidad_use_case,
+                    logger=logger,
+                    permitir_auto_registro=self.settings.MQTT_AUTO_REGISTER_DEVICES,
+                )
+                automate_use_case.ejecutar(topic, payload)
+            else:
+                use_case = IngestarTelemetriaUseCase(
+                    repo_dispositivos=repo_disp,
+                    repo_telemetria=repo_telem,
+                    publicador=self.publicador,
+                    logger=logger,
+                    permitir_auto_registro=self.settings.MQTT_AUTO_REGISTER_DEVICES,
+                    disponibilidad_use_case=disponibilidad_use_case,
+                )
+                use_case.ejecutar(topic, payload)
         except Exception as e:
             logger.error("mqtt_error_procesamiento", topico=topic, error=str(e), exc_info=True)
         finally:
