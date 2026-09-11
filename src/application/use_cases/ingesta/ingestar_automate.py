@@ -142,19 +142,15 @@ class IngestarAutomateUseCase:
     def _actualizar_disponibilidad_por_ppm(
         self, dispositivo_id: str, nuevo_estado: str, ppm: float, ahora: datetime
     ) -> None:
+        if not self.disponibilidad_use_case:
+            return
         try:
-            # Si hay máquina asociada a este dispositivo, actualizar evento
-            repo_maquinas = getattr(self.disponibilidad_use_case, "repo_maquinas", None)
-            if not repo_maquinas:
-                return
-            maquinas = repo_maquinas.listar_maquinas()
-            maquina = next((m for m in maquinas if m.dispositivo_id == dispositivo_id), None)
-            if maquina:
-                self.disponibilidad_use_case.procesar_potencia_instantanea(
-                    maquina_id=maquina.id,
-                    potencia_w=ppm * 10.0 if nuevo_estado == "MARCHA" else 0.0,
-                    instante=ahora,
-                )
+            potencia_simulada = ppm * 10.0 if nuevo_estado == "MARCHA" else 0.0
+            self.disponibilidad_use_case.clasificar_lectura(
+                dispositivo_id=dispositivo_id,
+                potencia_w=potencia_simulada,
+                recorded_at=ahora,
+            )
         except Exception as e:
             if self.logger:
                 self.logger.error("error_actualizar_disponibilidad_ppm", error=str(e))
