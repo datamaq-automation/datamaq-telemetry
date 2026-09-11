@@ -1,3 +1,6 @@
+import uuid
+from datetime import timedelta
+
 from src.application.dtos.auth_dto import (
     Activar2FARequestDTO,
     Desactivar2FARequestDTO,
@@ -6,7 +9,7 @@ from src.application.dtos.auth_dto import (
     Setup2FAResponseDTO,
     Verificar2FARequestDTO,
 )
-from src.domain.auth.entities import ahora_utc
+from src.domain.auth.entities import DispositivoConfiable, ahora_utc
 from src.domain.auth.exceptions import (
     Codigo2FAInvalidoError,
     CredencialesInvalidasError,
@@ -17,6 +20,7 @@ from src.domain.auth.exceptions import (
 from src.domain.auth.ports import (
     CifradorSecreto2FAPort,
     GeneradorTokenPort,
+    RepositorioDispositivosConfiablesPort,
     RepositorioUsuariosPort,
     ServicioTOTPPort,
 )
@@ -25,6 +29,7 @@ from src.domain.auth.services import (
     HashContrasenaService,
     PoliticaExpiracionService,
     RateLimiterService,
+    TokenDispositivoService,
 )
 
 
@@ -37,6 +42,7 @@ class Verificar2FAUseCase:
         cifrador_service: CifradorSecreto2FAPort,
         minutos_validez: int,
         rate_limiter: RateLimiterService | None = None,
+        repo_dispositivos: RepositorioDispositivosConfiablesPort | None = None,
     ):
         self.repo_usuarios = repo_usuarios
         self.token_service = token_service
@@ -44,12 +50,20 @@ class Verificar2FAUseCase:
         self.cifrador_service = cifrador_service
         self.minutos_validez = minutos_validez
         self.rate_limiter = rate_limiter
+        self.repo_dispositivos = repo_dispositivos
 
     def _registrar_intento(self, clave: str) -> None:
         if self.rate_limiter is not None:
             self.rate_limiter.registrar_intento(clave)
 
-    def verificar(self, dto: Verificar2FARequestDTO, clave_limite: str | None = None) -> LoginResponseDTO:
+    def verificar(
+        self,
+        dto: Verificar2FARequestDTO,
+        clave_limite: str | None = None,
+        ip_origen: str = "",
+        user_agent: str = "",
+        nombre_dispositivo: str | None = None,
+    ) -> LoginResponseDTO:
         claims = self.token_service.verificar_mfa(dto.mfa_token)
         if not claims or not claims.get("usuario"):
             raise TokenMFAPendienteInvalidoError("Token MFA inválido o expirado.")
@@ -87,9 +101,36 @@ class Verificar2FAUseCase:
         if self.rate_limiter is not None:
             self.rate_limiter.resetear(clave)
 
+        device_trust_token = None
+        if dto.recordar_dispositivo and self.repo_dispositivos is not None:
+            raw_secret = TokenDispositivoService.generar_secreto()
+            token_hash = TokenDispositivoService.calcular_hash(raw_secret)
+            ahora = ahora_utc()
+            disp = DispositivoConfiable(
+                id=str(uuid.uuid4()),
+                usuario_id=usuario.id,
+                token_hash=token_hash,
+                nombre_dispositivo=nombre_dispositivo,
+                user_agent=user_agent,
+                ip_origen=ip_origen,
+                creado_en=ahora,
+                ultimo_acceso_en=ahora,
+                expira_en=ahora + timedelta(days=30),
+                revocado=False,
+            )
+            self.repo_dispositivos.guardar(disp)
+            device_trust_token = raw_secret
+
         expira_en = PoliticaExpiracionService.calcular_expiracion(ahora_utc(), self.minutos_validez)
-        token = self.token_service.generar(usuario.id, usuario.usuario, expira_en, rol=usuario.rol)
-        return LoginResponseDTO(token=token, expira_en=expira_en, require_2fa=False)
+        token = self.token_service.generar(
+            usuario.id, usuario.usuario, expira_en, rol=usuario.rol, organizacion_id=usuario.organizacion_id
+        )
+        return LoginResponseDTO(
+            token=token,
+            expira_en=expira_en,
+            require_2fa=False,
+            device_trust_token=device_trust_token,
+        )
 
 
 class Setup2FAUseCase:

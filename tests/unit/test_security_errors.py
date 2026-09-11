@@ -3,11 +3,13 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
+from src.infrastructure.fastapi.middleware import RequestIdMiddleware
 from src.infrastructure.fastapi.server import manejar_excepcion_no_mapeada
 
 
 def _app_con_handler() -> FastAPI:
     app = FastAPI()
+    app.add_middleware(RequestIdMiddleware)
     app.add_exception_handler(Exception, manejar_excepcion_no_mapeada)
 
     @app.get("/boom")
@@ -28,6 +30,7 @@ def test_excepcion_no_mapeada_devuelve_500_sin_detalles():
     assert respuesta.status_code == 500
     assert respuesta.json() == {"detail": "error_interno"}
     assert "secreto-del-stack" not in respuesta.text
+    assert respuesta.headers.get("X-Request-ID") is not None
 
 
 def test_http_exception_mapeada_no_se_convierte_en_500():

@@ -15,11 +15,21 @@ class LoginResponseDTO(BaseModel):
     expira_en: FechaHoraUTC
     require_2fa: bool = False
     mfa_token: str | None = None
+    device_trust_token: str | None = Field(default=None, exclude=True)
 
 
 class MeResponseDTO(BaseModel):
     usuario: str
-    rol: Literal["superadmin", "admin", "operador", "invitado", "invitado_global"]
+    rol: Literal[
+        "superadmin",
+        "admin",
+        "operador",
+        "invitado",
+        "invitado_global",
+        "mantenimiento",
+        "ingeniero",
+        "auditor",
+    ]
     totp_enabled: bool = False
     organizacion_id: str | None = None
     organizacion_nombre: str | None = None
@@ -28,6 +38,12 @@ class MeResponseDTO(BaseModel):
 class Verificar2FARequestDTO(BaseModel):
     mfa_token: str = Field(min_length=1)
     codigo: str = Field(min_length=1, max_length=32)
+    recordar_dispositivo: bool = False
+
+
+class RevocarDispositivosResponseDTO(BaseModel):
+    mensaje: str = "Dispositivos confiables revocados exitosamente"
+    cantidad_revocados: int = 0
 
 
 class Setup2FAResponseDTO(BaseModel):

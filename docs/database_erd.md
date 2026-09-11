@@ -34,6 +34,7 @@ erDiagram
     ORGANIZATIONS ||--o{ FACILITIES : "FK_organization_id"
     ORGANIZATIONS ||--o{ USERS : "FK_organization_id"
     PLANS ||--o{ ORGANIZATIONS : "FK_plan_id"
+    USERS ||--o{ DISPOSITIVOS_CONFIABLES : "FK_usuario_id"
 
     CAMPAIGN_SAMPLES {
         bigint id PK
@@ -124,6 +125,19 @@ erDiagram
         string phases_with_ct
         datetime created_at
         datetime updated_at
+    }
+
+    DISPOSITIVOS_CONFIABLES {
+        string id PK
+        string usuario_id FK
+        string token_hash
+        string nombre_dispositivo
+        string user_agent
+        string ip_origen
+        datetime creado_en
+        datetime ultimo_acceso_en
+        datetime expira_en
+        boolean revocado
     }
 
     FACILITIES {
@@ -473,6 +487,25 @@ erDiagram
 
 **Índices:**
 - `ix_devices_device_uid` (UNIQUE): (`device_uid`)
+
+### Tabla `dispositivos_confiables`
+
+| Columna | Tipo SQL | Clave / Restricción | Nullable |
+| :--- | :--- | :--- | :--- |
+| `id` | `VARCHAR(36)` | **PRIMARY KEY** | No |
+| `usuario_id` | `VARCHAR(36)` | FK -> `users.id` | No |
+| `token_hash` | `VARCHAR(64)` | - | No |
+| `nombre_dispositivo` | `VARCHAR(150)` | - | Sí |
+| `user_agent` | `VARCHAR(255)` | - | No |
+| `ip_origen` | `VARCHAR(45)` | - | No |
+| `creado_en` | `DATETIME` | - | No |
+| `ultimo_acceso_en` | `DATETIME` | - | No |
+| `expira_en` | `DATETIME` | - | No |
+| `revocado` | `BOOLEAN` | - | No |
+
+**Índices:**
+- `idx_dispositivos_confiables_hash` (UNIQUE): (`token_hash`)
+- `idx_dispositivos_confiables_usuario`: (`usuario_id`)
 
 ### Tabla `facilities`
 

@@ -9,35 +9,20 @@ from src.adapters.gateways.in_memory_telemetria_buffer import InMemoryTelemetria
 from src.adapters.gateways.mqtt_comando_rafaga import MqttComandoRafagaGateway
 from src.application.use_cases.analizar_consumo import AnalizarConsumoUseCase
 from src.application.use_cases.atribuir_consumo import AtribuirConsumoUseCase
-from src.application.use_cases.autenticar_usuario import AutenticarUsuarioUseCase
 from src.application.use_cases.caracterizar_carga import CaracterizarCargaUseCase
 from src.application.use_cases.consultar_grupo_dispositivos import ConsultarGrupoDispositivosUseCase
 from src.application.use_cases.consultar_telemetria import ConsultarTelemetriaUseCase
 from src.application.use_cases.exportar_cargas import ExportarCargasUseCase
-from src.application.use_cases.exportar_disponibilidad import (
-    ExportarDisponibilidadUseCase,
-)
-from src.application.use_cases.exportar_telemetria import (
-    ExportarTelemetriaUseCase,
-)
-from src.application.use_cases.gestionar_2fa import (
-    Activar2FAUseCase,
-    Desactivar2FAUseCase,
-    Setup2FAUseCase,
-    Verificar2FAUseCase,
-)
+from src.application.use_cases.exportar_disponibilidad import ExportarDisponibilidadUseCase
+from src.application.use_cases.exportar_telemetria import ExportarTelemetriaUseCase
 from src.application.use_cases.gestionar_alertas import GestionarAlertasUseCase
 from src.application.use_cases.gestionar_cargas import GestionarCargasUseCase
 from src.application.use_cases.gestionar_disponibilidad import GestionarDisponibilidadUseCase
-from src.application.use_cases.gestionar_dispositivos import (
-    GestionarDispositivosUseCase,
-)
+from src.application.use_cases.gestionar_dispositivos import GestionarDispositivosUseCase
 from src.application.use_cases.gestionar_grupos_dispositivos import GestionarGruposDispositivosUseCase
 from src.application.use_cases.gestionar_maquinas import GestionarMaquinasUseCase
 from src.application.use_cases.gestionar_planes import GestionarPlanesUseCase
-from src.application.use_cases.gestionar_planta_estructura import (
-    GestionarPlantaEstructuraUseCase,
-)
+from src.application.use_cases.gestionar_planta_estructura import GestionarPlantaEstructuraUseCase
 from src.application.use_cases.ingesta.registro_campanas import registro_campanas_activas
 from src.application.use_cases.purgar_telemetria import PurgarTelemetriaExpiradaUseCase
 from src.application.use_cases.recuperar_contrasena import (
@@ -45,21 +30,13 @@ from src.application.use_cases.recuperar_contrasena import (
     SolicitarRecuperacionContrasenaUseCase,
 )
 from src.domain.auth.ports import (
-    CifradorSecreto2FAPort,
     GeneradorTokenPort,
     RepositorioUsuariosPort,
     ServicioEmailPort,
-    ServicioTOTPPort,
 )
-from src.domain.auth.services import (
-    HashContrasenaService,
-    RateLimiterService,
-    TokenRevocationService,
-)
-from src.infrastructure.auth.cifrador_2fa import CifradorSecreto2FA
+from src.domain.auth.services import HashContrasenaService, RateLimiterService, TokenRevocationService
 from src.infrastructure.auth.email_service import SmtpEmailService
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
-from src.infrastructure.auth.totp_service import PyOtpService
 from src.infrastructure.paho_mqtt.mqtt_listener import MQTTListener
 from src.infrastructure.settings.config import Settings, get_settings
 from src.infrastructure.settings.logger import get_logger
@@ -165,33 +142,36 @@ def get_exportar_cargas_use_case(
 def get_dispositivos_use_case(
     db: Annotated[Session, Depends(get_db_session)],
 ) -> GestionarDispositivosUseCase:
-    repo_disp = MySQLDispositivosRepository(db)
-    repo_org = MySQLOrganizacionesRepository(db)
-    repo_planes = MySQLPlanesRepository(db)
-    return GestionarDispositivosUseCase(repo_disp, repo_org, repo_planes)
+    return GestionarDispositivosUseCase(
+        MySQLDispositivosRepository(db),
+        MySQLOrganizacionesRepository(db),
+        MySQLPlanesRepository(db),
+    )
 
 
 def get_grupos_dispositivos_use_case(
     db: Annotated[Session, Depends(get_db_session)],
 ) -> GestionarGruposDispositivosUseCase:
-    repo_grupos = MySQLGruposDispositivosRepository(db)
-    repo_disp = MySQLDispositivosRepository(db)
-    return GestionarGruposDispositivosUseCase(repo_grupos, repo_disp)
+    return GestionarGruposDispositivosUseCase(
+        MySQLGruposDispositivosRepository(db),
+        MySQLDispositivosRepository(db),
+    )
 
 
 def get_consultar_grupo_dispositivos_use_case(
     db: Annotated[Session, Depends(get_db_session)],
 ) -> ConsultarGrupoDispositivosUseCase:
-    repo_grupos = MySQLGruposDispositivosRepository(db)
-    repo_telem = MySQLTelemetriaRepository(db)
-    return ConsultarGrupoDispositivosUseCase(repo_grupos, repo_telem, get_telemetria_use_case(db))
+    return ConsultarGrupoDispositivosUseCase(
+        MySQLGruposDispositivosRepository(db),
+        MySQLTelemetriaRepository(db),
+        get_telemetria_use_case(db),
+    )
 
 
 def get_planes_use_case(
     db: Annotated[Session, Depends(get_db_session)],
 ) -> GestionarPlanesUseCase:
-    repo_planes = MySQLPlanesRepository(db)
-    return GestionarPlanesUseCase(repo_planes)
+    return GestionarPlanesUseCase(MySQLPlanesRepository(db))
 
 
 def get_purga_use_case(
@@ -205,23 +185,22 @@ def get_purga_use_case(
 def get_alertas_use_case(
     db: Annotated[Session, Depends(get_db_session)],
 ) -> GestionarAlertasUseCase:
-    repo_telem = MySQLTelemetriaRepository(db)
-    repo_disp = MySQLDispositivosRepository(db)
     return GestionarAlertasUseCase(
-        repo_telemetria=repo_telem,
+        repo_telemetria=MySQLTelemetriaRepository(db),
         publicador=global_event_broadcaster,
-        repo_dispositivos=repo_disp,
+        repo_dispositivos=MySQLDispositivosRepository(db),
     )
 
 
 def get_maquinas_use_case(
     db: Annotated[Session, Depends(get_db_session)],
 ) -> GestionarMaquinasUseCase:
-    repo_maquinas = MySQLMaquinasRepository(db)
-    repo_telem = MySQLTelemetriaRepository(db)
-    repo_disp = MySQLDispositivosRepository(db)
-    repo_org = MySQLOrganizacionesRepository(db)
-    return GestionarMaquinasUseCase(repo_maquinas, repo_telem, repo_disp, repo_org)
+    return GestionarMaquinasUseCase(
+        MySQLMaquinasRepository(db),
+        MySQLTelemetriaRepository(db),
+        MySQLDispositivosRepository(db),
+        MySQLOrganizacionesRepository(db),
+    )
 
 
 def get_cargas_use_case(
@@ -261,12 +240,13 @@ def get_analisis_consumo_use_case(
 def get_disponibilidad_use_case(
     db: Annotated[Session, Depends(get_db_session)],
 ) -> GestionarDisponibilidadUseCase:
-    repo_maquinas = MySQLMaquinasRepository(db)
-    repo_eventos = MySQLEventosDisponibilidadRepository(db)
-    repo_paradas = MySQLParadasProgramadasRepository(db)
-    repo_disp = MySQLDispositivosRepository(db)
-    repo_org = MySQLOrganizacionesRepository(db)
-    return GestionarDisponibilidadUseCase(repo_maquinas, repo_eventos, repo_paradas, repo_disp, repo_org)
+    return GestionarDisponibilidadUseCase(
+        MySQLMaquinasRepository(db),
+        MySQLEventosDisponibilidadRepository(db),
+        MySQLParadasProgramadasRepository(db),
+        MySQLDispositivosRepository(db),
+        MySQLOrganizacionesRepository(db),
+    )
 
 
 def get_planta_estructura_use_case(
@@ -280,85 +260,6 @@ def get_usuarios_repository(
     db: Annotated[Session, Depends(get_db_session)],
 ) -> RepositorioUsuariosPort:
     return MySQLUsuariosRepository(db)
-
-
-def get_auth_use_case(
-    repo_usuarios: Annotated[RepositorioUsuariosPort, Depends(get_usuarios_repository)],
-) -> AutenticarUsuarioUseCase:
-    settings = get_settings()
-    rate_limiter = get_rate_limiter()
-    return AutenticarUsuarioUseCase(
-        repo_usuarios=repo_usuarios,
-        hash_service=HashContrasenaService(),
-        token_service=JwtTokenService(settings.API_SECRET_KEY),
-        minutos_validez=settings.AUTH_TOKEN_EXPIRA_MINUTOS,
-        rate_limiter=rate_limiter,
-        guest_organizacion_id=settings.GUEST_ORGANIZATION_ID,
-    )
-
-
-@lru_cache
-def get_totp_service() -> ServicioTOTPPort:
-    return PyOtpService()
-
-
-@lru_cache
-def get_cifrador_2fa() -> CifradorSecreto2FAPort:
-    settings = get_settings()
-    return CifradorSecreto2FA(settings.API_SECRET_KEY)
-
-
-def get_verificar_2fa_use_case(
-    db: Annotated[Session, Depends(get_db_session)],
-    totp_service: Annotated[ServicioTOTPPort, Depends(get_totp_service)],
-    cifrador_service: Annotated[CifradorSecreto2FAPort, Depends(get_cifrador_2fa)],
-) -> Verificar2FAUseCase:
-    repo_usuarios = MySQLUsuariosRepository(db)
-    settings = get_settings()
-    rate_limiter = get_rate_limiter()
-    return Verificar2FAUseCase(
-        repo_usuarios=repo_usuarios,
-        token_service=JwtTokenService(settings.API_SECRET_KEY),
-        totp_service=totp_service,
-        cifrador_service=cifrador_service,
-        minutos_validez=settings.AUTH_TOKEN_EXPIRA_MINUTOS,
-        rate_limiter=rate_limiter,
-    )
-
-
-def get_setup_2fa_use_case(
-    db: Annotated[Session, Depends(get_db_session)],
-    totp_service: Annotated[ServicioTOTPPort, Depends(get_totp_service)],
-) -> Setup2FAUseCase:
-    return Setup2FAUseCase(
-        repo_usuarios=MySQLUsuariosRepository(db),
-        totp_service=totp_service,
-    )
-
-
-def get_activar_2fa_use_case(
-    db: Annotated[Session, Depends(get_db_session)],
-    totp_service: Annotated[ServicioTOTPPort, Depends(get_totp_service)],
-    cifrador_service: Annotated[CifradorSecreto2FAPort, Depends(get_cifrador_2fa)],
-) -> Activar2FAUseCase:
-    return Activar2FAUseCase(
-        repo_usuarios=MySQLUsuariosRepository(db),
-        totp_service=totp_service,
-        cifrador_service=cifrador_service,
-    )
-
-
-def get_desactivar_2fa_use_case(
-    db: Annotated[Session, Depends(get_db_session)],
-    totp_service: Annotated[ServicioTOTPPort, Depends(get_totp_service)],
-    cifrador_service: Annotated[CifradorSecreto2FAPort, Depends(get_cifrador_2fa)],
-) -> Desactivar2FAUseCase:
-    return Desactivar2FAUseCase(
-        repo_usuarios=MySQLUsuariosRepository(db),
-        hash_service=HashContrasenaService(),
-        totp_service=totp_service,
-        cifrador_service=cifrador_service,
-    )
 
 
 @lru_cache(maxsize=1)

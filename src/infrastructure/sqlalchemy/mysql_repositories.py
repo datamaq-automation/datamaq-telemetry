@@ -17,6 +17,9 @@ from src.infrastructure.sqlalchemy.repositories.disponibilidad_repository import
     MySQLMaquinasRepository,
     MySQLParadasProgramadasRepository,
 )
+from src.infrastructure.sqlalchemy.repositories.dispositivos_confiables_repository import (
+    MySQLDispositivosConfiablesRepository,
+)
 from src.infrastructure.sqlalchemy.repositories.dispositivos_repository import (
     MySQLDispositivosRepository,
 )
@@ -42,6 +45,7 @@ from src.infrastructure.sqlalchemy.repositories.usuarios_repository import (
 __all__ = [
     "MySQLCampanasRepository",
     "MySQLCargasRepository",
+    "MySQLDispositivosConfiablesRepository",
     "MySQLDispositivosRepository",
     "MySQLEventosDisponibilidadRepository",
     "MySQLGruposDispositivosRepository",

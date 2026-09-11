@@ -23,6 +23,11 @@ from src.domain.disponibilidad.exceptions import (
     EventoDisponibilidadNoEncontradoError,
     MaquinaNoEncontradaError,
 )
+from src.domain.sge.exceptions import (
+    ArticuloSgeNoEncontradoError,
+    DominioSgeException,
+    RolNoAutorizadoParaPrevisualizacionError,
+)
 from src.domain.telemetria.exceptions import (
     AlertaNoEncontradaError,
     DispositivoNoEncontradoError,
@@ -52,6 +57,7 @@ class ErrorPresenter:
                 CampanaNoEncontradaError,
                 IntervaloActividadNoEncontradoError,
                 GrupoDispositivosNoEncontradoError,
+                ArticuloSgeNoEncontradoError,
             ),
         ):
             return 404, {"error": "NotFound", "mensaje": exc.mensaje}
@@ -59,7 +65,17 @@ class ErrorPresenter:
             exc, (MacAddressInvalidaError, TensionInvalidaError, FactorPotenciaInvalidoError, FirmaCargaInvalidaError)
         ):
             return 400, {"error": "ValidationError", "mensaje": exc.mensaje}
-        elif isinstance(exc, (DominioTelemetriaException, DominioDisponibilidadException, DominioCargasException)):
+        elif isinstance(exc, RolNoAutorizadoParaPrevisualizacionError):
+            return 403, {"error": "Forbidden", "mensaje": exc.mensaje}
+        elif isinstance(
+            exc,
+            (
+                DominioTelemetriaException,
+                DominioDisponibilidadException,
+                DominioCargasException,
+                DominioSgeException,
+            ),
+        ):
             return 422, {"error": "DomainError", "mensaje": exc.mensaje}
         elif isinstance(exc, NombreUsuarioInvalidoError):
             return 422, {"error": "ValidationError", "mensaje": exc.mensaje}

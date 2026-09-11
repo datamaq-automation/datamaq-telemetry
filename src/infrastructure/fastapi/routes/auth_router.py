@@ -1,7 +1,7 @@
 from typing import Annotated, Any
 
 import structlog
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Cookie, Depends, Request, Response
 
 from src.application.dtos.auth_dto import (
     Activar2FARequestDTO,
@@ -11,6 +11,7 @@ from src.application.dtos.auth_dto import (
     MeResponseDTO,
     Operacion2FAResponseDTO,
     RestablecerContrasenaDTO,
+    RevocarDispositivosResponseDTO,
     Setup2FAResponseDTO,
     SolicitarRecuperacionDTO,
     Verificar2FARequestDTO,
@@ -22,20 +23,26 @@ from src.application.use_cases.gestionar_2fa import (
     Setup2FAUseCase,
     Verificar2FAUseCase,
 )
+from src.application.use_cases.gestionar_dispositivos_confiables import (
+    RevocarDispositivosConfiablesUseCase,
+)
 from src.application.use_cases.recuperar_contrasena import (
     RestablecerContrasenaUseCase,
     SolicitarRecuperacionContrasenaUseCase,
 )
-from src.infrastructure.fastapi.dependencies import (
+from src.infrastructure.fastapi.auth_dependencies import (
     get_activar_2fa_use_case,
     get_auth_use_case,
     get_desactivar_2fa_use_case,
+    get_revocar_dispositivos_use_case,
+    get_setup_2fa_use_case,
+    get_verificar_2fa_use_case,
+)
+from src.infrastructure.fastapi.dependencies import (
     get_restablecer_contrasena_use_case,
     get_settings_dep,
-    get_setup_2fa_use_case,
     get_solicitar_recuperacion_use_case,
     get_usuario_actual,
-    get_verificar_2fa_use_case,
 )
 from src.infrastructure.fastapi.error_handler import manejar_error_http
 from src.infrastructure.settings.config import Settings
@@ -43,6 +50,9 @@ from src.infrastructure.settings.config import Settings
 router = APIRouter(prefix="/api/v1/auth", tags=["Autenticación"])
 
 logger = structlog.get_logger("auth")
+
+DEVICE_TRUST_COOKIE = "datamaq_device_trust"
+DEVICE_TRUST_MAX_AGE = 60 * 60 * 24 * 30  # 30 días
 
 
 def _fijar_cookie(response: Response, settings: Settings, token: str) -> None:
@@ -56,6 +66,26 @@ def _fijar_cookie(response: Response, settings: Settings, token: str) -> None:
     )
 
 
+def _fijar_cookie_dispositivo(response: Response, settings: Settings, token: str) -> None:
+    response.set_cookie(
+        key=DEVICE_TRUST_COOKIE,
+        value=token,
+        max_age=DEVICE_TRUST_MAX_AGE,
+        httponly=True,
+        samesite=settings.AUTH_COOKIE_SAMESITE,
+        secure=settings.auth_cookie_secure,
+        path="/api/v1/auth",
+    )
+
+
+def _obtener_ip_cliente(request: Request | None) -> str:
+    if request is None:
+        return "desconocida"
+    return request.headers.get("X-Forwarded-For", "").split(",")[0].strip() or (
+        request.client.host if request.client else "desconocida"
+    )
+
+
 @router.post("/login", response_model=LoginResponseDTO)
 def login(
     dto: LoginRequestDTO,
@@ -63,14 +93,16 @@ def login(
     response: Response,
     settings: Annotated[Settings, Depends(get_settings_dep)],
     request: Request = None,  # type: ignore[assignment]
+    datamaq_device_trust: Annotated[str | None, Cookie()] = None,
 ):
     try:
-        ip = "desconocida"
-        if request is not None:
-            ip = request.headers.get("X-Forwarded-For", "").split(",")[0].strip() or (
-                request.client.host if request.client else "desconocida"
-            )
-        resultado = use_case.login(dto, clave_ip=ip)
+        ip = _obtener_ip_cliente(request)
+        resultado = use_case.login(
+            dto,
+            clave_ip=ip,
+            device_token=datamaq_device_trust,
+            ip_origen=ip,
+        )
         logger.info(
             "login_exitoso",
             usuario=dto.usuario,
@@ -128,11 +160,16 @@ def verificar_2fa(
     use_case: Annotated[Verificar2FAUseCase, Depends(get_verificar_2fa_use_case)],
     response: Response,
     settings: Annotated[Settings, Depends(get_settings_dep)],
+    request: Request = None,  # type: ignore[assignment]
 ) -> LoginResponseDTO:
     try:
-        resultado = use_case.verificar(dto)
+        ip = _obtener_ip_cliente(request)
+        user_agent = request.headers.get("User-Agent", "") if request is not None else ""
+        resultado = use_case.verificar(dto, ip_origen=ip, user_agent=user_agent)
         if resultado.token:
             _fijar_cookie(response, settings, resultado.token)
+        if resultado.device_trust_token:
+            _fijar_cookie_dispositivo(response, settings, resultado.device_trust_token)
         return resultado
     except Exception as e:
         manejar_error_http(e)
@@ -206,5 +243,20 @@ def restablecer_contrasena(
 ) -> Operacion2FAResponseDTO:
     try:
         return use_case.ejecutar(dto)
+    except Exception as e:
+        manejar_error_http(e)
+
+
+@router.post("/dispositivos/revocar-todos", response_model=RevocarDispositivosResponseDTO)
+def revocar_dispositivos(
+    claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
+    use_case: Annotated[RevocarDispositivosConfiablesUseCase, Depends(get_revocar_dispositivos_use_case)],
+    response: Response,
+) -> RevocarDispositivosResponseDTO:
+    try:
+        usuario_id = str(claims.get("sub"))
+        cantidad = use_case.ejecutar(usuario_id)
+        response.delete_cookie(key=DEVICE_TRUST_COOKIE, path="/api/v1/auth")
+        return RevocarDispositivosResponseDTO(cantidad_revocados=cantidad)
     except Exception as e:
         manejar_error_http(e)

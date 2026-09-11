@@ -3,11 +3,31 @@ from typing import Any
 from src.application.dtos.auth_dto import LoginRequestDTO, LoginResponseDTO, MeResponseDTO
 from src.domain.auth.entities import ahora_utc
 from src.domain.auth.exceptions import CredencialesInvalidasError, DemasiadosIntentosError, UsuarioInactivoError
-from src.domain.auth.ports import GeneradorTokenPort, RepositorioUsuariosPort
-from src.domain.auth.services import HashContrasenaService, PoliticaExpiracionService, RateLimiterService
+from src.domain.auth.ports import (
+    GeneradorTokenPort,
+    RepositorioDispositivosConfiablesPort,
+    RepositorioUsuariosPort,
+)
+from src.domain.auth.services import (
+    HashContrasenaService,
+    PoliticaExpiracionService,
+    RateLimiterService,
+    TokenDispositivoService,
+)
 from src.domain.auth.value_objects import NombreUsuario
 
-ROLES_VALIDOS = frozenset({"superadmin", "admin", "operador", "invitado", "invitado_global"})
+ROLES_VALIDOS = frozenset(
+    {
+        "superadmin",
+        "admin",
+        "operador",
+        "invitado",
+        "invitado_global",
+        "mantenimiento",
+        "ingeniero",
+        "auditor",
+    }
+)
 
 
 class AutenticarUsuarioUseCase:
@@ -19,6 +39,7 @@ class AutenticarUsuarioUseCase:
         minutos_validez: int,
         rate_limiter: RateLimiterService | None = None,
         guest_organizacion_id: str | None = None,
+        repo_dispositivos: RepositorioDispositivosConfiablesPort | None = None,
     ):
         self.repo_usuarios = repo_usuarios
         self.hash_service = hash_service
@@ -26,6 +47,7 @@ class AutenticarUsuarioUseCase:
         self.minutos_validez = minutos_validez
         self.rate_limiter = rate_limiter
         self.guest_organizacion_id = guest_organizacion_id
+        self.repo_dispositivos = repo_dispositivos
 
     def _registrar_intento(self, clave: str) -> None:
         if self.rate_limiter is not None:
@@ -36,6 +58,8 @@ class AutenticarUsuarioUseCase:
         dto: LoginRequestDTO,
         clave_limite: str | None = None,
         clave_ip: str | None = None,
+        device_token: str | None = None,
+        ip_origen: str | None = None,
     ) -> LoginResponseDTO:
         nombre = NombreUsuario(dto.usuario).valor
         clave = clave_limite if clave_limite is not None else nombre
@@ -74,9 +98,19 @@ class AutenticarUsuarioUseCase:
             self.rate_limiter.resetear(clave)
 
         if usuario.totp_enabled:
-            expira_mfa = PoliticaExpiracionService.calcular_expiracion(ahora_utc(), 5)
-            mfa_token = self.token_service.generar_mfa(usuario.id, usuario.usuario, expira_mfa)
-            return LoginResponseDTO(token=None, expira_en=expira_mfa, require_2fa=True, mfa_token=mfa_token)
+            disp_valido = False
+            if self.repo_dispositivos is not None and device_token:
+                token_hash = TokenDispositivoService.calcular_hash(device_token)
+                disp = self.repo_dispositivos.obtener_por_hash(token_hash)
+                ahora = ahora_utc()
+                if disp is not None and disp.usuario_id == usuario.id and disp.es_valido(ip_origen, ahora):
+                    self.repo_dispositivos.actualizar_acceso(disp.id, ip_origen or disp.ip_origen, ahora)
+                    disp_valido = True
+
+            if not disp_valido:
+                expira_mfa = PoliticaExpiracionService.calcular_expiracion(ahora_utc(), 5)
+                mfa_token = self.token_service.generar_mfa(usuario.id, usuario.usuario, expira_mfa)
+                return LoginResponseDTO(token=None, expira_en=expira_mfa, require_2fa=True, mfa_token=mfa_token)
 
         expira_en = PoliticaExpiracionService.calcular_expiracion(ahora_utc(), self.minutos_validez)
         token = self.token_service.generar(

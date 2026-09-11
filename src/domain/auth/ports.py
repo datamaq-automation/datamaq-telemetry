@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any
 
-from src.domain.auth.entities import UsuarioAuth
+from src.domain.auth.entities import DispositivoConfiable, UsuarioAuth
 
 
 class RepositorioUsuariosPort(ABC):
@@ -80,4 +80,22 @@ class CifradorSecreto2FAPort(ABC):
 class ServicioEmailPort(ABC):
     @abstractmethod
     def enviar_email_recuperacion(self, destinatario: str, enlace_restablecimiento: str) -> bool:
+        pass
+
+
+class RepositorioDispositivosConfiablesPort(ABC):
+    @abstractmethod
+    def obtener_por_hash(self, token_hash: str) -> DispositivoConfiable | None:
+        pass
+
+    @abstractmethod
+    def guardar(self, dispositivo: DispositivoConfiable) -> DispositivoConfiable:
+        pass
+
+    @abstractmethod
+    def actualizar_acceso(self, id: str, ip: str, ultimo_acceso: datetime) -> None:
+        pass
+
+    @abstractmethod
+    def revocar_todos_de_usuario(self, usuario_id: str) -> int:
         pass

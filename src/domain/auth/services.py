@@ -166,3 +166,13 @@ class CodigosRespaldoService:
                 restantes = hashes[:i] + hashes[i + 1 :]
                 return True, restantes
         return False, hashes
+
+
+class TokenDispositivoService:
+    @staticmethod
+    def generar_secreto() -> str:
+        return secrets.token_urlsafe(32)
+
+    @staticmethod
+    def calcular_hash(secreto: str) -> str:
+        return hashlib.sha256(secreto.strip().encode("utf-8")).hexdigest()

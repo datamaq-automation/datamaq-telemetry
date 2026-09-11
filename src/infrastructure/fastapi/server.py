@@ -30,35 +30,18 @@ from src.infrastructure.fastapi.dependencies import (
 )
 from src.infrastructure.fastapi.error_handler import manejar_404
 from src.infrastructure.fastapi.middleware import RequestIdMiddleware
-from src.infrastructure.fastapi.routes.alertas_router import (
-    router as alertas_router,
-)
-from src.infrastructure.fastapi.routes.auth_router import (
-    router as auth_router,
-)
+from src.infrastructure.fastapi.routes.alertas_router import router as alertas_router
+from src.infrastructure.fastapi.routes.auth_router import router as auth_router
 from src.infrastructure.fastapi.routes.cargas_router import router as cargas_router
-from src.infrastructure.fastapi.routes.disponibilidad_router import (
-    router as disponibilidad_router,
-)
-from src.infrastructure.fastapi.routes.dispositivos_router import (
-    router as dispositivos_router,
-)
-from src.infrastructure.fastapi.routes.grupos_dispositivos_router import (
-    router as grupos_dispositivos_router,
-)
-from src.infrastructure.fastapi.routes.organizaciones_router import (
-    router as organizaciones_router,
-)
-from src.infrastructure.fastapi.routes.planes_router import (
-    router as planes_router,
-)
-from src.infrastructure.fastapi.routes.planta_estructura_router import (
-    router as planta_estructura_router,
-)
+from src.infrastructure.fastapi.routes.disponibilidad_router import router as disponibilidad_router
+from src.infrastructure.fastapi.routes.dispositivos_router import router as dispositivos_router
+from src.infrastructure.fastapi.routes.grupos_dispositivos_router import router as grupos_dispositivos_router
+from src.infrastructure.fastapi.routes.organizaciones_router import router as organizaciones_router
+from src.infrastructure.fastapi.routes.planes_router import router as planes_router
+from src.infrastructure.fastapi.routes.planta_estructura_router import router as planta_estructura_router
+from src.infrastructure.fastapi.routes.sge_router import router as sge_router
 from src.infrastructure.fastapi.routes.system_router import router as system_router
-from src.infrastructure.fastapi.routes.telemetria_router import (
-    router as telemetria_router,
-)
+from src.infrastructure.fastapi.routes.telemetria_router import router as telemetria_router
 from src.infrastructure.fastapi.security_headers import SecurityHeadersMiddleware
 from src.infrastructure.paho_mqtt.mqtt_listener import MQTTListener
 from src.infrastructure.settings.config import Settings, get_settings
@@ -101,7 +84,7 @@ WS_CLOSE_TOKEN_INVALIDO = 4401
 
 
 async def manejar_excepcion_no_mapeada(request: Request, exc: Exception) -> JSONResponse:
-    request_id = structlog.contextvars.get_contextvars().get("request_id")
+    request_id = getattr(request.state, "request_id", None) or structlog.contextvars.get_contextvars().get("request_id")
     contexto: dict[str, Any] = {
         "tipo": type(exc).__name__,
         "metodo": request.method,
@@ -477,6 +460,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(planes_router)
     app.include_router(alertas_router)
     app.include_router(auth_router)
+    app.include_router(sge_router)
 
     # WebSockets Live Telemetry Stream
     @app.websocket("/ws/live")

@@ -412,6 +412,25 @@ class PlanModel(Base):
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, onupdate=ahora_utc, nullable=False)
 
 
+class DispositivoConfiableModel(Base):
+    __tablename__ = "dispositivos_confiables"
+    __table_args__ = (
+        Index("idx_dispositivos_confiables_usuario", "usuario_id"),
+        Index("idx_dispositivos_confiables_hash", "token_hash", unique=True),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    usuario_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    nombre_dispositivo: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    user_agent: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    ip_origen: Mapped[str] = mapped_column(String(45), default="", nullable=False)
+    creado_en: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
+    ultimo_acceso_en: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
+    expira_en: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    revocado: Mapped[bool] = mapped_column(default=False, nullable=False)
+
+
 class UserModel(Base):
     __tablename__ = "users"
 

@@ -43,6 +43,9 @@ def manejar_error_http(exc: Exception) -> NoReturn:
     retry_after = getattr(exc, "retry_after_seg", None)
     if code == 429 and isinstance(retry_after, int):
         headers = {"Retry-After": str(retry_after)}
+    if code >= 500 and request_id:
+        headers = headers or {}
+        headers["X-Request-ID"] = str(request_id)
     raise HTTPException(status_code=code, detail=err["mensaje"], headers=headers) from exc
 
 
