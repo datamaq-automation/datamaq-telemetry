@@ -165,6 +165,7 @@ def alta_cliente(
                     contrasena=password,
                     esta_activo=True,
                     rol="operador",
+                    organizacion_id=org_id,
                 )
                 print(
                     f"[+] Usuario creado: '{usuario_creado.usuario}' "
