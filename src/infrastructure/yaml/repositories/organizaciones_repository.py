@@ -113,9 +113,10 @@ class YamlOrganizacionesRepository(RepositorioOrganizacionesPort):
                 if str(p.get("id")) == str(planta_id):
                     nodos = []
                     for n in p.get("nodos_unifilar", []):
+                        tipo_raw = str(n.get("tipo", "CARGA")).upper()
                         tipo = (
-                            TipoNodoUnifilar[n["tipo"]]
-                            if n.get("tipo") in TipoNodoUnifilar.__members__
+                            TipoNodoUnifilar[tipo_raw]
+                            if tipo_raw in TipoNodoUnifilar.__members__
                             else TipoNodoUnifilar.CARGA
                         )
                         nodos.append(

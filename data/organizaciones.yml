@@ -1,0 +1,71 @@
+# data/organizaciones.yml — Modelo Declarativo de Activos (ANSI/ISA-95 & ISO 50001)
+# Nivel 4 (Empresa / Tenant) y Nivel 3 (Sitio / Planta)
+
+organizaciones:
+  - id: "09c09578-a860-4c61-8e97-2a13240adb8f"
+    nombre: "Hogar (medidor doméstico)"
+    modo_free: "VITRINA_ANONIMA"
+    email_contacto: "invitado@datamaq.com.ar"
+    plantas:
+      - id: "2a4dd726-3e21-4b24-8993-51c2f5d4d65f"
+        nombre: "Casa"
+        nodos_unifilar:
+          - id: "nodo-acometida-hogar"
+            nombre: "Medidor Principal Hogar"
+            tipo: "acometida"
+            tension_nominal_v: 220.0
+            device_id: "2812d2af-b1cf-4daa-a379-40102fdb152d"
+            potencia_nominal_kw: 5.5
+            uso_significativo: false
+            categoria_uso: "ILUMINACION"
+
+  - id: "cf82b4be-0798-4beb-8978-2a27612d5761"
+    nombre: "Vajillas Durax S.A."
+    modo_free: "PRIVADO_BASICO"
+    email_contacto: "instrumental@vajillasdurax.com.ar"
+    plantas:
+      - id: "c64fd625-0037-4caa-b68a-800e8e0ee548"
+        nombre: "Planta Principal Durax"
+        nodos_unifilar:
+          - id: "nodo-durax-trifasico-1"
+            nombre: "SmartPlus Trifásico #1"
+            tipo: "transformador"
+            tension_nominal_v: 380.0
+            device_id: "51048a93-f1f3-4283-a708-24cbd39c7192"
+            potencia_nominal_kw: 300.0
+            uso_significativo: true
+            categoria_uso: "FUERZA_MOTRIZ"
+          - id: "nodo-durax-powermeter-bf2c"
+            nombre: "Powermeter-BF2C"
+            tipo: "carga"
+            tension_nominal_v: 380.0
+            parent_id: "nodo-durax-trifasico-1"
+            device_id: "b5f4bcd6-b017-4796-bb3d-efcfb50dc8f0"
+            potencia_nominal_kw: 150.0
+            uso_significativo: true
+            categoria_uso: "FUERZA_MOTRIZ"
+
+  - id: "edebb9a0-85e5-4bde-a370-e64bd9b9608c"
+    nombre: "Cooperativa de Trabajo Unión Papelera Platense Ltda"
+    modo_free: "PRIVADO_BASICO"
+    email_contacto: "unionpapeleraplatense@hotmail.com"
+    plantas:
+      - id: "4f68f653-a604-4834-8154-31f938248572"
+        nombre: "Planta Principal UPP"
+        nodos_unifilar:
+          - id: "nodo-upp-trafo-arriba"
+            nombre: "Trafo Arriba"
+            tipo: "transformador"
+            tension_nominal_v: 380.0
+            device_id: "a01b1642-ed29-4c3e-a793-f57de09504f8"
+            potencia_nominal_kw: 800.0
+            uso_significativo: true
+            categoria_uso: "FUERZA_MOTRIZ"
+          - id: "nodo-upp-trafo-abajo"
+            nombre: "Trafo Abajo"
+            tipo: "transformador"
+            tension_nominal_v: 380.0
+            device_id: "ce7e5a9a-c5e8-4936-be9a-a2057ccf8b4c"
+            potencia_nominal_kw: 800.0
+            uso_significativo: true
+            categoria_uso: "FUERZA_MOTRIZ"
