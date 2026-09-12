@@ -51,12 +51,14 @@ from src.infrastructure.sqlalchemy.mysql_repositories import (
     MySQLGruposDispositivosRepository,
     MySQLIntervalosActividadRepository,
     MySQLMaquinasRepository,
-    MySQLOrganizacionesRepository,
     MySQLParadasProgramadasRepository,
     MySQLPlanesRepository,
     MySQLSeriePotenciaRepository,
     MySQLTelemetriaRepository,
     MySQLUsuariosRepository,
+)
+from src.infrastructure.yaml.repositories.organizaciones_repository import (
+    YamlOrganizacionesRepository,
 )
 
 # Singleton in-memory broadcaster
@@ -107,7 +109,7 @@ def get_telemetria_use_case(
 ) -> ConsultarTelemetriaUseCase:
     repo_disp = MySQLDispositivosRepository(db)
     repo_telem = MySQLTelemetriaRepository(db)
-    repo_org = MySQLOrganizacionesRepository(db)
+    repo_org = YamlOrganizacionesRepository()
     repo_planes = MySQLPlanesRepository(db)
     return ConsultarTelemetriaUseCase(
         repo_telem, repo_disp, repo_org, repo_planes, buffer_en_vivo=global_telemetria_buffer
@@ -146,7 +148,7 @@ def get_dispositivos_use_case(
 ) -> GestionarDispositivosUseCase:
     return GestionarDispositivosUseCase(
         MySQLDispositivosRepository(db),
-        MySQLOrganizacionesRepository(db),
+        YamlOrganizacionesRepository(),
         MySQLPlanesRepository(db),
     )
 
@@ -201,7 +203,7 @@ def get_maquinas_use_case(
         MySQLMaquinasRepository(db),
         MySQLTelemetriaRepository(db),
         MySQLDispositivosRepository(db),
-        MySQLOrganizacionesRepository(db),
+        YamlOrganizacionesRepository(),
     )
 
 
@@ -247,14 +249,14 @@ def get_disponibilidad_use_case(
         MySQLEventosDisponibilidadRepository(db),
         MySQLParadasProgramadasRepository(db),
         MySQLDispositivosRepository(db),
-        MySQLOrganizacionesRepository(db),
+        YamlOrganizacionesRepository(),
     )
 
 
 def get_planta_estructura_use_case(
     db: Annotated[Session, Depends(get_db_session)],
 ) -> GestionarPlantaEstructuraUseCase:
-    repo_org = MySQLOrganizacionesRepository(db)
+    repo_org = YamlOrganizacionesRepository()
     return GestionarPlantaEstructuraUseCase(repo_org)
 
 

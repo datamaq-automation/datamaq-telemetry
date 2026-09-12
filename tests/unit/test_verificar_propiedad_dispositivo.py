@@ -34,8 +34,8 @@ def _mock_mysql_repos(monkeypatch, repo_dispositivos=None, repo_organizaciones=N
         lambda db: repo_dispositivos or MagicMock(),
     )
     monkeypatch.setattr(
-        "src.infrastructure.fastapi.device_ownership.MySQLOrganizacionesRepository",
-        lambda db: repo_organizaciones or MagicMock(),
+        "src.infrastructure.fastapi.device_ownership.YamlOrganizacionesRepository",
+        lambda *args, **kwargs: repo_organizaciones or MagicMock(),
     )
 
 
@@ -163,8 +163,8 @@ def _mock_grupos_repo(monkeypatch, repo_grupos=None, repo_organizaciones=None):
         lambda db: repo_grupos or MagicMock(),
     )
     monkeypatch.setattr(
-        "src.infrastructure.fastapi.device_ownership.MySQLOrganizacionesRepository",
-        lambda db: repo_organizaciones or MagicMock(),
+        "src.infrastructure.fastapi.device_ownership.YamlOrganizacionesRepository",
+        lambda *args, **kwargs: repo_organizaciones or MagicMock(),
     )
 
 
@@ -257,8 +257,8 @@ def _mock_maquinas_repos(monkeypatch, repo_maquinas=None, repo_dispositivos=None
         lambda db: repo_dispositivos or MagicMock(),
     )
     monkeypatch.setattr(
-        "src.infrastructure.fastapi.device_ownership.MySQLOrganizacionesRepository",
-        lambda db: repo_organizaciones or MagicMock(),
+        "src.infrastructure.fastapi.device_ownership.YamlOrganizacionesRepository",
+        lambda *args, **kwargs: repo_organizaciones or MagicMock(),
     )
 
 

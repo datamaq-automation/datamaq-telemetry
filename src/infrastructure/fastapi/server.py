@@ -57,7 +57,9 @@ from src.infrastructure.sqlalchemy.mysql_repositories import (
     MySQLCampanasRepository,
     MySQLCargasRepository,
     MySQLDispositivosRepository,
-    MySQLOrganizacionesRepository,
+)
+from src.infrastructure.yaml.repositories.organizaciones_repository import (
+    YamlOrganizacionesRepository,
 )
 
 logger = get_logger("server")
@@ -160,7 +162,7 @@ def _resolver_organizacion_evento(topico: str) -> str | None:
         session_factory = get_session_factory()
         db = session_factory()
         try:
-            repo = MySQLOrganizacionesRepository(db)
+            repo = YamlOrganizacionesRepository()
             return ResolvedorDispositivoIngesta.resolver_organizacion_id(mac_raw, repo)
         finally:
             db.close()

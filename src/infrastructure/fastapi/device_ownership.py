@@ -15,7 +15,9 @@ from src.infrastructure.sqlalchemy.mysql_repositories import (
     MySQLEventosDisponibilidadRepository,
     MySQLGruposDispositivosRepository,
     MySQLMaquinasRepository,
-    MySQLOrganizacionesRepository,
+)
+from src.infrastructure.yaml.repositories.organizaciones_repository import (
+    YamlOrganizacionesRepository,
 )
 
 
@@ -23,7 +25,7 @@ def _organizacion_de_dispositivo(db: Session, dispositivo_id: str | None) -> str
     """Resuelve dispositivo_id -> planta_id -> organizacion_id. None si no se puede resolver."""
     if dispositivo_id is None:
         return None
-    repo_organizaciones = MySQLOrganizacionesRepository(db)
+    repo_organizaciones = YamlOrganizacionesRepository()
     repo_dispositivos = MySQLDispositivosRepository(db)
     dispositivo = repo_dispositivos.obtener_por_id(dispositivo_id)
     if dispositivo is None or not dispositivo.planta_id:
@@ -63,7 +65,7 @@ def verificar_propiedad_dispositivo(
 
     organizacion_dispositivo = None
     if dispositivo.planta_id:
-        repo_organizaciones = MySQLOrganizacionesRepository(db)
+        repo_organizaciones = YamlOrganizacionesRepository()
         planta = repo_organizaciones.obtener_planta_por_id(dispositivo.planta_id)
         organizacion_dispositivo = planta.organizacion_id if planta else None
 
@@ -91,7 +93,7 @@ def verificar_propiedad_grupo_dispositivos(
     if grupo is None:
         raise HTTPException(status_code=404, detail="grupo_no_encontrado")
 
-    repo_organizaciones = MySQLOrganizacionesRepository(db)
+    repo_organizaciones = YamlOrganizacionesRepository()
     planta = repo_organizaciones.obtener_planta_por_id(grupo.planta_id)
     organizacion_grupo = planta.organizacion_id if planta else None
 
