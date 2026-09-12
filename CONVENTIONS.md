@@ -37,11 +37,17 @@ src/
 ├── infrastructure/                              # 4. Capa de Infraestructura (Librerías externas y Frameworks)
 │   ├── fastapi/                                 # Servidor FastAPI, dependencias y routers (/api/..., /ws/live)
 │   ├── sqlalchemy/                              # Modelos DeclarativeBase MySQL, engine y repositorios
+│   ├── yaml/                                    # Repositorios basados en archivos YAML locales
 │   ├── paho_mqtt/                               # Listener daemon MQTT con Paho
 │   └── settings/                                # Configuración con pydantic-settings y logger estructurado
 │
+├── data/                                        # Jerarquía de Activos Industriales (ANSI/ISA-95 & ISO 50001)
+│   ├── organizaciones.yml                       # Catálogo maestro de organizaciones
+│   └── organizaciones/{org}/plantas/{planta}/   # Topología desacoplada (planta.yml, unifilar.yml, layout.yml)
+│
 └── main.py                                      # Entrypoint ASGI (app = create_app())
 ```
+
 
 ---
 

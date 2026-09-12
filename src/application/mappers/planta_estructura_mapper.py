@@ -37,6 +37,10 @@ class PlantaEstructuraMapper:
             device_id=entity.device_id,
             tension_nominal_V=entity.tension_nominal_v,
             capacidad_nominal_kVA=entity.capacidad_nominal_kva,
+            potencia_nominal_kw=entity.potencia_nominal_kw,
+            uso_significativo=entity.uso_significativo,
+            categoria_uso=entity.categoria_uso,
+            variable_relevante=entity.variable_relevante,
             orden=entity.orden,
         )
 
@@ -54,6 +58,10 @@ class PlantaEstructuraMapper:
             device_id=dto.device_id,
             tension_nominal_v=dto.tension_nominal_V,
             capacidad_nominal_kva=dto.capacidad_nominal_kVA,
+            potencia_nominal_kw=dto.potencia_nominal_kw,
+            uso_significativo=dto.uso_significativo,
+            categoria_uso=dto.categoria_uso,
+            variable_relevante=dto.variable_relevante,
             orden=dto.orden,
         )
 

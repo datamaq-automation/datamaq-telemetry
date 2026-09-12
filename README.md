@@ -19,16 +19,22 @@ Construido para despliegues ligeros y directos sin Docker (**Python 3 + venv + M
    ├── Ingesta y normalización de telemetría
    ├── WebSockets en vivo (/ws/live)
    ├── REST API (/api/v1/dispositivos, /api/v1/telemetria/...)
-   └── Persistencia en MySQL (InnoDB / series temporales)
+   ├── Jerarquía SGE / ISA-95 (Configuración declarativa GitOps en ./data/)
+   │    ├── Nivel 4 (Empresa): Organizaciones y planes comerciales
+   │    ├── Nivel 3 (Sitio): Plantas y metas de eficiencia ISO 50001
+   │    └── Nivel 2 (Área/Proceso): Unifilar eléctrico, USEs y Layouts 2D
+   └── Persistencia en MySQL (InnoDB / series temporales y estados)
         │
         ▼
 [ Base de Datos MySQL: datamaq_telemetry ]
-   ├── organizations & facilities (Multi-tenancy)
-   ├── devices (Auto-registro de flota)
+   ├── users & dispositivos_confiables (Autenticación y RBAC)
+   ├── devices & machines (Auto-registro de flota y disponibilidad OEE)
    ├── telemetry_instantaneous (V, I, P, Q, S, FP)
    ├── telemetry_energy (kWh, kVARh importado/exportado)
    └── device_alerts & device_status_logs
 ```
+
+> 📘 Para detalles profundos sobre el modelo industrial de activos, consultar [`docs/arquitectura-sge-isa95.md`](docs/arquitectura-sge-isa95.md).
 
 ---
 

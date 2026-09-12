@@ -41,6 +41,8 @@ Bienvenido al centro de documentación técnica del backend de telemetría de en
 
 ### 3. Modelo de Datos, Persistencia y Gobernanza
 
+* 📄 [`docs/arquitectura-sge-isa95.md`](file:///home/agustin/proyectos_software/datamaq-telemetry/docs/arquitectura-sge-isa95.md)  
+  *Arquitectura de Datos SGE e ISA-95:* Jerarquía industrial de activos (Empresa -> Sitio/Planta -> Área/Topología Eléctrica -> Unidad/Medidor IoT), requisitos de ISO 50001 (Fronteras, USEs, Línea de Base y EnPIs) y persistencia GitOps declarativa en `./data/`.
 * 📄 [`docs/database_erd.md`](file:///home/agustin/proyectos_software/datamaq-telemetry/docs/database_erd.md)  
   *Diagrama Entidad-Relación (ERD):* Diagrama Mermaid autogenerado de todas las tablas MySQL, índices B-Tree, columnas de ingeniería y matriz de políticas de retención.
 * 📄 [`docs/to_www-datamaq.md`](file:///home/agustin/proyectos_software/datamaq-telemetry/docs/to_www-datamaq.md)  

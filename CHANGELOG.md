@@ -9,7 +9,13 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 ## [Sin publicar]
 
 ### Agregado
+- **Arquitectura de Datos SGE e ISA-95 (Jerarquía Declarativa de Activos y Topología)**:
+  - Formalización del modelo de datos de planta bajo estándares **ANSI/ISA-95** (Empresa -> Sitio -> Área/USE -> Unidad/Medidor) e **ISO 50001** (Sistemas de Gestión de la Energía). Documentado en [`docs/arquitectura-sge-isa95.md`](docs/arquitectura-sge-isa95.md) y `Spec E` en [`spec.md`](spec.md).
+  - Desacoplamiento de la gestión física y organizacional de MySQL hacia un modelo declarativo GitOps versionado en `./data/` con soporte para estructura multinivel (`./data/organizaciones/{org}/plantas/{planta}/`).
+  - Extensión de `NodoUnifilar` y `NodoUnifilarDTO` con metadatos energéticos de ISO 50001: `potencia_nominal_kw`, `uso_significativo`, `categoria_uso` y `variable_relevante`.
+  - Verificador de consistencia referencial en startup (`lifespan` FastAPI) para auditar claves foráneas huérfanas entre MySQL y YAML.
 - **Desagregación de cargas (NILM) sobre un medidor agregado** — implementa el paso 4 del roadmap de [`docs/disponibilidad-maquina-diseno-conceptual.md`](file:///home/agustin/proyectos_software/datamaq-telemetry/docs/disponibilidad-maquina-diseno-conceptual.md) §8, que había dejado el modelo de datos fuera de alcance. Documentado en [`docs/desagregacion-cargas-nilm.md`](file:///home/agustin/proyectos_software/datamaq-telemetry/docs/desagregacion-cargas-nilm.md); contrato para el frontend en [`docs/informe-cambios-contrato-cargas.md`](file:///home/agustin/proyectos_software/datamaq-telemetry/docs/informe-cambios-contrato-cargas.md). **Recurso nuevo y aditivo: no toca ningún DTO existente.**
+
   - **Contexto `src/domain/cargas/`** (stdlib puro): catálogo genérico de `Carga` con su `FirmaCarga`, `CampanaCaracterizacion` e `IntervaloActividadCarga`. Genérico a propósito — el domicilio es banco de pruebas de un motor que se aplica igual a un tablero industrial.
   - **`PerfiladorLineaBaseService`:** separa consumo permanente de consumo de actividad por percentil bajo en ventanas horarias. Es el único análisis que da un resultado sólido a 300 s **sin ninguna firma calibrada**. `delta_diurno_W` se reporta sin bautizarlo "iluminación": es todo lo que se suma de día y no se puede separar en escalones.
   - **`AnalizadorCiclosService`:** duración de encendido e inactividad (mediana y MAD), duty cycle, período, e inferencia de `PatronOperacion`, con `INDETERMINADO` cuando no alcanza la evidencia. Histéresis opcional para que una carga que roza el umbral no se fragmente hasta desaparecer.

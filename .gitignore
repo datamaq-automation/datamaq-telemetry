@@ -46,7 +46,4 @@ htmlcov/
 # Backups & Data
 backups/
 data/
-.aider.conf.yml
-.aider.conventions.md
-.aider*
 tmp/

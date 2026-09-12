@@ -331,6 +331,17 @@ async def lifespan(app: FastAPI):
     verificar_estado_migraciones()
     logger.info("tablas_db_verificadas")
 
+    try:
+        from src.infrastructure.sqlalchemy.verificador_consistencia import verificar_consistencia_organizaciones
+
+        db_session = get_session_factory()()
+        try:
+            verificar_consistencia_organizaciones(db_session)
+        finally:
+            db_session.close()
+    except Exception as e:
+        logger.warning("verificacion_consistencia_fallida", error=str(e))
+
     # Hook up live WebSocket broadcasts
     global_event_broadcaster.suscribir(websocket_broadcast_callback)
     # Buffer en RAM de lecturas en vivo por dispositivo (sobrevive a un F5 del navegador)

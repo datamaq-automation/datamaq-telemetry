@@ -22,8 +22,14 @@ API FastAPI y Worker MQTT para la ingesta y persistencia de telemetría de medid
 - `src/adapters/` — `gateways/`, `presenters/`.
   - **Inversión de Dependencias:** Nunca importa `src/infrastructure/`.
   - **Agnosticismo Web:** Presenters y gateways son clases puras de Python agnósticas de frameworks web. La lógica de entrada vive en los casos de uso de `application/`; los routers de `infrastructure/fastapi/` los inyectan directamente (sin capa de controllers).
-- `src/infrastructure/` — organizado por librería: `fastapi/`, `sqlalchemy/`, `paho_mqtt/`, `pydantic/`.
+- `src/infrastructure/` — organizado por librería: `fastapi/`, `sqlalchemy/`, `paho_mqtt/`, `pydantic/`, `yaml/`.
+- `data/` — Persistencia declarativa GitOps de la jerarquía de activos industriales bajo estándar **ANSI/ISA-95** e **ISO 50001**:
+  - Nivel 4 (Empresa / Tenant): `./data/organizaciones.yml` o `./data/organizaciones/{org_id}/organizacion.yml`.
+  - Nivel 3 (Sitio / Frontera SGE): `.../plantas/{planta_id}/planta.yml`.
+  - Nivel 2 (Área / Topología y USEs): `.../plantas/{planta_id}/unifilar.yml` y `layout.yml`.
+  - Verificación en startup: Toda relación de `organization_id` en MySQL se valida contra el modelo declarativo vía `verificador_consistencia_organizaciones`.
 - `src/main.py` — Entrypoint ASGI (`app = create_app()`).
+
 
 ## Convenciones
 

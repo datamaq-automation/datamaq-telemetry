@@ -11,6 +11,10 @@ class NodoUnifilarDTO(BaseModel):
     device_id: str | None = None
     tension_nominal_V: float
     capacidad_nominal_kVA: float | None = None
+    potencia_nominal_kw: float | None = None
+    uso_significativo: bool = False
+    categoria_uso: str | None = None
+    variable_relevante: str | None = None
     orden: int = 0
     model_config = ConfigDict(from_attributes=True)
 

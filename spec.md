@@ -221,10 +221,50 @@ Exponer endpoints REST para que el frontend del dashboard y operadores de planta
 ### `tests/integration/test_alertas_api.py`
 1. `test_create_app_registra_router_alertas`
 
-## 6. Criterios del Gauntlet
-
 ```bash
 pytest
 ruff check .
 python scripts/verify_architecture.py
 ```
+
+---
+
+# Spec E: Arquitectura de Datos SGE e ISA-95 (Jerarquía Declarativa de Activos y Topología)
+
+## 1. Objetivo y Contexto
+
+Alinear la estructura de datos y metadatos de telemetría con los estándares **ANSI/ISA-95** (Enterprise-Control System Integration) e **ISO 50001** (Sistemas de Gestión de la Energía). 
+Desacoplar la topología física/organizacional de las tablas relacionales de MySQL hacia un modelo declarativo GitOps estructurado en tres niveles jerárquicos bajo `./data/`:
+1. **Nivel 4 (Empresa / Multi-Tenant):** `./data/organizaciones.yml` o `./data/organizaciones/{org_id}/organizacion.yml`.
+2. **Nivel 3 (Sitio / Frontera SGE):** `./data/organizaciones/{org_id}/plantas/{planta_id}/planta.yml`.
+3. **Nivel 2 (Área / Topología y USEs):** `./data/organizaciones/{org_id}/plantas/{planta_id}/unifilar.yml` y `layout.yml`.
+
+## 2. Dominio y DTOs
+
+### `src/domain/telemetria/entities.py`
+- Extender `NodoUnifilar` con metadatos energéticos:
+  - `potencia_nominal_kw: float | None`
+  - `uso_significativo: bool` (Indicador de USE bajo ISO 50001)
+  - `categoria_uso: str | None` (Clasificación de carga)
+  - `variable_relevante: str | None` (Driver de producción / clima para EnPI)
+
+### `src/application/dtos/planta_estructura_dto.py`
+- Extender `NodoUnifilarDTO` para serializar los campos de ISO 50001 hacia la API REST y frontend.
+
+### `src/infrastructure/yaml/repositories/organizaciones_repository.py`
+- Soporte transparente para arquitectura multinivel de directorios y compatibilidad hacia atrás con archivos consolidados.
+
+## 3. Matriz de Pruebas
+
+### `tests/unit/test_yaml_organizaciones_repository.py`
+- Lectura de unifilar con metadatos SGE ISO 50001 (`uso_significativo`, `categoria_uso`, `variable_relevante`).
+- Mapeo bidireccional en `PlantaEstructuraMapper`.
+
+## 4. Criterios del Gauntlet
+
+```bash
+pytest tests/unit/
+ruff check .
+python scripts/verify_architecture.py
+```
+

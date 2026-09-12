@@ -1,8 +1,4 @@
-import glob
-import os
 from datetime import datetime
-
-import yaml
 
 from src.domain.telemetria.entities import (
     DispositivoLayout,
@@ -18,6 +14,7 @@ from src.domain.telemetria.value_objects import (
     PosicionLayout,
     TipoNodoUnifilar,
 )
+from src.infrastructure.yaml.loaders import cargar_organizaciones_completas
 
 
 class YamlOrganizacionesRepository(RepositorioOrganizacionesPort):
@@ -25,28 +22,7 @@ class YamlOrganizacionesRepository(RepositorioOrganizacionesPort):
         self.data_dir = data_dir
 
     def _cargar_organizaciones_raw(self) -> list[dict]:
-        pattern = os.path.join(self.data_dir, "**", "*.yml")
-        archivos = glob.glob(pattern, recursive=True)
-        pattern_yaml = os.path.join(self.data_dir, "**", "*.yaml")
-        archivos.extend(glob.glob(pattern_yaml, recursive=True))
-
-        organizaciones_raw = []
-        for filepath in set(archivos):
-            try:
-                with open(filepath, encoding="utf-8") as f:
-                    contenido = yaml.safe_load(f)
-                    if not contenido:
-                        continue
-                    if isinstance(contenido, list):
-                        organizaciones_raw.extend(contenido)
-                    elif isinstance(contenido, dict):
-                        if "organizaciones" in contenido and isinstance(contenido["organizaciones"], list):
-                            organizaciones_raw.extend(contenido["organizaciones"])
-                        elif "id" in contenido:
-                            organizaciones_raw.append(contenido)
-            except Exception:
-                continue
-        return organizaciones_raw
+        return cargar_organizaciones_completas(self.data_dir)
 
     def _dict_to_organizacion(self, d: dict) -> Organizacion:
         modo_free_str = d.get("modo_free", "PRIVADO_BASICO")
@@ -151,8 +127,18 @@ class YamlOrganizacionesRepository(RepositorioOrganizacionesPort):
                                 tension_nominal_v=float(n.get("tension_nominal_v", 380.0)),
                                 parent_id=n.get("padre_id") or n.get("parent_id"),
                                 device_id=n.get("dispositivo_id") or n.get("device_id"),
+                                capacidad_nominal_kva=float(n["capacidad_nominal_kva"])
+                                if n.get("capacidad_nominal_kva") is not None
+                                else None,
+                                potencia_nominal_kw=float(n["potencia_nominal_kw"])
+                                if n.get("potencia_nominal_kw") is not None
+                                else None,
+                                uso_significativo=bool(n.get("uso_significativo", False)),
+                                categoria_uso=n.get("categoria_uso"),
+                                variable_relevante=n.get("variable_relevante"),
                             )
                         )
+
                     return nodos
         return []
 

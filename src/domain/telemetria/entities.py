@@ -91,6 +91,10 @@ class NodoUnifilar:
     parent_id: str | None = None
     device_id: str | None = None
     capacidad_nominal_kva: float | None = None
+    potencia_nominal_kw: float | None = None
+    uso_significativo: bool = False
+    categoria_uso: str | None = None
+    variable_relevante: str | None = None
     orden: int = 0
     creado_en: datetime = field(default_factory=ahora_utc)
     actualizado_en: datetime = field(default_factory=ahora_utc)
