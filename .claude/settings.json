@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ruff check *)",
+      "Bash(ruff format *)",
+      "Bash(.venv/bin/python -m ruff check *)",
+      "Bash(.venv/bin/python -m ruff format *)",
+      "Bash(pytest *)",
+      "Bash(python -m pytest *)",
+      "Bash(python3 -m pytest *)",
+      "Bash(.venv/bin/python -m pytest *)",
+      "Bash(python3 -m json.tool *)",
+      "Bash(gh run watch *)",
+      "Bash(systemctl is-active *)",
+      "Bash(systemctl status *)",
+      "Bash(systemctl --failed)"
+    ]
+  }
+}
