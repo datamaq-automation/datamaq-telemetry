@@ -19,13 +19,11 @@ erDiagram
     DEVICES ||--o{ MACHINES : "FK_device_id"
     DEVICES ||--o{ TELEMETRY_ENERGY : "FK_device_id"
     DEVICES ||--o{ TELEMETRY_INSTANTANEOUS : "FK_device_id"
-    DEVICES ||--o{ UNIFILAR_NODES : "FK_device_id"
     DEVICE_GROUPS ||--o{ DEVICE_GROUP_MEMBERS : "FK_group_id"
     FACILITIES ||--o{ DEVICES : "FK_facility_id"
     FACILITIES ||--o{ DEVICE_GROUPS : "FK_facility_id"
     FACILITIES ||--o{ FACILITY_DEVICE_LAYOUTS : "FK_facility_id"
     FACILITIES ||--o{ FACILITY_ZONES : "FK_facility_id"
-    FACILITIES ||--o{ UNIFILAR_NODES : "FK_facility_id"
     FACILITY_ZONES ||--o{ FACILITY_DEVICE_LAYOUTS : "FK_zone_id"
     LOADS ||--o{ CHARACTERIZATION_CAMPAIGNS : "FK_load_id"
     LOADS ||--o{ LOAD_ACTIVITY_INTERVALS : "FK_load_id"
@@ -331,20 +329,6 @@ erDiagram
         decimal thd_v_promedio_porcentaje
         decimal thd_i_total_porcentaje
         datetime created_at
-    }
-
-    UNIFILAR_NODES {
-        string id PK
-        string facility_id FK
-        string parent_id
-        string name
-        string node_type
-        string device_id FK
-        decimal nominal_voltage_v
-        decimal nominal_capacity_kva
-        int sort_order
-        datetime created_at
-        datetime updated_at
     }
 
     USERS {
@@ -751,26 +735,6 @@ erDiagram
 **Índices:**
 - `idx_telemetry_inst_dev_time`: (`device_id`, `recorded_at`)
 - `idx_telemetry_inst_time`: (`recorded_at`)
-
-### Tabla `unifilar_nodes`
-
-| Columna | Tipo SQL | Clave / Restricción | Nullable |
-| :--- | :--- | :--- | :--- |
-| `id` | `VARCHAR(36)` | **PRIMARY KEY** | No |
-| `facility_id` | `VARCHAR(36)` | FK -> `facilities.id` | No |
-| `parent_id` | `VARCHAR(36)` | - | Sí |
-| `name` | `VARCHAR(150)` | - | No |
-| `node_type` | `VARCHAR(50)` | - | No |
-| `device_id` | `VARCHAR(36)` | FK -> `devices.id` | Sí |
-| `nominal_voltage_v` | `NUMERIC(8, 2)` | - | No |
-| `nominal_capacity_kva` | `NUMERIC(10, 2)` | - | Sí |
-| `sort_order` | `INTEGER` | - | No |
-| `created_at` | `DATETIME` | - | No |
-| `updated_at` | `DATETIME` | - | No |
-
-**Índices:**
-- `idx_unifilar_facility`: (`facility_id`)
-- `idx_unifilar_parent`: (`parent_id`)
 
 ### Tabla `users`
 

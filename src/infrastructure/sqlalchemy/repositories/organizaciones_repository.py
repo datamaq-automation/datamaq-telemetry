@@ -16,12 +16,10 @@ from src.domain.telemetria.value_objects import (
     CoordenadasZona,
     ModoFreeTier,
     PosicionLayout,
-    TipoNodoUnifilar,
 )
 from src.infrastructure.sqlalchemy.models import (
     FacilityDeviceLayoutModel,
     FacilityModel,
-    FacilityUnifilarNodeModel,
     FacilityZoneModel,
     OrganizationModel,
 )
@@ -165,55 +163,16 @@ class MySQLOrganizacionesRepository(RepositorioOrganizacionesPort):
         )
 
     def obtener_nodos_unifilar(self, planta_id: str) -> list[NodoUnifilar]:
-        models = (
-            self.db.query(FacilityUnifilarNodeModel)
-            .filter(FacilityUnifilarNodeModel.facility_id == planta_id)
-            .order_by(FacilityUnifilarNodeModel.sort_order.asc())
-            .all()
+        raise NotImplementedError(
+            "El backend SQL no soporta el diagrama unifilar; la estructura de planta usa "
+            "YamlOrganizacionesRepository (ver dependencies.py)."
         )
-        return [
-            NodoUnifilar(
-                id=m.id,
-                planta_id=m.facility_id,
-                parent_id=m.parent_id,
-                nombre=m.name,
-                tipo=(
-                    TipoNodoUnifilar(m.node_type)
-                    if m.node_type in [t.value for t in TipoNodoUnifilar]
-                    else TipoNodoUnifilar.CARGA
-                ),
-                device_id=m.device_id,
-                tension_nominal_v=float(m.nominal_voltage_v),
-                capacidad_nominal_kva=float(m.nominal_capacity_kva) if m.nominal_capacity_kva is not None else None,
-                orden=m.sort_order,
-                creado_en=m.created_at,
-                actualizado_en=m.updated_at,
-            )
-            for m in models
-        ]
 
     def guardar_nodos_unifilar(self, planta_id: str, nodos: list[NodoUnifilar]) -> list[NodoUnifilar]:
-        self.db.query(FacilityUnifilarNodeModel).filter(FacilityUnifilarNodeModel.facility_id == planta_id).delete()
-
-        for nodo in nodos:
-            tipo_str = nodo.tipo.value if hasattr(nodo.tipo, "value") else str(nodo.tipo)
-            model = FacilityUnifilarNodeModel(
-                id=nodo.id,
-                facility_id=planta_id,
-                parent_id=nodo.parent_id,
-                name=nodo.nombre,
-                node_type=tipo_str,
-                device_id=nodo.device_id,
-                nominal_voltage_v=Decimal(str(nodo.tension_nominal_v)),
-                nominal_capacity_kva=(
-                    Decimal(str(nodo.capacidad_nominal_kva)) if nodo.capacidad_nominal_kva is not None else None
-                ),
-                sort_order=nodo.orden,
-            )
-            self.db.add(model)
-
-        self.db.commit()
-        return self.obtener_nodos_unifilar(planta_id)
+        raise NotImplementedError(
+            "El backend SQL no soporta el diagrama unifilar; la estructura de planta usa "
+            "YamlOrganizacionesRepository (ver dependencies.py)."
+        )
 
     def obtener_zonas_planta(self, planta_id: str) -> list[ZonaPlanta]:
         models = self.db.query(FacilityZoneModel).filter(FacilityZoneModel.facility_id == planta_id).all()

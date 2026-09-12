@@ -19,7 +19,6 @@ from src.domain.telemetria.entities import (
     LecturaInstantanea,
     LogEstadoDispositivo,
     MedicionFase,
-    NodoUnifilar,
     Organizacion,
     Planta,
     PlanTelemetria,
@@ -39,7 +38,6 @@ from src.domain.telemetria.value_objects import (
     PotenciaReactiva,
     SeveridadAlerta,
     Tension,
-    TipoNodoUnifilar,
     VisibilidadPlan,
 )
 from src.infrastructure.sqlalchemy.models import (
@@ -659,44 +657,18 @@ def test_plan_visibilidad_invalida_fallback(db: Session) -> None:
     assert obtenido.visibilidad == VisibilidadPlan.PUBLICO
 
 
-def test_unifilar_nodos_guardar_y_obtener(db: Session) -> None:
+def test_unifilar_nodos_no_soportado_por_backend_sql(db: Session) -> None:
+    # El diagrama unifilar vive en YamlOrganizacionesRepository (dependencies.py); el
+    # backend SQL declara explícitamente que no lo soporta en vez de persistirlo a medias.
     org_repo = MySQLOrganizacionesRepository(db)
     org_repo.guardar_organizacion(Organizacion(id="org-uni", nombre="Org Unifilar"))
     org_repo.guardar_planta(Planta(id="plant-uni", organizacion_id="org-uni", nombre="Planta Unifilar"))
 
-    nodos = [
-        NodoUnifilar(
-            id="node-1",
-            planta_id="plant-uni",
-            parent_id=None,
-            nombre="Acometida MT",
-            tipo=TipoNodoUnifilar.ACOMETIDA,
-            device_id=None,
-            tension_nominal_v=13200.0,
-            capacidad_nominal_kva=1000.0,
-            orden=0,
-        ),
-        NodoUnifilar(
-            id="node-2",
-            planta_id="plant-uni",
-            parent_id="node-1",
-            nombre="Trafo Principal",
-            tipo=TipoNodoUnifilar.TRANSFORMADOR,
-            device_id=None,
-            tension_nominal_v=380.0,
-            capacidad_nominal_kva=800.0,
-            orden=1,
-        ),
-    ]
+    with pytest.raises(NotImplementedError):
+        org_repo.obtener_nodos_unifilar("plant-uni")
 
-    guardados = org_repo.guardar_nodos_unifilar("plant-uni", nodos)
-    assert len(guardados) == 2
-    assert guardados[0].nombre == "Acometida MT"
-    assert guardados[1].parent_id == "node-1"
-
-    recuperados = org_repo.obtener_nodos_unifilar("plant-uni")
-    assert len(recuperados) == 2
-    assert recuperados[1].tipo == TipoNodoUnifilar.TRANSFORMADOR
+    with pytest.raises(NotImplementedError):
+        org_repo.guardar_nodos_unifilar("plant-uni", [])
 
 
 def test_layout_planta_guardar_y_obtener(db: Session) -> None:
