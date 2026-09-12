@@ -32,6 +32,8 @@ class DispositivoMapper:
             esta_activo=entity.esta_activo,
             tipo_instalacion=entity.tipo_instalacion,
             fases_con_ti=entity.fases_con_ti,
+            categoria_tarifaria=getattr(entity, "categoria_tarifaria", "T2"),
+            penalizacion_reactiva_aplica=getattr(entity, "penalizacion_reactiva_aplica", True),
             estado=entity.estado.value,
             visto_por_ultima_vez=entity.visto_por_ultima_vez,
             creado_en=entity.creado_en,
@@ -54,6 +56,10 @@ class DispositivoMapper:
             esta_activo=dto.esta_activo,
             tipo_instalacion=dto.tipo_instalacion or "CONSUMO",
             fases_con_ti=dto.fases_con_ti or "R,S,T",
+            categoria_tarifaria=dto.categoria_tarifaria or "T2",
+            penalizacion_reactiva_aplica=dto.penalizacion_reactiva_aplica
+            if dto.penalizacion_reactiva_aplica is not None
+            else True,
             estado=EstadoDispositivo.ONLINE,
         )
 

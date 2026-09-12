@@ -44,6 +44,7 @@ from src.infrastructure.fastapi.routes.planta_estructura_router import router as
 from src.infrastructure.fastapi.routes.sge_router import router as sge_router
 from src.infrastructure.fastapi.routes.system_router import router as system_router
 from src.infrastructure.fastapi.routes.telemetria_router import router as telemetria_router
+from src.infrastructure.fastapi.routes.usuarios_router import router as usuarios_router
 from src.infrastructure.fastapi.security_headers import SecurityHeadersMiddleware
 from src.infrastructure.paho_mqtt.mqtt_listener import MQTTListener
 from src.infrastructure.settings.config import Settings, get_settings
@@ -476,6 +477,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(alertas_router)
     app.include_router(auth_router)
     app.include_router(sge_router)
+    app.include_router(usuarios_router)
 
     # WebSockets Live Telemetry Stream
     @app.websocket("/ws/live")

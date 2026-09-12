@@ -155,6 +155,8 @@ class Dispositivo:
     fases_con_ti: str = "R,S,T"
     potencia_contratada_kw: float | None = None
     tarifa: str | None = None
+    categoria_tarifaria: str | None = "T2"
+    penalizacion_reactiva_aplica: bool = True
     creado_en: datetime = field(default_factory=ahora_utc)
     actualizado_en: datetime = field(default_factory=ahora_utc)
 

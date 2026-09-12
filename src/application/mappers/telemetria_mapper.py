@@ -27,9 +27,9 @@ from src.domain.telemetria.value_objects import AnaliticaCalidadEnergia
 
 class TelemetriaMapper:
     @staticmethod
-    def analitica_to_dto(analitica: AnaliticaCalidadEnergia | None) -> AnaliticaCalidadEnergiaDTO | None:
+    def analitica_to_dto(analitica: AnaliticaCalidadEnergia | None) -> AnaliticaCalidadEnergiaDTO:
         if analitica is None:
-            return None
+            return AnaliticaCalidadEnergiaDTO(motivo_abstencion="SIN_DATOS")
         return AnaliticaCalidadEnergiaDTO(
             requiere_compensacion=analitica.requiere_compensacion,
             potencia_reactiva_a_compensar_kvar=analitica.potencia_reactiva_a_compensar_kvar,

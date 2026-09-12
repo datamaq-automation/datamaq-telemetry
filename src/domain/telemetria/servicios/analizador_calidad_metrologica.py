@@ -21,12 +21,6 @@ class AnalizadorMetrologicoService:
 
     @staticmethod
     def es_instalacion_monofasica(tipo_instalacion: str | None, fases_con_ti: str | None) -> bool:
-        """Determina si una instalación es monofásica (1P2W).
-
-        Criterio: tipo de instalación explícito ``1P2W``, o bien una única fase con TI.
-        Una instalación Aron (dos fases con TI) sigue siendo trifásica a efectos de
-        balance, aunque no mida la tercera corriente.
-        """
         tipo_norm = (tipo_instalacion or "").strip().upper()
         if tipo_norm == "1P2W":
             return True
@@ -34,33 +28,17 @@ class AnalizadorMetrologicoService:
 
     @staticmethod
     def fases_con_ti_como_lista(fases_con_ti: str | list[str] | set[str] | tuple[str, ...] | None) -> set[str]:
-        """Normaliza la configuración de fases con TI a un conjunto de fases en mayúsculas.
-
-        ``None`` o vacío se interpreta como las tres fases (configuración por defecto).
-        """
         if fases_con_ti is None:
             return {"R", "S", "T"}
         if isinstance(fases_con_ti, (list, set, tuple)):
             fases = {str(f).strip().upper() for f in fases_con_ti if str(f).strip()}
         else:
             fases = {f.strip().upper() for f in str(fases_con_ti).split(",") if f.strip()}
-        if not fases:
-            return {"R", "S", "T"}
-        return fases
+        return fases if fases else {"R", "S", "T"}
 
     @staticmethod
     def sanear_fase_sin_ti(fase: MedicionFase) -> MedicionFase:
-        """Anula corriente/P/Q/S/FP/THD_I de una fase sin TI, conservando tensión y THD_V.
-
-        En una instalación monofásica los tres bornes de tensión están en paralelo, así
-        que la tensión (y su THD) es real, pero la corriente y las potencias medidas sin
-        transformador de corriente son ruido que no debe propagarse.
-        """
-        return MedicionFase(
-            tension=fase.tension,
-            thd_v_porcentaje=fase.thd_v_porcentaje,
-            thd_v_pct=fase.thd_v_pct,
-        )
+        return MedicionFase(tension=fase.tension, thd_v_porcentaje=fase.thd_v_porcentaje, thd_v_pct=fase.thd_v_pct)
 
     @staticmethod
     def calcular_potencia_trifasica_activa(
@@ -199,18 +177,23 @@ class AnalizadorMetrologicoService:
     def _evaluar_abstencion_enre(cls, dispositivo: object | None) -> str | None:
         if dispositivo is None:
             return None
+        if getattr(dispositivo, "penalizacion_reactiva_aplica", True) is False:
+            return "TARIFA_SIN_CARGO_REACTIVA"
+        cat = (getattr(dispositivo, "categoria_tarifaria", None) or "").upper()
+        if cat in ("T1-R", "T1_R") or "RESIDENCIAL" in cat:
+            return "TARIFA_SIN_CARGO_REACTIVA"
         tipo_inst = getattr(dispositivo, "tipo_instalacion", None)
         fases_ti = getattr(dispositivo, "fases_con_ti", None)
         es_monofasico = tipo_inst == "MONOFASICO" or (fases_ti and len(cls.fases_con_ti_como_lista(fases_ti)) == 1)
-        potencia_contratada_kw = getattr(dispositivo, "potencia_contratada_kw", None)
-        tarifa = getattr(dispositivo, "tarifa", None)
-
-        if es_monofasico:
-            return "Instalación monofásica exenta de penalización por reactiva (Res. ENRE 184/2000)"
-        if tarifa and (tarifa.upper().startswith("T1") or "RESIDENCIAL" in tarifa.upper()):
-            return "Tarifa residencial exenta de penalización por reactiva (Res. ENRE 184/2000)"
-        if potencia_contratada_kw is not None and potencia_contratada_kw < 10.0:
-            return "Potencia contratada menor a 10 kW exenta de penalización (Res. ENRE 184/2000)"
+        pot_kw = getattr(dispositivo, "potencia_contratada_kw", None)
+        tarifa = (getattr(dispositivo, "tarifa", None) or "").upper()
+        if (
+            es_monofasico
+            or tarifa.startswith("T1-R")
+            or "RESIDENCIAL" in tarifa
+            or (pot_kw is not None and pot_kw < 10.0)
+        ):
+            return "TARIFA_SIN_CARGO_REACTIVA"
         return None
 
     @classmethod

@@ -55,6 +55,7 @@ class Settings(BaseSettings):
     DEBUG: bool | None = None
     CORS_ORIGINS: str | None = None
     CSP_HEADER: str = ""
+    DEFAULT_USER_PASSWORD: str = "Contraseña123"
 
     # Rate limiting de login
     LOGIN_MAX_INTENTOS: int = 5
