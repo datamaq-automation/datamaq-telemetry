@@ -98,10 +98,17 @@ organizaciones:
             zona_id: "area-upp-papelera"
             posicion: { x: 70, y: 40 }
         nodos_unifilar:
+          # Nodo virtual: punto de medición en MT de la distribuidora, sin medidor propio.
+          # Su valor es la suma de los dos trafos (medidores frontera).
+          - id: "nodo-upp-acometida-mt"
+            nombre: "Acometida MT"
+            tipo: "acometida"
+            tension_nominal_v: 13200.0  # asumido, pendiente de confirmar (ver tmp/dudas.md)
           - id: "nodo-upp-trafo-arriba"
             nombre: "Trafo Arriba"
             tipo: "transformador"
             tension_nominal_v: 380.0
+            parent_id: "nodo-upp-acometida-mt"
             device_id: "a01b1642-ed29-4c3e-a793-f57de09504f8"
             potencia_nominal_kw: 800.0
             uso_significativo: true
@@ -110,6 +117,7 @@ organizaciones:
             nombre: "Trafo Abajo"
             tipo: "transformador"
             tension_nominal_v: 380.0
+            parent_id: "nodo-upp-acometida-mt"
             device_id: "ce7e5a9a-c5e8-4936-be9a-a2057ccf8b4c"
             potencia_nominal_kw: 800.0
             uso_significativo: true

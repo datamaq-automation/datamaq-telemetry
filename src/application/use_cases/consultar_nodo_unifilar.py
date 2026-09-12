@@ -5,11 +5,11 @@ from src.application.dtos.planta_estructura_dto import (
     ResumenNodoUnifilarDTO,
 )
 from src.application.dtos.telemetria_dto import EnergiaAgregadaDTO
+from src.application.use_cases.agregacion_dispositivos import calcular_historico, calcular_resumen
 from src.application.use_cases.consultar_telemetria import ConsultarTelemetriaUseCase
-from src.domain.telemetria.entities import EnergiaAgregada, NodoUnifilar, Planta
+from src.domain.telemetria.entities import NodoUnifilar, Planta
 from src.domain.telemetria.exceptions import PlantaNoEncontradaError
 from src.domain.telemetria.ports import RepositorioOrganizacionesPort, RepositorioTelemetriaPort
-from src.domain.telemetria.servicios.agregador_grupo_dispositivos import AgregadorGrupoDispositivosService
 from src.domain.telemetria.servicios.arbol_unifilar import ArbolUnifilarService
 
 
@@ -50,20 +50,9 @@ class ConsultarNodoUnifilarUseCase:
     ) -> ResumenNodoUnifilarDTO:
         nodo, dispositivos_ids = self._resolver_nodo(planta_id, nodo_id, organizacion_id)
 
-        lecturas_por_dispositivo = {
-            dispositivo_id: self.repo_telemetria.obtener_ultima_instantanea(dispositivo_id)
-            for dispositivo_id in dispositivos_ids
-        }
-        potencia_sumada = AgregadorGrupoDispositivosService.sumar_ultimas_lecturas(lecturas_por_dispositivo)
-
-        agregados_por_dispositivo: dict[str, list[EnergiaAgregada]] = {}
-        for dispositivo_id in dispositivos_ids:
-            agregados_dto = self.consultar_telemetria.listar_energia_agregada(dispositivo_id, granularidad, zona, dias)
-            agregados_por_dispositivo[dispositivo_id] = [
-                EnergiaAgregada(periodo=a.periodo, energia_activa_neta_kwh=a.energia_activa_neta_kwh)
-                for a in agregados_dto
-            ]
-        energia_sumada = AgregadorGrupoDispositivosService.sumar_energia_agregada(agregados_por_dispositivo)
+        potencia_sumada, energia_sumada = calcular_resumen(
+            dispositivos_ids, self.repo_telemetria, self.consultar_telemetria, granularidad, zona, dias
+        )
 
         return ResumenNodoUnifilarDTO(
             planta_id=planta_id,
@@ -91,23 +80,7 @@ class ConsultarNodoUnifilarUseCase:
     ) -> list[PuntoPotenciaNodoUnifilarDTO]:
         _, dispositivos_ids = self._resolver_nodo(planta_id, nodo_id, organizacion_id)
 
-        intervalo_segundos = ConsultarTelemetriaUseCase._resolver_intervalo_segundos(granularidad, horas)
-        if intervalo_segundos <= 0:
-            intervalo_segundos = 300
-
-        lecturas_por_dispositivo: dict[str, list[tuple]] = {}
-        for dispositivo_id in dispositivos_ids:
-            lecturas_dto = self.consultar_telemetria.listar_instantaneas(
-                dispositivo_id, limite=2000, granularidad=granularidad, horas=horas
-            )
-            lecturas_por_dispositivo[dispositivo_id] = [
-                (lectura.registrado_en, lectura.potencia_activa_total_W, lectura.potencia_reactiva_total_VAR)
-                for lectura in lecturas_dto
-            ]
-
-        puntos = AgregadorGrupoDispositivosService.sumar_potencia_en_el_tiempo(
-            lecturas_por_dispositivo, intervalo_segundos
-        )
+        puntos = calcular_historico(dispositivos_ids, self.consultar_telemetria, granularidad, horas)
         return [
             PuntoPotenciaNodoUnifilarDTO(
                 momento=p.momento,
