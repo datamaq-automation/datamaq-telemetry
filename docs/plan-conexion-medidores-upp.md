@@ -199,6 +199,53 @@ hallazgos arriba), ambos medidores fueron localizados, dados de alta y aprovisio
 dispositivos. El factor de potencia bajo (`fp` 0.12 y 0.06) en ambos medidores llamó la atención —
 vale la pena confirmar con el cliente si es esperado para esas cargas o si merece revisión aparte.
 
+## Verificación de potencia activa / aparente — 2026-09-11 (tarde)
+
+Se revisó P, S y fp de ambos medidores con la base del VPS, `mosquitto_sub` en vivo y
+`http://<ip>/measurements.json` de cada equipo, mientras en planta se apagaba uno de los dos
+bancos de capacitores.
+
+- **`calibration_const_config.json` del SmartPlus:** por sensor de corriente expone `constant`,
+  `invert` (180°) y `phase`. **`phase` es un índice de fase de referencia (0/1/2), no grados** —
+  verificado empíricamente: con `phase=1` en el sensor R la potencia de R giró ~120°. La UI lo
+  rotula "Desfasaje", lo cual confunde. Default de fábrica: `phase 0,0,0`, `invert false`.
+- **Trafo abajo (`D48C49F03724`) tenía `phase 2,2,1` + `invert` en T** (origen desconocido). Con
+  eso mostraba una potencia activa falsa (~49 kW, fp 0.84) que en realidad era la corriente del
+  banco de capacitores leída contra otra fase; con el banco apagado, la carga chica quedaba con
+  fases cruzadas (R negativa, S fp 0.03). **Se restauró al default** → 7.7 kW / 4.5 kvar / fp 0.85,
+  las tres fases positivas e inductivas, coherente con planta casi parada. La config previa quedó
+  guardada por si hiciera falta compararla:
+  `{"current":[{"id":0,"phase":2,"invert":false},{"id":1,"phase":2,"invert":false},{"id":2,"phase":1,"invert":true}]}`.
+- **Trafo arriba (`ECC9FFB45488`) está en default y se lo considera bien cableado.** Sus
+  ~60 A/fase con Q ≈ −40 kvar y P ≈ 4 kW son el segundo banco de capacitores (que seguía prendido)
+  con casi nada de carga activa, no un error de TIs. Los −800 W en T son ~4° de error angular,
+  despreciable. Pendiente: cuando apaguen ese banco, la corriente debe bajar a pocos A y el fp
+  pasar a positivo/inductivo; si no, recién ahí revisar TIs.
+- Los datos persistidos de Trafo abajo entre ~20:05 y ~20:20 UTC (con el remapeo activo) no son
+  válidos; los contadores de energía internos del equipo también acumularon con esa config.
+- El backend calcula S como `|V|·|I|` por fase (suma aritmética para el total); coincide con
+  `√(P²+Q²)` del equipo dentro de ~1–2 %. S no depende del ángulo, así que fue confiable todo el
+  tiempo; P y fp sí dependen de la config de fases.
+
+## Verificación de continuidad — 2026-09-12
+
+Chequeo de rutina vía `ssh vps` para confirmar que la migración sigue estable un día después:
+
+- `mosquitto` activo (`8883` TLS, `1883` local) y `datamaq-telemetry` activo, sin errores en el
+  log de servicio de los últimos 30 minutos.
+- Ambos dispositivos de UPP con `status = ONLINE` y `last_seen_at` al segundo:
+
+  | `device_uid` | Facility | Última lectura (`telemetry_instantaneous`) | Lecturas última hora | Última fila en `telemetry_energy` |
+  | --- | --- | --- | --- | --- |
+  | `D48C49F03724` (Trafo abajo) | Planta Principal UPP | 2026-09-12 00:10:01 | 48 | 2026-09-12 00:11:15 |
+  | `ECC9FFB45488` (Trafo arriba) | Planta Principal UPP | 2026-09-12 00:10:01 | 48 | 2026-09-12 00:11:17 |
+
+- Cadencia de ~48 lecturas/hora por medidor (una cada ~75 s) es consistente con el reporte
+  esperado del firmware — confirma que la telemetría se sigue persistiendo de forma estable, no
+  fue algo puntual del día de la puesta en marcha.
+- **Paso 7 (verificación visual en el portal con el usuario de UPP) sigue pendiente** — este
+  chequeo fue solo a nivel backend/DB, no se confirmó la vista del cliente.
+
 ## Notas
 
 - El costo de datos del módem 4G puede ser un factor operativo continuo (no solo de la puesta en
