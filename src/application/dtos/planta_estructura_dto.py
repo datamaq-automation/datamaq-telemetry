@@ -2,6 +2,9 @@
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.application.dtos.telemetria_dto import EnergiaAgregadaDTO
+from src.application.dtos.tipos import FechaHoraUTC
+
 
 class NodoUnifilarDTO(BaseModel):
     id: str
@@ -9,6 +12,7 @@ class NodoUnifilarDTO(BaseModel):
     nombre: str
     tipo: str  # acometida, transformador, tgbt, seccional, carga
     device_id: str | None = None
+    es_virtual: bool = False
     tension_nominal_V: float
     capacidad_nominal_kVA: float | None = None
     potencia_nominal_kw: float | None = None
@@ -89,3 +93,19 @@ class PlantaAreasEstadisticasResponseDTO(BaseModel):
     superficie_total_m2: float | None = None
     areas: list[AreaEstadisticasDTO] = Field(default_factory=list)
     model_config = ConfigDict(from_attributes=True)
+
+
+class ResumenNodoUnifilarDTO(BaseModel):
+    planta_id: str
+    nodo_id: str
+    es_virtual: bool
+    dispositivos_ids: list[str] = Field(default_factory=list)
+    potencia_activa_total_w: float | None = None
+    dispositivos_sin_dato: list[str] = Field(default_factory=list)
+    energia_agregada: list[EnergiaAgregadaDTO] = Field(default_factory=list)
+
+
+class PuntoPotenciaNodoUnifilarDTO(BaseModel):
+    momento: FechaHoraUTC
+    potencia_activa_total_w: float | None = None
+    dispositivos_sin_dato: list[str] = Field(default_factory=list)

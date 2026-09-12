@@ -24,7 +24,7 @@ from src.domain.telemetria.entities import (
     Planta,
     ZonaPlanta,
 )
-from src.domain.telemetria.exceptions import CoordenadaInvalidaError
+from src.domain.telemetria.exceptions import CoordenadaInvalidaError, EstructuraUnifilarInvalidaError
 from src.domain.telemetria.ports import RepositorioOrganizacionesPort
 from src.domain.telemetria.value_objects import (
     CoordenadasZona,
@@ -245,6 +245,52 @@ def test_gestionar_unifilar_use_case():
     res_default = use_case.obtener_unifilar()
     assert res_default.planta_id == "plant-1"
     assert len(res_default.nodos) == 3
+
+
+def test_guardar_unifilar_con_nodo_virtual_marca_es_virtual():
+    repo = MockOrganizacionesRepo()
+    repo.guardar_planta(Planta(id="plant-1", organizacion_id="org-1", nombre="Planta Durax"))
+    use_case = GestionarPlantaEstructuraUseCase(repo)
+
+    req = GuardarUnifilarRequestDTO(
+        nodos=[
+            NodoUnifilarDTO(id="mt", nombre="Acometida MT", tipo="acometida", tension_nominal_V=13200.0),
+            NodoUnifilarDTO(
+                id="t1",
+                parent_id="mt",
+                nombre="Trafo 1",
+                tipo="transformador",
+                device_id="dev-1",
+                tension_nominal_V=380.0,
+            ),
+        ]
+    )
+    res = use_case.guardar_unifilar("plant-1", req)
+    por_id = {n.id: n for n in res.nodos}
+    assert por_id["mt"].es_virtual is True
+    assert por_id["t1"].es_virtual is False
+
+
+def test_guardar_unifilar_rechaza_padre_colgante_y_ciclo():
+    repo = MockOrganizacionesRepo()
+    repo.guardar_planta(Planta(id="plant-1", organizacion_id="org-1", nombre="Planta Durax"))
+    use_case = GestionarPlantaEstructuraUseCase(repo)
+
+    colgante = GuardarUnifilarRequestDTO(
+        nodos=[NodoUnifilarDTO(id="t1", parent_id="no-existe", nombre="T1", tipo="carga", tension_nominal_V=380.0)]
+    )
+    with pytest.raises(EstructuraUnifilarInvalidaError):
+        use_case.guardar_unifilar("plant-1", colgante)
+
+    ciclo = GuardarUnifilarRequestDTO(
+        nodos=[
+            NodoUnifilarDTO(id="a", parent_id="b", nombre="A", tipo="carga", tension_nominal_V=380.0),
+            NodoUnifilarDTO(id="b", parent_id="a", nombre="B", tipo="carga", tension_nominal_V=380.0),
+        ]
+    )
+    with pytest.raises(EstructuraUnifilarInvalidaError):
+        use_case.guardar_unifilar("plant-1", ciclo)
+    assert repo.nodos_unifilar.get("plant-1", []) == []
 
 
 def test_gestionar_layout_use_case():

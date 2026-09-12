@@ -12,11 +12,17 @@ from src.application.dtos.planta_estructura_dto import (
     LayoutPlantaDTO,
     NodoUnifilarDTO,
     PosicionLayoutDTO,
+    ResumenNodoUnifilarDTO,
     UnifilarPlantaDTO,
     ZonaPlantaDTO,
 )
-from src.domain.telemetria.exceptions import PlantaNoEncontradaError
+from src.domain.telemetria.exceptions import (
+    EstructuraUnifilarInvalidaError,
+    NodoUnifilarNoEncontradoError,
+    PlantaNoEncontradaError,
+)
 from src.infrastructure.fastapi.dependencies import (
+    get_consultar_nodo_unifilar_use_case,
     get_planta_estructura_use_case,
     get_usuario_actual,
 )
@@ -73,6 +79,7 @@ def _cliente(rol: str = "admin") -> tuple[TestClient, MagicMock]:
     app = create_app()
     mock_use_case = MagicMock()
     app.dependency_overrides[get_planta_estructura_use_case] = lambda: mock_use_case
+    app.dependency_overrides[get_consultar_nodo_unifilar_use_case] = lambda: mock_use_case
     app.dependency_overrides[get_usuario_actual] = lambda: {
         "sub": "u1",
         "rol": rol,
@@ -469,3 +476,70 @@ def test_get_areas_estadisticas_by_planta_exitoso():
     assert response.status_code == 200
     mock_use_case.obtener_areas_estadisticas.assert_called_once_with(planta_id="planta-durax")
     assert response.json()["planta_id"] == "planta-durax"
+
+
+# ============================================================================
+# TELEMETRÍA AGREGADA POR NODO DEL UNIFILAR
+# ============================================================================
+
+
+def test_put_unifilar_invalido_devuelve_422():
+    client, mock_use_case = _cliente()
+    mock_use_case.guardar_unifilar.side_effect = EstructuraUnifilarInvalidaError("ciclo")
+
+    response = client.put(
+        "/api/v1/plantas/planta-1/unifilar",
+        json={"nodos": [{"id": "a", "parent_id": "a", "nombre": "A", "tipo": "carga", "tension_nominal_V": 380.0}]},
+    )
+
+    assert response.status_code == 422
+
+
+def test_resumen_nodo_unifilar_exitoso():
+    client, mock_use_case = _cliente()
+    mock_use_case.resumen.return_value = ResumenNodoUnifilarDTO(
+        planta_id="planta-1",
+        nodo_id="mt",
+        es_virtual=True,
+        dispositivos_ids=["dev-1", "dev-2"],
+        potencia_activa_total_w=450000.0,
+    )
+
+    response = client.get("/api/v1/plantas/planta-1/unifilar/nodos/mt/resumen?granularity=day&dias=7")
+
+    assert response.status_code == 200
+    mock_use_case.resumen.assert_called_once_with("planta-1", "mt", "org-1", "day", "America/Argentina/Buenos_Aires", 7)
+    data = response.json()
+    assert data["es_virtual"] is True
+    assert data["dispositivos_ids"] == ["dev-1", "dev-2"]
+    assert data["potencia_activa_total_w"] == 450000.0
+
+
+def test_resumen_nodo_unifilar_superadmin_sin_org():
+    client, mock_use_case = _cliente(rol="superadmin")
+    mock_use_case.resumen.return_value = ResumenNodoUnifilarDTO(planta_id="planta-1", nodo_id="mt", es_virtual=True)
+
+    response = client.get("/api/v1/plantas/planta-1/unifilar/nodos/mt/resumen")
+
+    assert response.status_code == 200
+    assert mock_use_case.resumen.call_args.args[2] is None
+
+
+def test_resumen_nodo_unifilar_no_encontrado():
+    client, mock_use_case = _cliente()
+    mock_use_case.resumen.side_effect = NodoUnifilarNoEncontradoError("no existe")
+
+    response = client.get("/api/v1/plantas/planta-1/unifilar/nodos/x/resumen")
+
+    assert response.status_code == 404
+
+
+def test_historico_nodo_unifilar_exitoso():
+    client, mock_use_case = _cliente()
+    mock_use_case.historico.return_value = []
+
+    response = client.get("/api/v1/plantas/planta-1/unifilar/nodos/mt/resumen/historico?hours=6&granularity=15m")
+
+    assert response.status_code == 200
+    mock_use_case.historico.assert_called_once_with("planta-1", "mt", "org-1", "15m", 6)
+    assert response.json() == []

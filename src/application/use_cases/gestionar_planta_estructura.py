@@ -13,6 +13,7 @@ from src.application.mappers.planta_estructura_mapper import PlantaEstructuraMap
 from src.domain.telemetria.entities import Planta
 from src.domain.telemetria.exceptions import PlantaNoEncontradaError
 from src.domain.telemetria.ports import RepositorioOrganizacionesPort
+from src.domain.telemetria.servicios.arbol_unifilar import ArbolUnifilarService
 
 
 class GestionarPlantaEstructuraUseCase:
@@ -43,6 +44,7 @@ class GestionarPlantaEstructuraUseCase:
     def guardar_unifilar(self, planta_id: str, dto: GuardarUnifilarRequestDTO) -> UnifilarPlantaDTO:
         planta = self._resolver_planta(planta_id)
         entidades = [PlantaEstructuraMapper.dto_to_nodo(n, planta.id) for n in dto.nodos]
+        ArbolUnifilarService(entidades).validar()
         guardados = self.repo_organizaciones.guardar_nodos_unifilar(planta.id, entidades)
         return UnifilarPlantaDTO(
             planta_id=planta.id,

@@ -60,7 +60,7 @@ class GestionarDispositivosUseCase:
 
     def _enriquecer_dispositivo(self, dev: Dispositivo) -> DispositivoResponseDTO:
         area_id = None
-        linea_id = None
+        nodo_unifilar_id = None
         if dev.planta_id and self.repo_organizaciones:
             try:
                 disps_layout = self.repo_organizaciones.obtener_dispositivos_layout(dev.planta_id)
@@ -80,11 +80,11 @@ class GestionarDispositivosUseCase:
                     None,
                 )
                 if nodo:
-                    linea_id = nodo.parent_id or nodo.id
+                    nodo_unifilar_id = nodo.parent_id or nodo.id
             except Exception:
                 pass
 
-        return DispositivoMapper.to_dto(dev, area_id=area_id, linea_id=linea_id)
+        return DispositivoMapper.to_dto(dev, area_id=area_id, nodo_unifilar_id=nodo_unifilar_id)
 
     def listar_dispositivos(
         self, planta_id: str | None = None, organizacion_id: str | None = None

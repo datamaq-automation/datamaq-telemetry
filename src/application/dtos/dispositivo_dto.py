@@ -11,7 +11,7 @@ class DispositivoBaseDTO(BaseModel):
     modelo: str = "SmartPlus"
     planta_id: str | None = None
     area_id: str | None = None
-    linea_id: str | None = None
+    nodo_unifilar_id: str | None = None
     numero_serie: str | None = None
     version_hw: str | None = None
     version_fw: str | None = None
@@ -38,7 +38,7 @@ class DispositivoUpdateDTO(BaseModel):
     esta_activo: bool | None = None
     planta_id: str | None = None
     area_id: str | None = None
-    linea_id: str | None = None
+    nodo_unifilar_id: str | None = None
 
 
 DispositivoActualizarDTO = DispositivoUpdateDTO

@@ -67,3 +67,11 @@ class DispositivoDePlantaDistintaError(DominioTelemetriaException):
 
 class LimiteGruposExcedidoError(DominioTelemetriaException):
     """Lanzada cuando una planta intenta crear más grupos de dispositivos que el tope permitido."""
+
+
+class NodoUnifilarNoEncontradoError(DominioTelemetriaException):
+    """Lanzada cuando se intenta operar con un nodo del unifilar que no existe en la planta."""
+
+
+class EstructuraUnifilarInvalidaError(DominioTelemetriaException):
+    """Lanzada cuando el árbol del unifilar tiene ids duplicados, padres colgantes o ciclos."""

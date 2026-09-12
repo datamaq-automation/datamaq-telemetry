@@ -1,4 +1,4 @@
-"""tests/unit/test_dispositivos_area_mapping.py — Test de verificación para area_id y linea_id en DTO Dispositivo."""
+"""tests/unit/test_dispositivos_area_mapping.py — Test de verificación para area_id y nodo_unifilar_id en DTO Dispositivo."""
 
 from unittest.mock import MagicMock
 
@@ -8,7 +8,7 @@ from src.domain.telemetria.value_objects import MacAddress
 from src.infrastructure.yaml.repositories.organizaciones_repository import YamlOrganizacionesRepository
 
 
-def test_dispositivo_area_id_and_linea_id_mapping():
+def test_dispositivo_area_id_and_nodo_unifilar_id_mapping():
     yaml_repo = YamlOrganizacionesRepository(data_dir="data")
     mock_dev_repo = MagicMock()
 
@@ -35,7 +35,7 @@ def test_dispositivo_area_id_and_linea_id_mapping():
 
     assert len(dtos) == 2
     assert dtos[0].area_id == "area-durax-trafo-1"
-    assert dtos[0].linea_id == "nodo-durax-trifasico-1"
+    assert dtos[0].nodo_unifilar_id == "nodo-durax-acometida-mt"
 
     assert dtos[1].area_id == "area-durax-trafo-2"
-    assert dtos[1].linea_id == "nodo-durax-trifasico-1"
+    assert dtos[1].nodo_unifilar_id == "nodo-durax-acometida-mt"

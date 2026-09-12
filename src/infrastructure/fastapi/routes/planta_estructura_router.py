@@ -9,12 +9,16 @@ from src.application.dtos.planta_estructura_dto import (
     GuardarUnifilarRequestDTO,
     LayoutPlantaDTO,
     PlantaAreasEstadisticasResponseDTO,
+    PuntoPotenciaNodoUnifilarDTO,
+    ResumenNodoUnifilarDTO,
     UnifilarPlantaDTO,
 )
+from src.application.use_cases.consultar_nodo_unifilar import ConsultarNodoUnifilarUseCase
 from src.application.use_cases.gestionar_planta_estructura import (
     GestionarPlantaEstructuraUseCase,
 )
 from src.infrastructure.fastapi.dependencies import (
+    get_consultar_nodo_unifilar_use_case,
     get_planta_estructura_use_case,
     get_usuario_actual,
     requiere_rol_escritura,
@@ -74,6 +78,42 @@ def update_unifilar(
 ):
     try:
         return use_case.guardar_unifilar(planta_id=planta_id, dto=dto)
+    except Exception as e:
+        manejar_error_http(e)
+
+
+@router.get("/plantas/{planta_id}/unifilar/nodos/{nodo_id}/resumen", response_model=ResumenNodoUnifilarDTO)
+def resumen_nodo_unifilar(
+    planta_id: str,
+    nodo_id: str,
+    use_case: Annotated[ConsultarNodoUnifilarUseCase, Depends(get_consultar_nodo_unifilar_use_case)],
+    claims: Annotated[dict, Depends(get_usuario_actual)],
+    granularity: str = "day",
+    timezone: str = "America/Argentina/Buenos_Aires",
+    dias: int | None = None,
+):
+    try:
+        org_id = _resolver_org_id(claims)
+        return use_case.resumen(planta_id, nodo_id, org_id, granularity, timezone, dias)
+    except Exception as e:
+        manejar_error_http(e)
+
+
+@router.get(
+    "/plantas/{planta_id}/unifilar/nodos/{nodo_id}/resumen/historico",
+    response_model=list[PuntoPotenciaNodoUnifilarDTO],
+)
+def historico_nodo_unifilar(
+    planta_id: str,
+    nodo_id: str,
+    use_case: Annotated[ConsultarNodoUnifilarUseCase, Depends(get_consultar_nodo_unifilar_use_case)],
+    claims: Annotated[dict, Depends(get_usuario_actual)],
+    hours: int = 24,
+    granularity: str = "5m",
+):
+    try:
+        org_id = _resolver_org_id(claims)
+        return use_case.historico(planta_id, nodo_id, org_id, granularity, hours)
     except Exception as e:
         manejar_error_http(e)
 

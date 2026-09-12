@@ -52,19 +52,26 @@ organizaciones:
             zona_id: "area-durax-trafo-2"
             posicion: { x: 70, y: 30 }
         nodos_unifilar:
+          # Nodo virtual: punto de medición en MT de la distribuidora, sin medidor propio.
+          # Su valor es la suma de los dos trafos (medidores frontera).
+          - id: "nodo-durax-acometida-mt"
+            nombre: "Acometida MT"
+            tipo: "acometida"
+            tension_nominal_v: 13200.0  # asumido, pendiente de confirmar (ver tmp/dudas.md)
           - id: "nodo-durax-trifasico-1"
             nombre: "SmartPlus Trifásico #1"
             tipo: "transformador"
             tension_nominal_v: 380.0
+            parent_id: "nodo-durax-acometida-mt"
             device_id: "51048a93-f1f3-4283-a708-24cbd39c7192"
             potencia_nominal_kw: 300.0
             uso_significativo: true
             categoria_uso: "FUERZA_MOTRIZ"
           - id: "nodo-durax-powermeter-bf2c"
             nombre: "Powermeter-BF2C"
-            tipo: "carga"
+            tipo: "transformador"
             tension_nominal_v: 380.0
-            parent_id: "nodo-durax-trifasico-1"
+            parent_id: "nodo-durax-acometida-mt"
             device_id: "b5f4bcd6-b017-4796-bb3d-efcfb50dc8f0"
             potencia_nominal_kw: 150.0
             uso_significativo: true

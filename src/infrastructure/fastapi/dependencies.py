@@ -13,6 +13,7 @@ from src.application.use_cases.analizar_consumo import AnalizarConsumoUseCase
 from src.application.use_cases.atribuir_consumo import AtribuirConsumoUseCase
 from src.application.use_cases.caracterizar_carga import CaracterizarCargaUseCase
 from src.application.use_cases.consultar_grupo_dispositivos import ConsultarGrupoDispositivosUseCase
+from src.application.use_cases.consultar_nodo_unifilar import ConsultarNodoUnifilarUseCase
 from src.application.use_cases.consultar_telemetria import ConsultarTelemetriaUseCase
 from src.application.use_cases.exportar_cargas import ExportarCargasUseCase
 from src.application.use_cases.exportar_disponibilidad import ExportarDisponibilidadUseCase
@@ -258,6 +259,16 @@ def get_planta_estructura_use_case(
 ) -> GestionarPlantaEstructuraUseCase:
     repo_org = YamlOrganizacionesRepository()
     return GestionarPlantaEstructuraUseCase(repo_org)
+
+
+def get_consultar_nodo_unifilar_use_case(
+    db: Annotated[Session, Depends(get_db_session)],
+) -> ConsultarNodoUnifilarUseCase:
+    return ConsultarNodoUnifilarUseCase(
+        YamlOrganizacionesRepository(),
+        MySQLTelemetriaRepository(db),
+        get_telemetria_use_case(db),
+    )
 
 
 def get_usuarios_repository(

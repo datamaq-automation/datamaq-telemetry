@@ -35,6 +35,7 @@ class PlantaEstructuraMapper:
             nombre=entity.nombre,
             tipo=tipo_val,
             device_id=entity.device_id,
+            es_virtual=entity.device_id is None,
             tension_nominal_V=entity.tension_nominal_v,
             capacidad_nominal_kVA=entity.capacidad_nominal_kva,
             potencia_nominal_kw=entity.potencia_nominal_kw,
