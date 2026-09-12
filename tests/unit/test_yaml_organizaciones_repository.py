@@ -86,3 +86,26 @@ organizaciones:
     assert len(layout) == 1
     assert layout[0].device_id == "dev-t1"
     assert layout[0].posicion.x_porcentaje == 10.0
+
+
+def test_yaml_organizaciones_repository_casos_borde(tmp_path):
+    subfolder = tmp_path / "corrupted"
+    subfolder.mkdir()
+
+    # Archivo vacío
+    file_empty = subfolder / "empty.yml"
+    file_empty.write_text("", encoding="utf-8")
+
+    # Archivo inválido
+    file_invalid = subfolder / "invalid.yml"
+    file_invalid.write_text("::: invalid yaml content :::", encoding="utf-8")
+
+    # Archivo dict sin id
+    file_no_id = subfolder / "no_id.yml"
+    file_no_id.write_text("foo: bar", encoding="utf-8")
+
+    repo = YamlOrganizacionesRepository(data_dir=str(tmp_path))
+    assert repo.listar_organizaciones() == []
+    assert repo.obtener_por_id("any") is None
+    assert repo.listar_plantas() == []
+    assert repo.obtener_planta_por_id("any") is None
