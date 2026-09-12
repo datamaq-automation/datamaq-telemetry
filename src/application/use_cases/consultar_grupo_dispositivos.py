@@ -52,6 +52,9 @@ class ConsultarGrupoDispositivosUseCase:
         return ResumenGrupoDispositivosDTO(
             grupo_id=grupo_id,
             potencia_activa_total_w=potencia_sumada.potencia_activa_total_w,
+            potencia_reactiva_total_var=potencia_sumada.potencia_reactiva_total_var,
+            potencia_aparente_total_va=potencia_sumada.potencia_aparente_total_va,
+            factor_desplazamiento_total=potencia_sumada.factor_desplazamiento_total,
             dispositivos_sin_dato=potencia_sumada.dispositivos_sin_dato,
             energia_agregada=[
                 EnergiaAgregadaDTO(periodo=e.periodo, energia_activa_neta_kwh=e.energia_activa_neta_kwh)
@@ -79,7 +82,8 @@ class ConsultarGrupoDispositivosUseCase:
                 dispositivo_id, limite=2000, granularidad=granularidad, horas=horas
             )
             lecturas_por_dispositivo[dispositivo_id] = [
-                (lectura.registrado_en, lectura.potencia_activa_total_W) for lectura in lecturas_dto
+                (lectura.registrado_en, lectura.potencia_activa_total_W, lectura.potencia_reactiva_total_VAR)
+                for lectura in lecturas_dto
             ]
 
         puntos = AgregadorGrupoDispositivosService.sumar_potencia_en_el_tiempo(
@@ -89,6 +93,9 @@ class ConsultarGrupoDispositivosUseCase:
             PuntoPotenciaGrupoDTO(
                 momento=p.momento,
                 potencia_activa_total_w=p.potencia_activa_total_w,
+                potencia_reactiva_total_var=p.potencia_reactiva_total_var,
+                potencia_aparente_total_va=p.potencia_aparente_total_va,
+                factor_desplazamiento_total=p.factor_desplazamiento_total,
                 dispositivos_sin_dato=p.dispositivos_sin_dato,
             )
             for p in puntos

@@ -101,6 +101,9 @@ class ResumenNodoUnifilarDTO(BaseModel):
     es_virtual: bool
     dispositivos_ids: list[str] = Field(default_factory=list)
     potencia_activa_total_w: float | None = None
+    potencia_reactiva_total_var: float | None = None
+    potencia_aparente_total_va: float | None = None
+    factor_desplazamiento_total: float | None = None
     dispositivos_sin_dato: list[str] = Field(default_factory=list)
     energia_agregada: list[EnergiaAgregadaDTO] = Field(default_factory=list)
 
@@ -108,4 +111,7 @@ class ResumenNodoUnifilarDTO(BaseModel):
 class PuntoPotenciaNodoUnifilarDTO(BaseModel):
     momento: FechaHoraUTC
     potencia_activa_total_w: float | None = None
+    potencia_reactiva_total_var: float | None = None
+    potencia_aparente_total_va: float | None = None
+    factor_desplazamiento_total: float | None = None
     dispositivos_sin_dato: list[str] = Field(default_factory=list)

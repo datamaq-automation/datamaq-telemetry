@@ -29,6 +29,9 @@ class AgregarMiembroGrupoDTO(BaseModel):
 class ResumenGrupoDispositivosDTO(BaseModel):
     grupo_id: str
     potencia_activa_total_w: float | None = None
+    potencia_reactiva_total_var: float | None = None
+    potencia_aparente_total_va: float | None = None
+    factor_desplazamiento_total: float | None = None
     dispositivos_sin_dato: list[str] = []
     energia_agregada: list[EnergiaAgregadaDTO] = []
 
@@ -36,4 +39,7 @@ class ResumenGrupoDispositivosDTO(BaseModel):
 class PuntoPotenciaGrupoDTO(BaseModel):
     momento: FechaHoraUTC
     potencia_activa_total_w: float | None = None
+    potencia_reactiva_total_var: float | None = None
+    potencia_aparente_total_va: float | None = None
+    factor_desplazamiento_total: float | None = None
     dispositivos_sin_dato: list[str] = []

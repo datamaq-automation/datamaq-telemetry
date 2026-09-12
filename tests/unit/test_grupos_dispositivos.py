@@ -163,8 +163,10 @@ class TestGestionarGruposDispositivosUseCase:
             use_case.crear_grupo(dto)
 
 
-def _lectura(dispositivo_id: str, vatios: float) -> LecturaInstantanea:
+def _lectura(dispositivo_id: str, vatios: float, var: float | None = None) -> LecturaInstantanea:
     from datetime import datetime, timezone
+
+    from src.domain.telemetria.value_objects import PotenciaReactiva
 
     return LecturaInstantanea(
         id=None,
@@ -174,6 +176,7 @@ def _lectura(dispositivo_id: str, vatios: float) -> LecturaInstantanea:
         fase_s=MedicionFase(),
         fase_t=MedicionFase(),
         potencia_activa_total=PotenciaActiva(vatios),
+        potencia_reactiva_total=PotenciaReactiva(var) if var is not None else None,
     )
 
 
@@ -183,6 +186,57 @@ class TestAgregadorGrupoDispositivosService:
         resultado = AgregadorGrupoDispositivosService.sumar_ultimas_lecturas(lecturas)
         assert resultado.potencia_activa_total_w == 2500.0
         assert resultado.dispositivos_sin_dato == []
+
+    def test_suma_p_y_q_por_separado_y_recompone_s_y_fp(self):
+        # P = 3000+1000 = 4000 W; Q = 4000 + (-1000) = 3000 var (capacitiva resta) → S = 5000 VA, FP = 0.8
+        lecturas = {
+            "trafo-01": _lectura("trafo-01", 3000.0, var=4000.0),
+            "trafo-02": _lectura("trafo-02", 1000.0, var=-1000.0),
+        }
+        resultado = AgregadorGrupoDispositivosService.sumar_ultimas_lecturas(lecturas)
+        assert resultado.potencia_activa_total_w == 4000.0
+        assert resultado.potencia_reactiva_total_var == 3000.0
+        assert resultado.potencia_aparente_total_va == 5000.0
+        assert resultado.factor_desplazamiento_total == 0.8
+
+    def test_s_no_es_suma_de_las_s_individuales(self):
+        # S1 = 5000 (3000+4000j), S2 = 5000 (3000-4000j); suma vectorial: P=6000, Q=0 → S=6000, no 10000
+        lecturas = {
+            "trafo-01": _lectura("trafo-01", 3000.0, var=4000.0),
+            "trafo-02": _lectura("trafo-02", 3000.0, var=-4000.0),
+        }
+        resultado = AgregadorGrupoDispositivosService.sumar_ultimas_lecturas(lecturas)
+        assert resultado.potencia_aparente_total_va == 6000.0
+        assert resultado.factor_desplazamiento_total == 1.0
+
+    def test_q_parcial_deja_q_s_y_fp_en_none(self):
+        lecturas = {
+            "trafo-01": _lectura("trafo-01", 3000.0, var=4000.0),
+            "trafo-02": _lectura("trafo-02", 1000.0),
+        }
+        resultado = AgregadorGrupoDispositivosService.sumar_ultimas_lecturas(lecturas)
+        assert resultado.potencia_activa_total_w == 4000.0
+        assert resultado.potencia_reactiva_total_var is None
+        assert resultado.potencia_aparente_total_va is None
+        assert resultado.factor_desplazamiento_total is None
+
+    def test_sumar_potencia_en_el_tiempo_recompone_s_y_fp_por_bucket(self):
+        from datetime import datetime, timezone
+
+        base = datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc)
+        lecturas = {
+            "trafo-01": [(base, 3000.0, 4000.0), (base.replace(minute=5), 1000.0, None)],
+            "trafo-02": [(base, 1000.0, -1000.0), (base.replace(minute=5), 1000.0, 500.0)],
+        }
+        resultado = AgregadorGrupoDispositivosService.sumar_potencia_en_el_tiempo(lecturas, intervalo_segundos=300)
+        assert resultado[0].potencia_activa_total_w == 4000.0
+        assert resultado[0].potencia_reactiva_total_var == 3000.0
+        assert resultado[0].potencia_aparente_total_va == 5000.0
+        assert resultado[0].factor_desplazamiento_total == 0.8
+        # Segundo bucket: trafo-01 sin Q → no se recompone
+        assert resultado[1].potencia_activa_total_w == 2000.0
+        assert resultado[1].potencia_reactiva_total_var is None
+        assert resultado[1].factor_desplazamiento_total is None
 
     def test_suma_tolera_desalineamiento_y_avisa_dispositivo_sin_dato(self):
         lecturas = {"trafo-01": _lectura("trafo-01", 1000.0), "trafo-02": None}
