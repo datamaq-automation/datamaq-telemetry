@@ -1,4 +1,5 @@
 """src/domain/telemetria/servicios/persistencia_alertas.py."""
+
 import threading
 from datetime import datetime, timezone
 from typing import Any

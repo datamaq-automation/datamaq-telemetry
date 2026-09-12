@@ -1,4 +1,5 @@
 """src/domain/telemetria/servicios/evaluador_alertas_calidad.py."""
+
 from datetime import datetime, timezone
 
 from src.domain.telemetria.entities import AlertaDispositivo, LecturaInstantanea

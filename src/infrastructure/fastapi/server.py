@@ -1,4 +1,5 @@
 """src/infrastructure/fastapi/server.py."""
+
 import asyncio
 import json
 import time

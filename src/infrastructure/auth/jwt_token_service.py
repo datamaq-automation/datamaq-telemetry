@@ -1,4 +1,5 @@
 """src/infrastructure/auth/jwt_token_service.py."""
+
 import base64
 import hashlib
 import hmac

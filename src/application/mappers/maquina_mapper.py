@@ -1,4 +1,5 @@
 """src/application/mappers/maquina_mapper.py."""
+
 from src.application.dtos.maquina_dto import MaquinaCreateDTO, MaquinaResponseDTO
 from src.domain.disponibilidad.entities import Maquina
 

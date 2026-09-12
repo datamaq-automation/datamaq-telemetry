@@ -1,4 +1,5 @@
 """src/domain/disponibilidad/servicios/clasificador_disponibilidad.py."""
+
 from src.domain.disponibilidad.value_objects import EstadoMaquina
 
 

@@ -1,4 +1,5 @@
 """src/main.py."""
+
 from src.infrastructure.fastapi.server import create_app
 from src.infrastructure.settings.config import get_settings
 from src.infrastructure.settings.logger import setup_logging

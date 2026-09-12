@@ -1,4 +1,5 @@
 """tests/unit/test_alertas.py."""
+
 from datetime import datetime, timedelta, timezone
 
 import pytest

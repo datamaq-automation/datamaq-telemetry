@@ -1,4 +1,5 @@
 """src/infrastructure/fastapi/routes/organizaciones_router.py."""
+
 from typing import Annotated
 
 from fastapi import APIRouter, Depends

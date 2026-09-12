@@ -1,4 +1,5 @@
 """tests/unit/test_auth_2fa.py."""
+
 from datetime import datetime, timedelta, timezone
 
 import pyotp

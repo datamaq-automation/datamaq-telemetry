@@ -1,4 +1,5 @@
 """src/application/use_cases/exportar_telemetria.py."""
+
 from collections.abc import Generator
 from datetime import datetime
 

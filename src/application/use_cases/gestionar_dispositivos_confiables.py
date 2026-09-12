@@ -1,4 +1,5 @@
 """src/application/use_cases/gestionar_dispositivos_confiables.py."""
+
 from src.domain.auth.ports import RepositorioDispositivosConfiablesPort
 
 

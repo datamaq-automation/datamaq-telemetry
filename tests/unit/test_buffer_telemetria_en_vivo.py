@@ -1,4 +1,5 @@
 """tests/unit/test_buffer_telemetria_en_vivo.py."""
+
 from src.adapters.gateways.in_memory_telemetria_buffer import InMemoryTelemetriaBuffer
 
 

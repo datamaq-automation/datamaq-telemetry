@@ -1,4 +1,6 @@
 """src/domain/asistente/exceptions.py."""
+
+
 class DominioAsistenteException(Exception):
     """Excepción base del dominio del asistente conversacional."""
 

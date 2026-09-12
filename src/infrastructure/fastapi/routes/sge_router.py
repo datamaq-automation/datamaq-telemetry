@@ -1,4 +1,5 @@
 """src/infrastructure/fastapi/routes/sge_router.py."""
+
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query

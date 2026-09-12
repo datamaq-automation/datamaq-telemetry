@@ -1,4 +1,5 @@
 """src/application/mappers/alerta_mapper.py."""
+
 from src.application.dtos.alerta_dto import AlertaResponseDTO
 from src.domain.telemetria.entities import AlertaDispositivo
 

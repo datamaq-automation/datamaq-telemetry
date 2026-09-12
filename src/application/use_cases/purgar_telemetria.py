@@ -1,4 +1,5 @@
 """src/application/use_cases/purgar_telemetria.py."""
+
 import time
 from datetime import datetime, timedelta, timezone
 

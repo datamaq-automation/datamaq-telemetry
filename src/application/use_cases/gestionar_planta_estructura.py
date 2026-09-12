@@ -1,4 +1,5 @@
 """src/application/use_cases/gestionar_planta_estructura.py."""
+
 from src.application.dtos.planta_estructura_dto import (
     GuardarLayoutRequestDTO,
     GuardarUnifilarRequestDTO,

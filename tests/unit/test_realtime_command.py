@@ -1,4 +1,5 @@
 """tests/unit/test_realtime_command.py."""
+
 from unittest.mock import MagicMock, patch
 
 from starlette.testclient import TestClient

@@ -1,4 +1,5 @@
 """src/application/dtos/grupo_dispositivos_dto.py."""
+
 from pydantic import BaseModel, ConfigDict
 
 from src.application.dtos.telemetria_dto import EnergiaAgregadaDTO

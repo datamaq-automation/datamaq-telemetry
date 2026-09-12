@@ -1,4 +1,5 @@
 """src/application/use_cases/gestionar_usuarios.py."""
+
 import uuid
 
 from src.domain.auth.entities import UsuarioAuth

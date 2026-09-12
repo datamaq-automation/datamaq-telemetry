@@ -1,4 +1,5 @@
 """src/domain/asistente/entities.py."""
+
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Literal

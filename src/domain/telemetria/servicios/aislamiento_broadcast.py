@@ -1,4 +1,6 @@
 """src/domain/telemetria/servicios/aislamiento_broadcast.py."""
+
+
 def debe_recibir_evento(
     es_superadmin: bool,
     organizacion_cliente: str | None,

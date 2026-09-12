@@ -1,4 +1,5 @@
 """src/adapters/gateways/in_memory_documentacion_sge_repository.py."""
+
 from src.domain.sge.entities import ArticuloSge
 from src.domain.sge.ports import RepositorioDocumentacionSgePort
 

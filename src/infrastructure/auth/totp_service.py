@@ -1,4 +1,5 @@
 """src/infrastructure/auth/totp_service.py."""
+
 import io
 
 import pyotp

@@ -1,4 +1,5 @@
 """src/application/dtos/planta_estructura_dto.py."""
+
 from pydantic import BaseModel, ConfigDict, Field
 
 

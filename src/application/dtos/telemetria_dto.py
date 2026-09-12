@@ -1,4 +1,5 @@
 """src/application/dtos/telemetria_dto.py."""
+
 from datetime import date
 from typing import Any
 

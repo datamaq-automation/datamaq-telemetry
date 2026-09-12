@@ -1,4 +1,6 @@
 """src/domain/sge/exceptions.py."""
+
+
 class DominioSgeException(Exception):
     """Excepción base del dominio SGE ISO 50001."""
 

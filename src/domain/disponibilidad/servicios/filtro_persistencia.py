@@ -1,4 +1,5 @@
 """src/domain/disponibilidad/servicios/filtro_persistencia.py."""
+
 import threading
 from datetime import datetime
 from typing import Any

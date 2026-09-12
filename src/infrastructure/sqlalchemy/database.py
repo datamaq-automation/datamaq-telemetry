@@ -1,4 +1,5 @@
 """src/infrastructure/sqlalchemy/database.py."""
+
 from collections.abc import Generator
 from functools import lru_cache
 from pathlib import Path

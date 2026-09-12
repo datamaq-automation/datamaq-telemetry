@@ -1,4 +1,5 @@
 """src/infrastructure/fastapi/routes/disponibilidad_router.py."""
+
 from datetime import datetime
 from typing import Annotated, Any
 

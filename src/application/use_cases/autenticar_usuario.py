@@ -1,4 +1,5 @@
 """src/application/use_cases/autenticar_usuario.py."""
+
 from typing import Any
 
 from src.application.dtos.auth_dto import LoginRequestDTO, LoginResponseDTO, MeResponseDTO

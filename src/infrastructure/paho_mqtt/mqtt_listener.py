@@ -1,4 +1,5 @@
 """src/infrastructure/paho_mqtt/mqtt_listener.py."""
+
 import hashlib
 import json
 import time

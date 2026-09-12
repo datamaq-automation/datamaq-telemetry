@@ -1,4 +1,5 @@
 """src/application/dtos/maquina_dto.py."""
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.application.dtos.tipos import FechaHoraUTC

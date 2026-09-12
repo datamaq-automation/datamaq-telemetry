@@ -1,4 +1,5 @@
 """src/application/use_cases/recuperar_contrasena.py."""
+
 import hashlib
 from datetime import datetime, timedelta, timezone
 

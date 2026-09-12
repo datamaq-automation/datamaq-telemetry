@@ -1,4 +1,5 @@
 """src/infrastructure/sqlalchemy/repositories/asistente_repository.py."""
+
 from sqlalchemy.orm import Session
 
 from src.domain.asistente.entities import (

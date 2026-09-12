@@ -1,4 +1,5 @@
 """tests/unit/test_ingestar_automate.py."""
+
 from datetime import datetime, timezone
 from unittest.mock import MagicMock
 

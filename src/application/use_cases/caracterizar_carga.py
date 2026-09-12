@@ -1,4 +1,5 @@
 """src/application/use_cases/caracterizar_carga.py."""
+
 import uuid
 from datetime import datetime, timedelta, timezone
 

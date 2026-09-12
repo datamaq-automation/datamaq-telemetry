@@ -1,4 +1,5 @@
 """tests/unit/test_anomalias_fases_red.py."""
+
 from datetime import datetime, timezone
 
 import pytest

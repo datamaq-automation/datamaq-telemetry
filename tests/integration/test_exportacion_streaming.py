@@ -1,4 +1,5 @@
 """tests/integration/test_exportacion_streaming.py."""
+
 from datetime import datetime, timezone
 from unittest.mock import MagicMock
 

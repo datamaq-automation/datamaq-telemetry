@@ -55,9 +55,7 @@ def find_project_root(start_path: Path | None = None) -> Path:
 def _iter_py_files(directory: Path) -> list[Path]:
     if not directory.exists():
         return []
-    return sorted(
-        p for p in directory.rglob("*.py") if p.name != "__init__.py" and "__pycache__" not in p.parts
-    )
+    return sorted(p for p in directory.rglob("*.py") if p.name != "__init__.py" and "__pycache__" not in p.parts)
 
 
 def _module_name(path: Path, root: Path) -> str:
@@ -279,7 +277,9 @@ def check_deep_inheritance(root: Path) -> list[Finding]:
             path, lineno = class_location[name]
             rel_path = path.relative_to(root).as_posix()
             findings.append(
-                Finding("DEEP_INHERITANCE", rel_path, name, lineno, f"DIT={d} (máximo permitido {MAX_INHERITANCE_DEPTH})")
+                Finding(
+                    "DEEP_INHERITANCE", rel_path, name, lineno, f"DIT={d} (máximo permitido {MAX_INHERITANCE_DEPTH})"
+                )
             )
     return findings
 
@@ -320,7 +320,13 @@ def check_orphan_private_symbols(root: Path) -> list[Finding]:
             # pero por robustez exigimos 0 usos reales fuera de la firma).
             if usage_count[name] == 0:
                 findings.append(
-                    Finding("ORPHAN_PRIVATE_SYMBOL", rel_path, name, lineno, "Declarado pero nunca referenciado en el módulo")
+                    Finding(
+                        "ORPHAN_PRIVATE_SYMBOL",
+                        rel_path,
+                        name,
+                        lineno,
+                        "Declarado pero nunca referenciado en el módulo",
+                    )
                 )
     return findings
 

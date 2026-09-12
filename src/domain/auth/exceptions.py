@@ -1,4 +1,6 @@
 """src/domain/auth/exceptions.py."""
+
+
 class DominioAuthException(Exception):
     """Excepción base del dominio de autenticación."""
 

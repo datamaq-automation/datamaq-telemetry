@@ -61,12 +61,7 @@ def _function_body_loc(node: ast.FunctionDef | ast.AsyncFunctionDef) -> int:
     if not node.body:
         return 0
     start = node.body[0].lineno
-    end = max(
-        getattr(n, "end_lineno", n.lineno)
-        for stmt in node.body
-        for n in ast.walk(stmt)
-        if hasattr(n, "lineno")
-    )
+    end = max(getattr(n, "end_lineno", n.lineno) for stmt in node.body for n in ast.walk(stmt) if hasattr(n, "lineno"))
     return end - start + 1
 
 
@@ -94,9 +89,7 @@ def scan_file(path: Path, root: Path) -> list[Finding]:
         elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             loc = _function_body_loc(node)
             if loc > FUNCTION_LOC_THRESHOLD:
-                findings.append(
-                    Finding("GOD_FUNCTION", rel_path, node.name, node.lineno, loc, FUNCTION_LOC_THRESHOLD)
-                )
+                findings.append(Finding("GOD_FUNCTION", rel_path, node.name, node.lineno, loc, FUNCTION_LOC_THRESHOLD))
 
     return findings
 

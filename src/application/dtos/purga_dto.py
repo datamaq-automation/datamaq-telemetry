@@ -1,4 +1,5 @@
 """src/application/dtos/purga_dto.py."""
+
 from pydantic import BaseModel, Field
 
 from src.application.dtos.tipos import FechaHoraUTC

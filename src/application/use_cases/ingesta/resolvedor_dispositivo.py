@@ -1,4 +1,5 @@
 """src/application/use_cases/ingesta/resolvedor_dispositivo.py."""
+
 import threading
 import uuid
 from datetime import datetime, timezone

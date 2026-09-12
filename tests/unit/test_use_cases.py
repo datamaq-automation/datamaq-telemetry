@@ -1,4 +1,5 @@
 """tests/unit/test_use_cases.py."""
+
 from datetime import datetime, timedelta, timezone
 from typing import Any
 

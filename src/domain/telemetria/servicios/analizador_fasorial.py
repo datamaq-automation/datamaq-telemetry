@@ -1,4 +1,5 @@
 """src/domain/telemetria/servicios/analizador_fasorial.py."""
+
 from __future__ import annotations
 
 import math

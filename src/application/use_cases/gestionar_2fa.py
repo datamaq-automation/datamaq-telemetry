@@ -1,4 +1,5 @@
 """src/application/use_cases/gestionar_2fa.py."""
+
 import uuid
 from datetime import timedelta
 

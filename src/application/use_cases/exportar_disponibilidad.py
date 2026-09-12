@@ -1,4 +1,5 @@
 """src/application/use_cases/exportar_disponibilidad.py."""
+
 from collections.abc import Generator
 from datetime import datetime, timedelta, timezone
 

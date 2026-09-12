@@ -1,4 +1,5 @@
 """src/infrastructure/fastapi/routes/system_router.py."""
+
 from datetime import datetime, timezone
 from typing import Annotated
 

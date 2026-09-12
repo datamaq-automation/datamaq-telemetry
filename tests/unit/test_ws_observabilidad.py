@@ -1,4 +1,5 @@
 """tests/unit/test_ws_observabilidad.py."""
+
 from unittest.mock import patch
 
 from starlette.testclient import TestClient

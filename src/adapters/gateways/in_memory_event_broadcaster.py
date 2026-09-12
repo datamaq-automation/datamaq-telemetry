@@ -1,4 +1,5 @@
 """src/adapters/gateways/in_memory_event_broadcaster.py."""
+
 from collections.abc import Callable
 from typing import Any
 

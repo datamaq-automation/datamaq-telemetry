@@ -1,4 +1,5 @@
 """src/infrastructure/fastapi/routes/telemetria_router.py."""
+
 from datetime import datetime, timedelta
 from datetime import timezone as tz
 from typing import Annotated, Literal

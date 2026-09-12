@@ -1,4 +1,5 @@
 """src/application/use_cases/ingestar_telemetria.py."""
+
 import threading
 from datetime import datetime
 from typing import Any, ClassVar

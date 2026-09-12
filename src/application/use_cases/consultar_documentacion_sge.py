@@ -1,4 +1,5 @@
 """src/application/use_cases/consultar_documentacion_sge.py."""
+
 from src.domain.sge.entities import ArticuloSge
 from src.domain.sge.exceptions import RolNoAutorizadoParaPrevisualizacionError
 from src.domain.sge.ports import RepositorioDocumentacionSgePort

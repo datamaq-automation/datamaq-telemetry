@@ -49,9 +49,7 @@ def upgrade() -> None:
             sa.Column("text", sa.Text(), nullable=False),
             sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.func.now()),
         )
-        op.create_index(
-            "idx_assistant_messages_conversation", "assistant_messages", ["conversation_id", "created_at"]
-        )
+        op.create_index("idx_assistant_messages_conversation", "assistant_messages", ["conversation_id", "created_at"])
 
     if not inspector.has_table("assistant_intent_classifications"):
         op.create_table(

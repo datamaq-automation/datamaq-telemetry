@@ -1,4 +1,5 @@
 """tests/unit/test_metricas_disponibilidad_oee.py."""
+
 from datetime import datetime, timedelta, timezone
 
 import pytest

@@ -1,4 +1,5 @@
 """src/infrastructure/settings/logger.py."""
+
 import logging
 import sys
 from typing import Any

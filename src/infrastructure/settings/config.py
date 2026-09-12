@@ -1,4 +1,5 @@
 """src/infrastructure/settings/config.py."""
+
 import os
 import secrets
 from functools import lru_cache

@@ -1,4 +1,5 @@
 """tests/unit/test_planta_estructura.py."""
+
 import pytest
 from fastapi.testclient import TestClient
 

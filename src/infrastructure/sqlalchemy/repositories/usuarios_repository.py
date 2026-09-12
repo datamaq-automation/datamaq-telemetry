@@ -1,4 +1,5 @@
 """src/infrastructure/sqlalchemy/repositories/usuarios_repository.py."""
+
 from sqlalchemy.orm import Session
 
 from src.domain.auth.entities import UsuarioAuth

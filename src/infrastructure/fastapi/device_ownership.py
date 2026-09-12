@@ -1,4 +1,5 @@
 """src/infrastructure/fastapi/device_ownership.py."""
+
 from typing import Annotated, Any
 
 from fastapi import Depends, HTTPException

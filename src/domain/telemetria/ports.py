@@ -1,4 +1,5 @@
 """src/domain/telemetria/ports.py."""
+
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from datetime import datetime

@@ -1,4 +1,5 @@
 """src/application/dtos/plan_dto.py."""
+
 from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict

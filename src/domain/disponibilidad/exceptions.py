@@ -1,4 +1,6 @@
 """src/domain/disponibilidad/exceptions.py."""
+
+
 class DominioDisponibilidadException(Exception):
     """Excepción base del dominio de disponibilidad de máquina."""
 

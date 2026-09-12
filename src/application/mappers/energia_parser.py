@@ -1,4 +1,5 @@
 """src/application/mappers/energia_parser.py."""
+
 from datetime import datetime
 from typing import Any
 

@@ -1,4 +1,5 @@
 """src/application/use_cases/ingesta/ingestar_automate.py."""
+
 import threading
 import uuid
 from datetime import datetime, timedelta, timezone

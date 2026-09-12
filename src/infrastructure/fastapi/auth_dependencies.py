@@ -1,4 +1,5 @@
 """src/infrastructure/fastapi/auth_dependencies.py."""
+
 from typing import Annotated
 
 from fastapi import Depends

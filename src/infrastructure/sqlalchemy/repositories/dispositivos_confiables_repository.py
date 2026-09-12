@@ -1,4 +1,5 @@
 """src/infrastructure/sqlalchemy/repositories/dispositivos_confiables_repository.py."""
+
 from datetime import datetime
 
 from sqlalchemy.orm import Session

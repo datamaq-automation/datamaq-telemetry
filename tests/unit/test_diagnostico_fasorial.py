@@ -1,4 +1,5 @@
 """tests/unit/test_diagnostico_fasorial.py."""
+
 from datetime import datetime, timezone
 
 from src.domain.telemetria.entities import LecturaInstantanea, MedicionFase

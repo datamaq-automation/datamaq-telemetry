@@ -1,4 +1,5 @@
 """tests/unit/test_sge_documentacion.py."""
+
 from datetime import datetime, timedelta, timezone
 
 import pytest

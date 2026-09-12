@@ -1,4 +1,5 @@
 """src/application/dtos/carga_dto.py."""
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.application.dtos.maquina_dto import RegimenOperacionDTO

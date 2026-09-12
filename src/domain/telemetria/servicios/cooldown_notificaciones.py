@@ -1,4 +1,5 @@
 """src/domain/telemetria/servicios/cooldown_notificaciones.py."""
+
 import threading
 from datetime import datetime, timezone
 

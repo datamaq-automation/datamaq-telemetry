@@ -1,4 +1,5 @@
 """src/application/use_cases/gestionar_dispositivos.py."""
+
 import uuid
 
 from src.application.dtos.dispositivo_dto import (

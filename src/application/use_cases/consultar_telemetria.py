@@ -1,4 +1,5 @@
 """src/application/use_cases/consultar_telemetria.py."""
+
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 

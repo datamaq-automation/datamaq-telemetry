@@ -1,4 +1,5 @@
 """tests/unit/test_auth_ciberdefensa.py."""
+
 import time
 from unittest.mock import MagicMock
 

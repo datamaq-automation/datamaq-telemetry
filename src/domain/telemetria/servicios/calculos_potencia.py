@@ -1,4 +1,5 @@
 """src/domain/telemetria/servicios/calculos_potencia.py."""
+
 import threading
 from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
