@@ -54,14 +54,14 @@ def _planta_dto(**kwargs) -> PlantaResponseDTO:
     return PlantaResponseDTO(**base)
 
 
-def _cliente(rol: str = "admin") -> tuple[TestClient, MagicMock]:
+def _cliente(rol: str = "admin", org: str = "org-1") -> tuple[TestClient, MagicMock]:
     app = create_app()
     mock_use_case = MagicMock()
     app.dependency_overrides[get_dispositivos_use_case] = lambda: mock_use_case
     app.dependency_overrides[get_usuario_actual] = lambda: {
         "sub": "usuario-1",
         "rol": rol,
-        "org": "org-1",
+        "org": org,
     }
     return TestClient(app), mock_use_case
 
@@ -69,8 +69,8 @@ def _cliente(rol: str = "admin") -> tuple[TestClient, MagicMock]:
 # --- LISTAR ORGANIZACIONES ---
 
 
-def test_listar_organizaciones_exitoso():
-    client, mock_use_case = _cliente()
+def test_listar_organizaciones_superadmin():
+    client, mock_use_case = _cliente(rol="superadmin")
     org1 = _org_dto(id="org-1", nombre="Org Alfa")
     org2 = _org_dto(id="org-2", nombre="Org Beta")
     mock_use_case.listar_organizaciones.return_value = [org1, org2]
@@ -84,6 +84,22 @@ def test_listar_organizaciones_exitoso():
     assert data[0]["nombre"] == "Org Alfa"
     assert data[1]["id"] == "org-2"
     assert data[1]["nombre"] == "Org Beta"
+    mock_use_case.listar_organizaciones.assert_called_once()
+
+
+def test_listar_organizaciones_filtrado_por_tenant():
+    client, mock_use_case = _cliente(rol="invitado", org="org-1")
+    org1 = _org_dto(id="org-1", nombre="Org Alfa")
+    org2 = _org_dto(id="org-2", nombre="Org Beta")
+    mock_use_case.listar_organizaciones.return_value = [org1, org2]
+
+    response = client.get("/api/v1/organizaciones")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["id"] == "org-1"
+    assert data[0]["nombre"] == "Org Alfa"
     mock_use_case.listar_organizaciones.assert_called_once()
 
 
@@ -187,8 +203,8 @@ def test_crear_organizacion_payload_invalido_422():
 # --- LISTAR PLANTAS ---
 
 
-def test_listar_plantas_sin_filtro():
-    client, mock_use_case = _cliente()
+def test_listar_plantas_superadmin():
+    client, mock_use_case = _cliente(rol="superadmin")
     planta1 = _planta_dto(id="planta-1", nombre="Planta Norte")
     planta2 = _planta_dto(id="planta-2", nombre="Planta Sur")
     mock_use_case.listar_plantas.return_value = [planta1, planta2]
@@ -205,23 +221,46 @@ def test_listar_plantas_sin_filtro():
     mock_use_case.listar_plantas.assert_called_once_with(None)
 
 
-def test_listar_plantas_con_filtro_organizacion_id():
-    client, mock_use_case = _cliente()
-    planta1 = _planta_dto(id="planta-1", organizacion_id="org-especifica")
+def test_listar_plantas_usuario_regular_aislado():
+    client, mock_use_case = _cliente(rol="admin", org="org-1")
+    planta1 = _planta_dto(id="planta-1", organizacion_id="org-1", nombre="Planta Norte")
     mock_use_case.listar_plantas.return_value = [planta1]
 
-    response = client.get("/api/v1/plantas?organizacion_id=org-especifica")
+    response = client.get("/api/v1/plantas")
 
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 1
     assert data[0]["id"] == "planta-1"
-    assert data[0]["organizacion_id"] == "org-especifica"
-    mock_use_case.listar_plantas.assert_called_once_with("org-especifica")
+    mock_use_case.listar_plantas.assert_called_once_with("org-1")
+
+
+def test_listar_plantas_con_filtro_misma_org():
+    client, mock_use_case = _cliente(rol="invitado", org="org-1")
+    planta1 = _planta_dto(id="planta-1", organizacion_id="org-1")
+    mock_use_case.listar_plantas.return_value = [planta1]
+
+    response = client.get("/api/v1/plantas?organizacion_id=org-1")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["id"] == "planta-1"
+    mock_use_case.listar_plantas.assert_called_once_with("org-1")
+
+
+def test_listar_plantas_con_filtro_otra_org_fail_closed():
+    client, mock_use_case = _cliente(rol="invitado", org="org-1")
+
+    response = client.get("/api/v1/plantas?organizacion_id=org-2")
+
+    assert response.status_code == 200
+    assert response.json() == []
+    mock_use_case.listar_plantas.assert_not_called()
 
 
 def test_listar_plantas_vacio():
-    client, mock_use_case = _cliente()
+    client, mock_use_case = _cliente(rol="superadmin")
     mock_use_case.listar_plantas.return_value = []
 
     response = client.get("/api/v1/plantas")

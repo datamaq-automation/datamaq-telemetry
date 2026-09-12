@@ -94,7 +94,7 @@ def test_get_unifilar_default_exitoso_sin_planta_id():
     response = client.get("/api/v1/planta/unifilar")
 
     assert response.status_code == 200
-    mock_use_case.obtener_unifilar.assert_called_once_with(planta_id=None)
+    mock_use_case.obtener_unifilar.assert_called_once_with(planta_id=None, organizacion_id="org-1")
     data = response.json()
     assert data["planta_id"] == "planta-1"
     assert len(data["nodos"]) == 1
@@ -109,7 +109,7 @@ def test_get_unifilar_default_exitoso_con_planta_id_query():
     response = client.get("/api/v1/planta/unifilar?planta_id=planta-custom")
 
     assert response.status_code == 200
-    mock_use_case.obtener_unifilar.assert_called_once_with(planta_id="planta-custom")
+    mock_use_case.obtener_unifilar.assert_called_once_with(planta_id="planta-custom", organizacion_id="org-1")
     assert response.json()["planta_id"] == "planta-custom"
 
 
@@ -250,7 +250,7 @@ def test_get_layout_default_exitoso_sin_planta_id():
     response = client.get("/api/v1/planta/layout")
 
     assert response.status_code == 200
-    mock_use_case.obtener_layout.assert_called_once_with(planta_id=None)
+    mock_use_case.obtener_layout.assert_called_once_with(planta_id=None, organizacion_id="org-1")
     data = response.json()
     assert data["planta_id"] == "planta-1"
     assert len(data["zonas"]) == 1
@@ -265,7 +265,7 @@ def test_get_layout_default_exitoso_con_planta_id_query():
     response = client.get("/api/v1/planta/layout?planta_id=planta-custom")
 
     assert response.status_code == 200
-    mock_use_case.obtener_layout.assert_called_once_with(planta_id="planta-custom")
+    mock_use_case.obtener_layout.assert_called_once_with(planta_id="planta-custom", organizacion_id="org-1")
     assert response.json()["planta_id"] == "planta-custom"
 
 
@@ -447,7 +447,7 @@ def test_get_areas_estadisticas_default_exitoso():
     response = client.get("/api/v1/planta/areas")
 
     assert response.status_code == 200
-    mock_use_case.obtener_areas_estadisticas.assert_called_once_with(planta_id=None)
+    mock_use_case.obtener_areas_estadisticas.assert_called_once_with(planta_id=None, organizacion_id="org-1")
     data = response.json()
     assert data["planta_id"] == "planta-1"
     assert data["superficie_total_m2"] == 3500.0

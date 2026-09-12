@@ -28,16 +28,25 @@ router = APIRouter(
 )
 
 
+def _resolver_org_id(claims: dict) -> str | None:
+    rol = claims.get("rol")
+    if rol in ("superadmin", "invitado_global"):
+        return None
+    return claims.get("org")
+
+
 # --- Diagrama Unifilar ---
 
 
 @router.get("/planta/unifilar", response_model=UnifilarPlantaDTO)
 def get_unifilar_default(
     use_case: Annotated[GestionarPlantaEstructuraUseCase, Depends(get_planta_estructura_use_case)],
+    claims: Annotated[dict, Depends(get_usuario_actual)],
     planta_id: str | None = None,
 ):
     try:
-        return use_case.obtener_unifilar(planta_id=planta_id)
+        org_id = _resolver_org_id(claims)
+        return use_case.obtener_unifilar(planta_id=planta_id, organizacion_id=org_id)
     except Exception as e:
         manejar_error_http(e)
 
@@ -75,10 +84,12 @@ def update_unifilar(
 @router.get("/planta/layout", response_model=LayoutPlantaDTO)
 def get_layout_default(
     use_case: Annotated[GestionarPlantaEstructuraUseCase, Depends(get_planta_estructura_use_case)],
+    claims: Annotated[dict, Depends(get_usuario_actual)],
     planta_id: str | None = None,
 ):
     try:
-        return use_case.obtener_layout(planta_id=planta_id)
+        org_id = _resolver_org_id(claims)
+        return use_case.obtener_layout(planta_id=planta_id, organizacion_id=org_id)
     except Exception as e:
         manejar_error_http(e)
 
@@ -116,10 +127,12 @@ def update_layout(
 @router.get("/planta/areas", response_model=PlantaAreasEstadisticasResponseDTO)
 def get_areas_estadisticas_default(
     use_case: Annotated[GestionarPlantaEstructuraUseCase, Depends(get_planta_estructura_use_case)],
+    claims: Annotated[dict, Depends(get_usuario_actual)],
     planta_id: str | None = None,
 ):
     try:
-        return use_case.obtener_areas_estadisticas(planta_id=planta_id)
+        org_id = _resolver_org_id(claims)
+        return use_case.obtener_areas_estadisticas(planta_id=planta_id, organizacion_id=org_id)
     except Exception as e:
         manejar_error_http(e)
 
