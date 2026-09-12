@@ -79,6 +79,7 @@ class AreaEstadisticasDTO(BaseModel):
     dispositivos_activos_count: int = 0
     dispositivos_total_count: int = 0
     carga_promedio_kw: float = 0.0
+    dispositivo_ids: list[str] = Field(default_factory=list)
     coordenadas_layout: CoordenadasZonaDTO | None = None
     model_config = ConfigDict(from_attributes=True)
 

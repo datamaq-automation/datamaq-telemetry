@@ -17,7 +17,7 @@ from src.application.mappers.dispositivo_mapper import (
     DispositivoMapper,
     OrganizacionMapper,
 )
-from src.domain.telemetria.entities import Organizacion, Planta
+from src.domain.telemetria.entities import Dispositivo, Organizacion, Planta
 from src.domain.telemetria.exceptions import (
     DispositivoNoEncontradoError,
     LimiteDispositivosExcedidoError,
@@ -58,11 +58,39 @@ class GestionarDispositivosUseCase:
                 f"La organización '{org.nombre}' alcanzó el límite de {max_permitido} dispositivos permitidos por su plan."
             )
 
+    def _enriquecer_dispositivo(self, dev: Dispositivo) -> DispositivoResponseDTO:
+        area_id = None
+        linea_id = None
+        if dev.planta_id and self.repo_organizaciones:
+            try:
+                disps_layout = self.repo_organizaciones.obtener_dispositivos_layout(dev.planta_id)
+                d_layout = next(
+                    (d for d in disps_layout if d.device_id in (dev.id, dev.device_uid.valor)),
+                    None,
+                )
+                if d_layout:
+                    area_id = d_layout.zona_id
+            except Exception:
+                pass
+
+            try:
+                nodos = self.repo_organizaciones.obtener_nodos_unifilar(dev.planta_id)
+                nodo = next(
+                    (n for n in nodos if n.device_id in (dev.id, dev.device_uid.valor)),
+                    None,
+                )
+                if nodo:
+                    linea_id = nodo.parent_id or nodo.id
+            except Exception:
+                pass
+
+        return DispositivoMapper.to_dto(dev, area_id=area_id, linea_id=linea_id)
+
     def listar_dispositivos(
         self, planta_id: str | None = None, organizacion_id: str | None = None
     ) -> list[DispositivoResponseDTO]:
         dispositivos = self.repo_dispositivos.listar(planta_id, organizacion_id=organizacion_id)
-        return [DispositivoMapper.to_dto(d) for d in dispositivos]
+        return [self._enriquecer_dispositivo(d) for d in dispositivos]
 
     def obtener_dispositivo(self, id_o_uid: str) -> DispositivoResponseDTO:
         dev = self.repo_dispositivos.obtener_por_id(id_o_uid)
@@ -74,14 +102,14 @@ class GestionarDispositivosUseCase:
                 pass
         if not dev:
             raise DispositivoNoEncontradoError(f"Dispositivo '{id_o_uid}' no encontrado.")
-        return DispositivoMapper.to_dto(dev)
+        return self._enriquecer_dispositivo(dev)
 
     def registrar_dispositivo(self, dto: DispositivoCreateDTO) -> DispositivoResponseDTO:
         if dto.planta_id:
             self._validar_cupo_dispositivos(dto.planta_id)
         entity = DispositivoMapper.create_dto_to_entity(dto, str(uuid.uuid4()))
         saved = self.repo_dispositivos.guardar(entity)
-        return DispositivoMapper.to_dto(saved)
+        return self._enriquecer_dispositivo(saved)
 
     def actualizar_dispositivo(self, id_o_uid: str, dto: DispositivoUpdateDTO) -> DispositivoResponseDTO:
         dev = self.repo_dispositivos.obtener_por_id(id_o_uid)
@@ -111,7 +139,7 @@ class GestionarDispositivosUseCase:
             dev.esta_activo = dto.esta_activo
 
         saved = self.repo_dispositivos.guardar(dev)
-        return DispositivoMapper.to_dto(saved)
+        return self._enriquecer_dispositivo(saved)
 
     def listar_organizaciones(self) -> list[OrganizacionResponseDTO]:
         orgs = self.repo_organizaciones.listar_organizaciones()

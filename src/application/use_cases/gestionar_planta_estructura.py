@@ -123,6 +123,7 @@ class GestionarPlantaEstructuraUseCase:
             )
 
             sup_m2 = getattr(z, "superficie_m2", None)
+            disp_ids = [d.device_id for d in disps_zona if d.device_id]
             areas_dtos.append(
                 AreaEstadisticasDTO(
                     area_id=z.id,
@@ -132,6 +133,7 @@ class GestionarPlantaEstructuraUseCase:
                     dispositivos_activos_count=total_disps,
                     dispositivos_total_count=total_disps,
                     carga_promedio_kw=round(potencia_total_kw, 2),
+                    dispositivo_ids=disp_ids,
                     coordenadas_layout=coords_dto,
                 )
             )

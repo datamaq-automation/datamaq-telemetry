@@ -438,6 +438,7 @@ def test_get_areas_estadisticas_default_exitoso():
                 "dispositivos_activos_count": 2,
                 "dispositivos_total_count": 2,
                 "carga_promedio_kw": 120.0,
+                "dispositivo_ids": ["d-1", "d-2"],
                 "coordenadas_layout": None,
             }
         ],
@@ -452,6 +453,7 @@ def test_get_areas_estadisticas_default_exitoso():
     assert data["superficie_total_m2"] == 3500.0
     assert len(data["areas"]) == 1
     assert data["areas"][0]["area_id"] == "area-1"
+    assert data["areas"][0]["dispositivo_ids"] == ["d-1", "d-2"]
 
 
 def test_get_areas_estadisticas_by_planta_exitoso():

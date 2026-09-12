@@ -14,13 +14,17 @@ from src.domain.telemetria.value_objects import EstadoDispositivo, MacAddress
 
 class DispositivoMapper:
     @staticmethod
-    def to_dto(entity: Dispositivo) -> DispositivoResponseDTO:
+    def to_dto(entity: Dispositivo, area_id: str | None = None, linea_id: str | None = None) -> DispositivoResponseDTO:
+        resolved_area = area_id if area_id is not None else getattr(entity, "area_id", None)
+        resolved_linea = linea_id if linea_id is not None else getattr(entity, "linea_id", None)
         return DispositivoResponseDTO(
             id=entity.id,
             device_uid=entity.device_uid.valor,
             nombre=entity.nombre,
             modelo=entity.modelo,
             planta_id=entity.planta_id,
+            area_id=resolved_area,
+            linea_id=resolved_linea,
             numero_serie=entity.numero_serie,
             version_hw=entity.version_hw,
             version_fw=entity.version_fw,
