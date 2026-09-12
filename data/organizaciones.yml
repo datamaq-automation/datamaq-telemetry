@@ -9,6 +9,15 @@ organizaciones:
     plantas:
       - id: "2a4dd726-3e21-4b24-8993-51c2f5d4d65f"
         nombre: "Casa"
+        zonas:
+          - id: "area-casa-principal"
+            nombre: "Tablero Principal Hogar"
+            coordenadas: { x: 10, y: 10, ancho: 80, alto: 80 }
+        dispositivos_layout:
+          - id: "lay-casa-1"
+            dispositivo_id: "2812d2af-b1cf-4daa-a379-40102fdb152d"
+            zona_id: "area-casa-principal"
+            posicion: { x: 50, y: 50 }
         nodos_unifilar:
           - id: "nodo-acometida-hogar"
             nombre: "Medidor Principal Hogar"
@@ -26,6 +35,22 @@ organizaciones:
     plantas:
       - id: "c64fd625-0037-4caa-b68a-800e8e0ee548"
         nombre: "Planta Principal Durax"
+        zonas:
+          - id: "area-durax-trafo-1"
+            nombre: "Sala de Trafo 1"
+            coordenadas: { x: 5, y: 5, ancho: 40, alto: 80 }
+          - id: "area-durax-trafo-2"
+            nombre: "Sala de Trafo 2"
+            coordenadas: { x: 50, y: 5, ancho: 40, alto: 80 }
+        dispositivos_layout:
+          - id: "lay-durax-1"
+            dispositivo_id: "51048a93-f1f3-4283-a708-24cbd39c7192"
+            zona_id: "area-durax-trafo-1"
+            posicion: { x: 20, y: 30 }
+          - id: "lay-durax-2"
+            dispositivo_id: "b5f4bcd6-b017-4796-bb3d-efcfb50dc8f0"
+            zona_id: "area-durax-trafo-2"
+            posicion: { x: 70, y: 30 }
         nodos_unifilar:
           - id: "nodo-durax-trifasico-1"
             nombre: "SmartPlus Trifásico #1"
@@ -52,6 +77,19 @@ organizaciones:
     plantas:
       - id: "4f68f653-a604-4834-8154-31f938248572"
         nombre: "Planta Principal UPP"
+        zonas:
+          - id: "area-upp-papelera"
+            nombre: "Nave Principal UPP"
+            coordenadas: { x: 10, y: 10, ancho: 80, alto: 80 }
+        dispositivos_layout:
+          - id: "lay-upp-1"
+            dispositivo_id: "a01b1642-ed29-4c3e-a793-f57de09504f8"
+            zona_id: "area-upp-papelera"
+            posicion: { x: 30, y: 40 }
+          - id: "lay-upp-2"
+            dispositivo_id: "ce7e5a9a-c5e8-4936-be9a-a2057ccf8b4c"
+            zona_id: "area-upp-papelera"
+            posicion: { x: 70, y: 40 }
         nodos_unifilar:
           - id: "nodo-upp-trafo-arriba"
             nombre: "Trafo Arriba"
