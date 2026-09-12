@@ -1,4 +1,4 @@
-"""test_architecture.py — El Guantelete de Restricciones Extremas (Clean Architecture & DDD).
+"""tests/test_architecture.py — El Guantelete de Restricciones Extremas (Clean Architecture & DDD).
 
 Inspirado en la filosofía de Robert C. Martin ("Uncle Bob") sobre el desarrollo asistido por agentes IA:
 "Rodear a los agentes de restricciones extremas para tener máxima confianza en el código producido."
@@ -20,6 +20,15 @@ Batería de Pruebas ("The Constraint Gauntlet"):
      - Exige que todas las funciones y métodos en domain y application especifiquen Type Hints en parámetros y retorno.
   5. test_no_hardcoded_secrets:
      - Detecta credenciales, passwords, tokens JWT o connection strings quemadas en código fuente.
+  6. test_no_raw_sql_formatting:
+     - Prohíbe f-strings/format/concatenación dentro de sqlalchemy.text(...) (mitiga SQL Injection).
+  7. test_no_os_environ_direct_access:
+     - Prohíbe os.environ/os.getenv fuera de src/infrastructure/settings/config.py.
+  8. test_no_unstructured_prints:
+     - Prohíbe print() en código de producción (src/); exige el logger centralizado.
+  9. test_relative_path_headers:
+     - Exige que todo .py en src/ y tests/ (excepto __init__.py) inicie con docstring/comentario
+       que incluya su ruta relativa exacta respecto a la raíz del repositorio.
 
 Uso:
   - Con Pytest:  pytest tests/test_architecture.py -v
@@ -348,6 +357,152 @@ def verify_no_hardcoded_secrets(root_dir: Path | None = None) -> list[str]:
     return errors
 
 
+def verify_no_raw_sql_formatting(root_dir: Path | None = None) -> list[str]:
+    """Prohíbe concatenación/format/f-strings dentro de sqlalchemy.text(...) (mitiga SQL Injection)."""
+    root = root_dir or find_project_root()
+    src_dir = root / "src"
+    errors: list[str] = []
+
+    if not src_dir.exists():
+        return []
+
+    raw_sql_pattern = re.compile(r"""text\(\s*(f["']|["'][^"')]*["']\s*[%+]|["'][^"')]*\.format\()""")
+
+    for current_root, _, files in os.walk(src_dir):
+        for file in files:
+            if not file.endswith(".py"):
+                continue
+
+            full_path = Path(current_root) / file
+            rel_path = full_path.relative_to(root).as_posix()
+
+            try:
+                lines = full_path.read_text(encoding="utf-8").splitlines()
+                for lineno, line in enumerate(lines, start=1):
+                    if raw_sql_pattern.search(line):
+                        errors.append(
+                            f"[SQL RAW FORMATTING] {rel_path}:{lineno} "
+                            "Prohibido interpolar strings dentro de text(...). Use parámetros bindeados."
+                        )
+            except Exception:
+                pass
+
+    return errors
+
+
+def verify_no_os_environ_direct_access(root_dir: Path | None = None) -> list[str]:
+    """Prohíbe acceso directo a os.environ / os.getenv fuera de infrastructure/settings/config.py."""
+    root = root_dir or find_project_root()
+    src_dir = root / "src"
+    errors: list[str] = []
+
+    if not src_dir.exists():
+        return []
+
+    allowed_file = "src/infrastructure/settings/config.py"
+    env_access_pattern = re.compile(r"\bos\.(environ|getenv)\b")
+
+    for current_root, _, files in os.walk(src_dir):
+        for file in files:
+            if not file.endswith(".py"):
+                continue
+
+            full_path = Path(current_root) / file
+            rel_path = full_path.relative_to(root).as_posix()
+
+            if rel_path == allowed_file:
+                continue
+
+            try:
+                lines = full_path.read_text(encoding="utf-8").splitlines()
+                for lineno, line in enumerate(lines, start=1):
+                    stripped = line.strip()
+                    if stripped.startswith("#"):
+                        continue
+                    if env_access_pattern.search(line):
+                        errors.append(
+                            f"[ACCESO DIRECTO A ENV] {rel_path}:{lineno} "
+                            "Prohibido usar os.environ/os.getenv fuera de Settings. Centralice en config.py."
+                        )
+            except Exception:
+                pass
+
+    return errors
+
+
+def verify_no_unstructured_prints(root_dir: Path | None = None) -> list[str]:
+    """Prohíbe llamadas a print() en código de producción (src/), exige logging formal."""
+    root = root_dir or find_project_root()
+    src_dir = root / "src"
+    errors: list[str] = []
+
+    if not src_dir.exists():
+        return []
+
+    print_pattern = re.compile(r"(?<![\w.])print\s*\(")
+
+    for current_root, _, files in os.walk(src_dir):
+        for file in files:
+            if not file.endswith(".py"):
+                continue
+
+            full_path = Path(current_root) / file
+            rel_path = full_path.relative_to(root).as_posix()
+
+            try:
+                lines = full_path.read_text(encoding="utf-8").splitlines()
+                for lineno, line in enumerate(lines, start=1):
+                    stripped = line.strip()
+                    if stripped.startswith("#"):
+                        continue
+                    if print_pattern.search(line):
+                        errors.append(
+                            f"[PRINT NO ESTRUCTURADO] {rel_path}:{lineno} "
+                            "Prohibido print() en src/. Use el logger centralizado (get_logger)."
+                        )
+            except Exception:
+                pass
+
+    return errors
+
+
+def verify_relative_path_headers(root_dir: Path | None = None) -> list[str]:
+    """Exige que todo .py en src/ y tests/ comience con docstring/comentario con su ruta relativa."""
+    root = root_dir or find_project_root()
+    errors: list[str] = []
+
+    for base in ("src", "tests"):
+        base_dir = root / base
+        if not base_dir.exists():
+            continue
+
+        for current_root, _, files in os.walk(base_dir):
+            for file in files:
+                if not file.endswith(".py") or file == "__init__.py":
+                    continue
+
+                full_path = Path(current_root) / file
+                rel_path = full_path.relative_to(root).as_posix()
+
+                try:
+                    text = full_path.read_text(encoding="utf-8")
+                except Exception:
+                    continue
+
+                first_line = text.splitlines()[0] if text.splitlines() else ""
+                stripped = first_line.lstrip()
+                is_docstring = stripped.startswith('"""') or stripped.startswith("'''")
+                is_comment = stripped.startswith("#")
+
+                if not (is_docstring or is_comment) or rel_path not in first_line:
+                    errors.append(
+                        f"[CABECERA DE RUTA FALTANTE] {rel_path} "
+                        f"debe comenzar con un docstring/comentario que incluya '{rel_path}'."
+                    )
+
+    return errors
+
+
 # ==============================================================================
 # Suite de Pruebas Pytest ("The Constraint Gauntlet")
 # ==============================================================================
@@ -393,6 +548,38 @@ def test_no_hardcoded_secrets():
     )
 
 
+def test_no_raw_sql_formatting():
+    """Restricción 6: Prohíbe f-strings/format/concatenación dentro de text(...) (SQLi)."""
+    errors = verify_no_raw_sql_formatting()
+    assert not errors, f"\n❌ Se detectaron {len(errors)} usos de SQL crudo formateado:\n\n" + "\n".join(
+        f"  • {err}" for err in errors
+    )
+
+
+def test_no_os_environ_direct_access():
+    """Restricción 7: Prohíbe acceso directo a os.environ/os.getenv fuera de Settings."""
+    errors = verify_no_os_environ_direct_access()
+    assert not errors, f"\n❌ Se detectaron {len(errors)} accesos directos a variables de entorno:\n\n" + "\n".join(
+        f"  • {err}" for err in errors
+    )
+
+
+def test_no_unstructured_prints():
+    """Restricción 8: Prohíbe print() en código de producción (src/)."""
+    errors = verify_no_unstructured_prints()
+    assert not errors, f"\n❌ Se detectaron {len(errors)} usos de print() no estructurado:\n\n" + "\n".join(
+        f"  • {err}" for err in errors
+    )
+
+
+def test_relative_path_headers():
+    """Restricción 9: Todo .py en src/ y tests/ debe iniciar con docstring/comentario de su ruta relativa."""
+    errors = verify_relative_path_headers()
+    assert not errors, f"\n❌ Se detectaron {len(errors)} archivos sin cabecera de ruta:\n\n" + "\n".join(
+        f"  • {err}" for err in errors
+    )
+
+
 # ==============================================================================
 # CLI Runner Independiente
 # ==============================================================================
@@ -410,6 +597,10 @@ def main() -> None:
         ("3. Imports Absolutos (Prohibidos relativos)", verify_no_relative_imports()),
         ("4. Tipado Estricto (Domain & Application)", verify_type_annotations()),
         ("5. Seguridad & Secretos (Cero hardcoded)", verify_no_hardcoded_secrets()),
+        ("6. SQL Crudo Formateado (Prohibido en text(...))", verify_no_raw_sql_formatting()),
+        ("7. Acceso Directo a os.environ (Centralizar en Settings)", verify_no_os_environ_direct_access()),
+        ("8. Print() No Estructurado (Prohibido en src/)", verify_no_unstructured_prints()),
+        ("9. Cabeceras de Ruta Relativa (Trazabilidad)", verify_relative_path_headers()),
     ]
 
     total_errors: list[str] = []
