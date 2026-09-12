@@ -1,3 +1,4 @@
+"""src/infrastructure/sqlalchemy/repositories/intervalos_repository.py."""
 from datetime import datetime
 from decimal import Decimal
 

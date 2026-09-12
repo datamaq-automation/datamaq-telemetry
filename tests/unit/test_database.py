@@ -1,4 +1,4 @@
-"""Pruebas de la configuración de base de datos (database.py)."""
+"""tests/unit/test_database.py — Pruebas de la configuración de base de datos (database.py)."""
 
 from sqlalchemy import create_engine
 

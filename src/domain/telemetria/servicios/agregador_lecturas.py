@@ -1,4 +1,4 @@
-"""Servicio para remuestreo y agregación temporal de lecturas instantáneas."""
+"""src/domain/telemetria/servicios/agregador_lecturas.py — Servicio para remuestreo y agregación temporal de lecturas instantáneas."""
 
 from datetime import datetime, timezone
 

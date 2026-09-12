@@ -1,3 +1,4 @@
+"""tests/unit/test_domain.py."""
 from datetime import datetime, timezone
 
 import pytest

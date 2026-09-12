@@ -1,3 +1,4 @@
+"""tests/unit/test_notificaciones_alertas_criticas.py."""
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
 

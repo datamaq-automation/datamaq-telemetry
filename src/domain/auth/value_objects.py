@@ -1,3 +1,4 @@
+"""src/domain/auth/value_objects.py."""
 import re
 from dataclasses import dataclass
 

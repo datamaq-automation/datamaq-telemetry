@@ -1,4 +1,4 @@
-"""Fase 2 — Autenticación obligatoria, roles y rate limiting."""
+"""tests/unit/test_security_auth.py — Autenticación obligatoria, roles y rate limiting."""
 
 from datetime import datetime, timedelta, timezone
 

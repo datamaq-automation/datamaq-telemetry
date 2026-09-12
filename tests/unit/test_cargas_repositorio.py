@@ -1,4 +1,4 @@
-"""Repositorio SQLAlchemy del catálogo de cargas, con SQLite en memoria."""
+"""tests/unit/test_cargas_repositorio.py — Repositorio SQLAlchemy del catálogo de cargas, con SQLite en memoria."""
 
 from collections.abc import Iterator
 from datetime import datetime, timedelta, timezone

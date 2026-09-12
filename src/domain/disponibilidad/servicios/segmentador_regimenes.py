@@ -1,4 +1,4 @@
-"""Partición modal del eje de potencia en regímenes de operación."""
+"""src/domain/disponibilidad/servicios/segmentador_regimenes.py — Partición modal del eje de potencia en regímenes de operación."""
 
 import bisect
 import itertools

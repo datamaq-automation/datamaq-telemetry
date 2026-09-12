@@ -1,3 +1,4 @@
+"""tests/unit/test_erd_generation.py."""
 import os
 import subprocess
 import sys

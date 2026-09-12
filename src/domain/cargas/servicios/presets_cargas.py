@@ -1,4 +1,4 @@
-"""Catálogo de presets de cargas típicas y firmas estándar de fábrica."""
+"""src/domain/cargas/servicios/presets_cargas.py — Catálogo de presets de cargas típicas y firmas estándar de fábrica."""
 
 from src.domain.cargas.entities import Carga
 from src.domain.cargas.value_objects import (

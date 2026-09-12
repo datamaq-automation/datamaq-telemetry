@@ -1,3 +1,4 @@
+"""src/domain/cargas/exceptions.py."""
 class DominioCargasException(Exception):
     """Excepción base del dominio de desagregación de cargas."""
 

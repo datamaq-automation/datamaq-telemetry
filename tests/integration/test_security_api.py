@@ -1,4 +1,4 @@
-"""Fase 2 (integración) — Auth obligatoria en routers y rol admin en purge."""
+"""tests/integration/test_security_api.py — Auth obligatoria en routers y rol admin en purge."""
 
 from src.infrastructure.fastapi.dependencies import get_usuario_actual, requiere_rol_admin
 from src.infrastructure.fastapi.server import create_app

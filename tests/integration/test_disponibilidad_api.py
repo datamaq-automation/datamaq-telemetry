@@ -1,4 +1,4 @@
-"""Verifica que create_app() registra el router de disponibilidad de máquina sin conexión a DB."""
+"""tests/integration/test_disponibilidad_api.py — Verifica que create_app() registra el router de disponibilidad de máquina sin conexión a DB."""
 
 from datetime import datetime, timezone
 from unittest.mock import MagicMock

@@ -1,3 +1,4 @@
+"""src/infrastructure/sqlalchemy/repositories/telemetria_repository.py."""
 from collections.abc import Iterator
 from datetime import datetime
 from decimal import Decimal

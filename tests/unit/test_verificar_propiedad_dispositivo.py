@@ -1,4 +1,4 @@
-"""Tests de aislamiento por organización en los endpoints REST de telemetría/dispositivos."""
+"""tests/unit/test_verificar_propiedad_dispositivo.py — Tests de aislamiento por organización en los endpoints REST de telemetría/dispositivos."""
 
 from unittest.mock import MagicMock, patch
 

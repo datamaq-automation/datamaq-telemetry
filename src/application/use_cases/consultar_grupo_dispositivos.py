@@ -1,3 +1,4 @@
+"""src/application/use_cases/consultar_grupo_dispositivos.py."""
 from src.application.dtos.grupo_dispositivos_dto import (
     PuntoPotenciaGrupoDTO,
     ResumenGrupoDispositivosDTO,

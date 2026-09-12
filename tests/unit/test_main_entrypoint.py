@@ -1,4 +1,4 @@
-"""Pruebas del entrypoint ASGI (main.py)."""
+"""tests/unit/test_main_entrypoint.py — Pruebas del entrypoint ASGI (main.py)."""
 
 import src.main
 

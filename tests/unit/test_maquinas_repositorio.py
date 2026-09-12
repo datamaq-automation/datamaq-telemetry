@@ -1,4 +1,4 @@
-"""Repositorio SQLAlchemy de máquinas: filtro por organización, con SQLite en memoria."""
+"""tests/unit/test_maquinas_repositorio.py — Repositorio SQLAlchemy de máquinas: filtro por organización, con SQLite en memoria."""
 
 from collections.abc import Iterator
 

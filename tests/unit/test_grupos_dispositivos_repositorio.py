@@ -1,4 +1,4 @@
-"""Repositorio SQLAlchemy de grupos de dispositivos, con SQLite en memoria."""
+"""tests/unit/test_grupos_dispositivos_repositorio.py — Repositorio SQLAlchemy de grupos de dispositivos, con SQLite en memoria."""
 
 from collections.abc import Iterator
 

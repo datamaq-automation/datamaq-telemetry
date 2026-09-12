@@ -1,4 +1,4 @@
-"""Caso de uso de perfilado de consumo sobre la serie agregada de un medidor."""
+"""tests/unit/test_cargas_analizar_consumo.py — Caso de uso de perfilado de consumo sobre la serie agregada de un medidor."""
 
 from datetime import datetime, timedelta, timezone
 

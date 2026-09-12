@@ -1,4 +1,4 @@
-"""Fase G6 — Despliegue seguro (TLS Mosquitto + documentación de WebSocket global)."""
+"""tests/unit/test_security_deploy.py — Despliegue seguro (TLS Mosquitto + documentación de WebSocket global)."""
 
 from pathlib import Path
 

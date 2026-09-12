@@ -1,3 +1,4 @@
+"""tests/unit/test_dispositivos_confiables.py."""
 from datetime import datetime, timedelta
 
 import pyotp

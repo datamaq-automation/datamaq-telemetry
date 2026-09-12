@@ -1,4 +1,4 @@
-"""Pruebas de inmediatez del canal en vivo (specs/inmediatez-telemetria-en-vivo.md).
+"""tests/unit/test_inmediatez_ws.py — Pruebas de inmediatez del canal en vivo (specs/inmediatez-telemetria-en-vivo.md).
 
 Verifica que el topic `inst` difunde el `LecturaInstantaneaDTO` normalizado y que los
 subtopics distintos conservan el payload crudo.

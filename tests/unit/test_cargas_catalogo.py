@@ -1,4 +1,4 @@
-"""Catálogo de cargas: alta, edición, unicidad por medidor y firma manual."""
+"""tests/unit/test_cargas_catalogo.py — Catálogo de cargas: alta, edición, unicidad por medidor y firma manual."""
 
 import pytest
 

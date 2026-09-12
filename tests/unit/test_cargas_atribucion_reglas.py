@@ -1,4 +1,4 @@
-"""Tests unitarios para la integración del motor de reglas y presets en AtribuirConsumoUseCase."""
+"""tests/unit/test_cargas_atribucion_reglas.py — Tests unitarios para la integración del motor de reglas y presets en AtribuirConsumoUseCase."""
 
 from datetime import datetime, timedelta, timezone
 

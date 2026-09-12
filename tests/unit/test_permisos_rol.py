@@ -1,4 +1,4 @@
-"""Permisos por rol (D-04b): invitado de solo lectura en routers protegidos."""
+"""tests/unit/test_permisos_rol.py — Permisos por rol (D-04b): invitado de solo lectura en routers protegidos."""
 
 import pytest
 from fastapi import HTTPException

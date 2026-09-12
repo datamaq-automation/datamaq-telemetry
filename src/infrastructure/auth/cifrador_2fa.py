@@ -1,3 +1,4 @@
+"""src/infrastructure/auth/cifrador_2fa.py."""
 import base64
 import hashlib
 

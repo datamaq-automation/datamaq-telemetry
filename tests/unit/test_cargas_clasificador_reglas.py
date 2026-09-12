@@ -1,4 +1,4 @@
-"""Tests unitarios para el motor de reglas de clasificación y catálogo de presets de cargas."""
+"""tests/unit/test_cargas_clasificador_reglas.py — Tests unitarios para el motor de reglas de clasificación y catálogo de presets de cargas."""
 
 from datetime import datetime, timedelta, timezone
 

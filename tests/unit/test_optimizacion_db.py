@@ -1,3 +1,4 @@
+"""tests/unit/test_optimizacion_db.py."""
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 

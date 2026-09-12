@@ -1,4 +1,4 @@
-"""Pruebas unitarias del dominio y caso de uso de planes de telemetría freemium."""
+"""tests/unit/test_planes.py — Pruebas unitarias del dominio y caso de uso de planes de telemetría freemium."""
 
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal

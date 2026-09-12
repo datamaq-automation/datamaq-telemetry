@@ -1,3 +1,4 @@
+"""src/domain/telemetria/servicios/analizador_calidad_metrologica.py."""
 import cmath
 import math
 from datetime import datetime

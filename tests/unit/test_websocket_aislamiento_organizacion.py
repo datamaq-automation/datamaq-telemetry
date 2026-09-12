@@ -1,4 +1,4 @@
-"""Tests de aislamiento de datos por organización en el stream /ws/live (fuga cross-tenant)."""
+"""tests/unit/test_websocket_aislamiento_organizacion.py — Tests de aislamiento de datos por organización en el stream /ws/live (fuga cross-tenant)."""
 
 from unittest.mock import MagicMock
 

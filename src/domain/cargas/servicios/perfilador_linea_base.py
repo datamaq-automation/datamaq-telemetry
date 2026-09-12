@@ -1,4 +1,4 @@
-"""Línea de base de un medidor agregado: cuánto se consume cuando nadie hace nada."""
+"""src/domain/cargas/servicios/perfilador_linea_base.py — Línea de base de un medidor agregado: cuánto se consume cuando nadie hace nada."""
 
 from collections import defaultdict
 from datetime import tzinfo

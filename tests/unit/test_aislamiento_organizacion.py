@@ -1,4 +1,4 @@
-"""Tests de aislamiento de datos por organización (Etapa 1 multi-tenancy)."""
+"""tests/unit/test_aislamiento_organizacion.py — Tests de aislamiento de datos por organización (Etapa 1 multi-tenancy)."""
 
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock

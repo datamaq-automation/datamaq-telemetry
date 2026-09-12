@@ -1,4 +1,4 @@
-"""Tipos SQLAlchemy propios del borde de persistencia."""
+"""src/infrastructure/sqlalchemy/types.py — Tipos SQLAlchemy propios del borde de persistencia."""
 
 from datetime import datetime, timezone
 from typing import Any

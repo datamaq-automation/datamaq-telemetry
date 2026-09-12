@@ -1,4 +1,4 @@
-"""Reparto del consumo de un período entre las cargas conocidas, con residual explícito."""
+"""src/domain/cargas/servicios/atribuidor_consumo.py — Reparto del consumo de un período entre las cargas conocidas, con residual explícito."""
 
 from collections import defaultdict
 from datetime import datetime

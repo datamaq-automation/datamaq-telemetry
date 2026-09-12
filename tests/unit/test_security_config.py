@@ -1,4 +1,4 @@
-"""Fase 1 — Hardening de configuración (postura segura por defecto)."""
+"""tests/unit/test_security_config.py — Hardening de configuración (postura segura por defecto)."""
 
 from pathlib import Path
 

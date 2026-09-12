@@ -1,3 +1,4 @@
+"""src/domain/telemetria/value_objects.py."""
 import re
 from dataclasses import dataclass
 from datetime import datetime

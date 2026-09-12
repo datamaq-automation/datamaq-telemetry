@@ -1,4 +1,4 @@
-"""Pruebas de la infraestructura de migraciones Alembic (specs/migraciones.md)."""
+"""tests/unit/test_migraciones.py — Pruebas de la infraestructura de migraciones Alembic (specs/migraciones.md)."""
 
 import importlib.util
 import sys

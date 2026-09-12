@@ -1,3 +1,4 @@
+"""tests/unit/test_csv_streaming_mapper.py."""
 from datetime import datetime, timezone
 
 from src.application.mappers.csv_streaming_mapper import (

@@ -1,4 +1,4 @@
-"""Pruebas de los repositorios SQLAlchemy con SQLite en memoria."""
+"""tests/unit/test_mysql_repositories.py — Pruebas de los repositorios SQLAlchemy con SQLite en memoria."""
 
 from collections.abc import Iterator
 from datetime import datetime, timezone

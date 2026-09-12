@@ -1,4 +1,4 @@
-"""Grupos de dispositivos: suma de lecturas de varios medidores (ej. dos trafos de una planta)."""
+"""tests/unit/test_grupos_dispositivos.py — Grupos de dispositivos: suma de lecturas de varios medidores (ej. dos trafos de una planta)."""
 
 import pytest
 

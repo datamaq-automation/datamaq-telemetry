@@ -1,4 +1,4 @@
-"""Evaluador de anomalias de red y fases (cruce de TIs, secuencia inversa, desbalance y sobrecompensacion)."""
+"""src/domain/telemetria/servicios/evaluador_anomalias_fases.py — Evaluador de anomalias de red y fases (cruce de TIs, secuencia inversa, desbalance y sobrecompensacion)."""
 
 from datetime import datetime, timezone
 

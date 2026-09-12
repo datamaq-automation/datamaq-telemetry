@@ -1,3 +1,4 @@
+"""src/infrastructure/fastapi/routes/cargas_router.py."""
 from datetime import datetime
 from typing import Annotated
 

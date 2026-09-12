@@ -1,4 +1,4 @@
-"""Estimación de densidad y binarización logarítmica para potencias de máquinas."""
+"""src/domain/disponibilidad/servicios/histograma_log.py — Estimación de densidad y binarización logarítmica para potencias de máquinas."""
 
 import itertools
 import math

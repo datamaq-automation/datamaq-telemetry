@@ -1,4 +1,4 @@
-"""Pruebas de integración de la API de cargas: registro de rutas, contrato y códigos de error."""
+"""tests/integration/test_cargas_api.py — Pruebas de integración de la API de cargas: registro de rutas, contrato y códigos de error."""
 
 from datetime import datetime, timezone
 from unittest.mock import MagicMock

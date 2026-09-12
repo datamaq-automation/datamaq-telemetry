@@ -1,3 +1,4 @@
+"""src/domain/cargas/ports.py."""
 from abc import ABC, abstractmethod
 from datetime import datetime
 

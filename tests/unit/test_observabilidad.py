@@ -1,4 +1,4 @@
-"""Observabilidad de errores HTTP: request_id, logging de errores y mapeo consistente."""
+"""tests/unit/test_observabilidad.py — Observabilidad de errores HTTP: request_id, logging de errores y mapeo consistente."""
 
 import pytest
 from fastapi import FastAPI, HTTPException

@@ -1,4 +1,4 @@
-"""El backend no debe confundir el eco de sus propios comandos MQTT (conf/com) con
+"""tests/unit/test_mqtt_eco_comando_propio.py — El backend no debe confundir el eco de sus propios comandos MQTT (conf/com) con
 actividad genuina del dispositivo. Ver plan de aislamiento cross-tenant / falso ONLINE.
 """
 

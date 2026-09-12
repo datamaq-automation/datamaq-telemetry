@@ -1,4 +1,4 @@
-"""Fase 4 — Sanitización de entrada (DTOs y payload MQTT)."""
+"""tests/unit/test_security_sanitizacion.py — Sanitización de entrada (DTOs y payload MQTT)."""
 
 import pydantic
 

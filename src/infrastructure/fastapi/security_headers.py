@@ -1,4 +1,4 @@
-"""Middleware de headers de seguridad para endurecer toda respuesta HTTP."""
+"""src/infrastructure/fastapi/security_headers.py — Middleware de headers de seguridad para endurecer toda respuesta HTTP."""
 
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request

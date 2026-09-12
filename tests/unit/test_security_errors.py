@@ -1,4 +1,4 @@
-"""Fase G3 — Exception handler global devuelve 500 genérico sin exponer stack."""
+"""tests/unit/test_security_errors.py — Exception handler global devuelve 500 genérico sin exponer stack."""
 
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient

@@ -1,4 +1,4 @@
-"""Detección de episodios, desambiguación de firmas y reparto de consumo."""
+"""tests/unit/test_cargas_atribucion.py — Detección de episodios, desambiguación de firmas y reparto de consumo."""
 
 from datetime import datetime, timedelta, timezone
 

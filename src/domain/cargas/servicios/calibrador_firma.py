@@ -1,4 +1,4 @@
-"""Cálculo de la firma de una carga a partir de las muestras de una campaña."""
+"""src/domain/cargas/servicios/calibrador_firma.py — Cálculo de la firma de una carga a partir de las muestras de una campaña."""
 
 import itertools
 import math

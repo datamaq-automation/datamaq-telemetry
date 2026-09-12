@@ -1,4 +1,4 @@
-"""Captura de muestras de campaña desde el camino de ingesta MQTT."""
+"""tests/unit/test_cargas_captura_ingesta.py — Captura de muestras de campaña desde el camino de ingesta MQTT."""
 
 from datetime import datetime, timedelta, timezone
 

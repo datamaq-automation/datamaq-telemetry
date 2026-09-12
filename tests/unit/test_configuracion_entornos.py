@@ -1,4 +1,4 @@
-"""Modos de entorno (APP_ENV): derivación de postura dev/prod y regresión de arquitectura."""
+"""tests/unit/test_configuracion_entornos.py — Modos de entorno (APP_ENV): derivación de postura dev/prod y regresión de arquitectura."""
 
 import ast
 from pathlib import Path

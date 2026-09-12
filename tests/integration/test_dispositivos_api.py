@@ -1,4 +1,4 @@
-"""Pruebas de integración de la API de dispositivos: registro de rutas y acceso protegido."""
+"""tests/integration/test_dispositivos_api.py — Pruebas de integración de la API de dispositivos: registro de rutas y acceso protegido."""
 
 from datetime import datetime, timezone
 from unittest.mock import MagicMock

@@ -1,4 +1,4 @@
-"""Repositorio SQLAlchemy de dispositivos confiables, con SQLite en memoria."""
+"""tests/unit/test_dispositivos_confiables_repositorio.py — Repositorio SQLAlchemy de dispositivos confiables, con SQLite en memoria."""
 
 from collections.abc import Iterator
 from datetime import timedelta

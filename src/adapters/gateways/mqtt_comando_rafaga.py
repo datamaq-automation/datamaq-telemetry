@@ -1,4 +1,4 @@
-"""Adaptador del puerto de ráfaga sobre el listener MQTT."""
+"""src/adapters/gateways/mqtt_comando_rafaga.py — Adaptador del puerto de ráfaga sobre el listener MQTT."""
 
 from typing import Protocol
 

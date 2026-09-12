@@ -1,3 +1,4 @@
+"""src/domain/sge/ports.py."""
 from abc import ABC, abstractmethod
 
 from src.domain.sge.entities import ArticuloSge

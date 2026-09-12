@@ -1,4 +1,4 @@
-"""Sumidero paralelo que persiste lecturas a caudal completo durante una campaña."""
+"""src/application/use_cases/ingesta/capturador_campana.py — Sumidero paralelo que persiste lecturas a caudal completo durante una campaña."""
 
 from src.application.use_cases.ingesta.registro_campanas import RegistroCampanasActivas
 from src.domain.cargas.ports import RepositorioCampanasPort

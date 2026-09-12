@@ -1,4 +1,4 @@
-"""Pruebas de integración de la API de grupos de dispositivos (suma de lecturas de varios medidores)."""
+"""tests/integration/test_grupos_dispositivos_api.py — Pruebas de integración de la API de grupos de dispositivos (suma de lecturas de varios medidores)."""
 
 from unittest.mock import MagicMock
 

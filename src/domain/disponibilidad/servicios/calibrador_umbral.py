@@ -1,4 +1,4 @@
-"""Calibración de umbral marcha/parada a partir de segmentación modal (k=2)."""
+"""src/domain/disponibilidad/servicios/calibrador_umbral.py — Calibración de umbral marcha/parada a partir de segmentación modal (k=2)."""
 
 from src.domain.disponibilidad.servicios.segmentador_regimenes import (
     SegmentadorRegimenesService,

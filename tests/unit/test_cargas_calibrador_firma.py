@@ -1,4 +1,4 @@
-"""Calibración de firmas a partir de campañas de caracterización."""
+"""tests/unit/test_cargas_calibrador_firma.py — Calibración de firmas a partir de campañas de caracterización."""
 
 from datetime import datetime, timedelta, timezone
 

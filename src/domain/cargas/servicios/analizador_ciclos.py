@@ -1,4 +1,4 @@
-"""Ciclado de una carga: cuánto tiempo prende, cuánto descansa y con qué regularidad."""
+"""src/domain/cargas/servicios/analizador_ciclos.py — Ciclado de una carga: cuánto tiempo prende, cuánto descansa y con qué regularidad."""
 
 from dataclasses import replace
 from datetime import datetime

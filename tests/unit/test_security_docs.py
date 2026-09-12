@@ -1,4 +1,4 @@
-"""Fase 6 — Documentación defensiva (threat model presente)."""
+"""tests/unit/test_security_docs.py — Documentación defensiva (threat model presente)."""
 
 from pathlib import Path
 

@@ -1,3 +1,4 @@
+"""src/application/mappers/planta_estructura_mapper.py."""
 import uuid
 
 from src.application.dtos.planta_estructura_dto import (

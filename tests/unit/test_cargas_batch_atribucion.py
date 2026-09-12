@@ -1,4 +1,4 @@
-"""Caso de uso batch: idempotencia, protección de correcciones y corrección humana."""
+"""tests/unit/test_cargas_batch_atribucion.py — Caso de uso batch: idempotencia, protección de correcciones y corrección humana."""
 
 from datetime import datetime, timedelta, timezone
 

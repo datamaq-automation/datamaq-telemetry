@@ -1,4 +1,4 @@
-"""Fase 5 — Gestión de secretos operativos (seed_admin)."""
+"""tests/unit/test_security_ops.py — Gestión de secretos operativos (seed_admin)."""
 
 import pytest
 

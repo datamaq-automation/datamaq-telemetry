@@ -1,4 +1,4 @@
-"""Spec G — Robustez del Listener MQTT (hardening de ingesta)."""
+"""tests/unit/test_mqtt_robustez.py — Robustez del Listener MQTT (hardening de ingesta)."""
 
 import threading
 from datetime import datetime, timedelta, timezone

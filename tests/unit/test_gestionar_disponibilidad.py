@@ -1,4 +1,4 @@
-"""Caso de uso GestionarDisponibilidadUseCase: clasificación por evento, persistencia anti-transitorios,
+"""tests/unit/test_gestionar_disponibilidad.py — Caso de uso GestionarDisponibilidadUseCase: clasificación por evento, persistencia anti-transitorios,
 corrección humana y cruce con paradas programadas — todo con repositorios fake en memoria."""
 
 from datetime import datetime, timedelta, timezone

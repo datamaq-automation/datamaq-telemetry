@@ -1,3 +1,4 @@
+"""src/application/use_cases/ingesta/procesador_alertas_ingesta.py."""
 from datetime import datetime
 from typing import ClassVar
 

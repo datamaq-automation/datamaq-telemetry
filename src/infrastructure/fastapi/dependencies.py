@@ -1,3 +1,4 @@
+"""src/infrastructure/fastapi/dependencies.py."""
 from functools import lru_cache
 from typing import Annotated, Any
 

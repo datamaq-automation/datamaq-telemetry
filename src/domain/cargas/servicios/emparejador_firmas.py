@@ -1,4 +1,4 @@
-"""Atribución de un episodio de potencia a una carga del catálogo."""
+"""src/domain/cargas/servicios/emparejador_firmas.py — Atribución de un episodio de potencia a una carga del catálogo."""
 
 import math
 from datetime import tzinfo

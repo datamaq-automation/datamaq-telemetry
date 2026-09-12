@@ -1,3 +1,4 @@
+"""src/infrastructure/sqlalchemy/repositories/cargas_repository.py."""
 from datetime import datetime
 from decimal import Decimal
 

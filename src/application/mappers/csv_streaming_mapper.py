@@ -1,3 +1,4 @@
+"""src/application/mappers/csv_streaming_mapper.py."""
 import csv
 import io
 from collections.abc import Generator, Iterator, Sequence

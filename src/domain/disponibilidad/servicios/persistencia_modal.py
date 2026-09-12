@@ -1,4 +1,4 @@
-"""Persistencia topológica 1-D y selección de modas para distribuciones de potencia."""
+"""src/domain/disponibilidad/servicios/persistencia_modal.py — Persistencia topológica 1-D y selección de modas para distribuciones de potencia."""
 
 import math
 from collections import Counter

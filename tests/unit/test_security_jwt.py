@@ -1,4 +1,4 @@
-"""Fase G5 — JWT robusto: validación de `alg` y rotación de secretos vía clave dual."""
+"""tests/unit/test_security_jwt.py — JWT robusto: validación de `alg` y rotación de secretos vía clave dual."""
 
 import base64
 import hashlib

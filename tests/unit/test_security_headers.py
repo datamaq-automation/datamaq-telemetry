@@ -1,4 +1,4 @@
-"""Fase G4 — Middleware de headers de seguridad en toda respuesta."""
+"""tests/unit/test_security_headers.py — Middleware de headers de seguridad en toda respuesta."""
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient

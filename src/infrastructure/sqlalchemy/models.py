@@ -1,3 +1,4 @@
+"""src/infrastructure/sqlalchemy/models.py."""
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal

@@ -1,3 +1,4 @@
+"""src/domain/telemetria/servicios/agregador_grupo_dispositivos.py."""
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 

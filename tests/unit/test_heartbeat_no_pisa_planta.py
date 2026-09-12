@@ -1,4 +1,4 @@
-"""El refresco de heartbeat de la ingesta no debe pisar planta_id con un valor cacheado obsoleto.
+"""tests/unit/test_heartbeat_no_pisa_planta.py — El refresco de heartbeat de la ingesta no debe pisar planta_id con un valor cacheado obsoleto.
 
 Ver docs de la sesión: reasignar un dispositivo (seed_cliente.py) mientras sigue transmitiendo
 revertía la asignación al siguiente heartbeat, porque ResolvedorDispositivoIngesta reusaba

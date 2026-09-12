@@ -1,3 +1,4 @@
+"""tests/integration/test_cargas_presets_e_intervalos.py."""
 from datetime import datetime, timezone
 from unittest.mock import MagicMock
 

@@ -1,3 +1,4 @@
+"""src/infrastructure/sqlalchemy/repositories/grupos_dispositivos_repository.py."""
 from sqlalchemy.orm import Session
 
 from src.domain.telemetria.entities import Dispositivo, GrupoDispositivos

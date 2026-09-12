@@ -1,4 +1,4 @@
-"""Análisis temporal, cadencia y tasas de variación (|ΔP|/Δt) para clasificar regímenes."""
+"""src/domain/disponibilidad/servicios/dinamica_potencia.py — Análisis temporal, cadencia y tasas de variación (|ΔP|/Δt) para clasificar regímenes."""
 
 import bisect
 import itertools

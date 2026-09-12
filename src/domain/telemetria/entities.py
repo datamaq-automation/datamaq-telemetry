@@ -1,3 +1,4 @@
+"""src/domain/telemetria/entities.py."""
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from decimal import Decimal

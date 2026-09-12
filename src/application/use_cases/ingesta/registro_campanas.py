@@ -1,4 +1,4 @@
-"""Registro en memoria de las campañas activas por dispositivo."""
+"""src/application/use_cases/ingesta/registro_campanas.py — Registro en memoria de las campañas activas por dispositivo."""
 
 import threading
 from datetime import datetime, timezone

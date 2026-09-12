@@ -1,4 +1,4 @@
-"""Campañas de caracterización: apertura, captura, cierre y calibración."""
+"""tests/unit/test_cargas_campanas.py — Campañas de caracterización: apertura, captura, cierre y calibración."""
 
 from datetime import datetime, timedelta, timezone
 

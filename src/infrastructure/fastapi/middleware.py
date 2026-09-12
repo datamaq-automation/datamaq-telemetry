@@ -1,4 +1,4 @@
-"""Middleware de correlación de requests: genera y propaga un request_id único."""
+"""src/infrastructure/fastapi/middleware.py — Middleware de correlación de requests: genera y propaga un request_id único."""
 
 import uuid
 

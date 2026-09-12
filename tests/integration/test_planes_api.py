@@ -1,4 +1,4 @@
-"""Verifica que create_app() registra el router de planes sin conexión a DB."""
+"""tests/integration/test_planes_api.py — Verifica que create_app() registra el router de planes sin conexión a DB."""
 
 from src.infrastructure.fastapi.server import create_app
 

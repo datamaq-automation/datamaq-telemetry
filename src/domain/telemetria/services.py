@@ -1,4 +1,4 @@
-"""Fachada de compatibilidad hacia atrás para los servicios de dominio de telemetría.
+"""src/domain/telemetria/services.py — Fachada de compatibilidad hacia atrás para los servicios de dominio de telemetría.
 
 Los servicios han sido modularizados en submódulos especializados dentro del paquete
 `src.domain.telemetria.servicios`:

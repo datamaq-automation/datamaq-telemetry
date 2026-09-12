@@ -1,4 +1,4 @@
-"""Pruebas unitarias de recuperación y restablecimiento de contraseña vía email."""
+"""tests/unit/test_auth_recuperacion.py — Pruebas unitarias de recuperación y restablecimiento de contraseña vía email."""
 
 from datetime import datetime, timedelta, timezone
 

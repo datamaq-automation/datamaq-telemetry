@@ -1,3 +1,4 @@
+"""src/application/use_cases/atribuir_consumo.py."""
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 

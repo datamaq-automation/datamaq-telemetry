@@ -1,3 +1,4 @@
+"""src/application/use_cases/exportar_cargas.py."""
 from collections.abc import Generator
 from datetime import datetime, timedelta, timezone
 

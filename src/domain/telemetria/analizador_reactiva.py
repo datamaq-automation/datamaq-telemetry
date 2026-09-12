@@ -1,3 +1,4 @@
+"""src/domain/telemetria/analizador_reactiva.py."""
 import math
 
 

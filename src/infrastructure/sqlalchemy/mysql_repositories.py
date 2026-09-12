@@ -1,4 +1,4 @@
-"""Fachada de compatibilidad hacia atrás para los repositorios MySQL de SQLAlchemy.
+"""src/infrastructure/sqlalchemy/mysql_repositories.py — Fachada de compatibilidad hacia atrás para los repositorios MySQL de SQLAlchemy.
 
 Las implementaciones concretas han sido modularizadas en el paquete
 `src.infrastructure.sqlalchemy.repositories` siguiendo principios de

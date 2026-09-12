@@ -1,3 +1,4 @@
+"""src/domain/telemetria/servicios/politicas_suscripcion.py."""
 from datetime import datetime, timedelta, timezone
 
 from src.domain.telemetria.entities import PlanTelemetria

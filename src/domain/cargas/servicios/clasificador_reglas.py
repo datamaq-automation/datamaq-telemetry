@@ -1,4 +1,4 @@
-"""Clasificador heurístico basado en reglas físicas deterministas (NILM por reglas)."""
+"""src/domain/cargas/servicios/clasificador_reglas.py — Clasificador heurístico basado en reglas físicas deterministas (NILM por reglas)."""
 
 from src.domain.cargas.value_objects import (
     CategoriaCarga,

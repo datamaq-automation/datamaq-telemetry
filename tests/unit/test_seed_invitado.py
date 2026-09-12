@@ -1,4 +1,4 @@
-"""Seed de usuario invitado (rol invitado) y login con claim de rol."""
+"""tests/unit/test_seed_invitado.py — Seed de usuario invitado (rol invitado) y login con claim de rol."""
 
 from datetime import datetime
 

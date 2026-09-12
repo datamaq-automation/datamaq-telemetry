@@ -1,4 +1,4 @@
-"""Pruebas de integración de la API de telemetría: registro de rutas, ejecución end-to-end y serialización DTO."""
+"""tests/integration/test_telemetria_api.py — Pruebas de integración de la API de telemetría: registro de rutas, ejecución end-to-end y serialización DTO."""
 
 from datetime import datetime, timezone
 from unittest.mock import MagicMock

@@ -1,3 +1,4 @@
+"""src/application/dtos/alerta_dto.py."""
 from pydantic import BaseModel, ConfigDict
 
 from src.application.dtos.tipos import FechaHoraUTC

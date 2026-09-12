@@ -1,4 +1,4 @@
-"""Fase 4 — Aprovisionamiento MQTT con credenciales y CA TLS."""
+"""tests/unit/test_provision_device.py — Aprovisionamiento MQTT con credenciales y CA TLS."""
 
 import json
 import os

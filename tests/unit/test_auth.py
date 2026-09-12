@@ -1,4 +1,4 @@
-"""Pruebas unitarias del dominio, casos de uso y servicios de autenticación."""
+"""tests/unit/test_auth.py — Pruebas unitarias del dominio, casos de uso y servicios de autenticación."""
 
 from datetime import datetime, timedelta, timezone
 

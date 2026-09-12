@@ -1,4 +1,4 @@
-"""Pruebas de metrología monofásica (1P2W) y saneamiento de fases sin TI (specs/metrologia-monofasica.md)."""
+"""tests/unit/test_metrologia_monofasica.py — Pruebas de metrología monofásica (1P2W) y saneamiento de fases sin TI (specs/metrologia-monofasica.md)."""
 
 from datetime import datetime, timezone
 from typing import Any

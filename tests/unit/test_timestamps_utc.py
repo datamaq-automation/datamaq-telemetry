@@ -1,4 +1,4 @@
-"""Garantías de que todo datetime sale de la API como UTC aware (ISO-8601 con `Z`).
+"""tests/unit/test_timestamps_utc.py — Garantías de que todo datetime sale de la API como UTC aware (ISO-8601 con `Z`).
 
 Un datetime naive serializa como `2026-09-01T23:20:00`, sin offset, y JavaScript lo
 interpreta como hora local: la API mentía por el valor del offset del cliente.

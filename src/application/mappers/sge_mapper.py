@@ -1,3 +1,4 @@
+"""src/application/mappers/sge_mapper.py."""
 from src.application.dtos.sge_dto import SgeDocArticleDTO
 from src.domain.sge.entities import ArticuloSge
 

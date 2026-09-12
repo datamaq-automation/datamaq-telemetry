@@ -1,4 +1,4 @@
-"""Detección de escalones de potencia y su emparejado en episodios."""
+"""src/domain/cargas/servicios/detector_escalones.py — Detección de escalones de potencia y su emparejado en episodios."""
 
 import itertools
 

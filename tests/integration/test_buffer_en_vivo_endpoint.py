@@ -1,4 +1,4 @@
-"""Prueba de integración end-to-end del buffer en RAM de telemetría en vivo.
+"""tests/integration/test_buffer_en_vivo_endpoint.py — Prueba de integración end-to-end del buffer en RAM de telemetría en vivo.
 
 A diferencia de `tests/unit/test_buffer_telemetria_en_vivo.py` (que testea el adapter aislado)
 y de los tests de `test_use_cases.py` (que usan un fake del puerto), esta prueba ejercita el

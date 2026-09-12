@@ -1,3 +1,4 @@
+"""src/infrastructure/fastapi/routes/planes_router.py."""
 from typing import Annotated
 
 from fastapi import APIRouter, Depends

@@ -1,4 +1,4 @@
-"""Fase 3 — Endurecimiento MQTT: TLS, límite de payload, auto-registro y logs."""
+"""tests/unit/test_security_mqtt.py — Endurecimiento MQTT: TLS, límite de payload, auto-registro y logs."""
 
 from unittest.mock import MagicMock
 

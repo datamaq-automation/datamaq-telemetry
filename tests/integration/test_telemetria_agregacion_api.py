@@ -1,4 +1,4 @@
-"""Pruebas de integración de la agregación de energía por periodo (granularity=day|month)."""
+"""tests/integration/test_telemetria_agregacion_api.py — Pruebas de integración de la agregación de energía por periodo (granularity=day|month)."""
 
 from datetime import date
 from unittest.mock import MagicMock

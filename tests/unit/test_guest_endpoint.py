@@ -1,4 +1,4 @@
-"""Endpoint guest (D-04), rate limiting por IP y cabecera Retry-After (D-02)."""
+"""tests/unit/test_guest_endpoint.py — Endpoint guest (D-04), rate limiting por IP y cabecera Retry-After (D-02)."""
 
 from datetime import datetime, timedelta, timezone
 

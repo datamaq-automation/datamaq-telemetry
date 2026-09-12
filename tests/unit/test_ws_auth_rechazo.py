@@ -1,4 +1,4 @@
-"""Pruebas del manejo de rechazo de autenticación en /ws/live (specs/ws-auth-rechazo.md)."""
+"""tests/unit/test_ws_auth_rechazo.py — Pruebas del manejo de rechazo de autenticación en /ws/live (specs/ws-auth-rechazo.md)."""
 
 from datetime import datetime, timedelta, timezone
 

@@ -1,3 +1,4 @@
+"""src/infrastructure/sqlalchemy/repositories/planes_repository.py."""
 from decimal import Decimal
 
 from sqlalchemy.orm import Session

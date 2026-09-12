@@ -1,4 +1,4 @@
-"""Servicios de dominio para disponibilidad y regímenes de operación."""
+"""src/domain/disponibilidad/services.py — Servicios de dominio para disponibilidad y regímenes de operación."""
 
 from src.domain.disponibilidad.servicios.calculador_metricas_oee import (
     CalculadorMetricasOEEService,

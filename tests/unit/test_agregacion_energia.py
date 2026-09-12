@@ -1,4 +1,4 @@
-"""Fase RED — Agregación de energía por periodo (day/month) y su caso de uso."""
+"""tests/unit/test_agregacion_energia.py — Agregación de energía por periodo (day/month) y su caso de uso."""
 
 from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo

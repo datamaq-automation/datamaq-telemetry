@@ -1,4 +1,4 @@
-"""Servicio de dominio para calcular métricas de disponibilidad y OEE."""
+"""src/domain/disponibilidad/servicios/calculador_metricas_oee.py — Servicio de dominio para calcular métricas de disponibilidad y OEE."""
 
 from datetime import datetime
 

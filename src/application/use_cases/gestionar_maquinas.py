@@ -1,3 +1,4 @@
+"""src/application/use_cases/gestionar_maquinas.py."""
 import uuid
 from datetime import datetime, timedelta, timezone
 

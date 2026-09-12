@@ -1,3 +1,4 @@
+"""src/application/use_cases/gestionar_alertas.py."""
 from datetime import datetime, timezone
 
 from src.application.dtos.alerta_dto import AlertaResponseDTO

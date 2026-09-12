@@ -1,3 +1,4 @@
+"""tests/unit/test_cooldown_notificaciones_alertas.py."""
 from datetime import datetime, timedelta, timezone
 
 from src.domain.telemetria.servicios.cooldown_notificaciones import (

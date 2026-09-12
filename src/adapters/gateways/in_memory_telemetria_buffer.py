@@ -1,3 +1,4 @@
+"""src/adapters/gateways/in_memory_telemetria_buffer.py."""
 import threading
 from collections import deque
 

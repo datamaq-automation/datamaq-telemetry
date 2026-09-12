@@ -1,4 +1,4 @@
-"""Pruebas de la configuración de logging (logger.py)."""
+"""tests/unit/test_logger_setup.py — Pruebas de la configuración de logging (logger.py)."""
 
 import logging
 import sys

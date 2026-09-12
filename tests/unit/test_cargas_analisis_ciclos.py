@@ -1,4 +1,4 @@
-"""Extracción y caracterización de ciclos de encendido sobre la serie de potencia."""
+"""tests/unit/test_cargas_analisis_ciclos.py — Extracción y caracterización de ciclos de encendido sobre la serie de potencia."""
 
 from datetime import datetime, timedelta, timezone
 

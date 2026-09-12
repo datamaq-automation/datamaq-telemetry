@@ -1,4 +1,4 @@
-"""Tests unitarios para el script de verificación y auditoría de tamaño de código."""
+"""tests/unit/test_verify_code_size.py — Tests unitarios para el script de verificación y auditoría de tamaño de código."""
 
 from pathlib import Path
 

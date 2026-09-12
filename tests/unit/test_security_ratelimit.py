@@ -1,4 +1,4 @@
-"""Fase G1 — Rate limiter de login singleton y eviction por tope de claves."""
+"""tests/unit/test_security_ratelimit.py — Rate limiter de login singleton y eviction por tope de claves."""
 
 from src.domain.auth.services import RateLimiterService
 from src.infrastructure.fastapi import dependencies as deps

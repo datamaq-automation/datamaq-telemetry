@@ -1,4 +1,4 @@
-"""Pruebas de integración para endpoints de presets e intervalos de actividad por dispositivo."""
+"""tests/integration/test_cargas_presets_e_intervalos_api.py — Pruebas de integración para endpoints de presets e intervalos de actividad por dispositivo."""
 
 from datetime import datetime, timezone
 from unittest.mock import MagicMock

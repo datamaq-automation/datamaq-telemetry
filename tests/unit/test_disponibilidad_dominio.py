@@ -1,4 +1,4 @@
-"""Servicios de dominio de disponibilidad: clasificación, calibración por histograma y anti-transitorios."""
+"""tests/unit/test_disponibilidad_dominio.py — Servicios de dominio de disponibilidad: clasificación, calibración por histograma y anti-transitorios."""
 
 import random
 from datetime import datetime, timedelta, timezone

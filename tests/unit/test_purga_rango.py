@@ -1,4 +1,4 @@
-"""Fase RED — Purga de telemetría por rango temporal (corte_hasta)."""
+"""tests/unit/test_purga_rango.py — Purga de telemetría por rango temporal (corte_hasta)."""
 
 from datetime import datetime, timedelta, timezone
 

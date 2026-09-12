@@ -1,4 +1,4 @@
-"""Helper central para mapear excepciones a errores HTTP con logging correlacionado."""
+"""src/infrastructure/fastapi/error_handler.py — Helper central para mapear excepciones a errores HTTP con logging correlacionado."""
 
 from typing import Any, NoReturn
 

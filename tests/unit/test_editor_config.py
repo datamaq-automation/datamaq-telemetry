@@ -1,4 +1,4 @@
-"""Convención de configuración de editor: alinear Pylance con pyrightconfig.json."""
+"""tests/unit/test_editor_config.py — Convención de configuración de editor: alinear Pylance con pyrightconfig.json."""
 
 from pathlib import Path
 

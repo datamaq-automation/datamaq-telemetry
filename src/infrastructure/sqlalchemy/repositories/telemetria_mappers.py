@@ -1,3 +1,4 @@
+"""src/infrastructure/sqlalchemy/repositories/telemetria_mappers.py."""
 from src.domain.telemetria.entities import (
     AcumuladoEnergia,
     AlertaDispositivo,

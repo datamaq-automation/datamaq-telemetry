@@ -1,4 +1,4 @@
-"""Aislamiento por organización al dar de alta Maquina/ParadaProgramada (hallazgo del frontend)."""
+"""tests/unit/test_aislamiento_organizacion_maquinas.py — Aislamiento por organización al dar de alta Maquina/ParadaProgramada (hallazgo del frontend)."""
 
 from datetime import datetime, timedelta, timezone
 

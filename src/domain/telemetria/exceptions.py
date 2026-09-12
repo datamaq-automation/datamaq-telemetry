@@ -1,3 +1,4 @@
+"""src/domain/telemetria/exceptions.py."""
 class DominioTelemetriaException(Exception):
     """Excepción base del dominio de telemetría."""
 

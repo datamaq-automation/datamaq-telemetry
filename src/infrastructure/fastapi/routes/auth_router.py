@@ -1,3 +1,4 @@
+"""src/infrastructure/fastapi/routes/auth_router.py."""
 from typing import Annotated, Any
 
 import structlog

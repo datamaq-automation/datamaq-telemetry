@@ -1,4 +1,4 @@
-"""Diagnóstico de estacionariedad temporal para modas de potencia."""
+"""src/domain/disponibilidad/servicios/estacionariedad.py — Diagnóstico de estacionariedad temporal para modas de potencia."""
 
 import itertools
 from collections.abc import Callable

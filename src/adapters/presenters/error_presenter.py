@@ -1,3 +1,4 @@
+"""src/adapters/presenters/error_presenter.py."""
 from typing import Any
 
 from src.domain.auth.exceptions import (

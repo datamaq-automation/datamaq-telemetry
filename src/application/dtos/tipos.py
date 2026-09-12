@@ -1,4 +1,4 @@
-"""Tipos anotados compartidos por los DTOs."""
+"""src/application/dtos/tipos.py — Tipos anotados compartidos por los DTOs."""
 
 from datetime import datetime, timezone
 from typing import Annotated

@@ -1,4 +1,4 @@
-"""Verifica que create_app() registra el router de autenticación sin conexión a DB."""
+"""tests/integration/test_auth_api.py — Verifica que create_app() registra el router de autenticación sin conexión a DB."""
 
 from src.infrastructure.fastapi.dependencies import get_usuario_actual
 from src.infrastructure.fastapi.server import create_app
