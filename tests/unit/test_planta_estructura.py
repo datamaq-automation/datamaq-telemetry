@@ -390,3 +390,12 @@ def test_routes_unifilar_y_layout(api_test_client):
     assert res_get_layout.status_code == 200
     assert len(res_get_layout.json()["zonas"]) == 1
     assert res_get_layout.json()["dispositivos"][0]["device_id"] == "D48C49F03564"
+
+    # 6. GET /api/v1/planta/areas
+    res_get_areas = client.get("/api/v1/planta/areas")
+    assert res_get_areas.status_code == 200
+    data_areas = res_get_areas.json()
+    assert data_areas["planta_id"] == "plant-test"
+    assert len(data_areas["areas"]) == 1
+    assert data_areas["areas"][0]["area_id"] == "z-1"
+    assert data_areas["areas"][0]["dispositivos_activos_count"] == 1

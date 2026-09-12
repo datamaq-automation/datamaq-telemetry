@@ -69,3 +69,22 @@ class GuardarLayoutRequestDTO(BaseModel):
     plano_svg_url: str | None = None
     zonas: list[ZonaPlantaDTO] = Field(default_factory=list)
     dispositivos: list[DispositivoLayoutDTO] = Field(default_factory=list)
+
+
+class AreaEstadisticasDTO(BaseModel):
+    area_id: str
+    nombre: str
+    superficie_m2: float | None = None
+    lineas_count: int = 0
+    dispositivos_activos_count: int = 0
+    dispositivos_total_count: int = 0
+    carga_promedio_kw: float = 0.0
+    coordenadas_layout: CoordenadasZonaDTO | None = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PlantaAreasEstadisticasResponseDTO(BaseModel):
+    planta_id: str
+    superficie_total_m2: float | None = None
+    areas: list[AreaEstadisticasDTO] = Field(default_factory=list)
+    model_config = ConfigDict(from_attributes=True)

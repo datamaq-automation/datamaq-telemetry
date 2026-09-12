@@ -417,3 +417,53 @@ def test_update_layout_error_interno():
 
     assert response.status_code == 500
     assert "error interno" in response.json()["detail"].lower()
+
+
+# ============================================================================
+# ESTADÍSTICAS DE ÁREAS (ISA-95 NIVEL 2)
+# ============================================================================
+
+
+def test_get_areas_estadisticas_default_exitoso():
+    client, mock_use_case = _cliente()
+    mock_use_case.obtener_areas_estadisticas.return_value = {
+        "planta_id": "planta-1",
+        "superficie_total_m2": 3500.0,
+        "areas": [
+            {
+                "area_id": "area-1",
+                "nombre": "Zona Forja",
+                "superficie_m2": 1500.0,
+                "lineas_count": 1,
+                "dispositivos_activos_count": 2,
+                "dispositivos_total_count": 2,
+                "carga_promedio_kw": 120.0,
+                "coordenadas_layout": None,
+            }
+        ],
+    }
+
+    response = client.get("/api/v1/planta/areas")
+
+    assert response.status_code == 200
+    mock_use_case.obtener_areas_estadisticas.assert_called_once_with(planta_id=None)
+    data = response.json()
+    assert data["planta_id"] == "planta-1"
+    assert data["superficie_total_m2"] == 3500.0
+    assert len(data["areas"]) == 1
+    assert data["areas"][0]["area_id"] == "area-1"
+
+
+def test_get_areas_estadisticas_by_planta_exitoso():
+    client, mock_use_case = _cliente()
+    mock_use_case.obtener_areas_estadisticas.return_value = {
+        "planta_id": "planta-durax",
+        "superficie_total_m2": 9000.0,
+        "areas": [],
+    }
+
+    response = client.get("/api/v1/plantas/planta-durax/areas")
+
+    assert response.status_code == 200
+    mock_use_case.obtener_areas_estadisticas.assert_called_once_with(planta_id="planta-durax")
+    assert response.json()["planta_id"] == "planta-durax"

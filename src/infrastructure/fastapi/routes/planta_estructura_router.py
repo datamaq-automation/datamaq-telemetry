@@ -8,6 +8,7 @@ from src.application.dtos.planta_estructura_dto import (
     GuardarLayoutRequestDTO,
     GuardarUnifilarRequestDTO,
     LayoutPlantaDTO,
+    PlantaAreasEstadisticasResponseDTO,
     UnifilarPlantaDTO,
 )
 from src.application.use_cases.gestionar_planta_estructura import (
@@ -68,7 +69,7 @@ def update_unifilar(
         manejar_error_http(e)
 
 
-# --- Layout 2D de Planta ---
+# --- Layout de Planta ---
 
 
 @router.get("/planta/layout", response_model=LayoutPlantaDTO)
@@ -105,5 +106,30 @@ def update_layout(
 ):
     try:
         return use_case.guardar_layout(planta_id=planta_id, dto=dto)
+    except Exception as e:
+        manejar_error_http(e)
+
+
+# --- Estadísticas de Áreas (ISA-95 Nivel 2) ---
+
+
+@router.get("/planta/areas", response_model=PlantaAreasEstadisticasResponseDTO)
+def get_areas_estadisticas_default(
+    use_case: Annotated[GestionarPlantaEstructuraUseCase, Depends(get_planta_estructura_use_case)],
+    planta_id: str | None = None,
+):
+    try:
+        return use_case.obtener_areas_estadisticas(planta_id=planta_id)
+    except Exception as e:
+        manejar_error_http(e)
+
+
+@router.get("/plantas/{planta_id}/areas", response_model=PlantaAreasEstadisticasResponseDTO)
+def get_areas_estadisticas_by_planta(
+    planta_id: str,
+    use_case: Annotated[GestionarPlantaEstructuraUseCase, Depends(get_planta_estructura_use_case)],
+):
+    try:
+        return use_case.obtener_areas_estadisticas(planta_id=planta_id)
     except Exception as e:
         manejar_error_http(e)
