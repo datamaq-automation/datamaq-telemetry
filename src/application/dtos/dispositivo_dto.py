@@ -37,8 +37,6 @@ class DispositivoUpdateDTO(BaseModel):
     penalizacion_reactiva_aplica: bool | None = None
     esta_activo: bool | None = None
     planta_id: str | None = None
-    area_id: str | None = None
-    nodo_unifilar_id: str | None = None
 
 
 DispositivoActualizarDTO = DispositivoUpdateDTO

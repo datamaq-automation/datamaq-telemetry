@@ -59,7 +59,7 @@ organizaciones:
             tipo: "acometida"
             tension_nominal_v: 13200.0  # asumido, pendiente de confirmar (ver tmp/dudas.md)
           - id: "nodo-durax-trifasico-1"
-            nombre: "SmartPlus Trifásico #1"
+            nombre: "Trafo Usina"
             tipo: "transformador"
             tension_nominal_v: 380.0
             parent_id: "nodo-durax-acometida-mt"
@@ -68,7 +68,7 @@ organizaciones:
             uso_significativo: true
             categoria_uso: "FUERZA_MOTRIZ"
           - id: "nodo-durax-powermeter-bf2c"
-            nombre: "Powermeter-BF2C"
+            nombre: "Trafo Horno"
             tipo: "transformador"
             tension_nominal_v: 380.0
             parent_id: "nodo-durax-acometida-mt"

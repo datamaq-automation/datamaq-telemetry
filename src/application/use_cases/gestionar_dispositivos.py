@@ -80,7 +80,7 @@ class GestionarDispositivosUseCase:
                     None,
                 )
                 if nodo:
-                    nodo_unifilar_id = nodo.parent_id or nodo.id
+                    nodo_unifilar_id = nodo.id
             except Exception:
                 pass
 
