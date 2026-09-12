@@ -158,6 +158,9 @@ class AtribuirConsumoUseCase:
 
     @staticmethod
     def _atribucion_a_dto(dispositivo_id: str, atribucion: AtribucionConsumo) -> AtribucionConsumoResponseDTO:
+        residual_pct = (
+            round(atribucion.residual_porcentaje * 100, 2) if atribucion.residual_porcentaje is not None else None
+        )
         return AtribucionConsumoResponseDTO(
             dispositivo_id=dispositivo_id,
             desde=atribucion.desde,
@@ -165,13 +168,13 @@ class AtribuirConsumoUseCase:
             energia_total_kwh=atribucion.energia_total_kwh,
             energia_atribuida_kwh=atribucion.energia_atribuida_kwh,
             residual_kwh=atribucion.residual_kwh,
-            residual_porcentaje=atribucion.residual_porcentaje,
+            residual_porcentaje=residual_pct,
             items=[
                 ItemAtribucionDTO(
                     carga_id=i.carga_id,
                     nombre=i.nombre,
                     energia_kwh=i.energia_kwh,
-                    porcentaje=i.porcentaje,
+                    porcentaje=round(i.porcentaje * 100, 2),
                     intervalos=i.intervalos,
                     confianza_media=i.confianza_media,
                 )

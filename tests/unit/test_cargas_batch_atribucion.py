@@ -178,7 +178,9 @@ def test_la_atribucion_reparte_los_kwh_contra_el_contador():
     assert atribucion.energia_total_kwh == 5.0
     assert atribucion.energia_atribuida_kwh > 0
     assert atribucion.residual_kwh is not None
-    assert any(i.nombre == "Termotanque" for i in atribucion.items)
+    assert atribucion.residual_porcentaje is not None
+    assert 0.0 <= atribucion.residual_porcentaje <= 100.0
+    assert any(i.nombre == "Termotanque" and 0.0 <= i.porcentaje <= 100.0 for i in atribucion.items)
 
 
 def test_corregir_un_intervalo_lo_reimputa_y_lo_marca():
