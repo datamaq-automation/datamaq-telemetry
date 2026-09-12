@@ -524,6 +524,22 @@ def test_setup_2fa_error():
     assert response.json()["detail"] == "setup_2fa_invalido"
 
 
+def test_setup_2fa_rechaza_rol_invitado():
+    client, mocks = _cliente(claims={"usuario": "invitado1", "rol": "invitado"})
+    response = client.post("/api/v1/auth/2fa/setup")
+    assert response.status_code == 403
+    assert response.json()["detail"] == "2fa_no_disponible_para_invitado"
+    mocks["setup_2fa"].ejecutar.assert_not_called()
+
+
+def test_setup_2fa_rechaza_rol_invitado_global():
+    client, mocks = _cliente(claims={"usuario": "invitado_glob", "rol": "invitado_global"})
+    response = client.post("/api/v1/auth/2fa/setup")
+    assert response.status_code == 403
+    assert response.json()["detail"] == "2fa_no_disponible_para_invitado"
+    mocks["setup_2fa"].ejecutar.assert_not_called()
+
+
 # ==============================================================================
 # 8. 2FA: ACTIVAR
 # ==============================================================================
@@ -590,6 +606,36 @@ def test_activar_2fa_codigo_invalido():
     assert response.json()["detail"] == "codigo_2fa_invalido"
 
 
+def test_activar_2fa_rechaza_rol_invitado():
+    client, mocks = _cliente(claims={"usuario": "invitado1", "rol": "invitado"})
+    response = client.post(
+        "/api/v1/auth/2fa/activar",
+        json={
+            "secret": "JBSWY3DPEHPK3PXP1234",
+            "codigo": "000000",
+            "backup_codes": ["code1"],
+        },
+    )
+    assert response.status_code == 403
+    assert response.json()["detail"] == "2fa_no_disponible_para_invitado"
+    mocks["activar_2fa"].ejecutar.assert_not_called()
+
+
+def test_activar_2fa_rechaza_rol_invitado_global():
+    client, mocks = _cliente(claims={"usuario": "invitado_glob", "rol": "invitado_global"})
+    response = client.post(
+        "/api/v1/auth/2fa/activar",
+        json={
+            "secret": "JBSWY3DPEHPK3PXP1234",
+            "codigo": "000000",
+            "backup_codes": ["code1"],
+        },
+    )
+    assert response.status_code == 403
+    assert response.json()["detail"] == "2fa_no_disponible_para_invitado"
+    mocks["activar_2fa"].ejecutar.assert_not_called()
+
+
 # ==============================================================================
 # 9. 2FA: DESACTIVAR
 # ==============================================================================
@@ -642,6 +688,28 @@ def test_desactivar_2fa_credenciales_invalidas():
     )
     assert response.status_code == 401
     assert response.json()["detail"] == "credenciales_invalidas"
+
+
+def test_desactivar_2fa_rechaza_rol_invitado():
+    client, mocks = _cliente(claims={"usuario": "invitado1", "rol": "invitado"})
+    response = client.post(
+        "/api/v1/auth/2fa/desactivar",
+        json={"contrasena": "Clave123!", "codigo": "123456"},
+    )
+    assert response.status_code == 403
+    assert response.json()["detail"] == "2fa_no_disponible_para_invitado"
+    mocks["desactivar_2fa"].ejecutar.assert_not_called()
+
+
+def test_desactivar_2fa_rechaza_rol_invitado_global():
+    client, mocks = _cliente(claims={"usuario": "invitado_glob", "rol": "invitado_global"})
+    response = client.post(
+        "/api/v1/auth/2fa/desactivar",
+        json={"contrasena": "Clave123!", "codigo": "123456"},
+    )
+    assert response.status_code == 403
+    assert response.json()["detail"] == "2fa_no_disponible_para_invitado"
+    mocks["desactivar_2fa"].ejecutar.assert_not_called()
 
 
 # ==============================================================================

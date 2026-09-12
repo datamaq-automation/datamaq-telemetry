@@ -45,6 +45,7 @@ from src.infrastructure.fastapi.dependencies import (
     get_settings_dep,
     get_solicitar_recuperacion_use_case,
     get_usuario_actual,
+    no_permitido_para_invitados_2fa,
 )
 from src.infrastructure.fastapi.error_handler import manejar_error_http
 from src.infrastructure.settings.config import Settings
@@ -177,7 +178,11 @@ def verificar_2fa(
         manejar_error_http(e)
 
 
-@router.post("/2fa/setup", response_model=Setup2FAResponseDTO)
+@router.post(
+    "/2fa/setup",
+    response_model=Setup2FAResponseDTO,
+    dependencies=[Depends(no_permitido_para_invitados_2fa)],
+)
 def setup_2fa(
     claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
     use_case: Annotated[Setup2FAUseCase, Depends(get_setup_2fa_use_case)],
@@ -189,7 +194,11 @@ def setup_2fa(
         manejar_error_http(e)
 
 
-@router.post("/2fa/activar", response_model=Operacion2FAResponseDTO)
+@router.post(
+    "/2fa/activar",
+    response_model=Operacion2FAResponseDTO,
+    dependencies=[Depends(no_permitido_para_invitados_2fa)],
+)
 def activar_2fa(
     dto: Activar2FARequestDTO,
     claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
@@ -202,7 +211,11 @@ def activar_2fa(
         manejar_error_http(e)
 
 
-@router.post("/2fa/desactivar", response_model=Operacion2FAResponseDTO)
+@router.post(
+    "/2fa/desactivar",
+    response_model=Operacion2FAResponseDTO,
+    dependencies=[Depends(no_permitido_para_invitados_2fa)],
+)
 def desactivar_2fa(
     dto: Desactivar2FARequestDTO,
     claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],

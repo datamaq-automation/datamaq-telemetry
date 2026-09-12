@@ -403,3 +403,14 @@ def requiere_rol_escritura(claims: Annotated[dict[str, Any], Depends(get_usuario
     if claims.get("rol") in ("invitado", "invitado_global"):
         raise HTTPException(status_code=403, detail="forbidden")
     return claims
+
+
+def no_permitido_para_invitados_2fa(
+    claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
+) -> dict[str, Any]:
+    """Rechaza con 403 intentos de configuración, activación o desactivación de 2FA
+    por parte de usuarios con roles efímeros o no persistentes (invitado e invitado_global).
+    """
+    if claims.get("rol") in ("invitado", "invitado_global"):
+        raise HTTPException(status_code=403, detail="2fa_no_disponible_para_invitado")
+    return claims
