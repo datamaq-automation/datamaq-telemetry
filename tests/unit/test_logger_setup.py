@@ -4,6 +4,8 @@ import logging
 import sys
 from unittest.mock import MagicMock
 
+import pytest
+
 from src.infrastructure.settings.config import get_settings
 from src.infrastructure.settings.logger import (
     StructlogAdapter,
@@ -12,6 +14,22 @@ from src.infrastructure.settings.logger import (
     setup_logging,
     uvicorn_style_renderer,
 )
+
+
+@pytest.fixture(autouse=True)
+def _restaurar_root_logger():
+    """setup_logging() reemplaza los handlers del root logger con un StreamHandler que
+    congela la referencia a `sys.stdout` vigente en ese momento — si esta suite deja esa
+    configuración puesta, tests de otros módulos que dependan de `capsys` para leer logs
+    posteriores fallan en silencio (el handler sigue escribiendo al `sys.stdout` viejo).
+    Restaurar los handlers originales después de cada test evita ensuciar el resto de la suite.
+    """
+    root_logger = logging.getLogger()
+    handlers_originales = root_logger.handlers[:]
+    nivel_original = root_logger.level
+    yield
+    root_logger.handlers[:] = handlers_originales
+    root_logger.setLevel(nivel_original)
 
 
 def test_redactar_secretos():

@@ -55,7 +55,7 @@ def test_create_tables_if_needed_error(monkeypatch, capsys):
 
     create_tables_if_needed()
 
-    assert "Could not auto-create" in capsys.readouterr().out
+    assert "auto_create_tables_failed" in capsys.readouterr().out
 
 
 def test_verificar_estado_migraciones_sincronizado(monkeypatch):
