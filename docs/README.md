@@ -56,6 +56,9 @@ Bienvenido al centro de documentación técnica del backend de telemetría de en
 * 📄 [`docs/desagregacion-cargas-nilm.md`](file:///home/agustin/proyectos_software/datamaq-telemetry/docs/desagregacion-cargas-nilm.md)
   *Desagregación de Cargas (NILM) sobre un Medidor Agregado:* Implementación del paso 4 del roadmap anterior. Cubre qué es y qué no es inferible a 300 s de cadencia (tabla por aparato), el catálogo genérico de `Carga`, las campañas de caracterización activa y pasiva que miden firmas reales poniendo el medidor en ráfaga sin tocar la cadencia permanente, la detección de escalones (ΔP, ΔQ) y su emparejado en episodios, la desambiguación por duración de cargas resistivas indistinguibles en potencia, el motor batch idempotente de atribución de kWh contra el contador acumulado, el residual `NO_ATRIBUIDO` como salida de primera clase, y el bucle de corrección humana que construye el dataset etiquetado.
 
+* 📄 [`docs/asistente-conversacional-diseno.md`](file:///home/agustin/proyectos_software/datamaq-telemetry/docs/asistente-conversacional-diseno.md)
+  *Asistente Conversacional (Chatbot) — Diseño Conceptual:* Chatbot dentro de la app que explica en lenguaje natural el estado de la planta del usuario logueado (telemetría, alertas, disponibilidad, cargas), con aislamiento multi-tenant estricto por `organizacion_id`. Restricción de partida: VPS sin GPU, por lo que la clasificación de intención corre local (embeddings en CPU) y la generación de texto se delega a Groq. Certezas, dudas abiertas y notas de implementación previas al diseño técnico cerrado.
+
 ---
 
 ## ⚡ Guías de Desarrollo Rápidas
