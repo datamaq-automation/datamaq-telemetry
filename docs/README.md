@@ -60,6 +60,8 @@ Bienvenido al centro de documentación técnica del backend de telemetría de en
 
 ## ⚡ Guías de Desarrollo Rápidas
 
+* 📄 [`docs/entornos.md`](file:///home/agustin/proyectos_software/datamaq-telemetry/docs/entornos.md)
+  *Entornos del proyecto:* rutas absolutas de cada entorno de desarrollo (laptop y PC de escritorio) y del entorno de producción (VPS vía `ssh vps`).
 * Para el historial cronológico de cambios de la plataforma: [`CHANGELOG.md`](file:///home/agustin/proyectos_software/datamaq-telemetry/CHANGELOG.md)
 * Para convenciones de código, Clean Architecture y nomenclatura de DTOs: [`CONVENTIONS.md`](file:///home/agustin/proyectos_software/datamaq-telemetry/CONVENTIONS.md)
 * Para instrucciones de agentes y reglas de dependencias: [`AGENTS.md`](file:///home/agustin/proyectos_software/datamaq-telemetry/AGENTS.md)
