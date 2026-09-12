@@ -1,3 +1,4 @@
+"""src/infrastructure/sqlalchemy/database.py."""
 from collections.abc import Generator
 from functools import lru_cache
 from pathlib import Path
@@ -49,7 +50,7 @@ def create_tables_if_needed():
         engine = get_engine()
         Base.metadata.create_all(bind=engine)
     except Exception as e:
-        print(f"[Warning] Could not auto-create tables on start: {e}")
+        logger.warning("auto_create_tables_failed", error=str(e))
 
 
 def verificar_estado_migraciones(engine: Engine | None = None) -> dict[str, Any]:
