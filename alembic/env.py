@@ -11,6 +11,9 @@ from src.infrastructure.sqlalchemy.models import Base
 # de cargas en `Base.metadata` para que autogenerate las vea.
 from src.infrastructure.sqlalchemy import models_cargas  # noqa: F401  isort:skip
 
+# Idem para el contexto del asistente conversacional.
+from src.infrastructure.sqlalchemy import models_asistente  # noqa: F401  isort:skip
+
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
