@@ -68,3 +68,17 @@ class DispositivoConfiable:
         if ip is not None and not self.coincide_red(ip):
             return False
         return True
+
+
+@dataclass
+class AccesoPlantaUsuario:
+    """Fila de `user_facility_access`: una planta a la que un usuario puede acceder.
+
+    `puede_cambiar=False` significa que la planta está fija para ese usuario: el
+    selector de planta del frontend se muestra bloqueado en `planta_activa_id`.
+    """
+
+    usuario_id: str
+    planta_id: str
+    puede_cambiar: bool = True
+    creado_en: datetime = field(default_factory=ahora_utc)

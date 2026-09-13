@@ -20,6 +20,30 @@ class LoginResponseDTO(BaseModel):
     device_trust_token: str | None = Field(default=None, exclude=True)
 
 
+class PlantaAccesoDTO(BaseModel):
+    """Planta visible para el usuario autenticado y si puede cambiar la activa (R-02)."""
+
+    id: str
+    nombre: str
+    organizacion_id: str
+    puede_cambiar: bool
+
+
+class AsignarPlantaRequestDTO(BaseModel):
+    planta_id: str = Field(min_length=1, max_length=36)
+    puede_cambiar: bool = False
+
+
+class AsignarPlantasRequestDTO(BaseModel):
+    """Reemplaza el conjunto completo de plantas asignadas a un usuario.
+
+    Lista vacía = volver al comportamiento por defecto (todas las plantas de su
+    organización, con permiso de cambio).
+    """
+
+    plantas: list[AsignarPlantaRequestDTO] = Field(default_factory=list, max_length=100)
+
+
 class MeResponseDTO(BaseModel):
     usuario: str
     rol: Literal[
@@ -35,6 +59,8 @@ class MeResponseDTO(BaseModel):
     totp_enabled: bool = False
     organizacion_id: str | None = None
     organizacion_nombre: str | None = None
+    plantas: list[PlantaAccesoDTO] = Field(default_factory=list)
+    planta_activa_id: str | None = None
 
 
 class Verificar2FARequestDTO(BaseModel):

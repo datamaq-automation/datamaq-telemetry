@@ -16,7 +16,7 @@ RAIZ = Path(__file__).resolve().parents[2]
 ALEMBIC_INI = RAIZ / "alembic.ini"
 ENV_PY = RAIZ / "alembic" / "env.py"
 REVISION_INICIAL = "209ce0774d59"
-REVISION_HEAD = "m7n8o9p0q1r2"
+REVISION_HEAD = "n8o9p0q1r2s3"
 
 TABLAS_MODELO = {
     "plans",

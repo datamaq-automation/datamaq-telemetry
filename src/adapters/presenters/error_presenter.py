@@ -13,6 +13,7 @@ from src.domain.auth.exceptions import (
     TokenMFAPendienteInvalidoError,
     TokenRecuperacionInvalidoError,
     UsuarioInactivoError,
+    UsuarioNoEncontradoError,
 )
 from src.domain.cargas.exceptions import (
     CampanaNoEncontradaError,
@@ -63,6 +64,7 @@ class ErrorPresenter:
                 GrupoDispositivosNoEncontradoError,
                 ArticuloSgeNoEncontradoError,
                 NodoUnifilarNoEncontradoError,
+                UsuarioNoEncontradoError,
             ),
         ):
             return 404, {"error": "NotFound", "mensaje": exc.mensaje}

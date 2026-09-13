@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any
 
-from src.domain.auth.entities import DispositivoConfiable, UsuarioAuth
+from src.domain.auth.entities import AccesoPlantaUsuario, DispositivoConfiable, UsuarioAuth
 
 
 class RepositorioUsuariosPort(ABC):
@@ -17,6 +17,23 @@ class RepositorioUsuariosPort(ABC):
 
     @abstractmethod
     def guardar(self, usuario: UsuarioAuth) -> UsuarioAuth:
+        pass
+
+
+class RepositorioAccesosPlantaPort(ABC):
+    """Asignación explícita usuario ↔ planta (`user_facility_access`).
+
+    Sin filas para un usuario, la política de dominio cae al comportamiento
+    histórico: todas las plantas de su organización, con permiso de cambio.
+    """
+
+    @abstractmethod
+    def listar_por_usuario(self, usuario_id: str) -> list[AccesoPlantaUsuario]:
+        pass
+
+    @abstractmethod
+    def reemplazar(self, usuario_id: str, accesos: list[AccesoPlantaUsuario]) -> list[AccesoPlantaUsuario]:
+        """Sustituye el conjunto completo de accesos del usuario (idempotente)."""
         pass
 
 

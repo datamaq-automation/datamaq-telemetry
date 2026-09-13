@@ -8,6 +8,9 @@ import secrets
 import time
 from datetime import datetime, timedelta, timezone
 
+from src.domain.auth.entities import AccesoPlantaUsuario
+from src.domain.telemetria.entities import Planta
+
 
 class HashContrasenaService:
     """Hashea y verifica contraseñas con scrypt (stdlib, sin dependencias)."""
@@ -63,6 +66,50 @@ class HashContrasenaService:
             dklen=len(esperado),
         )
         return hmac.compare_digest(digest, esperado)
+
+
+ROLES_ACCESO_GLOBAL: frozenset[str] = frozenset({"superadmin", "invitado_global"})
+
+
+class PoliticaAccesoPlantasService:
+    """Decide a qué plantas accede un usuario y si puede cambiar la activa.
+
+    Reglas, en orden:
+    1. Roles globales (`superadmin`, `invitado_global`): todas las plantas de todas
+       las organizaciones, siempre con permiso de cambio. La tabla de asignaciones
+       no aplica para ellos.
+    2. Usuario con filas explícitas en `user_facility_access`: solo esas plantas,
+       acotadas a su organización (una fila que apunte a otra org se ignora), con
+       el `puede_cambiar` de cada fila.
+    3. Usuario sin filas: comportamiento histórico, todas las plantas de su
+       organización con permiso de cambio.
+
+    La planta activa es la primera de la lista resultante (orden de asignación
+    para el caso 2, orden del YAML para los otros).
+    """
+
+    @staticmethod
+    def resolver(
+        rol: str,
+        organizacion_id: str | None,
+        plantas: list[Planta],
+        accesos: list[AccesoPlantaUsuario],
+    ) -> list[tuple[Planta, bool]]:
+        if rol in ROLES_ACCESO_GLOBAL:
+            return [(p, True) for p in plantas]
+        propias = [p for p in plantas if organizacion_id is not None and p.organizacion_id == organizacion_id]
+        if not accesos:
+            return [(p, True) for p in propias]
+        por_id = {p.id: p for p in propias}
+        resultado: list[tuple[Planta, bool]] = []
+        vistas: set[str] = set()
+        for acceso in sorted(accesos, key=lambda a: (a.creado_en, a.planta_id)):
+            planta = por_id.get(acceso.planta_id)
+            if planta is None or planta.id in vistas:
+                continue
+            vistas.add(planta.id)
+            resultado.append((planta, acceso.puede_cambiar))
+        return resultado
 
 
 class PoliticaExpiracionService:

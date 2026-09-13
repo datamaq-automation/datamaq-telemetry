@@ -12,11 +12,13 @@ from src.application.use_cases.gestionar_2fa import (
     Setup2FAUseCase,
     Verificar2FAUseCase,
 )
+from src.application.use_cases.gestionar_acceso_plantas import GestionarAccesoPlantasUseCase
 from src.application.use_cases.gestionar_dispositivos_confiables import (
     RevocarDispositivosConfiablesUseCase,
 )
 from src.domain.auth.ports import (
     CifradorSecreto2FAPort,
+    RepositorioAccesosPlantaPort,
     RepositorioDispositivosConfiablesPort,
     RepositorioUsuariosPort,
     ServicioTOTPPort,
@@ -29,9 +31,11 @@ from src.infrastructure.fastapi.dependencies import get_rate_limiter
 from src.infrastructure.settings.config import get_settings
 from src.infrastructure.sqlalchemy.database import get_db_session
 from src.infrastructure.sqlalchemy.mysql_repositories import (
+    MySQLAccesosPlantaRepository,
     MySQLDispositivosConfiablesRepository,
     MySQLUsuariosRepository,
 )
+from src.infrastructure.yaml.repositories.organizaciones_repository import YamlOrganizacionesRepository
 
 
 def get_usuarios_repository(
@@ -46,11 +50,25 @@ def get_dispositivos_confiables_repository(
     return MySQLDispositivosConfiablesRepository(db)
 
 
+def get_accesos_planta_repository(
+    db: Annotated[Session, Depends(get_db_session)],
+) -> RepositorioAccesosPlantaPort:
+    return MySQLAccesosPlantaRepository(db)
+
+
+def get_acceso_plantas_use_case(
+    repo_accesos: Annotated[RepositorioAccesosPlantaPort, Depends(get_accesos_planta_repository)],
+    repo_usuarios: Annotated[RepositorioUsuariosPort, Depends(get_usuarios_repository)],
+) -> GestionarAccesoPlantasUseCase:
+    return GestionarAccesoPlantasUseCase(repo_accesos, YamlOrganizacionesRepository(), repo_usuarios)
+
+
 def get_auth_use_case(
     repo_usuarios: Annotated[RepositorioUsuariosPort, Depends(get_usuarios_repository)],
     repo_dispositivos: Annotated[
         RepositorioDispositivosConfiablesPort, Depends(get_dispositivos_confiables_repository)
     ],
+    acceso_plantas: Annotated[GestionarAccesoPlantasUseCase, Depends(get_acceso_plantas_use_case)],
 ) -> AutenticarUsuarioUseCase:
     settings = get_settings()
     rate_limiter = get_rate_limiter()
@@ -62,6 +80,7 @@ def get_auth_use_case(
         rate_limiter=rate_limiter,
         guest_organizacion_id=settings.GUEST_ORGANIZATION_ID,
         repo_dispositivos=repo_dispositivos,
+        acceso_plantas=acceso_plantas,
     )
 
 

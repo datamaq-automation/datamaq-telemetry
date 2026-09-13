@@ -33,6 +33,7 @@ erDiagram
     ORGANIZATIONS ||--o{ USERS : "FK_organization_id"
     PLANS ||--o{ ORGANIZATIONS : "FK_plan_id"
     USERS ||--o{ DISPOSITIVOS_CONFIABLES : "FK_usuario_id"
+    USERS ||--o{ USER_FACILITY_ACCESS : "FK_user_id"
 
     CAMPAIGN_SAMPLES {
         bigint id PK
@@ -331,6 +332,13 @@ erDiagram
         decimal thd_i_t
         decimal thd_v_promedio_porcentaje
         decimal thd_i_total_porcentaje
+        datetime created_at
+    }
+
+    USER_FACILITY_ACCESS {
+        string user_id PK
+        string facility_id PK
+        boolean can_switch
         datetime created_at
     }
 
@@ -742,6 +750,18 @@ erDiagram
 **Índices:**
 - `idx_telemetry_inst_dev_time`: (`device_id`, `recorded_at`)
 - `idx_telemetry_inst_time`: (`recorded_at`)
+
+### Tabla `user_facility_access`
+
+| Columna | Tipo SQL | Clave / Restricción | Nullable |
+| :--- | :--- | :--- | :--- |
+| `user_id` | `VARCHAR(36)` | **PRIMARY KEY**, FK -> `users.id` | No |
+| `facility_id` | `VARCHAR(36)` | **PRIMARY KEY** | No |
+| `can_switch` | `BOOLEAN` | - | No |
+| `created_at` | `DATETIME` | - | No |
+
+**Índices:**
+- `idx_user_facility_access_facility`: (`facility_id`)
 
 ### Tabla `users`
 

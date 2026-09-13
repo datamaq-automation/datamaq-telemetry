@@ -431,3 +431,20 @@ class UserModel(Base):
     )
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, onupdate=ahora_utc, nullable=False)
+
+
+class UserFacilityAccessModel(Base):
+    """Asignación explícita usuario ↔ planta (R-02 del frontend).
+
+    `facility_id` no lleva FK: las plantas son SSOT del YAML declarativo
+    (`data/organizaciones.yml`), igual que `users.organization_id` se valida
+    contra el YAML en startup y no contra `facilities`.
+    """
+
+    __tablename__ = "user_facility_access"
+    __table_args__ = (Index("idx_user_facility_access_facility", "facility_id"),)
+
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    facility_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    can_switch: Mapped[bool] = mapped_column(default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)

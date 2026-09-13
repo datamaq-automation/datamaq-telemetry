@@ -3,6 +3,7 @@
 from typing import Any
 
 from src.application.dtos.auth_dto import LoginRequestDTO, LoginResponseDTO, MeResponseDTO
+from src.application.use_cases.gestionar_acceso_plantas import GestionarAccesoPlantasUseCase
 from src.domain.auth.entities import ahora_utc
 from src.domain.auth.exceptions import CredencialesInvalidasError, DemasiadosIntentosError, UsuarioInactivoError
 from src.domain.auth.ports import (
@@ -42,6 +43,7 @@ class AutenticarUsuarioUseCase:
         rate_limiter: RateLimiterService | None = None,
         guest_organizacion_id: str | None = None,
         repo_dispositivos: RepositorioDispositivosConfiablesPort | None = None,
+        acceso_plantas: GestionarAccesoPlantasUseCase | None = None,
     ):
         self.repo_usuarios = repo_usuarios
         self.hash_service = hash_service
@@ -50,6 +52,7 @@ class AutenticarUsuarioUseCase:
         self.rate_limiter = rate_limiter
         self.guest_organizacion_id = guest_organizacion_id
         self.repo_dispositivos = repo_dispositivos
+        self.acceso_plantas = acceso_plantas
 
     def _registrar_intento(self, clave: str) -> None:
         if self.rate_limiter is not None:
@@ -158,10 +161,16 @@ class AutenticarUsuarioUseCase:
         if user and user.organizacion_id:
             org_id = user.organizacion_id
 
+        plantas = []
+        if self.acceso_plantas is not None:
+            plantas = self.acceso_plantas.resolver(user.id if user else None, str(rol), org_id)
+
         return MeResponseDTO(
             usuario=usuario,
             rol=rol,
             totp_enabled=totp_enabled,
             organizacion_id=org_id,
             organizacion_nombre=org_nombre,
+            plantas=plantas,
+            planta_activa_id=GestionarAccesoPlantasUseCase.planta_activa(plantas),
         )

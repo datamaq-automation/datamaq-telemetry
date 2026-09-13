@@ -5,6 +5,9 @@ Las implementaciones concretas han sido modularizadas en el paquete
 Single Responsibility (SRP) y Screaming Architecture.
 """
 
+from src.infrastructure.sqlalchemy.repositories.accesos_planta_repository import (
+    MySQLAccesosPlantaRepository,
+)
 from src.infrastructure.sqlalchemy.repositories.campanas_repository import (
     MySQLCampanasRepository,
 )
@@ -43,6 +46,7 @@ from src.infrastructure.sqlalchemy.repositories.usuarios_repository import (
 )
 
 __all__ = [
+    "MySQLAccesosPlantaRepository",
     "MySQLCampanasRepository",
     "MySQLCargasRepository",
     "MySQLDispositivosConfiablesRepository",
