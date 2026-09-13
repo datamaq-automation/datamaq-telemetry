@@ -5,9 +5,9 @@
 > `docs/adr-001-no-redis-cache.md` para el contexto de la sesión completa; el detalle del
 > incidente vive en el mensaje del commit `e216396`).
 >
-> **Estado:** aprobado en su totalidad. Algunos ítems dependen de datos que todavía no están
-> disponibles (webhook, destino de backup) o de una decisión de presupuesto (staging) — quedan
-> documentados, no bloquean el resto.
+> **Estado:** aprobado en su totalidad. 7 de 9 ítems resueltos (D-1 descartado por plan de GitHub,
+> D-2/D-4/D-6/D-7/D-8/D-9 hechos). Quedan D-3 (falta token de Telegram) y D-5 (falta enganchar el
+> staging de D-4 al pipeline de CD).
 
 ## Resumen
 
@@ -15,11 +15,11 @@
 |---|---|---|---|
 | D-1 | Required reviewers en Environment `production` | ❌ No disponible en este plan de GitHub | — |
 | D-2 | Guard anti-`.env` commiteado | ✅ Hecho | `scripts/guard_secrets.sh`, CI, pre-push |
-| D-3 | Alerta de deploy fallido a un canal | ⏸ Pendiente de un webhook (Slack/Discord/Telegram) | — |
-| D-4 | Ambiente de staging | ⏸ Pendiente de decisión de infra/presupuesto | — |
-| D-5 | Backup + stop antes de migrar, en el propio CD | ⏸ Depende de D-4 | — |
-| D-6 | Backup de la base fuera del VPS actual | ⏸ Pendiente de un destino | — |
-| D-7 | Logs centralizados con retención larga | ⏸ Pendiente de un destino | — |
+| D-3 | Alerta de deploy fallido a un canal | ⏸ Telegram confirmado, falta token del bot y chat_id | — |
+| D-4 | Ambiente de staging | ✅ Hecho — PC local de escritorio, no el VPS (ver nota) | `~/backups/datamaq-telemetry/refresh_staging.sh` (no está en git, es de esta PC) |
+| D-5 | Backup + stop antes de migrar, en el propio CD | ⏸ Sigue pendiente — hoy el refresh de staging es manual, no está enganchado al CD | — |
+| D-6 | Backup de la base fuera del VPS actual | ✅ Hecho — PC local de escritorio, timer diario 04:30 | `~/backups/datamaq-telemetry/backup_diario.sh` (no está en git) |
+| D-7 | Logs centralizados con retención larga | ✅ Hecho — PC local, timer diario 04:45, 30 días de retención | `~/backups/datamaq-telemetry/logs_diario.sh` (no está en git) |
 | D-8 | Aislamiento por cgroups del servicio | ✅ Hecho | VPS: `/etc/systemd/system/datamaq-telemetry.service.d/limits.conf` (no está en git) |
 | D-9 | Actions sobre Node 24 (sacar warning de Node 20) | ✅ Hecho | `.github/workflows/*.yml` |
 
@@ -47,6 +47,41 @@ upgrade de plan de GitHub (Team/Enterprise habilitan esto).
 - **CI:** primer step de `.github/workflows/ci.yml`, antes de instalar dependencias — server-side,
   no evitable con `git push --no-verify` ni desde una máquina sin el hook configurado
   (`git config core.hooksPath .githooks`).
+
+## D-4 · Staging — PC local, no "el mismo VPS con un medidor"
+
+Se evaluó y **se descartó** la alternativa de usar el propio VPS de producción como staging
+(acotado a un solo medidor). Dos motivos, en orden de importancia:
+
+1. **Cero aislamiento real.** Un error de una migración de prueba (bloqueo de tabla, disco lleno,
+   MySQL caído) pasa en el mismo MySQL, mismo disco, misma RAM que usa producción — exactamente lo
+   que un staging existe para evitar. La migración de WP2 de hoy tuvo una condición de carrera real
+   que, de haber corrido "en el mismo VPS", habría afectado el servicio real mientras se investigaba.
+2. **Acotar a un solo medidor esconde justo los problemas que importan.** Los bugs de hoy (WP1 con
+   ~87 000 filas por consulta, WP2 con 123 000 filas duplicadas) aparecen por volumen y por
+   varios medidores interactuando — un dataset de un solo medidor da falsa confianza.
+
+**Lo que se implementó en cambio:** la PC de escritorio de Agustín ya tenía una base MySQL local
+con datos reales de los 5 medidores (la que se usó para ensayar la migración de WP2 durante la
+sesión). Cumple los dos requisitos de un staging — está genuinamente aislada del VPS (un error acá
+no lo toca) y tiene datos a escala real, no un subconjunto — y no cuesta un servidor nuevo.
+
+- `~/backups/datamaq-telemetry/refresh_staging.sh`: restaura la base local desde el backup más
+  reciente de D-6 (o uno puntual, como argumento). Deja la base al mismo estado de migraciones que
+  el VPS en el momento del backup — verificado hoy: `m7n8o9p0q1r2 (head)` en ambos lados.
+- Flujo para ensayar una migración: `bash refresh_staging.sh` → `DATABASE_URL=... alembic upgrade head`
+  contra la base local → si sale limpio, recién ahí correr contra el VPS real.
+- **No versionado**: estos tres scripts (`backup_diario.sh`, `logs_diario.sh`,
+  `refresh_staging.sh`) viven en `~/backups/datamaq-telemetry/` de esta PC, fuera del repo — son
+  configuración de esta máquina, no del proyecto. Si en algún momento se decide que otra persona
+  también necesite este flujo, conviene versionarlos en `scripts/` con las credenciales por
+  variable de entorno en vez de hardcodeadas.
+
+**Límite de este staging, dicho explícitamente:** el refresh es manual, no corre servicio
+`datamaq-telemetry` real contra la base local (solo se prueban migraciones de Alembic, no
+comportamiento end-to-end de la API), y depende de que la PC esté prendida y con red hacia el VPS
+para refrescarse. Es una mejora real sobre "ensayar a mano cada vez", no un staging de nivel
+producción.
 
 ## D-8 · Aislamiento por cgroups
 
@@ -77,8 +112,7 @@ Inputs verificados sin cambios rotos para el uso actual del repo.
 
 ## Pendientes con dato faltante
 
-- **D-3** (alerta de deploy fallido): falta una URL de webhook real.
-- **D-6** (backup fuera del host): falta definir destino (otro VPS, bucket, etc.).
-- **D-7** (logs centralizados): falta definir destino/herramienta.
-- **D-4 / D-5** (staging + backup-antes-de-migrar en el CD): decisión de infra/presupuesto, en
-  espera.
+- **D-3** (alerta de deploy fallido): canal confirmado (Telegram) — falta el token del bot y el
+  `chat_id` para conectarlo al step de CI.
+- **D-5** (backup + stop antes de migrar, dentro del propio CD): sigue pendiente. Hoy el ensayo en
+  staging (D-4) es un paso manual antes de tocar el VPS, no algo que el pipeline haga solo.
