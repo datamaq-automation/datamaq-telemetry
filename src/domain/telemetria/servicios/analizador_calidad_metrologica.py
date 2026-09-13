@@ -176,6 +176,16 @@ class AnalizadorMetrologicoService:
 
     @classmethod
     def _evaluar_abstencion_enre(cls, dispositivo: object | None) -> str | None:
+        """Exención del cargo por bajo FP (Programa de Mejora del FP, ENRE).
+
+        La frontera real es la categoría tarifaria **T1-R residencial**, no la
+        cantidad de fases ni la demanda contratada: un T1-G (comercio, consorcio,
+        edificio chico) con medidor que registra reactiva está alcanzado aunque
+        sea monofásico y tenga poca demanda. Antes esta función eximía por
+        "es monofásico" o "demanda < 10 kW", que exime de más — un T1-G
+        monofásico quedaba fuera del cargo por error. Solo la categoría
+        tarifaria explícita (o el flag `penalizacion_reactiva_aplica`) decide.
+        """
         if dispositivo is None:
             return None
         if getattr(dispositivo, "penalizacion_reactiva_aplica", True) is False:
@@ -183,17 +193,8 @@ class AnalizadorMetrologicoService:
         cat = (getattr(dispositivo, "categoria_tarifaria", None) or "").upper()
         if cat in ("T1-R", "T1_R") or "RESIDENCIAL" in cat:
             return "TARIFA_SIN_CARGO_REACTIVA"
-        tipo_inst = getattr(dispositivo, "tipo_instalacion", None)
-        fases_ti = getattr(dispositivo, "fases_con_ti", None)
-        es_monofasico = tipo_inst == "MONOFASICO" or (fases_ti and len(cls.fases_con_ti_como_lista(fases_ti)) == 1)
-        pot_kw = getattr(dispositivo, "potencia_contratada_kw", None)
         tarifa = (getattr(dispositivo, "tarifa", None) or "").upper()
-        if (
-            es_monofasico
-            or tarifa.startswith("T1-R")
-            or "RESIDENCIAL" in tarifa
-            or (pot_kw is not None and pot_kw < 10.0)
-        ):
+        if tarifa.startswith("T1-R") or "RESIDENCIAL" in tarifa:
             return "TARIFA_SIN_CARGO_REACTIVA"
         return None
 

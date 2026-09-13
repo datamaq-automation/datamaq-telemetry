@@ -72,3 +72,27 @@ def test_analitica_reactiva_aplica_para_t2():
     assert analitica.requiere_compensacion is True
     assert analitica.penalizacion_estimada_ars is not None
     assert analitica.motivo_abstencion is None
+
+
+def test_analitica_reactiva_t1g_monofasico_no_esta_exenta():
+    """Hallazgo de la investigación de D-11: un T1-G (comercio, consorcio) con
+    medidor monofásico que registra reactiva SÍ está alcanzado por el cargo —
+    la exención es por categoría T1-R, no por cantidad de fases. Antes de esta
+    corrección, `es_monofasico` eximía a este caso por error."""
+    disp = Dispositivo(
+        id="disp-1",
+        device_uid=MacAddress("28:12:d2:af:b1:cf"),
+        nombre="Comercio Monofásico",
+        categoria_tarifaria="T1-G",
+        tipo_instalacion="CONSUMO",
+        fases_con_ti="R",
+    )
+    lectura = _crear_lectura(fp=0.70)
+
+    analitica = AnalizadorMetrologicoService.calcular_analitica_completa(
+        lectura=lectura,
+        dispositivo=disp,
+    )
+
+    assert analitica.motivo_abstencion is None
+    assert analitica.requiere_compensacion is True

@@ -121,6 +121,8 @@ erDiagram
         datetime last_seen_at
         string installation_type
         string phases_with_ct
+        string categoria_tarifaria
+        boolean penalizacion_reactiva_aplica
         datetime created_at
         datetime updated_at
     }
@@ -467,6 +469,8 @@ erDiagram
 | `last_seen_at` | `DATETIME` | - | Sí |
 | `installation_type` | `VARCHAR(30)` | - | No |
 | `phases_with_ct` | `VARCHAR(20)` | - | No |
+| `categoria_tarifaria` | `VARCHAR(10)` | - | No |
+| `penalizacion_reactiva_aplica` | `BOOLEAN` | - | No |
 | `created_at` | `DATETIME` | - | No |
 | `updated_at` | `DATETIME` | - | No |
 
