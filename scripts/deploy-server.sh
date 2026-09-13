@@ -66,11 +66,33 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
     echo "==> Instalando dependencias..."
     ./.venv/bin/pip install -r requirements.txt
 
-    echo "==> Aplicando migraciones de base de datos (Alembic)..."
-    ./.venv/bin/alembic upgrade head
+    echo "==> Backup de la base antes de migrar (D-5)..."
+    source .env
+    BACKUP_DIR="/tmp/datamaq-telemetry-pre-migracion"
+    mkdir -p "$BACKUP_DIR"
+    BACKUP_FILE="$BACKUP_DIR/pre_migracion_$(date +%Y%m%d_%H%M%S).sql.gz"
+    mysqldump --add-drop-table -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" | gzip > "$BACKUP_FILE"
+    echo "Backup: $BACKUP_FILE ($(du -h "$BACKUP_FILE" | cut -f1))"
+    # Retención corta: solo para el rollback inmediato de este deploy, no reemplaza
+    # el backup diario con retención larga fuera del VPS (D-6).
+    ls -t "$BACKUP_DIR"/pre_migracion_*.sql.gz 2>/dev/null | tail -n +6 | xargs -r rm --
 
-    echo "==> Reiniciando servicio $DEPLOY_SERVICE_NAME..."
-    sudo systemctl restart "$DEPLOY_SERVICE_NAME"
+    echo "==> Deteniendo servicio antes de migrar (evita escrituras concurrentes durante el ALTER)..."
+    sudo systemctl stop "$DEPLOY_SERVICE_NAME"
+
+    echo "==> Aplicando migraciones de base de datos (Alembic)..."
+    if ! ./.venv/bin/alembic upgrade head; then
+        echo "ERROR: la migración falló. Restaurando base ($BACKUP_FILE) y código anterior..."
+        gunzip -c "$BACKUP_FILE" | mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASSWORD" "$DB_NAME"
+        git reset --hard "$PREVIOUS_COMMIT"
+        ./.venv/bin/pip install -r /tmp/telemetry-deps.txt
+        sudo systemctl start "$DEPLOY_SERVICE_NAME"
+        echo "ERROR: Deploy fallido en la migración. Rollback de base y código ejecutado."
+        exit 1
+    fi
+
+    echo "==> Iniciando servicio $DEPLOY_SERVICE_NAME..."
+    sudo systemctl start "$DEPLOY_SERVICE_NAME"
 
     echo "==> Verificando salud del servicio vía HTTP ($HEALTH_URL)..."
     MAX_WAIT=30
@@ -90,11 +112,13 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
     done
 
     if [ "$HEALTH_OK" != true ]; then
-        echo "ERROR: El health-check falló después de ${MAX_WAIT}s. Ejecutando rollback a $PREVIOUS_COMMIT..."
+        echo "ERROR: El health-check falló después de ${MAX_WAIT}s. Ejecutando rollback completo (base + código) a $PREVIOUS_COMMIT..."
+        sudo systemctl stop "$DEPLOY_SERVICE_NAME"
+        gunzip -c "$BACKUP_FILE" | mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASSWORD" "$DB_NAME"
         git reset --hard "$PREVIOUS_COMMIT"
         ./.venv/bin/pip install -r /tmp/telemetry-deps.txt
-        sudo systemctl restart "$DEPLOY_SERVICE_NAME"
-        echo "ERROR: Deploy fallido. Rollback ejecutado (código y dependencias)."
+        sudo systemctl start "$DEPLOY_SERVICE_NAME"
+        echo "ERROR: Deploy fallido. Rollback ejecutado (base, código y dependencias)."
         exit 1
     fi
 

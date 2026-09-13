@@ -5,9 +5,8 @@
 > `docs/adr-001-no-redis-cache.md` para el contexto de la sesión completa; el detalle del
 > incidente vive en el mensaje del commit `e216396`).
 >
-> **Estado:** aprobado en su totalidad. 8 de 9 ítems resueltos (D-1 descartado por plan de GitHub,
-> D-2/D-3/D-4/D-6/D-7/D-8/D-9 hechos). Queda D-5 (falta enganchar el staging de D-4 al pipeline
-> de CD, hoy el ensayo previo a migrar es manual).
+> **Estado:** aprobado en su totalidad y **cerrado**: 8 de 9 ítems hechos, D-1 descartado por
+> límite del plan de GitHub (sin alternativa aplicada, se mantuvo el auto-deploy).
 
 ## Resumen
 
@@ -17,7 +16,7 @@
 | D-2 | Guard anti-`.env` commiteado | ✅ Hecho | `scripts/guard_secrets.sh`, CI, pre-push |
 | D-3 | Alerta de deploy fallido a un canal | ✅ Hecho — Telegram | `.github/workflows/deploy.yml` (step final, `if: failure()`) |
 | D-4 | Ambiente de staging | ✅ Hecho — PC local de escritorio, no el VPS (ver nota) | `~/backups/datamaq-telemetry/refresh_staging.sh` (no está en git, es de esta PC) |
-| D-5 | Backup + stop antes de migrar, en el propio CD | ⏸ Sigue pendiente — hoy el refresh de staging es manual, no está enganchado al CD | — |
+| D-5 | Backup + stop antes de migrar, en el propio CD | ✅ Hecho | `scripts/deploy-server.sh` |
 | D-6 | Backup de la base fuera del VPS actual | ✅ Hecho — PC local de escritorio, timer diario 04:30 | `~/backups/datamaq-telemetry/backup_diario.sh` (no está en git) |
 | D-7 | Logs centralizados con retención larga | ✅ Hecho — PC local, timer diario 04:45, 30 días de retención | `~/backups/datamaq-telemetry/logs_diario.sh` (no está en git) |
 | D-8 | Aislamiento por cgroups del servicio | ✅ Hecho | VPS: `/etc/systemd/system/datamaq-telemetry.service.d/limits.conf` (no está en git) |
@@ -121,7 +120,30 @@ extraídos de `/var/www/datamaq-hub/.env` (root en el VPS), seteados como secret
 `production` (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`), nunca escritos en el repo. Probado antes
 de conectarlo: mensaje de prueba entregado (`ok: true`) al chat privado de Agustín.
 
-## Pendientes
+## D-5 · Backup + stop antes de migrar, dentro del propio CD
 
-- **D-5** (backup + stop antes de migrar, dentro del propio CD): sigue pendiente. Hoy el ensayo en
-  staging (D-4) es un paso manual antes de tocar el VPS, no algo que el pipeline haga solo.
+`scripts/deploy-server.sh` cambió de "migrar con el servicio corriendo, después reiniciar" a:
+
+1. `mysqldump --add-drop-table` de toda la base a `/tmp/datamaq-telemetry-pre-migracion/`
+   (retención corta: los últimos 5 dumps, solo para el rollback inmediato de este deploy — no
+   reemplaza el backup diario con retención larga fuera del VPS de D-6).
+2. **Detener el servicio antes de `alembic upgrade head`** — antes migraba con el proceso vivo,
+   que es exactamente la condición de carrera que causó el problema de WP2 durante la sesión
+   (escrituras concurrentes mientras se creaba un índice único).
+3. Si la migración falla: restaura la base desde el dump y el código al commit anterior, arranca
+   el servicio viejo.
+4. Si la migración sale bien pero el health-check post-deploy falla: **también restaura la base**,
+   no solo el código — antes el rollback por health-check solo revertía código y dependencias,
+   dejando código viejo corriendo contra un esquema ya migrado si la migración había sido la causa
+   real de la falla.
+
+Credenciales: las mismas que ya usa la aplicación (`source .env` en el propio VPS, usuario
+`datamaq`) — no hizo falta ningún secret nuevo. Ensayado antes de aplicar: backup + restore
+sobre la base real, sobre sí misma (inofensivo), confirmando que el usuario `datamaq` tiene los
+permisos que el script asume.
+
+**Trade-off aceptado a propósito:** todo deploy ahora tiene una ventana de downtime real (stop →
+migrar → start), no el reinicio casi instantáneo de antes — incluso para pushes sin cambios de
+esquema (`alembic upgrade head` sobre una base ya al día es casi inmediato, pero igual pasa por
+detener y levantar el servicio). Se prefirió simplicidad y corrección sobre optimizar para el
+caso común de "no hay migración nueva".
