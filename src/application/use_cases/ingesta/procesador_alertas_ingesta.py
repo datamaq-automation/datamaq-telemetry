@@ -1,7 +1,7 @@
 """src/application/use_cases/ingesta/procesador_alertas_ingesta.py."""
 
 from datetime import datetime
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from src.application.mappers.alerta_mapper import AlertaMapper
 from src.domain.telemetria.entities import (
@@ -96,6 +96,149 @@ def _auto_resolver_alertas_fn(
                 )
 
 
+def _evaluar_tension_fn(
+    dispositivo: Dispositivo,
+    mac_raw: str,
+    lectura: LecturaInstantanea,
+    recorded_at: datetime,
+    repo: RepositorioTelemetriaPort,
+    pub: PublicadorEventosPort | None,
+    log: LoggerPort | None,
+) -> AlertaDispositivo | None:
+    alerta_raw = AnalizadorCalidadEnergiaService.evaluar_alerta_tension(dispositivo.id, lectura)
+    alerta = ProcesadorAlertasIngesta._filtro_persistencia.procesar_alerta(
+        dispositivo.id, alerta_raw, categoria="TENSION", ahora=recorded_at
+    )
+    if alerta:
+        _despachar_alerta_fn(alerta, mac_raw, repo, pub, log, dispositivo)
+    return alerta_raw
+
+
+def _evaluar_desbalance_fn(
+    dispositivo: Dispositivo,
+    mac_raw: str,
+    lectura: LecturaInstantanea,
+    es_monofasico: bool,
+    recorded_at: datetime,
+    repo: RepositorioTelemetriaPort,
+    pub: PublicadorEventosPort | None,
+    log: LoggerPort | None,
+) -> tuple[AlertaDispositivo | None, AlertaDispositivo | None]:
+    alerta_v_raw = (
+        AnalizadorCalidadEnergiaService.evaluar_alerta_desbalance(dispositivo.id, lectura)
+        if not es_monofasico
+        else None
+    )
+    alerta_v = ProcesadorAlertasIngesta._filtro_persistencia.procesar_alerta(
+        dispositivo.id, alerta_v_raw, categoria="DESBALANCE_TENSION", ahora=recorded_at
+    )
+    if alerta_v:
+        _despachar_alerta_fn(alerta_v, mac_raw, repo, pub, log, dispositivo)
+
+    alerta_i_raw = (
+        AnalizadorCalidadEnergiaService.evaluar_alerta_desbalance_corriente(
+            dispositivo.id, lectura, es_monofasico=es_monofasico
+        )
+        if not es_monofasico
+        else None
+    )
+    alerta_i = ProcesadorAlertasIngesta._filtro_persistencia.procesar_alerta(
+        dispositivo.id, alerta_i_raw, categoria="DESBALANCE_CORRIENTE", ahora=recorded_at
+    )
+    if alerta_i:
+        _despachar_alerta_fn(alerta_i, mac_raw, repo, pub, log, dispositivo)
+
+    return alerta_v_raw, alerta_i_raw
+
+
+def _evaluar_ti_fn(
+    dispositivo: Dispositivo,
+    mac_raw: str,
+    lectura: LecturaInstantanea,
+    recorded_at: datetime,
+    repo: RepositorioTelemetriaPort,
+    pub: PublicadorEventosPort | None,
+    log: LoggerPort | None,
+) -> tuple[list[AlertaDispositivo], list[AlertaDispositivo]]:
+    tipo_inst = getattr(dispositivo, "tipo_instalacion", "CONSUMO")
+    fases_ti_list = [f.strip().upper() for f in getattr(dispositivo, "fases_con_ti", "R,S,T").split(",")]
+    alertas_ti_raw = AnalizadorCalidadEnergiaService.evaluar_alerta_ti_invertido(
+        dispositivo_id=dispositivo.id,
+        lectura=lectura,
+        tipo_instalacion=tipo_inst,
+        fases_con_ti=fases_ti_list,
+    )
+    for a_ti in alertas_ti_raw:
+        a_filtrada = ProcesadorAlertasIngesta._filtro_persistencia.procesar_alerta(
+            dispositivo.id, a_ti, categoria=f"TI_INVERTIDO_{a_ti.mensaje[:50]}", ahora=recorded_at
+        )
+        if a_filtrada:
+            _despachar_alerta_fn(a_filtrada, mac_raw, repo, pub, log, dispositivo)
+
+    alertas_cruce_raw = AnalizadorCalidadEnergiaService.evaluar_alerta_cruce_ti(
+        dispositivo_id=dispositivo.id,
+        lectura=lectura,
+        tipo_instalacion=tipo_inst,
+        fases_con_ti=fases_ti_list,
+    )
+    for a_cruce in alertas_cruce_raw:
+        a_filtrada = ProcesadorAlertasIngesta._filtro_persistencia.procesar_alerta(
+            dispositivo.id, a_cruce, categoria=f"CRUCE_TI_{a_cruce.mensaje[:50]}", ahora=recorded_at
+        )
+        if a_filtrada:
+            _despachar_alerta_fn(a_filtrada, mac_raw, repo, pub, log, dispositivo)
+
+    return alertas_ti_raw, alertas_cruce_raw
+
+
+def _evaluar_fp_fn(
+    dispositivo: Dispositivo,
+    mac_raw: str,
+    lectura: LecturaInstantanea,
+    recorded_at: datetime,
+    repo: RepositorioTelemetriaPort,
+    pub: PublicadorEventosPort | None,
+    log: LoggerPort | None,
+) -> tuple[AlertaDispositivo | None, AlertaDispositivo | None]:
+    alerta_fp_raw = AnalizadorCalidadEnergiaService.evaluar_alerta_factor_potencia(dispositivo.id, lectura)
+    alerta_fp = ProcesadorAlertasIngesta._filtro_persistencia.procesar_alerta(
+        dispositivo.id, alerta_fp_raw, categoria="BAJO_FACTOR_POTENCIA", ahora=recorded_at
+    )
+    if alerta_fp:
+        _despachar_alerta_fn(alerta_fp, mac_raw, repo, pub, log, dispositivo)
+
+    alerta_sc_raw = AnalizadorCalidadEnergiaService.evaluar_alerta_sobrecompensacion_reactiva(dispositivo.id, lectura)
+    alerta_sc = ProcesadorAlertasIngesta._filtro_persistencia.procesar_alerta(
+        dispositivo.id, alerta_sc_raw, categoria="SOBRECOMPENSACION_REACTIVA", ahora=recorded_at
+    )
+    if alerta_sc:
+        _despachar_alerta_fn(alerta_sc, mac_raw, repo, pub, log, dispositivo)
+
+    return alerta_fp_raw, alerta_sc_raw
+
+
+def _evaluar_thd_fn(
+    dispositivo: Dispositivo,
+    mac_raw: str,
+    lectura: LecturaInstantanea,
+    recorded_at: datetime,
+    repo: RepositorioTelemetriaPort,
+    pub: PublicadorEventosPort | None,
+    log: LoggerPort | None,
+) -> list[AlertaDispositivo]:
+    alertas_raw = AnalizadorCalidadEnergiaService.evaluar_alertas_distorsion_armonica(dispositivo.id, lectura)
+    for a in alertas_raw:
+        a_filtrada = ProcesadorAlertasIngesta._filtro_persistencia.procesar_alerta(
+            dispositivo.id,
+            a,
+            categoria=f"THD_{a.tipo_alerta}_{a.fase or 'GLOBAL'}",
+            ahora=recorded_at,
+        )
+        if a_filtrada:
+            _despachar_alerta_fn(a_filtrada, mac_raw, repo, pub, log, dispositivo)
+    return alertas_raw
+
+
 class ProcesadorAlertasIngesta:
     """Orquesta la evaluación, persistencia temporal y auto-resolución de alertas normativas."""
 
@@ -103,6 +246,12 @@ class ProcesadorAlertasIngesta:
     _cooldown_notificaciones: ClassVar[CooldownNotificacionesAlertasService] = CooldownNotificacionesAlertasService()
     _notificador: ClassVar[NotificadorAlertasPort | None] = None
     _destinatarios: ClassVar[list[str]] = []
+
+    _evaluar_tension = staticmethod(_evaluar_tension_fn)
+    _evaluar_desbalance = staticmethod(_evaluar_desbalance_fn)
+    _evaluar_ti = staticmethod(_evaluar_ti_fn)
+    _evaluar_fp = staticmethod(_evaluar_fp_fn)
+    _evaluar_thd = staticmethod(_evaluar_thd_fn)
 
     @classmethod
     def configurar_notificador(
@@ -112,156 +261,6 @@ class ProcesadorAlertasIngesta:
     ) -> None:
         cls._notificador = notificador
         cls._destinatarios = destinatarios or []
-
-    @classmethod
-    def _evaluar_tension(
-        cls,
-        dispositivo: Dispositivo,
-        mac_raw: str,
-        lectura: LecturaInstantanea,
-        recorded_at: datetime,
-        repo: RepositorioTelemetriaPort,
-        pub: PublicadorEventosPort | None,
-        log: LoggerPort | None,
-    ) -> AlertaDispositivo | None:
-        alerta_raw = AnalizadorCalidadEnergiaService.evaluar_alerta_tension(dispositivo.id, lectura)
-        alerta = cls._filtro_persistencia.procesar_alerta(
-            dispositivo.id, alerta_raw, categoria="TENSION", ahora=recorded_at
-        )
-        if alerta:
-            cls._despachar_alerta(alerta, mac_raw, repo, pub, log, dispositivo)
-        return alerta_raw
-
-    @classmethod
-    def _evaluar_desbalance(
-        cls,
-        dispositivo: Dispositivo,
-        mac_raw: str,
-        lectura: LecturaInstantanea,
-        es_monofasico: bool,
-        recorded_at: datetime,
-        repo: RepositorioTelemetriaPort,
-        pub: PublicadorEventosPort | None,
-        log: LoggerPort | None,
-    ) -> tuple[AlertaDispositivo | None, AlertaDispositivo | None]:
-        alerta_v_raw = (
-            AnalizadorCalidadEnergiaService.evaluar_alerta_desbalance(dispositivo.id, lectura)
-            if not es_monofasico
-            else None
-        )
-        alerta_v = cls._filtro_persistencia.procesar_alerta(
-            dispositivo.id, alerta_v_raw, categoria="DESBALANCE_TENSION", ahora=recorded_at
-        )
-        if alerta_v:
-            cls._despachar_alerta(alerta_v, mac_raw, repo, pub, log, dispositivo)
-
-        alerta_i_raw = (
-            AnalizadorCalidadEnergiaService.evaluar_alerta_desbalance_corriente(
-                dispositivo.id, lectura, es_monofasico=es_monofasico
-            )
-            if not es_monofasico
-            else None
-        )
-        alerta_i = cls._filtro_persistencia.procesar_alerta(
-            dispositivo.id, alerta_i_raw, categoria="DESBALANCE_CORRIENTE", ahora=recorded_at
-        )
-        if alerta_i:
-            cls._despachar_alerta(alerta_i, mac_raw, repo, pub, log, dispositivo)
-
-        return alerta_v_raw, alerta_i_raw
-
-    @classmethod
-    def _evaluar_ti(
-        cls,
-        dispositivo: Dispositivo,
-        mac_raw: str,
-        lectura: LecturaInstantanea,
-        recorded_at: datetime,
-        repo: RepositorioTelemetriaPort,
-        pub: PublicadorEventosPort | None,
-        log: LoggerPort | None,
-    ) -> tuple[list[AlertaDispositivo], list[AlertaDispositivo]]:
-        tipo_inst = getattr(dispositivo, "tipo_instalacion", "CONSUMO")
-        fases_ti_list = [f.strip().upper() for f in getattr(dispositivo, "fases_con_ti", "R,S,T").split(",")]
-        alertas_ti_raw = AnalizadorCalidadEnergiaService.evaluar_alerta_ti_invertido(
-            dispositivo_id=dispositivo.id,
-            lectura=lectura,
-            tipo_instalacion=tipo_inst,
-            fases_con_ti=fases_ti_list,
-        )
-        for a_ti in alertas_ti_raw:
-            a_filtrada = cls._filtro_persistencia.procesar_alerta(
-                dispositivo.id, a_ti, categoria=f"TI_INVERTIDO_{a_ti.mensaje[:50]}", ahora=recorded_at
-            )
-            if a_filtrada:
-                cls._despachar_alerta(a_filtrada, mac_raw, repo, pub, log, dispositivo)
-
-        alertas_cruce_raw = AnalizadorCalidadEnergiaService.evaluar_alerta_cruce_ti(
-            dispositivo_id=dispositivo.id,
-            lectura=lectura,
-            tipo_instalacion=tipo_inst,
-            fases_con_ti=fases_ti_list,
-        )
-        for a_cruce in alertas_cruce_raw:
-            a_filtrada = cls._filtro_persistencia.procesar_alerta(
-                dispositivo.id, a_cruce, categoria=f"CRUCE_TI_{a_cruce.fase}", ahora=recorded_at
-            )
-            if a_filtrada:
-                cls._despachar_alerta(a_filtrada, mac_raw, repo, pub, log, dispositivo)
-
-        return alertas_ti_raw, alertas_cruce_raw
-
-    @classmethod
-    def _evaluar_fp(
-        cls,
-        dispositivo: Dispositivo,
-        mac_raw: str,
-        lectura: LecturaInstantanea,
-        recorded_at: datetime,
-        repo: RepositorioTelemetriaPort,
-        pub: PublicadorEventosPort | None,
-        log: LoggerPort | None,
-    ) -> tuple[AlertaDispositivo | None, AlertaDispositivo | None]:
-        alerta_raw = AnalizadorCalidadEnergiaService.evaluar_alerta_factor_potencia(dispositivo.id, lectura)
-        alerta = cls._filtro_persistencia.procesar_alerta(
-            dispositivo.id, alerta_raw, categoria="FACTOR_POTENCIA", ahora=recorded_at
-        )
-        if alerta:
-            cls._despachar_alerta(alerta, mac_raw, repo, pub, log, dispositivo)
-
-        alerta_cap_raw = AnalizadorCalidadEnergiaService.evaluar_alerta_sobrecompensacion_reactiva(
-            dispositivo.id, lectura
-        )
-        alerta_cap = cls._filtro_persistencia.procesar_alerta(
-            dispositivo.id, alerta_cap_raw, categoria="SOBRECOMPENSACION_REACTIVA", ahora=recorded_at
-        )
-        if alerta_cap:
-            cls._despachar_alerta(alerta_cap, mac_raw, repo, pub, log, dispositivo)
-
-        return alerta_raw, alerta_cap_raw
-
-    @classmethod
-    def _evaluar_thd(
-        cls,
-        dispositivo: Dispositivo,
-        mac_raw: str,
-        lectura: LecturaInstantanea,
-        recorded_at: datetime,
-        repo: RepositorioTelemetriaPort,
-        pub: PublicadorEventosPort | None,
-        log: LoggerPort | None,
-    ) -> list[AlertaDispositivo]:
-        alertas_raw = AnalizadorCalidadEnergiaService.evaluar_alertas_distorsion_armonica(dispositivo.id, lectura)
-        for a_thd in alertas_raw:
-            a_filtrada = cls._filtro_persistencia.procesar_alerta(
-                dispositivo.id,
-                a_thd,
-                categoria=f"DISTORSION_ARMONICA_{a_thd.tipo_alerta}_{a_thd.fase or 'ALL'}",
-                ahora=recorded_at,
-            )
-            if a_filtrada:
-                cls._despachar_alerta(a_filtrada, mac_raw, repo, pub, log, dispositivo)
-        return alertas_raw
 
     @classmethod
     def _auto_resolver_todas_normalizadas(
@@ -359,6 +358,55 @@ class ProcesadorAlertasIngesta:
             publicador,
             logger,
         )
+
+        cls._auto_resolver_alertas(
+            dispositivo.id,
+            mac_raw,
+            ["PÉRDIDA_COMUNICACIÓN", "CONECTIVIDAD_INESTABLE"],
+            recorded_at,
+            repo_telemetria,
+            publicador,
+            logger,
+        )
+
+    @classmethod
+    def evaluar_conectividad(
+        cls,
+        dispositivo: Dispositivo,
+        mac_raw: str,
+        payload: dict[str, Any],
+        recorded_at: datetime,
+        repo_telemetria: RepositorioTelemetriaPort,
+        publicador: PublicadorEventosPort | None = None,
+        logger: LoggerPort | None = None,
+    ) -> None:
+        wifi = payload.get("wifi")
+        if isinstance(wifi, dict):
+            rssi = wifi.get("rssi")
+            quality = wifi.get("quality")
+            if (rssi is not None and isinstance(rssi, (int, float)) and rssi < -78) or (
+                quality is not None and isinstance(quality, (int, float)) and quality < 40
+            ):
+                alerta = AlertaDispositivo(
+                    id=None,
+                    dispositivo_id=dispositivo.id,
+                    tipo_alerta="CONECTIVIDAD_INESTABLE",
+                    severidad=SeveridadAlerta.WARNING,
+                    categoria="CONECTIVIDAD",
+                    mensaje=f"Señal Wi-Fi de calidad degradada (RSSI: {rssi} dBm, Calidad: {quality}%).",
+                    disparada_en=recorded_at,
+                )
+                cls._despachar_alerta(alerta, mac_raw, repo_telemetria, publicador, logger, dispositivo)
+            else:
+                cls._auto_resolver_alertas(
+                    dispositivo.id,
+                    mac_raw,
+                    ["CONECTIVIDAD_INESTABLE"],
+                    recorded_at,
+                    repo_telemetria,
+                    publicador,
+                    logger,
+                )
 
     _despachar_alerta = staticmethod(_despachar_alerta_fn)
     _auto_resolver_alertas = staticmethod(_auto_resolver_alertas_fn)

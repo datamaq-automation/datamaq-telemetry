@@ -227,3 +227,78 @@ class AgregadorLecturasService:
             resultado.append(agregada)
 
         return resultado
+
+    @staticmethod
+    def _obtener_x_y(item: LecturaInstantanea) -> tuple[float, float]:
+        reg = item.registrado_en
+        if reg.tzinfo is None:
+            reg = reg.replace(tzinfo=timezone.utc)
+        x = reg.timestamp()
+        y = (
+            item.potencia_activa_total.vatios
+            if item.potencia_activa_total and item.potencia_activa_total.vatios is not None
+            else 0.0
+        )
+        return x, y
+
+    @classmethod
+    def _calcular_centroide_bucket(
+        cls,
+        next_bucket: list[LecturaInstantanea],
+        ultimo_dato: LecturaInstantanea,
+    ) -> tuple[float, float]:
+        if next_bucket:
+            next_x_sum = sum(cls._obtener_x_y(it)[0] for it in next_bucket)
+            next_y_sum = sum(cls._obtener_x_y(it)[1] for it in next_bucket)
+            return next_x_sum / len(next_bucket), next_y_sum / len(next_bucket)
+        return cls._obtener_x_y(ultimo_dato)
+
+    @classmethod
+    def downsample_lttb(
+        cls,
+        lecturas: list[LecturaInstantanea],
+        target_points: int,
+    ) -> list[LecturaInstantanea]:
+        """Reduce la serie temporal a target_points usando Largest-Triangle-Three-Buckets (LTTB)."""
+        if not lecturas or target_points <= 0 or len(lecturas) <= target_points:
+            return lecturas
+
+        if target_points == 1:
+            return [lecturas[0]]
+        if target_points == 2:
+            return [lecturas[0], lecturas[-1]]
+
+        es_descendente = lecturas[0].registrado_en > lecturas[-1].registrado_en
+        datos = list(reversed(lecturas)) if es_descendente else list(lecturas)
+
+        n = len(datos)
+        bucket_size = (n - 2) / (target_points - 2)
+        resultado = [datos[0]]
+        a_idx = 0
+
+        for i in range(target_points - 2):
+            next_start = int((i + 1) * bucket_size) + 1
+            next_end = min(int((i + 2) * bucket_size) + 1, n)
+            c_x, c_y = cls._calcular_centroide_bucket(datos[next_start:next_end], datos[-1])
+
+            curr_start = int(i * bucket_size) + 1
+            curr_end = min(int((i + 1) * bucket_size) + 1, n)
+            curr_bucket = datos[curr_start:curr_end]
+
+            a_x, a_y = cls._obtener_x_y(datos[a_idx])
+            max_area, max_idx = -1.0, curr_start
+
+            for j, candidate in enumerate(curr_bucket):
+                idx = curr_start + j
+                b_x, b_y = cls._obtener_x_y(candidate)
+                area = abs((a_x - c_x) * (b_y - a_y) - (a_x - b_x) * (c_y - a_y)) * 0.5
+                if area > max_area:
+                    max_area, max_idx = area, idx
+
+            resultado.append(datos[max_idx])
+            a_idx = max_idx
+
+        resultado.append(datos[-1])
+        if es_descendente:
+            resultado.reverse()
+        return resultado

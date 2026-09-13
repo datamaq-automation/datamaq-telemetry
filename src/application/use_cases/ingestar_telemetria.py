@@ -217,6 +217,15 @@ class IngestarTelemetriaUseCase:
     ) -> None:
         log = TelemetriaPayloadParser.parsear_log_estado(payload, dispositivo.id, recorded_at)
         self.repo_telemetria.guardar_log_estado(log)
+        ProcesadorAlertasIngesta.evaluar_conectividad(
+            dispositivo=dispositivo,
+            mac_raw=dispositivo.device_uid.valor,
+            payload=payload,
+            recorded_at=recorded_at,
+            repo_telemetria=self.repo_telemetria,
+            publicador=self.publicador,
+            logger=self.logger,
+        )
 
     def _procesar_event(
         self,

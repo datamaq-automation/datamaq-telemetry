@@ -122,6 +122,7 @@ class AnalizadorMetrologicoService:
         return round(abs(-(v_r + v_s + v_t) / 3.0), 2)
 
     agregar_lecturas_en_intervalo = AgregadorLecturasService.agregar_lecturas_en_intervalo
+    downsample_lttb = AgregadorLecturasService.downsample_lttb
 
     @staticmethod
     def calcular_desbalance_corriente(

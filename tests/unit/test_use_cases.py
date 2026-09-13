@@ -564,6 +564,22 @@ def test_consultar_telemetria_granularidad_y_bucketing():
     res_auto_24h = consultar_uc.listar_instantaneas(dev.id, limite=100, granularidad="auto", horas=24)
     assert len(res_auto_24h) == 2
 
+    # 5. Consulta 'lttb' con limite=3 -> downsampling preservando el pico de potencia
+    l_pico = LecturaInstantanea(
+        id=None,
+        dispositivo_id=dev.id,
+        registrado_en=ahora - timedelta(minutes=20),
+        fase_r=MedicionFase(),
+        fase_s=MedicionFase(),
+        fase_t=MedicionFase(),
+        potencia_activa_total=PotenciaActiva(150000.0),
+    )
+    repo_telem.guardar_instantanea(l_pico)
+    res_lttb = consultar_uc.listar_instantaneas(dev.id, limite=3, granularidad="lttb")
+    assert len(res_lttb) == 3
+    potencias_lttb = [r.potencia_activa_total_W for r in res_lttb if r.potencia_activa_total_W is not None]
+    assert 150000.0 in potencias_lttb
+
 
 class FakeBufferTelemetriaEnVivo:
     """Fake plano del puerto `BufferTelemetriaEnVivoPort` para tests."""

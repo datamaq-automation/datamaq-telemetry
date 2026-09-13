@@ -157,14 +157,17 @@ class ConsultarTelemetriaUseCase:
         if horas_efectivas is None and desde is not None:
             horas_efectivas = max(1, int((ahora - desde).total_seconds() / 3600.0))
 
+        es_lttb = (granularidad or "").strip().lower() == "lttb"
         intervalo_pedido = self._resolver_intervalo_segundos(granularidad, horas_efectivas)
         intervalo_segundos = max(intervalo_pedido, min_intervalo)
         desde_efectivo = self._acotar_fecha_desde(dev, desde)
 
-        limite_db = max(limite * 10, 5000) if intervalo_segundos > 0 else limite
+        limite_db = max(limite * 10, 5000) if (intervalo_segundos > 0 or es_lttb) else limite
         lecturas = self.repo_telemetria.listar_instantaneas(dev.id, limite_db, desde_efectivo)
 
-        if intervalo_segundos > 0:
+        if es_lttb:
+            lecturas = AnalizadorCalidadEnergiaService.downsample_lttb(lecturas, target_points=limite)
+        elif intervalo_segundos > 0:
             lecturas = AnalizadorCalidadEnergiaService.agregar_lecturas_en_intervalo(
                 lecturas, intervalo_segundos, es_monofasico=es_monofasico
             )[:limite]

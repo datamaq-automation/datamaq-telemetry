@@ -76,7 +76,10 @@ def get_instantaneous_history(
     use_case: Annotated[ConsultarTelemetriaUseCase, Depends(get_telemetria_use_case)],
     limit: int = Query(500, ge=1, le=5000, description="Límite máximo de registros a retornar"),
     hours: int | None = Query(None, ge=1, le=720, description="Últimas N horas"),
-    granularity: str = Query("auto", description="Granularidad temporal: auto, raw, 1m, 5m, 15m, 1h"),
+    granularity: str = Query(
+        "auto",
+        description="Granularidad temporal: auto, raw, 1m, 5m, 15m, 1h, lttb (downsampling con preservación de picos)",
+    ),
 ):
     try:
         desde = datetime.now(tz.utc) - timedelta(hours=hours) if hours else None
