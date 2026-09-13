@@ -322,3 +322,33 @@ class TestAgregadorGrupoDispositivosService:
 
         assert len(resultado) == 1
         assert resultado[0].potencia_activa_total_w is None
+
+    def test_sumar_potencia_nodo_virtual_media_tension_agregacion_correcta(self):
+        """Verifica que la agregación del nodo virtual de Media Tensión suma exactamente las potencias
+        en Vatios (W = P_trafo1 + P_trafo2) sin aplicar doble factor de transformación ni errores de magnitud.
+        """
+        from datetime import datetime, timezone
+
+        base = datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc)
+        # Trafo 1: 450,000 W (450 kW), Trafo 2: 350,000 W (350 kW)
+        p_trafo1_w = 450000.0
+        p_trafo2_w = 350000.0
+        q_trafo1_var = 150000.0
+        q_trafo2_var = 100000.0
+
+        lecturas = {
+            "dev-trafo-1": [(base, p_trafo1_w, q_trafo1_var)],
+            "dev-trafo-2": [(base, p_trafo2_w, q_trafo2_var)],
+        }
+
+        resultado = AgregadorGrupoDispositivosService.sumar_potencia_en_el_tiempo(lecturas, intervalo_segundos=300)
+
+        assert len(resultado) == 1
+        punto = resultado[0]
+
+        # P_total = P_trafo1 + P_trafo2 = 800,000 W (800 kW <= 2000 kVA capacidad nominal)
+        assert punto.potencia_activa_total_w == 800000.0
+        assert punto.potencia_reactiva_total_var == 250000.0
+        assert punto.dispositivos_sin_dato == []
+        # Potencia aparente S = sqrt(800000^2 + 250000^2) ≈ 838152.73 VA
+        assert punto.potencia_aparente_total_va == 838152.73
