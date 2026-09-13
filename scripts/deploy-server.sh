@@ -71,7 +71,7 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
     BACKUP_DIR="/tmp/datamaq-telemetry-pre-migracion"
     mkdir -p "$BACKUP_DIR"
     BACKUP_FILE="$BACKUP_DIR/pre_migracion_$(date +%Y%m%d_%H%M%S).sql.gz"
-    mysqldump --add-drop-table -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" | gzip > "$BACKUP_FILE"
+    mysqldump --add-drop-table --no-tablespaces -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" | gzip > "$BACKUP_FILE"
     echo "Backup: $BACKUP_FILE ($(du -h "$BACKUP_FILE" | cut -f1))"
     # Retención corta: solo para el rollback inmediato de este deploy, no reemplaza
     # el backup diario con retención larga fuera del VPS (D-6).

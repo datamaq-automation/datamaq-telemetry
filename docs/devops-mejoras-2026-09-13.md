@@ -147,3 +147,19 @@ migrar → start), no el reinicio casi instantáneo de antes — incluso para pu
 esquema (`alembic upgrade head` sobre una base ya al día es casi inmediato, pero igual pasa por
 detener y levantar el servicio). Se prefirió simplicidad y corrección sobre optimizar para el
 caso común de "no hay migración nueva".
+
+**Primer deploy real con el script nuevo, falló — y encontró dos cosas que el ensayo manual no
+mostró:**
+
+1. `mysqldump` sin `--no-tablespaces` intenta volcar metadata de tablespaces, que requiere el
+   privilegio `PROCESS` que `datamaq` no tiene — no era fatal (el dump se completaba igual), pero
+   ensuciaba el log. Agregado `--no-tablespaces`.
+2. **Fatal de verdad:** el sudoers de `datamaq` (`/etc/sudoers.d/datamaq-telemetry`) solo tenía
+   `NOPASSWD` para `restart`/`status`/`is-active` — nunca para `stop` ni `start` por separado, que
+   es justo lo que este cambio necesita. El deploy murió en el primer `sudo systemctl stop` con
+   `sudo: a password is required`, **antes de tocar nada** (ni el backup se usó, ni la migración
+   corrió) — el servicio quedó intacto, confirmado con `systemctl is-active` inmediatamente
+   después de la falla. Corregido extendiendo la regla existente (mismo patrón least-privilege,
+   comandos exactos, no `ALL`) para incluir `stop`/`start` de `datamaq-telemetry.service`.
+   Verificado con `visudo -cf` antes de instalar, y funcionalmente con `sudo -n systemctl
+   stop/start` real como usuario `datamaq` antes de reintentar el deploy.
