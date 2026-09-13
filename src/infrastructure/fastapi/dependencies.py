@@ -6,6 +6,7 @@ from typing import Annotated, Any
 from fastapi import Cookie, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 
+from src.adapters.gateways.dispositivos_datos_maestros_gateway import DispositivosConDatosMaestrosGateway
 from src.adapters.gateways.in_memory_event_broadcaster import InMemoryEventBroadcaster
 from src.adapters.gateways.in_memory_telemetria_buffer import InMemoryTelemetriaBuffer
 from src.adapters.gateways.mqtt_comando_rafaga import MqttComandoRafagaGateway
@@ -39,6 +40,7 @@ from src.domain.auth.ports import (
     ServicioEmailPort,
 )
 from src.domain.auth.services import HashContrasenaService, RateLimiterService, TokenRevocationService
+from src.domain.telemetria.ports import RepositorioDispositivosPort
 from src.infrastructure.auth.email_service import SmtpEmailService
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
 from src.infrastructure.paho_mqtt.mqtt_listener import MQTTListener
@@ -71,6 +73,11 @@ global_telemetria_buffer = InMemoryTelemetriaBuffer()
 
 # Listener MQTT registrado en el lifespan del servidor (estado de conexión)
 _mqtt_listener_registrado: MQTTListener | None = None
+
+
+def repo_dispositivos_resuelto(db: Session) -> RepositorioDispositivosPort:
+    """Repositorio de dispositivos con la precedencia del YAML aplicada (instalación y contrato)."""
+    return DispositivosConDatosMaestrosGateway(MySQLDispositivosRepository(db), YamlOrganizacionesRepository())
 
 
 def registrar_mqtt_listener(listener: MQTTListener) -> None:
@@ -109,7 +116,7 @@ def get_rate_limiter() -> RateLimiterService:
 def get_telemetria_use_case(
     db: Annotated[Session, Depends(get_db_session)],
 ) -> ConsultarTelemetriaUseCase:
-    repo_disp = MySQLDispositivosRepository(db)
+    repo_disp = repo_dispositivos_resuelto(db)
     repo_telem = MySQLTelemetriaRepository(db)
     repo_org = YamlOrganizacionesRepository()
     repo_planes = MySQLPlanesRepository(db)
@@ -128,7 +135,7 @@ def get_exportar_telemetria_use_case(
 ) -> ExportarTelemetriaUseCase:
     return ExportarTelemetriaUseCase(
         repo_telemetria=MySQLTelemetriaRepository(db),
-        repo_dispositivos=MySQLDispositivosRepository(db),
+        repo_dispositivos=repo_dispositivos_resuelto(db),
     )
 
 
@@ -154,7 +161,7 @@ def get_dispositivos_use_case(
     db: Annotated[Session, Depends(get_db_session)],
 ) -> GestionarDispositivosUseCase:
     return GestionarDispositivosUseCase(
-        MySQLDispositivosRepository(db),
+        repo_dispositivos_resuelto(db),
         YamlOrganizacionesRepository(),
         MySQLPlanesRepository(db),
         repo_suscripciones=MySQLSuscripcionesRepository(db),
@@ -181,7 +188,7 @@ def get_alertas_use_case(
     return GestionarAlertasUseCase(
         repo_telemetria=MySQLTelemetriaRepository(db),
         publicador=global_event_broadcaster,
-        repo_dispositivos=MySQLDispositivosRepository(db),
+        repo_dispositivos=repo_dispositivos_resuelto(db),
     )
 
 
@@ -227,7 +234,7 @@ def get_maquinas_use_case(
     return GestionarMaquinasUseCase(
         MySQLMaquinasRepository(db),
         MySQLTelemetriaRepository(db),
-        MySQLDispositivosRepository(db),
+        repo_dispositivos_resuelto(db),
         YamlOrganizacionesRepository(),
     )
 
@@ -244,7 +251,7 @@ def get_caracterizacion_use_case(
     return CaracterizarCargaUseCase(
         repo_campanas=MySQLCampanasRepository(db),
         repo_cargas=MySQLCargasRepository(db),
-        repo_dispositivos=MySQLDispositivosRepository(db),
+        repo_dispositivos=repo_dispositivos_resuelto(db),
         registro=registro_campanas_activas,
         comando_rafaga=MqttComandoRafagaGateway(get_mqtt_listener()),
     )
@@ -273,7 +280,7 @@ def get_disponibilidad_use_case(
         MySQLMaquinasRepository(db),
         MySQLEventosDisponibilidadRepository(db),
         MySQLParadasProgramadasRepository(db),
-        MySQLDispositivosRepository(db),
+        repo_dispositivos_resuelto(db),
         YamlOrganizacionesRepository(),
     )
 

@@ -34,6 +34,7 @@ from src.domain.sge.exceptions import (
 )
 from src.domain.telemetria.exceptions import (
     AlertaNoEncontradaError,
+    CampoGestionadoPorYamlError,
     DispositivoNoEncontradoError,
     DominioTelemetriaException,
     FactorPotenciaInvalidoError,
@@ -67,9 +68,17 @@ class ErrorPresenter:
         ):
             return 404, {"error": "NotFound", "mensaje": exc.mensaje}
         elif isinstance(
-            exc, (MacAddressInvalidaError, TensionInvalidaError, FactorPotenciaInvalidoError, FirmaCargaInvalidaError)
+            exc,
+            (
+                MacAddressInvalidaError,
+                TensionInvalidaError,
+                FactorPotenciaInvalidoError,
+                FirmaCargaInvalidaError,
+            ),
         ):
             return 400, {"error": "ValidationError", "mensaje": exc.mensaje}
+        elif isinstance(exc, CampoGestionadoPorYamlError):
+            return 422, {"error": "GestionadoPorYaml", "mensaje": exc.mensaje}
         elif isinstance(exc, RolNoAutorizadoParaPrevisualizacionError):
             return 403, {"error": "Forbidden", "mensaje": exc.mensaje}
         elif isinstance(

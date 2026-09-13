@@ -7,11 +7,10 @@ from sqlalchemy.orm import Session
 
 from src.domain.telemetria.services import debe_recibir_evento
 from src.domain.telemetria.value_objects import MacAddress
-from src.infrastructure.fastapi.dependencies import get_usuario_actual
+from src.infrastructure.fastapi.dependencies import get_usuario_actual, repo_dispositivos_resuelto
 from src.infrastructure.settings.config import get_settings
 from src.infrastructure.sqlalchemy.database import get_db_session
 from src.infrastructure.sqlalchemy.mysql_repositories import (
-    MySQLDispositivosRepository,
     MySQLEventosDisponibilidadRepository,
     MySQLMaquinasRepository,
 )
@@ -36,7 +35,7 @@ def _organizacion_de_dispositivo(db: Session, dispositivo_id: str | None) -> str
     """Resuelve dispositivo_id -> planta_id -> organizacion_id. None si no se puede resolver."""
     if dispositivo_id is None:
         return None
-    repo_dispositivos = MySQLDispositivosRepository(db)
+    repo_dispositivos = repo_dispositivos_resuelto(db)
     dispositivo = repo_dispositivos.obtener_por_id(dispositivo_id)
     if dispositivo is None or not dispositivo.planta_id:
         return None
@@ -62,7 +61,7 @@ def verificar_propiedad_dispositivo(
     if id_dispositivo is None:
         return
 
-    repo_dispositivos = MySQLDispositivosRepository(db)
+    repo_dispositivos = repo_dispositivos_resuelto(db)
     dispositivo = repo_dispositivos.obtener_por_id(id_dispositivo)
     if dispositivo is None:
         try:

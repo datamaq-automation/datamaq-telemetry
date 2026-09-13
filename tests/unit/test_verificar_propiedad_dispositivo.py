@@ -27,7 +27,7 @@ class _FakeSettings:
 
 def _mock_mysql_repos(monkeypatch, repo_dispositivos=None, repo_organizaciones=None):
     monkeypatch.setattr(
-        "src.infrastructure.fastapi.device_ownership.MySQLDispositivosRepository",
+        "src.infrastructure.fastapi.device_ownership.repo_dispositivos_resuelto",
         lambda db: repo_dispositivos or MagicMock(),
     )
     monkeypatch.setattr(

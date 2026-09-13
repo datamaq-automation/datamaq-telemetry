@@ -67,3 +67,7 @@ class NodoUnifilarNoEncontradoError(DominioTelemetriaException):
 
 class EstructuraUnifilarInvalidaError(DominioTelemetriaException):
     """Lanzada cuando el árbol del unifilar tiene ids duplicados, padres colgantes o ciclos."""
+
+
+class CampoGestionadoPorYamlError(DominioTelemetriaException):
+    """Lanzada cuando se intenta escribir por API un campo que el YAML declara para ese medidor."""

@@ -75,6 +75,9 @@ class MockOrganizacionesRepo(RepositorioOrganizacionesPort):
     def obtener_dispositivos_layout(self, planta_id: str) -> list[DispositivoLayout]:
         return list(self.dispositivos_layout.get(planta_id, []))
 
+    def obtener_instalacion_medidor(self, dispositivo_id: str):
+        return None
+
     def guardar_layout_planta(
         self,
         planta_id: str,

@@ -282,6 +282,7 @@ Para editar parámetros de instalación de un medidor en campo:
 }
 ```
 * **Opciones de `fases_con_ti`:** `"R,S,T"` (Trifásico 4 hilos), `"S,T"` o `"R,T"` (Método Aron / 2-TI).
+* **Precedencia del YAML (desde 2026-09-13).** `ubicacion_tag`, `tipo_instalacion` y `fases_con_ti` son datos de puesta en servicio; `categoria_tarifaria` y `penalizacion_reactiva_aplica` son del contrato con la distribuidora (viven en la `acometida` del unifilar, no en el medidor). Cuando el backend los tiene declarados en `data/organizaciones.yml` para ese medidor, **lo que devuelve `GET` es el valor del YAML** y un `PATCH` que intente escribirlos responde **`422 {"detail": "Gestionado por YAML: …"}`** — nunca un 200 sin efecto. Un `PATCH` que solo toca otros campos (`nombre`, `numero_serie`, `esta_activo`, `planta_id`) sigue funcionando. Hoy ningún medidor tiene esos campos declarados, así que el comportamiento es idéntico al anterior; avisaremos cuando se carguen.
 * **`categoria_tarifaria`** (`T1-R | T1-G | T2 | T3`, default `"T2"`) y **`penalizacion_reactiva_aplica`**
   (`boolean`, default `true`) — desde 2026-09-13 son columnas reales persistidas (antes de esa
   fecha existían en el contrato pero el `PATCH` era un no-op silencioso: nunca se guardaban).

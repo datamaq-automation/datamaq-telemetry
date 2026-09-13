@@ -9,6 +9,7 @@ from src.domain.telemetria.entities import (
     AlertaDispositivo,
     Dispositivo,
     DispositivoLayout,
+    InstalacionMedidor,
     LecturaInstantanea,
     LogEstadoDispositivo,
     NodoUnifilar,
@@ -216,6 +217,11 @@ class RepositorioOrganizacionesPort(ABC):
 
     @abstractmethod
     def obtener_dispositivos_layout(self, planta_id: str) -> list[DispositivoLayout]:
+        pass
+
+    @abstractmethod
+    def obtener_instalacion_medidor(self, dispositivo_id: str) -> InstalacionMedidor | None:
+        """Datos de puesta en servicio declarados para un medidor (`plantas[].medidores[]`), o None."""
         pass
 
 

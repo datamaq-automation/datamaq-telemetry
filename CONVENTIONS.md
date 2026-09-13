@@ -60,7 +60,18 @@ src/
 2. **Imports Absolutos:** Siempre `from src....`, nunca imports relativos.
 3. **`__init__.py` de 0 bytes:** Todos los `__init__.py` en `src/` y `tests/` deben tener exactamente 0 bytes.
 4. **Commits:** Conventional Commits (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`).
-5. **Datos físicos declarativos (`data/*.yml`): sin fuente, sin campo.** Todo número físico de planta (kVA de placa, kW contratados, tensión nominal, relación de TI, coordenadas) necesita una fuente verificable — placa, factura, plano, medición — citada en un comentario del YAML. Si no la hay, el campo **se omite** (el dominio lo trata como `None`, la API devuelve `null`); jamás se estima ni se "completa". Un LLM que rellena un YAML de planta no es una fuente. Antecedente: el 2026-09-13 se borraron potencias nominales de trafos inventadas por un LLM que contradecían la medición real.
+5. **Qué va en el YAML y qué en MySQL.** *Si lo define un ingeniero con un plano en la mano y cambia con una obra, es dato maestro → YAML versionado. Si lo produce el sistema operando o un usuario en el día a día, es dato transaccional → MySQL. Nada vive en los dos lados.* Corolario: un endpoint que no persiste no existe (la estructura de planta se edita por commit, no por API).
+
+   | Dato | Dónde | Por qué |
+   |---|---|---|
+   | Organización (identidad), planta, zona, layout, unifilar | YAML | Estructura ISA-95; cambia con obras; necesita revisión y fuente citada. |
+   | Instalación del medidor (tag, tipo, fases con TI) y contrato (categoría tarifaria, reactiva) | YAML, con precedencia sobre MySQL cuando se declara | Puesta en servicio y contrato con la distribuidora. El contrato va en la `acometida`, no en el medidor. `PATCH` responde 422 sobre campos gobernados. |
+   | Suscripción (plan, PRO, modo free) | MySQL (`organizations`) | Estado comercial con fecha de vencimiento. |
+   | Registro y runtime del medidor (MAC, serie, firmware, `last_seen`, estado) | MySQL | Auto-descubierto por MQTT y actualizado por el equipo. |
+   | Usuarios, accesos, telemetría, alertas, eventos, paradas, campañas, cargas, máquinas (umbrales calibrados) | MySQL | Operación y contenido de usuario. |
+   | `machines.name`, catálogo `plans` | MySQL (deuda: son maestros, migrar cuando toque) | Requieren decisiones del frontend y del CEO. |
+
+6. **Datos físicos declarativos (`data/*.yml`): sin fuente, sin campo.** Todo número físico de planta (kVA de placa, kW contratados, tensión nominal, relación de TI, coordenadas) necesita una fuente verificable — placa, factura, plano, medición — citada en un comentario del YAML. Si no la hay, el campo **se omite** (el dominio lo trata como `None`, la API devuelve `null`); jamás se estima ni se "completa". Un LLM que rellena un YAML de planta no es una fuente. Antecedente: el 2026-09-13 se borraron potencias nominales de trafos inventadas por un LLM que contradecían la medición real.
 
 ---
 

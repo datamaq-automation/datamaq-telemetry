@@ -1,5 +1,22 @@
 # data/organizaciones.yml — Modelo Declarativo de Activos (ANSI/ISA-95 & ISO 50001)
 # Nivel 4 (Empresa / Tenant) y Nivel 3 (Sitio / Planta)
+#
+# Qué va acá y qué no (CONVENTIONS §3.5 y §3.6): datos maestros que define un ingeniero
+# con un plano en la mano. NO va el estado comercial (plan, PRO, modo free: tabla
+# `organizations` en MySQL) ni nada operativo.
+#
+# Claves opcionales por planta, con precedencia sobre MySQL cuando se declaran:
+#   medidores:                      # datos de puesta en servicio de cada Powermeter
+#     - id: "<uuid del dispositivo>"
+#       tag_ubicacion: "…"          # tag físico ISA-5.1 del tablero
+#       tipo_instalacion: "CONSUMO" # CONSUMO | GENERACION_FV | …
+#       fases_con_ti: "R,S,T"       # fases con TI conectado
+#   nodos_unifilar[tipo=acometida]: # contrato con la distribuidora (lo heredan los medidores aguas abajo)
+#       categoria_tarifaria: "T3-MT"
+#       penalizacion_reactiva_aplica: true
+# Un campo declarado acá no se puede editar por PATCH /dispositivos (422). Sin fuente
+# verificable (placa, factura, plano), el campo se omite; scripts/exportar_instalacion_medidores.py
+# vuelca lo que hoy dice MySQL como BORRADOR para confirmarlo en campo.
 
 organizaciones:
   - id: "09c09578-a860-4c61-8e97-2a13240adb8f"

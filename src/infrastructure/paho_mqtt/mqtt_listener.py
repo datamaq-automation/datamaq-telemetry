@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 import paho.mqtt.client as mqtt
 from paho.mqtt.enums import CallbackAPIVersion
 
+from src.adapters.gateways.dispositivos_datos_maestros_gateway import DispositivosConDatosMaestrosGateway
 from src.application.use_cases.gestionar_disponibilidad import GestionarDisponibilidadUseCase
 from src.application.use_cases.ingestar_telemetria import IngestarTelemetriaUseCase
 from src.domain.telemetria.ports import PublicadorEventosPort
@@ -22,6 +23,7 @@ from src.infrastructure.sqlalchemy.mysql_repositories import (
     MySQLParadasProgramadasRepository,
     MySQLTelemetriaRepository,
 )
+from src.infrastructure.yaml.repositories.organizaciones_repository import YamlOrganizacionesRepository
 
 logger = get_logger("mqtt_listener")
 
@@ -156,7 +158,9 @@ class MQTTListener:
     def _procesar_mensaje(self, topic, payload):
         db = self.session_factory()
         try:
-            repo_disp = MySQLDispositivosRepository(db)
+            repo_disp = DispositivosConDatosMaestrosGateway(
+                MySQLDispositivosRepository(db), YamlOrganizacionesRepository()
+            )
             repo_telem = MySQLTelemetriaRepository(db)
             disponibilidad_use_case = GestionarDisponibilidadUseCase(
                 repo_maquinas=MySQLMaquinasRepository(db),

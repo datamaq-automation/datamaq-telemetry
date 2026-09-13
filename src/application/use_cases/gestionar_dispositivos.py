@@ -26,6 +26,7 @@ from src.domain.telemetria.ports import (
     RepositorioPlanesPort,
     RepositorioSuscripcionesPort,
 )
+from src.domain.telemetria.servicios.datos_maestros_medidor import DatosMaestrosMedidorService
 from src.domain.telemetria.value_objects import MacAddress
 
 
@@ -128,6 +129,8 @@ class GestionarDispositivosUseCase:
         if not dev:
             raise DispositivoNoEncontradoError(f"Dispositivo '{id_o_uid}' no encontrado.")
 
+        self._rechazar_campos_gobernados_por_yaml(dev, dto)
+
         if dto.planta_id is not None and dto.planta_id != dev.planta_id:
             self._validar_cupo_dispositivos(dto.planta_id)
             dev.planta_id = dto.planta_id
@@ -150,6 +153,16 @@ class GestionarDispositivosUseCase:
 
         saved = self.repo_dispositivos.guardar(dev)
         return self._enriquecer_dispositivo(saved)
+
+    def _rechazar_campos_gobernados_por_yaml(self, dev: Dispositivo, dto: DispositivoUpdateDTO) -> None:
+        """Un campo declarado en el YAML para este medidor no se edita por API (422), nunca un no-op silencioso."""
+        instalacion = self.repo_organizaciones.obtener_instalacion_medidor(dev.id)
+        nodos = self.repo_organizaciones.obtener_nodos_unifilar(dev.planta_id) if dev.planta_id else []
+        gobernados = DatosMaestrosMedidorService.campos_gobernados_por_yaml(dev.id, instalacion, nodos)
+        if not gobernados:
+            return
+        a_escribir = {campo for campo, valor in dto.model_dump().items() if valor is not None}
+        DatosMaestrosMedidorService.rechazar_escritura_de_campos_gobernados(a_escribir, gobernados)
 
     def listar_organizaciones(self) -> list[OrganizacionResponseDTO]:
         orgs = self.repo_organizaciones.listar_organizaciones()

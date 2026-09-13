@@ -1,5 +1,6 @@
 from src.domain.telemetria.entities import (
     DispositivoLayout,
+    InstalacionMedidor,
     NodoUnifilar,
     Organizacion,
     Planta,
@@ -112,6 +113,12 @@ class YamlOrganizacionesRepository(RepositorioOrganizacionesPort):
                                 uso_significativo=bool(n.get("uso_significativo", False)),
                                 categoria_uso=n.get("categoria_uso"),
                                 variable_relevante=n.get("variable_relevante"),
+                                categoria_tarifaria=n.get("categoria_tarifaria"),
+                                penalizacion_reactiva_aplica=(
+                                    bool(n["penalizacion_reactiva_aplica"])
+                                    if n.get("penalizacion_reactiva_aplica") is not None
+                                    else None
+                                ),
                             )
                         )
 
@@ -164,3 +171,16 @@ class YamlOrganizacionesRepository(RepositorioOrganizacionesPort):
                         )
                     return disps
         return []
+
+    def obtener_instalacion_medidor(self, dispositivo_id: str) -> InstalacionMedidor | None:
+        for raw in self._cargar_organizaciones_raw():
+            for p in raw.get("plantas", []):
+                for m in p.get("medidores", []) or []:
+                    if str(m.get("id")) == str(dispositivo_id):
+                        return InstalacionMedidor(
+                            dispositivo_id=str(m["id"]),
+                            tag_ubicacion=m.get("tag_ubicacion"),
+                            tipo_instalacion=m.get("tipo_instalacion"),
+                            fases_con_ti=m.get("fases_con_ti"),
+                        )
+        return None

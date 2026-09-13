@@ -62,7 +62,7 @@ Consecuencias observables:
 * `DispositivoResponseDTO.nodo_unifilar_id` de esos cuatro medidores **cambia** al id del TGBT.
 * `GET /api/v1/plantas/{id}/unifilar/nodos/{nodo_id}/…` (agregación) sigue funcionando para el trafo y la acometida: un nodo virtual suma los medidores frontera aguas abajo (`ArbolUnifilarService.medidores_frontera`), así que el trafo devuelve exactamente lo mismo que antes, ahora vía su TGBT.
 * `uso_significativo` y `categoria_uso` (ISO 50001) se movieron al TGBT, que es el punto medido.
-* `potencia_nominal_kw` de los trafos **se eliminó**: los valores que había (300/150 kW Durax, 800/800 UPP) no salían de ninguna placa — los inventó un LLM. Regla nueva en `CONVENTIONS.md` §3.5: sin fuente verificable, sin campo. El frontend recibe `null` y no debe interpretarlo como 0.
+* `potencia_nominal_kw` de los trafos **se eliminó**: los valores que había (300/150 kW Durax, 800/800 UPP) no salían de ninguna placa — los inventó un LLM. Regla nueva en `CONVENTIONS.md` §3.6: sin fuente verificable, sin campo. El frontend recibe `null` y no debe interpretarlo como 0.
 * La planta "Casa" (medidor doméstico, 220 V) **no cambia**: no tiene trafo ni TGBT.
 
 ### 2.4 Sobre el ejemplo del informe
@@ -153,7 +153,18 @@ El mapa de contextos es correcto en lo importante — **el punto de unión es si
 
 **Sobre la regla propuesta ("Zona" en vez de "Área"):** de acuerdo, y no es un cambio nuevo — es alinear la UI con el nombre que el contrato ya usa. Del lado backend "Área" solo aparece en `GET /plantas/{id}/areas` (estadísticas por zona, `AreaEstadisticasDTO`), que se renombra cuando ISA-95 tenga fecha. El selector de tres niveles queda entonces: **Planta** (`/auth/me → plantas[]`) › **Zona** (`/layout → zonas[]`) › **TGBT** (`/unifilar → nodos[].tipo == "tgbt"`), unidos por `device_id`.
 
-## 7. Checklist para el frontend
+## 7. Addendum (mismo día): endpoints eliminados y cambio en `PATCH`
+
+Después de este informe hicimos el saneamiento YAML ↔ MySQL (cuatro commits, `refactor(estructura)`, `refactor(suscripcion)`, `refactor(grupos)`, `feat(instalacion)`). Lo que les toca:
+
+| Cambio | Efecto en el frontend |
+|---|---|
+| `POST /api/v1/organizaciones`, `POST /api/v1/plantas`, `PUT /api/v1/plantas/{id}/unifilar`, `PUT /api/v1/plantas/{id}/layout` **eliminados** | Respondían 200 sin persistir nada (repositorio YAML de solo lectura). Ahora `405`. La estructura de planta se edita por commit al YAML del backend. Si tenían pantallas de edición de unifilar/layout, hoy no hacían nada real. |
+| `/api/v1/grupos-dispositivos*` **eliminado** | Duplicaba al nodo virtual del unifilar (`GET …/unifilar/nodos/{id}/resumen` e `/historico`). No figuraba en la guía; en producción estaba vacío. |
+| `PATCH /api/v1/dispositivos/{id}` puede responder **`422 {"detail": "Gestionado por YAML: …"}`** | Solo para `ubicacion_tag`, `tipo_instalacion`, `fases_con_ti`, `categoria_tarifaria`, `penalizacion_reactiva_aplica` y solo cuando el YAML los declara para ese medidor. **Hoy no hay ninguno declarado**: comportamiento idéntico. Avisaremos antes de cargar el primero. |
+| `GET /organizaciones` | Misma forma. `plan_id`, `pro_vence_en` y `modo_free` ahora salen de MySQL (suscripción) en vez del YAML. |
+
+## 8. Checklist para el frontend
 
 - [ ] Ampliar el schema de `NodoUnifilarDTO`: `tipo` como enum cerrado, `nombre_maquina: string | null`.
 - [ ] Dejar de asumir que el medidor está en el nodo `transformador` — buscar `tipo == "tgbt"` (o, más robusto, `es_virtual == false`).

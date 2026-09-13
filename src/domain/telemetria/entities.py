@@ -108,8 +108,37 @@ class NodoUnifilar:
     categoria_uso: str | None = None
     variable_relevante: str | None = None
     orden: int = 0
+    # Contrato con la distribuidora: solo tiene sentido en la `acometida` (punto de
+    # suministro). Los medidores aguas abajo lo heredan por el árbol.
+    categoria_tarifaria: str | None = None
+    penalizacion_reactiva_aplica: bool | None = None
     creado_en: datetime = field(default_factory=ahora_utc)
     actualizado_en: datetime = field(default_factory=ahora_utc)
+
+
+@dataclass(frozen=True)
+class InstalacionMedidor:
+    """Datos de puesta en servicio de un medidor, declarados en el YAML (dato maestro).
+
+    Cada campo es opcional: solo lo declarado gobierna; lo no declarado sigue
+    saliendo de MySQL. Un campo declarado no puede modificarse por `PATCH`.
+    """
+
+    dispositivo_id: str
+    tag_ubicacion: str | None = None
+    tipo_instalacion: str | None = None
+    fases_con_ti: str | None = None
+
+    def campos_declarados(self) -> set[str]:
+        return {
+            campo
+            for campo, valor in (
+                ("ubicacion_tag", self.tag_ubicacion),
+                ("tipo_instalacion", self.tipo_instalacion),
+                ("fases_con_ti", self.fases_con_ti),
+            )
+            if valor is not None
+        }
 
 
 @dataclass
