@@ -198,3 +198,48 @@ def test_acc_de_dispositivo_trifasico_suma_las_tres_fases_en_la_ingesta_real():
     acumulado, _ = repo_telem.energias[0]
     assert acumulado.energia_activa_neta is not None
     assert round(acumulado.energia_activa_neta.kwh, 2) == round(166.43 + 1.51 + 0.37, 2)
+
+
+# --- Throttle de persistencia (WP3, D5, nivel ③) -------------------------------------
+
+
+def test_energyio_dentro_de_la_ventana_no_se_persiste_dos_veces():
+    _limpiar_caches()
+    repo_disp = _RepoDisp(_dispositivo_monofasico())
+    repo_telem = _RepoTelem()
+    use_case = IngestarTelemetriaUseCase(repo_disp, repo_telem, granularidad_segundos=300)
+
+    use_case.ejecutar("m/wifi/D48C49F03564/energyio", {"t": 1789300000, "ae_imp": 100.0})
+    use_case.ejecutar("m/wifi/D48C49F03564/energyio", {"t": 1789300002, "ae_imp": 100.02})  # +2s, misma ventana
+
+    assert len(repo_telem.energias) == 1
+    acumulado, _ = repo_telem.energias[0]
+    assert acumulado.energia_activa_importada.kwh == 100.0  # la segunda, dentro de la ventana, no llegó a persistir
+
+
+def test_energyio_fuera_de_la_ventana_se_persiste_de_nuevo():
+    _limpiar_caches()
+    repo_disp = _RepoDisp(_dispositivo_monofasico())
+    repo_telem = _RepoTelem()
+    use_case = IngestarTelemetriaUseCase(repo_disp, repo_telem, granularidad_segundos=300)
+
+    use_case.ejecutar("m/wifi/D48C49F03564/energyio", {"t": 1789300000, "ae_imp": 100.0})
+    use_case.ejecutar("m/wifi/D48C49F03564/energyio", {"t": 1789300301, "ae_imp": 105.0})  # +301s
+
+    assert len(repo_telem.energias) == 2
+
+
+def test_acc_y_energyio_tienen_ventanas_de_throttle_independientes():
+    """Si compartieran clave, el que llega primero en la ventana 'gana el turno'
+    y descarta al otro aunque sea energyio (prioritario, D1) el que se pierde."""
+    _limpiar_caches()
+    repo_disp = _RepoDisp(_dispositivo_monofasico())
+    repo_telem = _RepoTelem()
+    use_case = IngestarTelemetriaUseCase(repo_disp, repo_telem, granularidad_segundos=300)
+
+    use_case.ejecutar("m/wifi/D48C49F03564/acc", {"t": 1789300000, "f": [{"n": "R", "a": 100.0}]})
+    use_case.ejecutar("m/wifi/D48C49F03564/energyio", {"t": 1789300002, "ae_imp": 100.5})
+
+    assert len(repo_telem.energias) == 2
+    fuentes = {acumulado.fuente for acumulado, _ in repo_telem.energias}
+    assert fuentes == {"acc", "energyio"}
