@@ -15,7 +15,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Guard: sin .env reales trackeados (D-2)
+      - name: "Guard: sin .env reales trackeados (D-2)"
         run: bash scripts/guard_secrets.sh
 
       - name: Setup Python 3.12
