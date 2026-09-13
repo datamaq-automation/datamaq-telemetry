@@ -33,25 +33,30 @@ echo -e "${BOLD}${CYAN}=========================================================
 echo -e "${BOLD}${CYAN}  ⚡ DATAMAQ TELEMETRY — GAUNTLET PRE-PUSH (VERIFICACIÓN LOCAL)       ${RESET}"
 echo -e "${BOLD}${CYAN}======================================================================${RESET}"
 
+TOTAL_STAGES=7
+
 run_stage() {
     local num="$1"
     local title="$2"
     local cmd="$3"
 
-    echo -e "\n${BOLD}${CYAN}==> [${num}/6] ${title}${RESET}"
+    echo -e "\n${BOLD}${CYAN}==> [${num}/${TOTAL_STAGES}] ${title}${RESET}"
     local t_start=$(_time_now)
 
     if eval "$cmd"; then
         local t_end=$(_time_now)
         local dur=$(_calc_duration "$t_start" "$t_end")
-        echo -e "${GREEN}✓ [PASS] Stage ${num}/6 (${title}) superado en ${dur}${RESET}"
+        echo -e "${GREEN}✓ [PASS] Stage ${num}/${TOTAL_STAGES} (${title}) superado en ${dur}${RESET}"
     else
         local t_end=$(_time_now)
         local dur=$(_calc_duration "$t_start" "$t_end")
-        echo -e "${RED}✗ [FAIL] Stage ${num}/6 (${title}) falló tras ${dur}${RESET}"
+        echo -e "${RED}✗ [FAIL] Stage ${num}/${TOTAL_STAGES} (${title}) falló tras ${dur}${RESET}"
         return 1
     fi
 }
+
+# Stage 0: Secretos — ver scripts/guard_secrets.sh para el origen (D-2)
+run_stage "0" "Guard: sin .env reales trackeados" "bash scripts/guard_secrets.sh"
 
 # Stage 1: Integridad
 run_stage "1" "Integridad: __init__.py de 0 bytes" "pytest tests/test_empty_inits.py -q --no-header"
