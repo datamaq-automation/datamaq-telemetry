@@ -25,6 +25,15 @@ class SeveridadAlerta(str, Enum):
     CRITICAL = "CRITICAL"
 
 
+@dataclass(frozen=True)
+class ReglaAlertaConectividad:
+    timeout_segundos: int = 300
+    max_reconexiones_ventana: int = 3
+    ventana_reconexiones_minutos: int = 30
+    rssi_umbral_dbm: int = -78
+    calidad_umbral_pct: int = 40
+
+
 class VisibilidadPlan(str, Enum):
     PUBLICO = "PUBLICO"
     PRIVADO = "PRIVADO"

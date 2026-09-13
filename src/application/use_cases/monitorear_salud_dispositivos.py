@@ -100,7 +100,7 @@ class MonitorearSaludDispositivosUseCase:
         if self._publicador:
             self._publicador.publicar_telemetria_en_vivo(
                 f"telemetria/alertas/{dev.device_uid.valor}",
-                AlertaMapper.entidad_a_dto(alerta).model_dump(mode="json"),
+                AlertaMapper.to_dto(alerta).model_dump(mode="json"),
             )
 
         if (
@@ -131,4 +131,4 @@ class MonitorearSaludDispositivosUseCase:
             if alerta:
                 alertas_generadas.append(alerta)
 
-        return [AlertaMapper.entidad_a_dto(a) for a in alertas_generadas]
+        return [AlertaMapper.to_dto(a) for a in alertas_generadas]

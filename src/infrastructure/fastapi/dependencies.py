@@ -10,6 +10,9 @@ from src.adapters.gateways.in_memory_event_broadcaster import InMemoryEventBroad
 from src.adapters.gateways.in_memory_telemetria_buffer import InMemoryTelemetriaBuffer
 from src.adapters.gateways.mqtt_comando_rafaga import MqttComandoRafagaGateway
 from src.application.use_cases.analizar_consumo import AnalizarConsumoUseCase
+from src.application.use_cases.asistente.procesar_pregunta_asistente import (
+    ProcesarPreguntaAsistenteUseCase,
+)
 from src.application.use_cases.atribuir_consumo import AtribuirConsumoUseCase
 from src.application.use_cases.caracterizar_carga import CaracterizarCargaUseCase
 from src.application.use_cases.consultar_grupo_dispositivos import ConsultarGrupoDispositivosUseCase
@@ -194,6 +197,26 @@ def get_alertas_use_case(
         repo_telemetria=MySQLTelemetriaRepository(db),
         publicador=global_event_broadcaster,
         repo_dispositivos=MySQLDispositivosRepository(db),
+    )
+
+
+def get_procesar_pregunta_asistente_use_case(
+    db: Annotated[Session, Depends(get_db_session)],
+) -> ProcesarPreguntaAsistenteUseCase:
+    from src.infrastructure.asistente.clasificador_reglas import (
+        ClasificadorIntencionReglasAdapter,
+    )
+    from src.infrastructure.groq.groq_adapter import GroqRespuestaAdapter
+    from src.infrastructure.sqlalchemy.repositories.asistente_repository import (
+        MySQLConversacionesAsistenteRepository,
+    )
+
+    return ProcesarPreguntaAsistenteUseCase(
+        clasificador=ClasificadorIntencionReglasAdapter(),
+        generador=GroqRespuestaAdapter(),
+        repo_conversaciones=MySQLConversacionesAsistenteRepository(db),
+        gestor_alertas=get_alertas_use_case(db),
+        gestor_dispositivos=get_dispositivos_use_case(db),
     )
 
 
