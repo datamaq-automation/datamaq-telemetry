@@ -31,7 +31,29 @@ Por directiva de arquitectura del ecosistema DataMaq:
 | `/api/v1/auth/login` | `POST` | Público | Autenticación con `{"usuario": "...", "contrasena": "..."}`. Emite cookie y JWT. |
 | `/api/v1/auth/guest` | `POST` | Público | **Acceso Invitado Stateless:** Emite cookie y JWT con rol `invitado` sin consultar la base de datos (con rate limiting por IP). |
 | `/api/v1/auth/logout` | `POST` | Público | Cierre de sesión. Borra la cookie `datamaq_token`. |
-| `/api/v1/auth/me` | `GET` | Autenticado | Devuelve la identidad y rol activo `{"usuario": "...", "rol": "admin" \| "operador" \| "invitado"}`. |
+| `/api/v1/auth/me` | `GET` | Autenticado | Devuelve la identidad, rol activo y plantas accesibles (ver 2.2.1). |
+| `/api/v1/usuarios/{usuario_id}/plantas` | `GET` / `PUT` | `admin` (misma org) / `superadmin` | Consulta y reemplaza el conjunto de plantas asignadas a un usuario y su permiso de cambio. |
+
+#### 2.2.1 Plantas accesibles en `GET /api/v1/auth/me`
+
+```json
+{
+  "usuario": "operador.horno@datamaq.com.ar",
+  "rol": "operador",
+  "totp_enabled": false,
+  "organizacion_id": "cf82b4be-0798-4beb-8978-2a27612d5761",
+  "organizacion_nombre": null,
+  "plantas": [
+    { "id": "c64fd625-…", "nombre": "Planta Principal Durax", "organizacion_id": "cf82b4be-…", "puede_cambiar": false }
+  ],
+  "planta_activa_id": "c64fd625-…"
+}
+```
+
+* `plantas` es la lista exacta que debe ofrecer el selector de Planta; `planta_activa_id` es la primera de esa lista (o `null` si está vacía).
+* `puede_cambiar: false` en la planta activa = selector bloqueado para ese usuario.
+* Reglas (backend, `PoliticaAccesoPlantasService`): `superadmin` e `invitado_global` ven todas las plantas de todas las organizaciones, siempre con `puede_cambiar: true`. Un usuario **con** asignaciones explícitas ve solo esas plantas, en el orden en que fueron asignadas. Un usuario **sin** asignaciones ve todas las plantas de su organización con `puede_cambiar: true` (comportamiento histórico, no requiere migrar datos).
+* `PUT /api/v1/usuarios/{id}/plantas` recibe `{"plantas": [{"planta_id": "...", "puede_cambiar": false}]}` y **reemplaza** el conjunto completo; `{"plantas": []}` vuelve al comportamiento por defecto. Una `planta_id` que no pertenezca a la organización del usuario responde `404`.
 
 ### 2.3 Matriz de Permisos por Rol
 
@@ -274,7 +296,11 @@ Para editar parámetros de instalación de un medidor en campo:
 
 Endpoints para persistencia y renderizado dinámico de la infraestructura de planta:
 
-* `GET /api/v1/planta/unifilar?planta_id=...`: Árbol jerárquico de tableros y medidores.
+* `GET /api/v1/planta/unifilar?planta_id=...` (o `GET /api/v1/plantas/{planta_id}/unifilar`): Árbol jerárquico de tableros y medidores.
+  * `tipo` es un vocabulario cerrado: `acometida | transformador | tgbt | seccional | carga`. Un `PUT` con otro valor responde `422`.
+  * Jerarquía real de las plantas industriales (declarada en `data/organizaciones.yml`): `acometida` MT (virtual, 13,2 kV) → `transformador` (virtual) → `tgbt` (**Tablero General de Baja Tensión**, 380 V, con `device_id`). El medidor se declara en el TGBT porque es lo que físicamente se mide; los nodos virtuales (`es_virtual: true`, `device_id: null`) suman los medidores frontera aguas abajo.
+  * El unifilar es un árbol distinto del layout: `parent_id` siempre apunta a otro nodo del unifilar, nunca a una zona (`area-*`) del layout 2D.
+  * `nombre_maquina` (`string | null`): nombre de la máquina asociada 1:1 al medidor del nodo (`machines.device_id` es `UNIQUE`), para mostrarla en lugar del nombre del medidor cuando exista. "Máquina" no es un nivel adicional del árbol.
 * `PUT /api/v1/plantas/{planta_id}/unifilar`: Guardar topología unifilar.
 * `GET /api/v1/planta/layout?planta_id=...`: Zonas de planta y ubicación porcentual (`pos_x_pct`, `pos_y_pct`) de los tableros sobre el plano SVG.
 * `PUT /api/v1/plantas/{planta_id}/layout`: Guardar distribución espacial 2D.

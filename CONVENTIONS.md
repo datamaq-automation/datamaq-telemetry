@@ -60,6 +60,7 @@ src/
 2. **Imports Absolutos:** Siempre `from src....`, nunca imports relativos.
 3. **`__init__.py` de 0 bytes:** Todos los `__init__.py` en `src/` y `tests/` deben tener exactamente 0 bytes.
 4. **Commits:** Conventional Commits (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`).
+5. **Datos físicos declarativos (`data/*.yml`): sin fuente, sin campo.** Todo número físico de planta (kVA de placa, kW contratados, tensión nominal, relación de TI, coordenadas) necesita una fuente verificable — placa, factura, plano, medición — citada en un comentario del YAML. Si no la hay, el campo **se omite** (el dominio lo trata como `None`, la API devuelve `null`); jamás se estima ni se "completa". Un LLM que rellena un YAML de planta no es una fuente. Antecedente: el 2026-09-13 se borraron potencias nominales de trafos inventadas por un LLM que contradecían la medición real.
 
 ---
 
