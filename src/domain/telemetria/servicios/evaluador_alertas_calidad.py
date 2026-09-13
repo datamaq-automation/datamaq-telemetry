@@ -259,27 +259,19 @@ class EvaluadorAlertasCalidadService(EvaluadorAnomaliasFasesService):
         t_disparo = (
             lectura.registrado_en if (lectura and lectura.registrado_en is not None) else datetime.now(timezone.utc)
         )
-        if fp < umbral_critico:
-            return AlertaDispositivo(
-                id=None,
-                dispositivo_id=dispositivo_id,
-                tipo_alerta="BAJO_FACTOR_POTENCIA",
-                severidad=SeveridadAlerta.CRITICAL,
-                mensaje=f"Factor de potencia crítico con penalización tarifaria: {fp} (Mínimo: {umbral_critico})",
-                disparada_en=t_disparo,
-                fase="TOTAL",
-                valor_medido=fp,
-                valor_umbral=umbral_critico,
-                unidad="",
-                categoria="FACTOR_POTENCIA",
+        if fp < umbral_warning:
+            severidad = SeveridadAlerta.WARNING
+            msg = (
+                f"Factor de potencia crítico con penalización tarifaria: {fp} (Mínimo: {umbral_critico})"
+                if fp < umbral_critico
+                else f"Factor de potencia por debajo del límite regulatorio ENRE: {fp} (Mínimo: {umbral_warning})"
             )
-        elif fp < umbral_warning:
             return AlertaDispositivo(
                 id=None,
                 dispositivo_id=dispositivo_id,
                 tipo_alerta="BAJO_FACTOR_POTENCIA",
-                severidad=SeveridadAlerta.WARNING,
-                mensaje=f"Factor de potencia por debajo del límite regulatorio ENRE: {fp} (Mínimo: {umbral_warning})",
+                severidad=severidad,
+                mensaje=msg,
                 disparada_en=t_disparo,
                 fase="TOTAL",
                 valor_medido=fp,
@@ -287,6 +279,7 @@ class EvaluadorAlertasCalidadService(EvaluadorAnomaliasFasesService):
                 unidad="",
                 categoria="FACTOR_POTENCIA",
             )
+
         return None
 
     @staticmethod

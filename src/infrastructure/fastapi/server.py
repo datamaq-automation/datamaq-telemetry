@@ -17,9 +17,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from src.adapters.gateways.mqtt_comando_rafaga import MqttComandoRafagaGateway
 from src.application.use_cases.caracterizar_carga import CaracterizarCargaUseCase
 from src.application.use_cases.ingesta.registro_campanas import registro_campanas_activas
-from src.application.use_cases.ingesta.resolvedor_dispositivo import (
-    ResolvedorDispositivoIngesta,
-)
+from src.application.use_cases.ingesta.resolvedor_dispositivo import ResolvedorDispositivoIngesta
 from src.domain.telemetria.services import debe_recibir_evento
 from src.domain.telemetria.value_objects import MacAddress
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
@@ -33,8 +31,10 @@ from src.infrastructure.fastapi.dependencies import (
 from src.infrastructure.fastapi.error_handler import manejar_404
 from src.infrastructure.fastapi.middleware import RequestIdMiddleware
 from src.infrastructure.fastapi.routes.alertas_router import router as alertas_router
+from src.infrastructure.fastapi.routes.analitica_router import router as analitica_router
 from src.infrastructure.fastapi.routes.auth_router import router as auth_router
 from src.infrastructure.fastapi.routes.cargas_router import router as cargas_router
+from src.infrastructure.fastapi.routes.copilot_router import router as copilot_router
 from src.infrastructure.fastapi.routes.disponibilidad_router import router as disponibilidad_router
 from src.infrastructure.fastapi.routes.dispositivos_router import router as dispositivos_router
 from src.infrastructure.fastapi.routes.grupos_dispositivos_router import router as grupos_dispositivos_router
@@ -59,9 +59,7 @@ from src.infrastructure.sqlalchemy.mysql_repositories import (
     MySQLCargasRepository,
     MySQLDispositivosRepository,
 )
-from src.infrastructure.yaml.repositories.organizaciones_repository import (
-    YamlOrganizacionesRepository,
-)
+from src.infrastructure.yaml.repositories.organizaciones_repository import YamlOrganizacionesRepository
 
 logger = get_logger("server")
 
@@ -465,21 +463,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_exception_handler(StarletteHTTPException, manejar_404)
 
     # Register Routers
-    app.include_router(system_router)
-    app.include_router(disponibilidad_router)
-    app.include_router(cargas_router)
-    app.include_router(telemetria_router)
-    app.include_router(dispositivos_router)
-    app.include_router(grupos_dispositivos_router)
-    app.include_router(organizaciones_router)
-    app.include_router(planta_estructura_router)
-    app.include_router(planes_router)
-    app.include_router(alertas_router)
-    app.include_router(auth_router)
-    app.include_router(sge_router)
-    app.include_router(usuarios_router)
+    routers = (system_router, disponibilidad_router, cargas_router, telemetria_router, dispositivos_router, grupos_dispositivos_router, organizaciones_router, planta_estructura_router, planes_router, alertas_router, auth_router, sge_router, usuarios_router, analitica_router, copilot_router)  # fmt: skip
+    for r in routers:
+        app.include_router(r)
 
     # WebSockets Live Telemetry Stream
+
     @app.websocket("/ws/live")
     async def websocket_stream(websocket: WebSocket):
         client_host = websocket.client.host if websocket.client else "desconocido"
