@@ -43,7 +43,9 @@ DEV_ID = "dev-test-1234"
 @pytest.fixture()
 def mock_db() -> MagicMock:
     """Fixture que provee un Mock de Session de SQLAlchemy."""
-    return MagicMock(spec=Session)
+    db = MagicMock(spec=Session)
+    db.get_bind.return_value.dialect.name = "mysql"  # este repositorio es MySQL-específico
+    return db
 
 
 @pytest.fixture()
@@ -237,7 +239,7 @@ class TestGuardarInstantanea:
 
 
 class TestGuardarEnergia:
-    """Tests para guardar_energia."""
+    """Tests para guardar_energia (WP2: upsert por (device_id, recorded_at), D1)."""
 
     def test_guardar_energia_completa(self, repo: MySQLTelemetriaRepository, mock_db: MagicMock):
         acumulado = AcumuladoEnergia(
@@ -250,22 +252,42 @@ class TestGuardarEnergia:
             energia_activa_exportada=EnergiaActiva(kwh=49.5),
             energia_reactiva_importada=EnergiaReactiva(kvarh=260.0),
             energia_reactiva_exportada=EnergiaReactiva(kvarh=9.8),
+            fuente="energyio",
         )
 
-        repo.guardar_energia(acumulado)
+        repo.guardar_energia(acumulado, prioritario=True)
 
-        mock_db.add.assert_called_once()
+        mock_db.execute.assert_called_once()
         mock_db.commit.assert_called_once()
-        model = mock_db.add.call_args[0][0]
-        assert isinstance(model, TelemetryEnergyModel)
-        assert model.device_id == DEV_ID
-        assert model.recorded_at == AHORA
-        assert model.net_active_energy_kwh == 1000.5
-        assert model.net_reactive_energy_kvarh == 250.2
-        assert model.imported_active_energy_kwh == 1050.0
-        assert model.exported_active_energy_kwh == 49.5
-        assert model.imported_reactive_energy_kvarh == 260.0
-        assert model.exported_reactive_energy_kvarh == 9.8
+        stmt = mock_db.execute.call_args[0][0]
+        compilado = stmt.compile(dialect=__import__("sqlalchemy").dialects.mysql.dialect())
+        assert "ON DUPLICATE KEY UPDATE" in str(compilado).upper()
+        params = compilado.params
+        assert params["device_id"] == DEV_ID
+        assert params["recorded_at"] == AHORA
+        assert float(params["net_active_energy_kwh"]) == 1000.5
+        assert float(params["exported_active_energy_kwh"]) == 49.5
+        assert params["source"] == "energyio"
+
+    def test_guardar_energia_no_prioritaria_usa_insert_ignore(
+        self, repo: MySQLTelemetriaRepository, mock_db: MagicMock
+    ):
+        acumulado = AcumuladoEnergia(
+            id=None,
+            dispositivo_id=DEV_ID,
+            registrado_en=AHORA,
+            energia_activa_neta=EnergiaActiva(kwh=100.0),
+            fuente="acc",
+        )
+
+        repo.guardar_energia(acumulado, prioritario=False)
+
+        stmt = mock_db.execute.call_args[0][0]
+        compilado = stmt.compile(dialect=__import__("sqlalchemy").dialects.mysql.dialect())
+        sql = str(compilado).upper()
+        assert "INSERT IGNORE" in sql
+        assert "ON DUPLICATE KEY UPDATE" not in sql
+        assert compilado.params["source"] == "acc"
 
     def test_guardar_energia_minima(self, repo: MySQLTelemetriaRepository, mock_db: MagicMock):
         acumulado = AcumuladoEnergia(
@@ -276,15 +298,18 @@ class TestGuardarEnergia:
 
         repo.guardar_energia(acumulado)
 
-        mock_db.add.assert_called_once()
+        mock_db.execute.assert_called_once()
         mock_db.commit.assert_called_once()
-        model = mock_db.add.call_args[0][0]
-        assert model.net_active_energy_kwh is None
-        assert model.net_reactive_energy_kvarh is None
-        assert model.imported_active_energy_kwh is None
-        assert model.exported_active_energy_kwh is None
-        assert model.imported_reactive_energy_kvarh is None
-        assert model.exported_reactive_energy_kvarh is None
+        stmt = mock_db.execute.call_args[0][0]
+        compilado = stmt.compile(dialect=__import__("sqlalchemy").dialects.mysql.dialect())
+        params = compilado.params
+        assert params["net_active_energy_kwh"] is None
+        assert params["net_reactive_energy_kvarh"] is None
+        assert params["imported_active_energy_kwh"] is None
+        assert params["exported_active_energy_kwh"] is None
+        assert params["imported_reactive_energy_kvarh"] is None
+        assert params["exported_reactive_energy_kvarh"] is None
+        assert params["source"] is None
 
 
 class TestGuardarLogEstado:

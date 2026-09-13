@@ -287,6 +287,7 @@ erDiagram
         decimal exported_active_energy_kwh
         decimal imported_reactive_energy_kvarh
         decimal exported_reactive_energy_kvarh
+        string source
         datetime created_at
     }
 
@@ -683,11 +684,13 @@ erDiagram
 | `exported_active_energy_kwh` | `NUMERIC(14, 3)` | - | Sí |
 | `imported_reactive_energy_kvarh` | `NUMERIC(14, 3)` | - | Sí |
 | `exported_reactive_energy_kvarh` | `NUMERIC(14, 3)` | - | Sí |
+| `source` | `VARCHAR(16)` | - | Sí |
 | `created_at` | `DATETIME` | - | No |
 
 **Índices:**
 - `idx_telemetry_energy_dev_time`: (`device_id`, `recorded_at`)
 - `idx_telemetry_energy_time`: (`recorded_at`)
+- `uq_energy_dev_time` (UNIQUE): (`device_id`, `recorded_at`)
 
 ### Tabla `telemetry_instantaneous`
 

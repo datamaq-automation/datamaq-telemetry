@@ -165,7 +165,7 @@ class MockTelemetriaRepo(RepositorioTelemetriaPort):
     def guardar_instantanea(self, lectura: LecturaInstantanea) -> None:
         self.instantaneas.append(lectura)
 
-    def guardar_energia(self, acumulado: AcumuladoEnergia) -> None:
+    def guardar_energia(self, acumulado: AcumuladoEnergia, prioritario: bool = True) -> None:
         self.energias.append(acumulado)
 
     def guardar_log_estado(self, log: LogEstadoDispositivo) -> None:

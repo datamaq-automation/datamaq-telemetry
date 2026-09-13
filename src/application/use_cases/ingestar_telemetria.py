@@ -33,6 +33,7 @@ from src.domain.telemetria.ports import (
     RepositorioTelemetriaPort,
 )
 from src.domain.telemetria.services import FiltroPersistenciaTemporalService
+from src.domain.telemetria.servicios.analizador_calidad_metrologica import AnalizadorMetrologicoService
 
 
 class IngestarTelemetriaUseCase:
@@ -130,7 +131,7 @@ class IngestarTelemetriaUseCase:
         if subtopico == "inst":
             self._procesar_instantanea(topico, mac_raw, payload, dispositivo, recorded_at)
         elif subtopico in ("acc", "energyio"):
-            self._procesar_energia(payload, dispositivo, recorded_at)
+            self._procesar_energia(payload, dispositivo, recorded_at, fuente=subtopico)
         elif subtopico == "status":
             self._procesar_status(payload, dispositivo, recorded_at)
         elif subtopico == "event":
@@ -198,9 +199,17 @@ class IngestarTelemetriaUseCase:
         payload: dict[str, Any],
         dispositivo: Dispositivo,
         recorded_at: datetime,
+        fuente: str,
     ) -> None:
-        acumulado = TelemetriaPayloadParser.parsear_acumulado(payload, dispositivo.id, recorded_at)
-        self.repo_telemetria.guardar_energia(acumulado)
+        fases_con_ti = AnalizadorMetrologicoService.fases_con_ti_como_lista(
+            getattr(dispositivo, "fases_con_ti", "R,S,T")
+        )
+        acumulado = TelemetriaPayloadParser.parsear_acumulado(
+            payload, dispositivo.id, recorded_at, fases_con_ti=fases_con_ti, fuente=fuente
+        )
+        # D1: energyio (registro total del equipo) prioriza sobre acc (suma de
+        # fases, respaldo) cuando ambos publican el mismo instante.
+        self.repo_telemetria.guardar_energia(acumulado, prioritario=(fuente == "energyio"))
         if self.logger:
             e_act = acumulado.energia_activa_neta.kwh if acumulado.energia_activa_neta else None
             self.logger.debug(

@@ -338,11 +338,9 @@ class TelemetriaPayloadParser:
 
     @staticmethod
     def parsear_acumulado(
-        payload: dict[str, Any],
-        dispositivo_id: str,
-        recorded_at: datetime,
+        payload: dict[str, Any], dispositivo_id: str, recorded_at: datetime, **kwargs: Any
     ) -> AcumuladoEnergia:
-        return EnergiaPayloadParser.parsear_acumulado(payload, dispositivo_id, recorded_at)
+        return EnergiaPayloadParser.parsear_acumulado(payload, dispositivo_id, recorded_at, **kwargs)
 
     @staticmethod
     def parsear_log_estado(

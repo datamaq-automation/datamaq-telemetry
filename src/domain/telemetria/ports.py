@@ -67,7 +67,14 @@ class RepositorioTelemetriaPort(ABC):
         pass
 
     @abstractmethod
-    def guardar_energia(self, acumulado: AcumuladoEnergia) -> None:
+    def guardar_energia(self, acumulado: AcumuladoEnergia, prioritario: bool = True) -> None:
+        """Persiste un acumulado de energía.
+
+        ``prioritario=True`` (fuente ``energyio``, D1) sobreescribe cualquier fila
+        existente para el mismo (device_id, recorded_at). ``prioritario=False``
+        (fuente ``acc``, respaldo) solo inserta si no había fila — nunca pisa un
+        valor de la fuente prioritaria que haya llegado antes.
+        """
         pass
 
     @abstractmethod

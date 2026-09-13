@@ -215,6 +215,9 @@ class AcumuladoEnergia:
     energia_activa_exportada: EnergiaActiva | None = None
     energia_reactiva_importada: EnergiaReactiva | None = None
     energia_reactiva_exportada: EnergiaReactiva | None = None
+    fuente: str | None = None
+    """Subtópico MQTT de origen: "energyio" (registro total del equipo, prioritario)
+    o "acc" (suma de fases, respaldo). None para lecturas sin fuente rastreada."""
 
 
 @dataclass(frozen=True)

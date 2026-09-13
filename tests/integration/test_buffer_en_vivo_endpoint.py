@@ -65,7 +65,7 @@ class _RepoTelemetriaFakeSoloDb(RepositorioTelemetriaPort):
     def guardar_instantanea(self, lectura: LecturaInstantanea) -> None:
         self._instantaneas.append(lectura)
 
-    def guardar_energia(self, acumulado: object) -> None:
+    def guardar_energia(self, acumulado: object, prioritario: bool = True) -> None:
         pass
 
     def guardar_log_estado(self, log: object) -> None:
