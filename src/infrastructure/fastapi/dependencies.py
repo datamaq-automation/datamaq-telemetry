@@ -15,7 +15,6 @@ from src.application.use_cases.asistente.procesar_pregunta_asistente import (
 )
 from src.application.use_cases.atribuir_consumo import AtribuirConsumoUseCase
 from src.application.use_cases.caracterizar_carga import CaracterizarCargaUseCase
-from src.application.use_cases.consultar_grupo_dispositivos import ConsultarGrupoDispositivosUseCase
 from src.application.use_cases.consultar_nodo_unifilar import ConsultarNodoUnifilarUseCase
 from src.application.use_cases.consultar_telemetria import ConsultarTelemetriaUseCase
 from src.application.use_cases.exportar_cargas import ExportarCargasUseCase
@@ -25,7 +24,6 @@ from src.application.use_cases.gestionar_alertas import GestionarAlertasUseCase
 from src.application.use_cases.gestionar_cargas import GestionarCargasUseCase
 from src.application.use_cases.gestionar_disponibilidad import GestionarDisponibilidadUseCase
 from src.application.use_cases.gestionar_dispositivos import GestionarDispositivosUseCase
-from src.application.use_cases.gestionar_grupos_dispositivos import GestionarGruposDispositivosUseCase
 from src.application.use_cases.gestionar_maquinas import GestionarMaquinasUseCase
 from src.application.use_cases.gestionar_planes import GestionarPlanesUseCase
 from src.application.use_cases.gestionar_planta_estructura import GestionarPlantaEstructuraUseCase
@@ -52,7 +50,6 @@ from src.infrastructure.sqlalchemy.mysql_repositories import (
     MySQLCargasRepository,
     MySQLDispositivosRepository,
     MySQLEventosDisponibilidadRepository,
-    MySQLGruposDispositivosRepository,
     MySQLIntervalosActividadRepository,
     MySQLMaquinasRepository,
     MySQLParadasProgramadasRepository,
@@ -161,25 +158,6 @@ def get_dispositivos_use_case(
         YamlOrganizacionesRepository(),
         MySQLPlanesRepository(db),
         repo_suscripciones=MySQLSuscripcionesRepository(db),
-    )
-
-
-def get_grupos_dispositivos_use_case(
-    db: Annotated[Session, Depends(get_db_session)],
-) -> GestionarGruposDispositivosUseCase:
-    return GestionarGruposDispositivosUseCase(
-        MySQLGruposDispositivosRepository(db),
-        MySQLDispositivosRepository(db),
-    )
-
-
-def get_consultar_grupo_dispositivos_use_case(
-    db: Annotated[Session, Depends(get_db_session)],
-) -> ConsultarGrupoDispositivosUseCase:
-    return ConsultarGrupoDispositivosUseCase(
-        MySQLGruposDispositivosRepository(db),
-        MySQLTelemetriaRepository(db),
-        get_telemetria_use_case(db),
     )
 
 

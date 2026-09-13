@@ -9,7 +9,6 @@ from src.domain.telemetria.entities import (
     AlertaDispositivo,
     Dispositivo,
     DispositivoLayout,
-    GrupoDispositivos,
     LecturaInstantanea,
     LogEstadoDispositivo,
     NodoUnifilar,
@@ -217,36 +216,6 @@ class RepositorioOrganizacionesPort(ABC):
 
     @abstractmethod
     def obtener_dispositivos_layout(self, planta_id: str) -> list[DispositivoLayout]:
-        pass
-
-
-class RepositorioGruposDispositivosPort(ABC):
-    @abstractmethod
-    def crear(self, grupo: GrupoDispositivos) -> GrupoDispositivos:
-        pass
-
-    @abstractmethod
-    def obtener_por_id(self, grupo_id: str) -> GrupoDispositivos | None:
-        pass
-
-    @abstractmethod
-    def listar_por_planta(self, planta_id: str) -> list[GrupoDispositivos]:
-        pass
-
-    @abstractmethod
-    def agregar_miembro(self, grupo_id: str, dispositivo_id: str) -> None:
-        pass
-
-    @abstractmethod
-    def quitar_miembro(self, grupo_id: str, dispositivo_id: str) -> None:
-        pass
-
-    @abstractmethod
-    def eliminar(self, grupo_id: str) -> None:
-        pass
-
-    @abstractmethod
-    def listar_dispositivos_miembro(self, grupo_id: str) -> list[Dispositivo]:
         pass
 
 

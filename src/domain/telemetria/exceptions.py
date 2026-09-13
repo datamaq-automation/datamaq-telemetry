@@ -57,16 +57,8 @@ class ZonaHorariaInvalidaError(DominioTelemetriaException):
     """Lanzada cuando el identificador IANA de zona horaria no existe o es inválido."""
 
 
-class GrupoDispositivosNoEncontradoError(DominioTelemetriaException):
-    """Lanzada cuando se intenta operar con un grupo de dispositivos que no existe."""
-
-
 class DispositivoDePlantaDistintaError(DominioTelemetriaException):
     """Lanzada al intentar agregar a un grupo un dispositivo de otra planta."""
-
-
-class LimiteGruposExcedidoError(DominioTelemetriaException):
-    """Lanzada cuando una planta intenta crear más grupos de dispositivos que el tope permitido."""
 
 
 class NodoUnifilarNoEncontradoError(DominioTelemetriaException):

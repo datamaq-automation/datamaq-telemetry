@@ -16,7 +16,7 @@ RAIZ = Path(__file__).resolve().parents[2]
 ALEMBIC_INI = RAIZ / "alembic.ini"
 ENV_PY = RAIZ / "alembic" / "env.py"
 REVISION_INICIAL = "209ce0774d59"
-REVISION_HEAD = "p0q1r2s3t4u5"
+REVISION_HEAD = "q1r2s3t4u5v6"
 
 TABLAS_MODELO = {
     "plans",
@@ -514,3 +514,35 @@ def test_e2_organizations_queda_como_suscripcion_con_backfill(tmp_path, monkeypa
     command.upgrade(cfg, "head")
     command.downgrade(cfg, "o9p0q1r2s3t4")
     assert "name" in {c["name"] for c in inspect(engine).get_columns("organizations")}
+
+
+def test_e3_drop_device_groups_aborta_si_hay_filas(tmp_path, monkeypatch):
+    """E3: no se borran datos cargados; con filas la migración falla y el deploy hace rollback."""
+    db = tmp_path / "e3.db"
+    engine = create_engine(f"sqlite:///{db}")
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db}")
+    cfg = _config()
+
+    command.upgrade(cfg, "p0q1r2s3t4u5")
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO facilities (id, organization_id, name, created_at, updated_at) "
+                "VALUES ('f1', 'o1', 'F', '2026-01-01', '2026-01-01')"
+            )
+        )
+        conn.execute(
+            text(
+                "INSERT INTO device_groups (id, facility_id, name, created_at, updated_at) "
+                "VALUES ('g1', 'f1', 'Alimentador', '2026-01-01', '2026-01-01')"
+            )
+        )
+    with pytest.raises(RuntimeError, match="device_groups tiene 1 filas"):
+        command.upgrade(cfg, "head")
+    assert inspect(engine).has_table("device_groups")
+
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM device_groups"))
+    command.upgrade(cfg, "head")
+    assert not inspect(engine).has_table("device_groups")
+    assert not inspect(engine).has_table("device_group_members")

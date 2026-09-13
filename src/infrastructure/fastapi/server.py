@@ -37,7 +37,6 @@ from src.infrastructure.fastapi.routes.cargas_router import router as cargas_rou
 from src.infrastructure.fastapi.routes.copilot_router import router as copilot_router
 from src.infrastructure.fastapi.routes.disponibilidad_router import router as disponibilidad_router
 from src.infrastructure.fastapi.routes.dispositivos_router import router as dispositivos_router
-from src.infrastructure.fastapi.routes.grupos_dispositivos_router import router as grupos_dispositivos_router
 from src.infrastructure.fastapi.routes.organizaciones_router import router as organizaciones_router
 from src.infrastructure.fastapi.routes.planes_router import router as planes_router
 from src.infrastructure.fastapi.routes.planta_estructura_router import router as planta_estructura_router
@@ -470,7 +469,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_exception_handler(StarletteHTTPException, manejar_404)
 
     # Register Routers
-    routers = (system_router, disponibilidad_router, cargas_router, telemetria_router, dispositivos_router, grupos_dispositivos_router, organizaciones_router, planta_estructura_router, planes_router, alertas_router, auth_router, sge_router, usuarios_router, analitica_router, copilot_router)  # fmt: skip
+    routers = (system_router, disponibilidad_router, cargas_router, telemetria_router, dispositivos_router, organizaciones_router, planta_estructura_router, planes_router, alertas_router, auth_router, sge_router, usuarios_router, analitica_router, copilot_router)  # fmt: skip
     for r in routers:
         app.include_router(r)
 

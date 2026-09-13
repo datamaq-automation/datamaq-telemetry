@@ -11,16 +11,13 @@ erDiagram
     CHARACTERIZATION_CAMPAIGNS ||--o{ CAMPAIGN_SAMPLES : "FK_campaign_id"
     DEVICES ||--o{ CHARACTERIZATION_CAMPAIGNS : "FK_device_id"
     DEVICES ||--o{ DEVICE_ALERTS : "FK_device_id"
-    DEVICES ||--o{ DEVICE_GROUP_MEMBERS : "FK_device_id"
     DEVICES ||--o{ DEVICE_STATUS_LOGS : "FK_device_id"
     DEVICES ||--o{ LOADS : "FK_device_id"
     DEVICES ||--o{ LOAD_ACTIVITY_INTERVALS : "FK_device_id"
     DEVICES ||--o{ MACHINES : "FK_device_id"
     DEVICES ||--o{ TELEMETRY_ENERGY : "FK_device_id"
     DEVICES ||--o{ TELEMETRY_INSTANTANEOUS : "FK_device_id"
-    DEVICE_GROUPS ||--o{ DEVICE_GROUP_MEMBERS : "FK_group_id"
     FACILITIES ||--o{ DEVICES : "FK_facility_id"
-    FACILITIES ||--o{ DEVICE_GROUPS : "FK_facility_id"
     LOADS ||--o{ CHARACTERIZATION_CAMPAIGNS : "FK_load_id"
     LOADS ||--o{ LOAD_ACTIVITY_INTERVALS : "FK_load_id"
     MACHINES ||--o{ MACHINE_AVAILABILITY_EVENTS : "FK_machine_id"
@@ -76,19 +73,6 @@ erDiagram
         string unit
         string category
         string notes
-    }
-
-    DEVICE_GROUP_MEMBERS {
-        string group_id PK
-        string device_id PK
-    }
-
-    DEVICE_GROUPS {
-        string id PK
-        string facility_id FK
-        string name
-        datetime created_at
-        datetime updated_at
     }
 
     DEVICE_STATUS_LOGS {
@@ -389,26 +373,6 @@ erDiagram
 - `idx_alerts_dev_resolved`: (`device_id`, `is_resolved`)
 - `idx_alerts_resolved_purge`: (`is_resolved`, `resolved_at`)
 - `ix_device_alerts_device_id`: (`device_id`)
-
-### Tabla `device_group_members`
-
-| Columna | Tipo SQL | Clave / Restricción | Nullable |
-| :--- | :--- | :--- | :--- |
-| `group_id` | `VARCHAR(36)` | **PRIMARY KEY**, FK -> `device_groups.id` | No |
-| `device_id` | `VARCHAR(36)` | **PRIMARY KEY**, FK -> `devices.id` | No |
-
-### Tabla `device_groups`
-
-| Columna | Tipo SQL | Clave / Restricción | Nullable |
-| :--- | :--- | :--- | :--- |
-| `id` | `VARCHAR(36)` | **PRIMARY KEY** | No |
-| `facility_id` | `VARCHAR(36)` | FK -> `facilities.id` | No |
-| `name` | `VARCHAR(150)` | - | No |
-| `created_at` | `DATETIME` | - | No |
-| `updated_at` | `DATETIME` | - | No |
-
-**Índices:**
-- `idx_device_group_facility`: (`facility_id`)
 
 ### Tabla `device_status_logs`
 

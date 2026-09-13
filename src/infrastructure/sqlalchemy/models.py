@@ -72,37 +72,6 @@ class FacilityModel(Base):
 
     organization: Mapped["OrganizationModel"] = relationship(back_populates="facilities")
     devices: Mapped[list["DeviceModel"]] = relationship(back_populates="facility")
-    device_groups: Mapped[list["DeviceGroupModel"]] = relationship(
-        back_populates="facility", cascade="all, delete-orphan"
-    )
-
-
-class DeviceGroupModel(Base):
-    __tablename__ = "device_groups"
-    __table_args__ = (Index("idx_device_group_facility", "facility_id"),)
-
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
-    facility_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("facilities.id", ondelete="CASCADE"), nullable=False
-    )
-    name: Mapped[str] = mapped_column(String(150), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, onupdate=ahora_utc, nullable=False)
-
-    facility: Mapped["FacilityModel"] = relationship(back_populates="device_groups")
-    members: Mapped[list["DeviceGroupMemberModel"]] = relationship(back_populates="group", cascade="all, delete-orphan")
-
-
-class DeviceGroupMemberModel(Base):
-    __tablename__ = "device_group_members"
-
-    group_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("device_groups.id", ondelete="CASCADE"), primary_key=True
-    )
-    device_id: Mapped[str] = mapped_column(String(36), ForeignKey("devices.id", ondelete="CASCADE"), primary_key=True)
-
-    group: Mapped["DeviceGroupModel"] = relationship(back_populates="members")
-    device: Mapped["DeviceModel"] = relationship()
 
 
 class DeviceModel(Base):

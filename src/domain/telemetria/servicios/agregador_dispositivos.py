@@ -1,4 +1,4 @@
-"""src/domain/telemetria/servicios/agregador_grupo_dispositivos.py."""
+"""src/domain/telemetria/servicios/agregador_dispositivos.py."""
 
 import math
 from dataclasses import dataclass
@@ -8,7 +8,7 @@ from src.domain.telemetria.entities import EnergiaAgregada, LecturaInstantanea
 
 
 @dataclass(frozen=True)
-class PotenciaSumadaGrupo:
+class PotenciaSumada:
     """Suma de la última lectura conocida de cada dispositivo miembro de un grupo.
 
     ``dispositivos_sin_dato`` lista los device_id sin ninguna lectura instantánea
@@ -32,10 +32,10 @@ class PotenciaSumadaGrupo:
 
 
 @dataclass(frozen=True)
-class PuntoPotenciaGrupo:
+class PuntoPotencia:
     """Un punto de la serie de tiempo de potencia sumada de un grupo (un bucket).
 
-    Ver ``PotenciaSumadaGrupo`` para la salvedad de ``factor_desplazamiento_total``
+    Ver ``PotenciaSumada`` para la salvedad de ``factor_desplazamiento_total``
     (cos φ, no el FP real con armónicos).
     """
 
@@ -61,7 +61,7 @@ def _recomponer_s_y_cos_fi(p_w: float | None, q_var: float | None) -> tuple[floa
     return round(s_va, 2), round(p_w / s_va, 4)
 
 
-class AgregadorGrupoDispositivosService:
+class AgregadorDispositivosService:
     """Suma lecturas de varios dispositivos ya resueltas por dispositivo, sin acceso a I/O.
 
     Tolera desalineamiento temporal entre dispositivos a propósito (confirmado con el
@@ -75,7 +75,7 @@ class AgregadorGrupoDispositivosService:
     @staticmethod
     def sumar_ultimas_lecturas(
         lecturas_por_dispositivo: dict[str, LecturaInstantanea | None],
-    ) -> PotenciaSumadaGrupo:
+    ) -> PotenciaSumada:
         total_p = 0.0
         total_q = 0.0
         hubo_dato = False
@@ -95,7 +95,7 @@ class AgregadorGrupoDispositivosService:
         p = round(total_p, 2) if hubo_dato else None
         q = round(total_q, 2) if hubo_dato and q_completa else None
         s, fp = _recomponer_s_y_cos_fi(p, q)
-        return PotenciaSumadaGrupo(
+        return PotenciaSumada(
             potencia_activa_total_w=p,
             dispositivos_sin_dato=sin_dato,
             potencia_reactiva_total_var=q,
@@ -134,7 +134,7 @@ class AgregadorGrupoDispositivosService:
     def sumar_potencia_en_el_tiempo(
         lecturas_por_dispositivo: dict[str, list[tuple]],
         intervalo_segundos: int,
-    ) -> list[PuntoPotenciaGrupo]:
+    ) -> list[PuntoPotencia]:
         """Bucketiza por tiempo (mismo cálculo de piso que AgregadorLecturasService) y suma
         entre dispositivos. Tolera que cada dispositivo tenga sus propios timestamps: lo que
         importa es a qué bucket cae cada lectura, no que coincidan exactamente entre sí.
@@ -181,7 +181,7 @@ class AgregadorGrupoDispositivosService:
             )
             s, fp = _recomponer_s_y_cos_fi(p, q)
             resultado.append(
-                PuntoPotenciaGrupo(
+                PuntoPotencia(
                     momento=datetime.fromtimestamp(bucket_ts, tz=timezone.utc),
                     potencia_activa_total_w=p,
                     dispositivos_sin_dato=sorted(todos_los_dispositivos - con_dato),

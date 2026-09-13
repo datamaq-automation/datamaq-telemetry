@@ -13,7 +13,6 @@ from src.infrastructure.sqlalchemy.database import get_db_session
 from src.infrastructure.sqlalchemy.mysql_repositories import (
     MySQLDispositivosRepository,
     MySQLEventosDisponibilidadRepository,
-    MySQLGruposDispositivosRepository,
     MySQLMaquinasRepository,
 )
 from src.infrastructure.yaml.repositories.organizaciones_repository import (
@@ -77,32 +76,6 @@ def verificar_propiedad_dispositivo(
 
     if not debe_recibir_evento(False, claims.get("org"), organizacion_dispositivo):
         raise HTTPException(status_code=404, detail="dispositivo_no_encontrado")
-
-
-def verificar_propiedad_grupo_dispositivos(
-    claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
-    db: Annotated[Session, Depends(get_db_session)],
-    grupo_id: str | None = None,
-) -> None:
-    """Rechaza con 404 si el grupo de dispositivos pedido no pertenece a la organización
-    del usuario autenticado. Superadmin y modo sin auth (AUTH_REQUIRED=False) pasan sin chequeo.
-    """
-    settings = get_settings()
-    if not settings.AUTH_REQUIRED or claims.get("rol") in ("superadmin", "invitado_global"):
-        return
-
-    if grupo_id is None:
-        return
-
-    repo_grupos = MySQLGruposDispositivosRepository(db)
-    grupo = repo_grupos.obtener_por_id(grupo_id)
-    if grupo is None:
-        raise HTTPException(status_code=404, detail="grupo_no_encontrado")
-
-    organizacion_grupo = _resolver_organizacion_planta(grupo.planta_id)
-
-    if not debe_recibir_evento(False, claims.get("org"), organizacion_grupo):
-        raise HTTPException(status_code=404, detail="grupo_no_encontrado")
 
 
 def verificar_propiedad_maquina(
