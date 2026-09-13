@@ -5,9 +5,9 @@
 > `docs/adr-001-no-redis-cache.md` para el contexto de la sesión completa; el detalle del
 > incidente vive en el mensaje del commit `e216396`).
 >
-> **Estado:** aprobado en su totalidad. 7 de 9 ítems resueltos (D-1 descartado por plan de GitHub,
-> D-2/D-4/D-6/D-7/D-8/D-9 hechos). Quedan D-3 (falta token de Telegram) y D-5 (falta enganchar el
-> staging de D-4 al pipeline de CD).
+> **Estado:** aprobado en su totalidad. 8 de 9 ítems resueltos (D-1 descartado por plan de GitHub,
+> D-2/D-3/D-4/D-6/D-7/D-8/D-9 hechos). Queda D-5 (falta enganchar el staging de D-4 al pipeline
+> de CD, hoy el ensayo previo a migrar es manual).
 
 ## Resumen
 
@@ -15,7 +15,7 @@
 |---|---|---|---|
 | D-1 | Required reviewers en Environment `production` | ❌ No disponible en este plan de GitHub | — |
 | D-2 | Guard anti-`.env` commiteado | ✅ Hecho | `scripts/guard_secrets.sh`, CI, pre-push |
-| D-3 | Alerta de deploy fallido a un canal | ⏸ Telegram confirmado, falta token del bot y chat_id | — |
+| D-3 | Alerta de deploy fallido a un canal | ✅ Hecho — Telegram | `.github/workflows/deploy.yml` (step final, `if: failure()`) |
 | D-4 | Ambiente de staging | ✅ Hecho — PC local de escritorio, no el VPS (ver nota) | `~/backups/datamaq-telemetry/refresh_staging.sh` (no está en git, es de esta PC) |
 | D-5 | Backup + stop antes de migrar, en el propio CD | ⏸ Sigue pendiente — hoy el refresh de staging es manual, no está enganchado al CD | — |
 | D-6 | Backup de la base fuera del VPS actual | ✅ Hecho — PC local de escritorio, timer diario 04:30 | `~/backups/datamaq-telemetry/backup_diario.sh` (no está en git) |
@@ -110,9 +110,18 @@ techo de seguridad generoso (4× la RAM en uso), no un ajuste fino de capacidad.
 
 Inputs verificados sin cambios rotos para el uso actual del repo.
 
-## Pendientes con dato faltante
+## D-3 · Alerta de deploy fallido por Telegram
 
-- **D-3** (alerta de deploy fallido): canal confirmado (Telegram) — falta el token del bot y el
-  `chat_id` para conectarlo al step de CI.
+Step final de `.github/workflows/deploy.yml`, `if: failure()` — se dispara solo si `Deploy` (el
+step anterior) falla, con el commit, quién lo disparó y el link al run.
+
+Bot reutilizado, no uno nuevo: `@datamaq_bot`, ya usado por `datamaq-hub` y `www-datamaq`
+("Watchdog & Alertas" / "Notificaciones & Alertas") con el mismo `chat_id`. Token y `chat_id`
+extraídos de `/var/www/datamaq-hub/.env` (root en el VPS), seteados como secrets del Environment
+`production` (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`), nunca escritos en el repo. Probado antes
+de conectarlo: mensaje de prueba entregado (`ok: true`) al chat privado de Agustín.
+
+## Pendientes
+
 - **D-5** (backup + stop antes de migrar, dentro del propio CD): sigue pendiente. Hoy el ensayo en
   staging (D-4) es un paso manual antes de tocar el VPS, no algo que el pipeline haga solo.

@@ -48,3 +48,20 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: ./scripts/deploy-server.sh
+
+      - name: "Alertar por Telegram si falló (D-3)"
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SHA_CORTO: ${{ github.sha }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          MSG="🔴 CD Deploy falló — datamaq-telemetry
+          Commit: ${SHA_CORTO:0:7} (disparado por ${ACTOR})
+          Run: ${RUN_URL}"
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=${MSG}" \
+            -o /dev/null -w "Telegram respondió HTTP %{http_code}\n"

@@ -220,6 +220,14 @@ def get_procesar_pregunta_asistente_use_case(
     )
 
 
+def get_procesar_chat_copilot_use_case() -> Any:
+    from src.application.use_cases.copilot.procesar_chat_copilot import (
+        ProcesarChatCopilotUseCase,
+    )
+
+    return ProcesarChatCopilotUseCase()
+
+
 def get_maquinas_use_case(
     db: Annotated[Session, Depends(get_db_session)],
 ) -> GestionarMaquinasUseCase:
