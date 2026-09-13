@@ -101,6 +101,22 @@ export interface AnaliticaCalidadEnergiaDTO {
   potencia_reactiva_a_compensar_kvar: number | null; // Qc calculado (kVAr)
   banco_sugerido_kvar: number | null; // Escalón comercial normalizado estándar (kVAr)
   penalizacion_estimada_ars: number | null; // Recargo mensual estimado en factura ($ ARS)
+  recargo_porcentaje: number | null; // % de recargo sobre el cargo de potencia por FP < 0.95
+
+  // Alcance tarifario (D-11, 2026-09-13): cuándo el backend se abstiene de emitir
+  // veredicto de reactiva porque la categoría del dispositivo no está alcanzada
+  // por el régimen (Programa de Mejora del FP, ENRE). "TARIFA_SIN_CARGO_REACTIVA"
+  // es el único valor emitido hoy; en ese caso requiere_compensacion es false y
+  // penalizacion_estimada_ars es null. No inferir la exención de fases_con_ti —
+  // depende únicamente de categoria_tarifaria/penalizacion_reactiva_aplica del
+  // dispositivo (ver §6), que el backend ya resuelve.
+  motivo_abstencion: string | null;
+
+  // Ventana de evaluación (D-12, pendiente: hoy siempre 15 e instantáneo salvo
+  // que el backend ya haya migrado a ventana integrada)
+  ventana_evaluacion_min: number | null;
+  vigente_desde: string | null; // ISO 8601 UTC, desde cuándo se sostiene el veredicto
+  factor_potencia_integrado: number | null; // FP promedio de la ventana, si aplica
 
   // Desbalances Normativos (IEC 61000-4-30 / NEMA)
   desbalance_tension_porcentaje: number | null; // VUR %
@@ -237,10 +253,20 @@ Para editar parámetros de instalación de un medidor en campo:
   "numero_serie": "377",
   "tipo_instalacion": "3P4W",
   "fases_con_ti": "R,S,T",
-  "planta_id": "8f5a1e2b-..."
+  "planta_id": "8f5a1e2b-...",
+  "categoria_tarifaria": "T1-R",
+  "penalizacion_reactiva_aplica": false
 }
 ```
 * **Opciones de `fases_con_ti`:** `"R,S,T"` (Trifásico 4 hilos), `"S,T"` o `"R,T"` (Método Aron / 2-TI).
+* **`categoria_tarifaria`** (`T1-R | T1-G | T2 | T3`, default `"T2"`) y **`penalizacion_reactiva_aplica`**
+  (`boolean`, default `true`) — desde 2026-09-13 son columnas reales persistidas (antes de esa
+  fecha existían en el contrato pero el `PATCH` era un no-op silencioso: nunca se guardaban).
+  Determinan `analitica.motivo_abstencion` en el bloque de §4 — `"T1-R"` o `"RESIDENCIAL"` en la
+  categoría, o `penalizacion_reactiva_aplica: false` explícito, hacen que el backend se abstenga
+  del veredicto de reactiva (`"TARIFA_SIN_CARGO_REACTIVA"`). **No es automático por ser
+  monofásico:** un `"T1-G"` (comercio, consorcio) monofásico con medición de reactiva sigue
+  alcanzado por el cargo — hay que declarar la categoría real, no inferirla de `fases_con_ti`.
 
 ---
 

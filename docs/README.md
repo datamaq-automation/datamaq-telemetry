@@ -49,6 +49,8 @@ Bienvenido al centro de documentación técnica del backend de telemetría de en
   *ADR-001 — No incorporar Redis como cache sobre MySQL:* Decisión fundamentada con métricas reales de producción (buffer pool hit 99,999 %, 7 q/s, base de 79 MB en RAM). Define los disparadores concretos (múltiples workers, múltiples instancias, colas diferidas) que sí justificarían revisarla.
 * 📄 [`docs/to_www-datamaq.md`](file:///home/agustin/proyectos_software/datamaq-telemetry/docs/to_www-datamaq.md)  
   *Directiva de Negocio y Modelo Freemium:* Especificación del modelo comercial de DataMaq ($0 de por vida, Ciclo PRO de 60 días incluido en obras/consultorías, bifurcación Free entre Vitrina Pública Anonimizada de 30 días y Monitoreo Privado Básico de 14 días).
+* 📄 [`docs/devops-mejoras-2026-09-13.md`](file:///home/agustin/proyectos_software/datamaq-telemetry/docs/devops-mejoras-2026-09-13.md)  
+  *Plan de Mejoras DevOps:* Estado (hecho / descartado / pendiente de dato) de las 9 mejoras derivadas del incidente en que el pipeline `CD Deploy` estuvo roto ~14 horas por un secret commiteado con `DEPLOY_SSH_USER=root`. Guard anti-`.env` en CI, límites de cgroup, actualización de Actions a Node 24.
 
 ---
 
