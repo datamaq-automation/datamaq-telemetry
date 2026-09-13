@@ -46,6 +46,7 @@ htmlcov/
 # Backups & Data
 backups/
 tmp/
+scratch/
 
 # Config local de scripts/deploy-server.sh y scripts/logs.sh — nunca trackear:
 # terminó commiteado una vez (eccc85d) con DEPLOY_SSH_USER=root, rompiendo el

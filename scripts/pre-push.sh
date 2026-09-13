@@ -68,10 +68,10 @@ run_stage "2" "Estilo & Formato: ruff check + format" "ruff check . && ruff form
 run_stage "3" "Tipado Estricto: pyright" "pyright"
 
 # Stage 4: Tests Unitarios con Cobertura
-run_stage "4" "Tests Unitarios & Cobertura (>=85%)" "pytest tests/unit --cov=src --cov-report=term-missing:skip-covered --cov-fail-under=85 -o console_output_style=progress"
+run_stage "4" "Tests Unitarios & Cobertura (>=85%)" "pytest tests/unit -n auto --cov=src --cov-report=term-missing:skip-covered --cov-fail-under=85 -o console_output_style=progress"
 
 # Stage 5: Tests de Integración
-run_stage "5" "Tests de Integración" "pytest tests/integration -q --no-header"
+run_stage "5" "Tests de Integración" "pytest tests/integration -n auto -q --no-header"
 
 # Stage 6: Reglas de Arquitectura y Tamaño
 run_stage "6" "Clean Architecture & Tamaño de Código" "python3 scripts/verify_architecture.py && python3 scripts/verify_code_size.py"

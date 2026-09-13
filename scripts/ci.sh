@@ -21,10 +21,10 @@ echo "==> [3/6] Tipado: pyright"
 pyright
 
 echo "==> [4/6] Tests unitarios con cobertura (>=85%)"
-pytest tests/unit --cov=src --cov-report=term-missing --cov-fail-under=85
+pytest tests/unit -n auto --cov=src --cov-report=term-missing --cov-fail-under=85
 
 echo "==> [5/6] Tests de integración"
-pytest tests/integration -q
+pytest tests/integration -n auto -q
 
 echo "==> [6/6] Reglas de Arquitectura y Tamaño de Código"
 python scripts/verify_architecture.py
