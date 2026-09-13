@@ -478,7 +478,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(auth_router)
     app.include_router(sge_router)
     app.include_router(usuarios_router)
-    app.include_router(copilot_router)
 
     # WebSockets Live Telemetry Stream
     @app.websocket("/ws/live")
