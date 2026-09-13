@@ -35,7 +35,6 @@ from src.infrastructure.fastapi.middleware import RequestIdMiddleware
 from src.infrastructure.fastapi.routes.alertas_router import router as alertas_router
 from src.infrastructure.fastapi.routes.auth_router import router as auth_router
 from src.infrastructure.fastapi.routes.cargas_router import router as cargas_router
-from src.infrastructure.fastapi.routes.copilot_router import router as copilot_router
 from src.infrastructure.fastapi.routes.disponibilidad_router import router as disponibilidad_router
 from src.infrastructure.fastapi.routes.dispositivos_router import router as dispositivos_router
 from src.infrastructure.fastapi.routes.grupos_dispositivos_router import router as grupos_dispositivos_router
