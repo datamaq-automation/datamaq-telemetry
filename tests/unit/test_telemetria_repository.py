@@ -716,34 +716,57 @@ class TestListarEnergias:
         assert len(resultado) == 1
 
 
-class TestListarAcumuladosParaAgregacion:
-    """Tests para listar_acumulados_para_agregacion."""
+class TestListarUltimosAcumuladosPorPeriodo:
+    """Tests para listar_ultimos_acumulados_por_periodo (WP1: agregación en SQL)."""
 
-    def test_listar_acumulados_sin_desde(self, repo: MySQLTelemetriaRepository, mock_db: MagicMock):
+    def _mock_query_chain(self, mock_db: MagicMock, filas: list) -> MagicMock:
+        """El método hace dos self.db.query(...): uno para la subquery (con rn) y
+        otro sobre el alias filtrando rn == 1. Ambos pasan por el mismo mock de
+        Session.query, así que se configura para devolver una cadena servible en
+        cualquier orden de encadenamiento."""
         q_mock = MagicMock()
         q_mock.filter.return_value = q_mock
+        q_mock.subquery.return_value = MagicMock()
         q_mock.order_by.return_value = q_mock
-        q_mock.all.return_value = [_crear_modelo_energia(id=1), _crear_modelo_energia(id=2)]
+        q_mock.all.return_value = filas
         mock_db.query.return_value = q_mock
+        return q_mock
 
-        resultado = repo.listar_acumulados_para_agregacion(DEV_ID)
+    def test_falla_explicito_si_convert_tz_devuelve_null(self, repo: MySQLTelemetriaRepository, mock_db: MagicMock):
+        """Sin las tablas de zona horaria de MySQL cargadas, CONVERT_TZ devuelve NULL:
+        no debe agregarse en silencio por UTC, debe fallar con un mensaje accionable."""
+        mock_db.execute.return_value.scalar.return_value = None
 
-        mock_db.query.assert_called_once_with(TelemetryEnergyModel)
-        q_mock.filter.assert_called_once()
-        q_mock.order_by.assert_called_once()
+        with pytest.raises(RuntimeError, match="tablas de zona horaria"):
+            repo.listar_ultimos_acumulados_por_periodo(
+                DEV_ID, granularidad="day", zona="America/Argentina/Buenos_Aires"
+            )
+
+    def test_listar_sin_desde(self, repo: MySQLTelemetriaRepository, mock_db: MagicMock):
+        mock_db.execute.return_value.scalar.return_value = datetime(2026, 9, 12, 7, 0, 0)
+        q_mock = self._mock_query_chain(mock_db, [_crear_modelo_energia(id=1), _crear_modelo_energia(id=2)])
+
+        resultado = repo.listar_ultimos_acumulados_por_periodo(DEV_ID, granularidad="day", zona="UTC")
+
+        assert q_mock.filter.called
         assert len(resultado) == 2
 
-    def test_listar_acumulados_con_desde(self, repo: MySQLTelemetriaRepository, mock_db: MagicMock):
-        q_mock = MagicMock()
-        q_mock.filter.return_value = q_mock
-        q_mock.order_by.return_value = q_mock
-        q_mock.all.return_value = [_crear_modelo_energia(id=1)]
-        mock_db.query.return_value = q_mock
+    def test_listar_con_desde_filtra_por_recorded_at(self, repo: MySQLTelemetriaRepository, mock_db: MagicMock):
+        mock_db.execute.return_value.scalar.return_value = datetime(2026, 9, 12, 7, 0, 0)
+        self._mock_query_chain(mock_db, [_crear_modelo_energia(id=1)])
 
         desde = datetime(2026, 9, 1, 0, 0, 0, tzinfo=timezone.utc)
-        resultado = repo.listar_acumulados_para_agregacion(DEV_ID, desde=desde)
+        resultado = repo.listar_ultimos_acumulados_por_periodo(DEV_ID, desde=desde, granularidad="day", zona="UTC")
 
-        assert q_mock.filter.call_count == 2
+        assert len(resultado) == 1
+
+    def test_granularidad_month_no_lanza(self, repo: MySQLTelemetriaRepository, mock_db: MagicMock):
+        """Cubre la rama DATE_FORMAT(...,'%Y-%m-01') para granularidad mensual."""
+        mock_db.execute.return_value.scalar.return_value = datetime(2026, 9, 12, 7, 0, 0)
+        self._mock_query_chain(mock_db, [_crear_modelo_energia(id=1)])
+
+        resultado = repo.listar_ultimos_acumulados_por_periodo(DEV_ID, granularidad="month", zona="UTC")
+
         assert len(resultado) == 1
 
 

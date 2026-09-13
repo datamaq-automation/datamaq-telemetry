@@ -118,11 +118,20 @@ class RepositorioTelemetriaPort(ABC):
         pass
 
     @abstractmethod
-    def listar_acumulados_para_agregacion(
+    def listar_ultimos_acumulados_por_periodo(
         self,
         dispositivo_id: str,
         desde: datetime | None = None,
+        granularidad: str = "day",
+        zona: str = "UTC",
     ) -> list[AcumuladoEnergia]:
+        """Un acumulado por periodo (el último recibido), no la serie completa.
+
+        Reemplaza la carga de la serie cruda para agregación: el "último del
+        periodo" se resuelve en SQL (ROW_NUMBER particionado por periodo local),
+        de modo que un dispositivo con meses de datos a cadencia de segundos
+        devuelve como máximo un puñado de filas en vez de cientos de miles.
+        """
         pass
 
     @abstractmethod

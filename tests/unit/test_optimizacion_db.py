@@ -241,8 +241,8 @@ class MockTelemetriaRepo(RepositorioTelemetriaPort):
             q = [e for e in q if self._gte(e.registrado_en, desde)]
         return q[:limite]
 
-    def listar_acumulados_para_agregacion(
-        self, dispositivo_id: str, desde: datetime | None = None
+    def listar_ultimos_acumulados_por_periodo(
+        self, dispositivo_id: str, desde: datetime | None = None, granularidad: str = "day", zona: str = "UTC"
     ) -> list[AcumuladoEnergia]:
         q = [e for e in self.energias if e.dispositivo_id == dispositivo_id]
         if desde:

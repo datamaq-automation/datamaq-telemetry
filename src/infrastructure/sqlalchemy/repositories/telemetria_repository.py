@@ -4,8 +4,8 @@ from collections.abc import Iterator
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import asc, desc
-from sqlalchemy.orm import Session
+from sqlalchemy import asc, desc, func, select
+from sqlalchemy.orm import Session, aliased
 
 from src.domain.telemetria.entities import (
     AcumuladoEnergia,
@@ -264,14 +264,59 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
         items = q.order_by(desc(TelemetryEnergyModel.recorded_at)).limit(limite).all()
         return [self._energia_to_entity(m) for m in items]
 
-    def listar_acumulados_para_agregacion(
-        self, dispositivo_id: str, desde: datetime | None = None
+    def listar_ultimos_acumulados_por_periodo(
+        self,
+        dispositivo_id: str,
+        desde: datetime | None = None,
+        granularidad: str = "day",
+        zona: str = "UTC",
     ) -> list[AcumuladoEnergia]:
-        q = self.db.query(TelemetryEnergyModel).filter(TelemetryEnergyModel.device_id == dispositivo_id)
+        """Un acumulado por periodo local, resuelto en SQL con ROW_NUMBER().
+
+        Antes: cargaba la serie cruda entera (hasta ~87 000 filas para un
+        dispositivo con meses de datos) y el dominio se quedaba con el último
+        valor por periodo en Python. Ahora esa reducción la hace MySQL: el
+        WHERE usa el índice (device_id, recorded_at) para filtrar, y solo se
+        hidrata en Python una fila por día/mes.
+
+        Requiere las tablas de zona horaria de MySQL cargadas
+        (``mysql_tzinfo_to_sql``); sin ellas, CONVERT_TZ devuelve NULL para
+        cualquier zona IANA y se pierde la partición por periodo local, así
+        que se falla explícito en vez de agregar en silencio por UTC.
+        """
+        prueba_tz = self.db.execute(select(func.convert_tz(func.now(), "UTC", zona))).scalar()
+        if prueba_tz is None:
+            raise RuntimeError(
+                f"CONVERT_TZ devolvió NULL para la zona {zona!r}: las tablas de zona horaria de "
+                "MySQL no están cargadas. Ejecutar `mysql_tzinfo_to_sql /usr/share/zoneinfo | "
+                "mysql mysql` en el servidor antes de agregar energía por periodo."
+            )
+
+        recorded_at_local = func.convert_tz(TelemetryEnergyModel.recorded_at, "UTC", zona)
+        periodo_expr = (
+            func.date_format(recorded_at_local, "%Y-%m-01") if granularidad == "month" else func.date(recorded_at_local)
+        )
+        rn = (
+            func.row_number()
+            .over(partition_by=periodo_expr, order_by=desc(TelemetryEnergyModel.recorded_at))
+            .label("rn")
+        )
+
+        base = self.db.query(TelemetryEnergyModel, rn.label("rn")).filter(
+            TelemetryEnergyModel.device_id == dispositivo_id
+        )
         if desde:
-            q = q.filter(TelemetryEnergyModel.recorded_at >= desde)
-        items = q.order_by(asc(TelemetryEnergyModel.recorded_at)).all()
-        return [self._energia_to_entity(m) for m in items]
+            base = base.filter(TelemetryEnergyModel.recorded_at >= desde)
+        subq = base.subquery()
+        modelo = aliased(TelemetryEnergyModel, subq)
+
+        items = self.db.query(modelo).filter(subq.c.rn == 1).all()
+        entidades = [self._energia_to_entity(m) for m in items]
+        # El resultado está acotado al número de periodos (días/meses), nunca a la
+        # cadencia de ingesta: ordenar en Python es gratis y evita depender de las
+        # columnas de la subquery para el ORDER BY.
+        entidades.sort(key=lambda e: e.registrado_en)
+        return entidades
 
     def listar_potencias_para_histograma(
         self, dispositivo_id: str, desde: datetime, limite: int | None = None
