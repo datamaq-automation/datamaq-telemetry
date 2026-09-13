@@ -149,7 +149,8 @@ class IngestarTelemetriaUseCase:
 
         if self.publicador:
             self.publicador.publicar_telemetria_en_vivo(
-                topico, TelemetriaMapper.instantanea_to_dto(lectura).model_dump(mode="json")
+                topico,
+                TelemetriaMapper.instantanea_to_dto(lectura, dispositivo=dispositivo).model_dump(mode="json"),
             )
 
         p_tot = lectura.potencia_activa_total.vatios if lectura.potencia_activa_total else None

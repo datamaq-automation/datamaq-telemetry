@@ -63,9 +63,14 @@ class TelemetriaMapper:
     def instantanea_to_dto(
         lectura: LecturaInstantanea,
         analitica: AnaliticaCalidadEnergia | None = None,
+        dispositivo: object | None = None,
     ) -> LecturaInstantaneaDTO:
         if analitica is None:
-            analitica = AnalizadorCalidadEnergiaService.calcular_analitica_completa(lectura)
+            # D-11: sin `dispositivo`, _evaluar_abstencion_enre no puede saber si el
+            # circuito está alcanzado por el régimen ENRE 184/2000 — un dispositivo
+            # T1-R/monofásico pasaría por acá con requiere_compensacion=true y un
+            # monto real en pesos, siendo que está exento por categoría tarifaria.
+            analitica = AnalizadorCalidadEnergiaService.calcular_analitica_completa(lectura, dispositivo=dispositivo)
 
         return LecturaInstantaneaDTO(
             id=lectura.id,

@@ -128,7 +128,7 @@ class ConsultarTelemetriaUseCase:
         dev = self._resolver_dispositivo(id_o_uid)
         inst = self.repo_telemetria.obtener_ultima_instantanea(dev.id)
         acc = self.repo_telemetria.obtener_ultimo_acumulado(dev.id)
-        inst_dto = TelemetriaMapper.instantanea_to_dto(inst) if inst else None
+        inst_dto = TelemetriaMapper.instantanea_to_dto(inst, dispositivo=dev) if inst else None
 
         return TelemetriaLatestResponseDTO(
             device_id=dev.id,
@@ -174,7 +174,7 @@ class ConsultarTelemetriaUseCase:
         else:
             lecturas = lecturas[:limite]
 
-        lecturas_dto = [TelemetriaMapper.instantanea_to_dto(item) for item in lecturas]
+        lecturas_dto = [TelemetriaMapper.instantanea_to_dto(item, dispositivo=dev) for item in lecturas]
         return self._mezclar_buffer_en_vivo(dev.id, lecturas_dto, limite)
 
     def _mezclar_buffer_en_vivo(
