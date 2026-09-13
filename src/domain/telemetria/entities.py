@@ -46,16 +46,38 @@ class PlanTelemetria:
 
 @dataclass
 class Organizacion:
+    """Identidad del cliente (ISA-95 nivel 4). Dato maestro: vive en `data/organizaciones.yml`.
+
+    El estado comercial (plan, vencimiento PRO, modo free) es `Suscripcion`, no
+    está acá: tiene fecha de vencimiento y se gestiona en MySQL, no por commit.
+    """
+
     id: str
     nombre: str
-    plan_id: str | None = None
     cuit: str | None = None
     email_contacto: str | None = None
     telefono_contacto: str | None = None
-    pro_vence_en: datetime | None = None
-    modo_free: ModoFreeTier = ModoFreeTier.PRIVADO_BASICO
     creado_en: datetime = field(default_factory=ahora_utc)
     actualizado_en: datetime = field(default_factory=ahora_utc)
+
+
+@dataclass
+class Suscripcion:
+    """Estado comercial de una organización (tabla `organizations` en MySQL).
+
+    Sin fila para una organización se asume `por_defecto`: free tier privado,
+    sin plan y sin PRO vigente — lo mismo que hoy da el YAML cuando no declara nada.
+    """
+
+    organizacion_id: str
+    plan_id: str | None = None
+    pro_vence_en: datetime | None = None
+    modo_free: ModoFreeTier = ModoFreeTier.PRIVADO_BASICO
+    actualizado_en: datetime = field(default_factory=ahora_utc)
+
+    @classmethod
+    def por_defecto(cls, organizacion_id: str) -> "Suscripcion":
+        return cls(organizacion_id=organizacion_id)
 
 
 @dataclass

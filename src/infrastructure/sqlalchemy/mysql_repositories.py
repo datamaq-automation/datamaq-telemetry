@@ -35,6 +35,9 @@ from src.infrastructure.sqlalchemy.repositories.intervalos_repository import (
 from src.infrastructure.sqlalchemy.repositories.planes_repository import (
     MySQLPlanesRepository,
 )
+from src.infrastructure.sqlalchemy.repositories.suscripciones_repository import (
+    MySQLSuscripcionesRepository,
+)
 from src.infrastructure.sqlalchemy.repositories.telemetria_repository import (
     MySQLTelemetriaRepository,
 )
@@ -55,6 +58,7 @@ __all__ = [
     "MySQLParadasProgramadasRepository",
     "MySQLPlanesRepository",
     "MySQLSeriePotenciaRepository",
+    "MySQLSuscripcionesRepository",
     "MySQLTelemetriaRepository",
     "MySQLUsuariosRepository",
 ]

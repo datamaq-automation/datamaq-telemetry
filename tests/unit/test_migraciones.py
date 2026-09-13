@@ -16,7 +16,7 @@ RAIZ = Path(__file__).resolve().parents[2]
 ALEMBIC_INI = RAIZ / "alembic.ini"
 ENV_PY = RAIZ / "alembic" / "env.py"
 REVISION_INICIAL = "209ce0774d59"
-REVISION_HEAD = "o9p0q1r2s3t4"
+REVISION_HEAD = "p0q1r2s3t4u5"
 
 TABLAS_MODELO = {
     "plans",
@@ -480,3 +480,37 @@ def test_backfill_monofasico_anula_columnas_trifasicas(tmp_path, monkeypatch, in
     assert float(tri[1]) == 0.4
     assert float(tri[2]) == 395.0
     assert float(tri[3]) == 0.0
+
+
+def test_e2_organizations_queda_como_suscripcion_con_backfill(tmp_path, monkeypatch):
+    """E2: se van las columnas de identidad y el free tier se fija desde lo que declaraba el YAML."""
+    db = tmp_path / "e2.db"
+    engine = create_engine(f"sqlite:///{db}")
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db}")
+    cfg = _config()
+
+    command.upgrade(cfg, "o9p0q1r2s3t4")
+    with engine.begin() as conn:
+        # Durax existía con el valor viejo (nunca se leía de acá); Hogar no existía.
+        conn.execute(
+            text(
+                "INSERT INTO organizations (id, name, free_tier_mode, created_at, updated_at) "
+                "VALUES ('cf82b4be-0798-4beb-8978-2a27612d5761', 'Durax', 'VITRINA_ANONIMA', "
+                "'2026-01-01', '2026-01-01')"
+            )
+        )
+    command.upgrade(cfg, "head")
+
+    columnas = {c["name"] for c in inspect(engine).get_columns("organizations")}
+    assert {"id", "plan_id", "pro_expires_at", "free_tier_mode"} <= columnas
+    assert not {"name", "tax_id", "contact_email", "contact_phone"} & columnas
+    with engine.connect() as conn:
+        filas = dict(conn.execute(text("SELECT id, free_tier_mode FROM organizations")).all())
+    assert filas["cf82b4be-0798-4beb-8978-2a27612d5761"] == "PRIVADO_BASICO"
+    assert filas["09c09578-a860-4c61-8e97-2a13240adb8f"] == "VITRINA_ANONIMA"
+    assert filas["edebb9a0-85e5-4bde-a370-e64bd9b9608c"] == "PRIVADO_BASICO"
+
+    # Idempotente y reversible
+    command.upgrade(cfg, "head")
+    command.downgrade(cfg, "o9p0q1r2s3t4")
+    assert "name" in {c["name"] for c in inspect(engine).get_columns("organizations")}

@@ -251,7 +251,7 @@ def sqlite_session() -> Iterator[Session]:
     Base.metadata.create_all(engine)
     session = sessionmaker(bind=engine)()
 
-    org = OrganizationModel(id="org-sql-1", name="Organización de Prueba")
+    org = OrganizationModel(id="org-sql-1")
     session.add(org)
     session.commit()
 

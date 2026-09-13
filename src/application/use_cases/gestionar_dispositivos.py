@@ -15,7 +15,7 @@ from src.application.mappers.dispositivo_mapper import (
     DispositivoMapper,
     OrganizacionMapper,
 )
-from src.domain.telemetria.entities import Dispositivo
+from src.domain.telemetria.entities import Dispositivo, Suscripcion
 from src.domain.telemetria.exceptions import (
     DispositivoNoEncontradoError,
     LimiteDispositivosExcedidoError,
@@ -24,6 +24,7 @@ from src.domain.telemetria.ports import (
     RepositorioDispositivosPort,
     RepositorioOrganizacionesPort,
     RepositorioPlanesPort,
+    RepositorioSuscripcionesPort,
 )
 from src.domain.telemetria.value_objects import MacAddress
 
@@ -34,10 +35,16 @@ class GestionarDispositivosUseCase:
         repo_dispositivos: RepositorioDispositivosPort,
         repo_organizaciones: RepositorioOrganizacionesPort,
         repo_planes: RepositorioPlanesPort | None = None,
+        repo_suscripciones: RepositorioSuscripcionesPort | None = None,
     ):
         self.repo_dispositivos = repo_dispositivos
         self.repo_organizaciones = repo_organizaciones
         self.repo_planes = repo_planes
+        self.repo_suscripciones = repo_suscripciones
+
+    def _suscripcion_de(self, organizacion_id: str) -> Suscripcion:
+        sus = self.repo_suscripciones.obtener_por_organizacion(organizacion_id) if self.repo_suscripciones else None
+        return sus or Suscripcion.por_defecto(organizacion_id)
 
     def _validar_cupo_dispositivos(self, planta_id: str) -> None:
         if not self.repo_planes:
@@ -48,7 +55,8 @@ class GestionarDispositivosUseCase:
         org = self.repo_organizaciones.obtener_por_id(planta.organizacion_id)
         if not org:
             return
-        plan = self.repo_planes.obtener_por_id(org.plan_id) if org.plan_id else None
+        plan_id = self._suscripcion_de(org.id).plan_id
+        plan = self.repo_planes.obtener_por_id(plan_id) if plan_id else None
         max_permitido = plan.max_dispositivos if plan else 1
         actual = self.repo_dispositivos.contar_por_organizacion(org.id)
         if actual >= max_permitido:
@@ -145,7 +153,7 @@ class GestionarDispositivosUseCase:
 
     def listar_organizaciones(self) -> list[OrganizacionResponseDTO]:
         orgs = self.repo_organizaciones.listar_organizaciones()
-        return [OrganizacionMapper.org_to_dto(o) for o in orgs]
+        return [OrganizacionMapper.org_to_dto(o, self._suscripcion_de(o.id)) for o in orgs]
 
     def listar_plantas(self, organizacion_id: str | None = None) -> list[PlantaResponseDTO]:
         plantas = self.repo_organizaciones.listar_plantas(organizacion_id)

@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from src.domain.telemetria.entities import (
     DispositivoLayout,
     NodoUnifilar,
@@ -10,7 +8,6 @@ from src.domain.telemetria.entities import (
 from src.domain.telemetria.ports import RepositorioOrganizacionesPort
 from src.domain.telemetria.value_objects import (
     CoordenadasZona,
-    ModoFreeTier,
     PosicionLayout,
     TipoNodoUnifilar,
 )
@@ -24,32 +21,16 @@ class YamlOrganizacionesRepository(RepositorioOrganizacionesPort):
     def _cargar_organizaciones_raw(self) -> list[dict]:
         return cargar_organizaciones_completas(self.data_dir)
 
-    def _dict_to_organizacion(self, d: dict) -> Organizacion:
-        modo_free_str = d.get("modo_free", "PRIVADO_BASICO")
-        try:
-            modo_free = ModoFreeTier[modo_free_str]
-        except (KeyError, TypeError):
-            modo_free = ModoFreeTier.PRIVADO_BASICO
-
-        pro_vence_en = None
-        if d.get("pro_vence_en"):
-            if isinstance(d["pro_vence_en"], datetime):
-                pro_vence_en = d["pro_vence_en"]
-            elif isinstance(d["pro_vence_en"], str):
-                try:
-                    pro_vence_en = datetime.fromisoformat(d["pro_vence_en"])
-                except ValueError:
-                    pass
-
+    @staticmethod
+    def _dict_to_organizacion(d: dict) -> Organizacion:
+        # `modo_free`, `plan_id` y `pro_vence_en` ya no se leen del YAML: son estado
+        # comercial (Suscripcion, MySQL). Si alguien los deja en el archivo, se ignoran.
         return Organizacion(
             id=str(d["id"]),
             nombre=str(d["nombre"]),
-            plan_id=d.get("plan_id"),
             cuit=d.get("cuit"),
             email_contacto=d.get("email_contacto"),
             telefono_contacto=d.get("telefono_contacto"),
-            pro_vence_en=pro_vence_en,
-            modo_free=modo_free,
         )
 
     def obtener_por_id(self, organizacion_id: str) -> Organizacion | None:

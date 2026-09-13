@@ -33,14 +33,17 @@ def generate_uuid() -> str:
 
 
 class OrganizationModel(Base):
+    """Suscripción (estado comercial) de una organización.
+
+    La identidad (nombre, CUIT, contacto) vive en `data/organizaciones.yml`; acá
+    queda el `id` como ancla de las FK de `users`/`facilities` y lo que tiene
+    fecha de vencimiento: plan, PRO y modo free.
+    """
+
     __tablename__ = "organizations"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
-    name: Mapped[str] = mapped_column(String(150), nullable=False)
     plan_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("plans.id", ondelete="SET NULL"), nullable=True)
-    tax_id: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    contact_email: Mapped[str | None] = mapped_column(String(120), nullable=True)
-    contact_phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
     pro_expires_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
     free_tier_mode: Mapped[str] = mapped_column(String(30), default="PRIVADO_BASICO", nullable=False)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)

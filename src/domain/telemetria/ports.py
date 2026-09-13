@@ -16,6 +16,7 @@ from src.domain.telemetria.entities import (
     Organizacion,
     Planta,
     PlanTelemetria,
+    Suscripcion,
     ZonaPlanta,
 )
 from src.domain.telemetria.value_objects import EstadoDispositivo, LecturaPotenciaTemporal, MacAddress
@@ -246,6 +247,16 @@ class RepositorioGruposDispositivosPort(ABC):
 
     @abstractmethod
     def listar_dispositivos_miembro(self, grupo_id: str) -> list[Dispositivo]:
+        pass
+
+
+class RepositorioSuscripcionesPort(ABC):
+    @abstractmethod
+    def obtener_por_organizacion(self, organizacion_id: str) -> Suscripcion | None:
+        pass
+
+    @abstractmethod
+    def guardar(self, suscripcion: Suscripcion) -> Suscripcion:
         pass
 
 

@@ -11,7 +11,7 @@ from src.application.dtos.telemetria_dto import (
     TelemetriaLatestResponseDTO,
 )
 from src.application.mappers.telemetria_mapper import TelemetriaMapper
-from src.domain.telemetria.entities import Dispositivo
+from src.domain.telemetria.entities import Dispositivo, Suscripcion
 from src.domain.telemetria.exceptions import (
     DispositivoNoEncontradoError,
     GranularidadEnergiaInvalidaError,
@@ -22,6 +22,7 @@ from src.domain.telemetria.ports import (
     RepositorioDispositivosPort,
     RepositorioOrganizacionesPort,
     RepositorioPlanesPort,
+    RepositorioSuscripcionesPort,
     RepositorioTelemetriaPort,
 )
 from src.domain.telemetria.services import (
@@ -41,12 +42,30 @@ class ConsultarTelemetriaUseCase:
         repo_organizaciones: RepositorioOrganizacionesPort | None = None,
         repo_planes: RepositorioPlanesPort | None = None,
         buffer_en_vivo: BufferTelemetriaEnVivoPort | None = None,
+        repo_suscripciones: RepositorioSuscripcionesPort | None = None,
     ):
         self.repo_telemetria = repo_telemetria
         self.repo_dispositivos = repo_dispositivos
         self.repo_organizaciones = repo_organizaciones
         self.repo_planes = repo_planes
         self.buffer_en_vivo = buffer_en_vivo
+        self.repo_suscripciones = repo_suscripciones
+
+    def _suscripcion_de_dispositivo(self, dev: Dispositivo) -> Suscripcion | None:
+        """Suscripción de la organización del dispositivo; None si no se puede resolver la organización."""
+        if not self.repo_organizaciones or not dev.planta_id:
+            return None
+        planta = self.repo_organizaciones.obtener_planta_por_id(dev.planta_id)
+        if not planta or not planta.organizacion_id:
+            return None
+        if self.repo_organizaciones.obtener_por_id(planta.organizacion_id) is None:
+            return None
+        sus = (
+            self.repo_suscripciones.obtener_por_organizacion(planta.organizacion_id)
+            if self.repo_suscripciones
+            else None
+        )
+        return sus or Suscripcion.por_defecto(planta.organizacion_id)
 
     def _resolver_dispositivo(self, id_o_uid: str) -> Dispositivo:
         # Check by UUID first
@@ -65,32 +84,26 @@ class ConsultarTelemetriaUseCase:
 
     def _obtener_contexto_suscripcion(self, dev: Dispositivo) -> tuple[bool, ModoFreeTier, int, int]:
         ahora = datetime.now(timezone.utc)
-        if self.repo_organizaciones and dev.planta_id:
-            planta = self.repo_organizaciones.obtener_planta_por_id(dev.planta_id)
-            if planta and planta.organizacion_id:
-                org = self.repo_organizaciones.obtener_por_id(planta.organizacion_id)
-                if org:
-                    es_pro = PoliticaSuscripcionService.es_pro_vigente(org.pro_vence_en, ahora)
-                    retencion_dias = PoliticaSuscripcionService.resolver_retencion_dias(es_pro, org.modo_free)
-                    min_intervalo = PoliticaSuscripcionService.resolver_intervalo_minimo_segundos(es_pro, org.modo_free)
-                    return es_pro, org.modo_free, retencion_dias, min_intervalo
+        sus = self._suscripcion_de_dispositivo(dev)
+        if sus is not None:
+            es_pro = PoliticaSuscripcionService.es_pro_vigente(sus.pro_vence_en, ahora)
+            retencion_dias = PoliticaSuscripcionService.resolver_retencion_dias(es_pro, sus.modo_free)
+            min_intervalo = PoliticaSuscripcionService.resolver_intervalo_minimo_segundos(es_pro, sus.modo_free)
+            return es_pro, sus.modo_free, retencion_dias, min_intervalo
         # Dispositivos de desarrollo o sin asignación a planta no sufren restricciones
         return True, ModoFreeTier.PRIVADO_BASICO, 365, 0
 
     def _calcular_fecha_corte_retencion(self, dev: Dispositivo) -> datetime:
         ahora = datetime.now(timezone.utc)
-        if self.repo_organizaciones and dev.planta_id:
-            planta = self.repo_organizaciones.obtener_planta_por_id(dev.planta_id)
-            if planta and planta.organizacion_id:
-                org = self.repo_organizaciones.obtener_por_id(planta.organizacion_id)
-                if org and self.repo_planes and org.plan_id:
-                    plan = self.repo_planes.obtener_por_id(org.plan_id)
-                    if plan:
-                        return PoliticaRetencionService.ventana_consulta(plan, ahora)
-                if org:
-                    es_pro = PoliticaSuscripcionService.es_pro_vigente(org.pro_vence_en, ahora)
-                    dias = PoliticaSuscripcionService.resolver_retencion_dias(es_pro, org.modo_free)
-                    return ahora - timedelta(days=dias)
+        sus = self._suscripcion_de_dispositivo(dev)
+        if sus is not None:
+            if self.repo_planes and sus.plan_id:
+                plan = self.repo_planes.obtener_por_id(sus.plan_id)
+                if plan:
+                    return PoliticaRetencionService.ventana_consulta(plan, ahora)
+            es_pro = PoliticaSuscripcionService.es_pro_vigente(sus.pro_vence_en, ahora)
+            dias = PoliticaSuscripcionService.resolver_retencion_dias(es_pro, sus.modo_free)
+            return ahora - timedelta(days=dias)
         return ahora - timedelta(days=14)
 
     def _acotar_fecha_desde(self, dev: Dispositivo, desde: datetime | None) -> datetime:

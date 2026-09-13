@@ -38,6 +38,9 @@ from src.infrastructure.sqlalchemy.models import (
 CSV_DEFAULT_PATH = "/home/agustin/Descargas/Reporte 22-08-2026 10_48_08 (GMT-3).csv"
 
 
+ORG_DEMO_ID = "00000000-0000-4000-8000-00000000de00"
+
+
 class CSVProfileExtractor:
     """Extrae las series y patrones eléctricos del archivo CSV de referencia."""
 
@@ -224,13 +227,11 @@ def asegurar_organizacion_y_dispositivos(
 ) -> tuple[DeviceModel, DeviceModel]:
     """Crea la organización demo y los dos dispositivos si no existen."""
     # 1. Organización Demo
-    org = db.query(OrganizationModel).filter_by(name="Empresa Demo S.A.").first()
+    # La identidad de la organización vive en el YAML; en MySQL solo queda la suscripción
+    # (id + estado comercial). Para el mock alcanza con una fila de id fijo.
+    org = db.query(OrganizationModel).filter_by(id=ORG_DEMO_ID).first()
     if not org:
-        org = OrganizationModel(
-            name="Empresa Demo S.A.",
-            contact_email="demo@datamaq.com.ar",
-            contact_phone="+54 11 5555-0100",
-        )
+        org = OrganizationModel(id=ORG_DEMO_ID)
         db.add(org)
         db.flush()
 

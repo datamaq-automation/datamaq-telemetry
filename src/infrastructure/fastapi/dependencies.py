@@ -58,6 +58,7 @@ from src.infrastructure.sqlalchemy.mysql_repositories import (
     MySQLParadasProgramadasRepository,
     MySQLPlanesRepository,
     MySQLSeriePotenciaRepository,
+    MySQLSuscripcionesRepository,
     MySQLTelemetriaRepository,
     MySQLUsuariosRepository,
 )
@@ -116,7 +117,12 @@ def get_telemetria_use_case(
     repo_org = YamlOrganizacionesRepository()
     repo_planes = MySQLPlanesRepository(db)
     return ConsultarTelemetriaUseCase(
-        repo_telem, repo_disp, repo_org, repo_planes, buffer_en_vivo=global_telemetria_buffer
+        repo_telem,
+        repo_disp,
+        repo_org,
+        repo_planes,
+        buffer_en_vivo=global_telemetria_buffer,
+        repo_suscripciones=MySQLSuscripcionesRepository(db),
     )
 
 
@@ -154,6 +160,7 @@ def get_dispositivos_use_case(
         MySQLDispositivosRepository(db),
         YamlOrganizacionesRepository(),
         MySQLPlanesRepository(db),
+        repo_suscripciones=MySQLSuscripcionesRepository(db),
     )
 
 

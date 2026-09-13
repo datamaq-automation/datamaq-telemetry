@@ -218,11 +218,7 @@ erDiagram
 
     ORGANIZATIONS {
         string id PK
-        string name
         string plan_id FK
-        string tax_id
-        string contact_email
-        string contact_phone
         datetime pro_expires_at
         string free_tier_mode
         datetime created_at
@@ -581,11 +577,7 @@ erDiagram
 | Columna | Tipo SQL | Clave / Restricción | Nullable |
 | :--- | :--- | :--- | :--- |
 | `id` | `VARCHAR(36)` | **PRIMARY KEY** | No |
-| `name` | `VARCHAR(150)` | - | No |
 | `plan_id` | `VARCHAR(36)` | FK -> `plans.id` | Sí |
-| `tax_id` | `VARCHAR(50)` | - | Sí |
-| `contact_email` | `VARCHAR(120)` | - | Sí |
-| `contact_phone` | `VARCHAR(50)` | - | Sí |
 | `pro_expires_at` | `DATETIME` | - | Sí |
 | `free_tier_mode` | `VARCHAR(30)` | - | No |
 | `created_at` | `DATETIME` | - | No |

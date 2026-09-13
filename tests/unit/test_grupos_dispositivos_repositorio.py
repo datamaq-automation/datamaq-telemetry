@@ -33,7 +33,7 @@ def db() -> Iterator[Session]:
     event.listen(engine, "connect", lambda conn, _: conn.execute("PRAGMA foreign_keys=ON"))
     Base.metadata.create_all(engine)
     session = sessionmaker(bind=engine)()
-    session.add(OrganizationModel(id=ORG_ID, name="Org Test"))
+    session.add(OrganizationModel(id=ORG_ID))
     session.add(FacilityModel(id=PLANTA_ID, organization_id=ORG_ID, name="Planta Test"))
     session.add(DeviceModel(id=DEVICE_1, facility_id=PLANTA_ID, device_uid="AA:BB:CC:00:00:01", name="Trafo 1"))
     session.add(DeviceModel(id=DEVICE_2, facility_id=PLANTA_ID, device_uid="AA:BB:CC:00:00:02", name="Trafo 2"))

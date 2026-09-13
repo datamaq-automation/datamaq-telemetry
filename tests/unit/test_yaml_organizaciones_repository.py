@@ -1,4 +1,4 @@
-from src.domain.telemetria.value_objects import ModoFreeTier, TipoNodoUnifilar
+from src.domain.telemetria.value_objects import TipoNodoUnifilar
 from src.infrastructure.yaml.repositories.organizaciones_repository import (
     YamlOrganizacionesRepository,
 )
@@ -52,7 +52,9 @@ organizaciones:
     assert len(orgs) == 1
     assert orgs[0].id == "org-test-1"
     assert orgs[0].nombre == "Test Org"
-    assert orgs[0].modo_free == ModoFreeTier.PRIVADO_BASICO
+    # `modo_free`/`plan_id` del YAML se ignoran: la suscripción vive en MySQL (E2)
+    assert not hasattr(orgs[0], "modo_free")
+    assert orgs[0].cuit == "20-99999999-9"
 
     org = repo.obtener_por_id("org-test-1")
     assert org is not None

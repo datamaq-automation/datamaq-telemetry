@@ -23,6 +23,7 @@ from src.domain.telemetria.entities import (
     Organizacion,
     Planta,
     PlanTelemetria,
+    Suscripcion,
     ZonaPlanta,
 )
 from src.domain.telemetria.exceptions import LimiteDispositivosExcedidoError
@@ -31,6 +32,7 @@ from src.domain.telemetria.ports import (
     RepositorioDispositivosPort,
     RepositorioOrganizacionesPort,
     RepositorioPlanesPort,
+    RepositorioSuscripcionesPort,
     RepositorioTelemetriaPort,
 )
 from src.domain.telemetria.value_objects import (
@@ -112,6 +114,18 @@ class MockOrganizacionesRepo(RepositorioOrganizacionesPort):
         dispositivos: list[DispositivoLayout],
     ) -> None:
         pass
+
+
+class MockSuscripcionesRepo(RepositorioSuscripcionesPort):
+    def __init__(self):
+        self.suscripciones: dict[str, Suscripcion] = {}
+
+    def obtener_por_organizacion(self, organizacion_id: str) -> Suscripcion | None:
+        return self.suscripciones.get(organizacion_id)
+
+    def guardar(self, suscripcion: Suscripcion) -> Suscripcion:
+        self.suscripciones[suscripcion.organizacion_id] = suscripcion
+        return suscripcion
 
 
 class MockDispositivosRepo(RepositorioDispositivosPort):
@@ -378,10 +392,12 @@ def test_validacion_cupo_max_dispositivos():
     )
     repo_planes.guardar_plan(plan1)
 
-    use_case = GestionarDispositivosUseCase(repo_disp, repo_org, repo_planes)
+    repo_sus = MockSuscripcionesRepo()
+    use_case = GestionarDispositivosUseCase(repo_disp, repo_org, repo_planes, repo_suscripciones=repo_sus)
 
-    # Organización con Plan 1 (max 1 dispositivo), declarada en el repo (no hay alta por API)
-    repo_org.guardar_organizacion(Organizacion(id="org-test", nombre="Empresa Test", plan_id="plan-1"))
+    # Organización con Plan 1 (max 1 dispositivo): identidad en el repo YAML, plan en la suscripción
+    repo_org.guardar_organizacion(Organizacion(id="org-test", nombre="Empresa Test"))
+    repo_sus.guardar(Suscripcion(organizacion_id="org-test", plan_id="plan-1"))
     planta_dto = repo_org.guardar_planta(
         Planta(id="planta-central", organizacion_id="org-test", nombre="Planta Central")
     )
@@ -472,7 +488,9 @@ def test_ventana_retencion_consultas():
     )
     repo_planes.guardar_plan(plan_7d)
 
-    org = repo_org.guardar_organizacion(Organizacion(id="org-1", nombre="Org Test", plan_id="plan-7d"))
+    org = repo_org.guardar_organizacion(Organizacion(id="org-1", nombre="Org Test"))
+    repo_sus = MockSuscripcionesRepo()
+    repo_sus.guardar(Suscripcion(organizacion_id="org-1", plan_id="plan-7d"))
     planta = repo_org.guardar_planta(Planta(id="plant-1", organizacion_id=org.id, nombre="Planta 1"))
     dev = repo_disp.guardar(
         Dispositivo(id="dev-1", device_uid=MacAddress("AABBCCDDEE99"), nombre="PM 1", planta_id=planta.id)
@@ -488,7 +506,7 @@ def test_ventana_retencion_consultas():
         LecturaInstantanea(None, dev.id, ahora - timedelta(days=3), MedicionFase(), MedicionFase(), MedicionFase())
     )
 
-    consultar_uc = ConsultarTelemetriaUseCase(repo_telem, repo_disp, repo_org, repo_planes)
+    consultar_uc = ConsultarTelemetriaUseCase(repo_telem, repo_disp, repo_org, repo_planes, repo_suscripciones=repo_sus)
 
     # Si se pide desde hace 30 días, la consulta debe quedar acotada a los 7 días de retención del plan
     resultado = consultar_uc.listar_instantaneas(dev.id, limite=100, desde=ahora - timedelta(days=30))
@@ -611,17 +629,17 @@ def test_consultar_telemetria_modo_pro_y_free_bifurcado():
     repo_telem = MockTelemetriaRepo()
     repo_disp = MockDispositivosRepo()
     repo_org = MockOrganizacionesRepo()
+    repo_sus = MockSuscripcionesRepo()
 
     ahora = datetime.now(timezone.utc)
 
     # 1. Caso PRO: Organización con PRO activo vence en 40 días
-    org_pro = Organizacion(
-        id="org-pro",
-        nombre="Industria Pro Activa",
-        pro_vence_en=ahora + timedelta(days=40),
-        modo_free=ModoFreeTier.PRIVADO_BASICO,
+    repo_org.guardar_organizacion(Organizacion(id="org-pro", nombre="Industria Pro Activa"))
+    repo_sus.guardar(
+        Suscripcion(
+            organizacion_id="org-pro", pro_vence_en=ahora + timedelta(days=40), modo_free=ModoFreeTier.PRIVADO_BASICO
+        )
     )
-    repo_org.guardar_organizacion(org_pro)
     planta_pro = Planta(id="planta-pro", organizacion_id="org-pro", nombre="Planta Central")
     repo_org.guardar_planta(planta_pro)
     dev_pro = Dispositivo(
@@ -637,7 +655,7 @@ def test_consultar_telemetria_modo_pro_y_free_bifurcado():
         LecturaInstantanea(2, dev_pro.id, ahora - timedelta(days=100), MedicionFase(), MedicionFase(), MedicionFase())
     )
 
-    consultar_uc = ConsultarTelemetriaUseCase(repo_telem, repo_disp, repo_org)
+    consultar_uc = ConsultarTelemetriaUseCase(repo_telem, repo_disp, repo_org, repo_suscripciones=repo_sus)
 
     # PRO puede consultar raw sin restricción y retención hasta 365 días
     lecturas_pro = consultar_uc.listar_instantaneas(
@@ -646,13 +664,14 @@ def test_consultar_telemetria_modo_pro_y_free_bifurcado():
     assert len(lecturas_pro) == 2
 
     # 2. Caso Free Privado Básico: PRO vencido hace 10 días
-    org_free_priv = Organizacion(
-        id="org-free-priv",
-        nombre="Industria Free Privada",
-        pro_vence_en=ahora - timedelta(days=10),
-        modo_free=ModoFreeTier.PRIVADO_BASICO,
+    repo_org.guardar_organizacion(Organizacion(id="org-free-priv", nombre="Industria Free Privada"))
+    repo_sus.guardar(
+        Suscripcion(
+            organizacion_id="org-free-priv",
+            pro_vence_en=ahora - timedelta(days=10),
+            modo_free=ModoFreeTier.PRIVADO_BASICO,
+        )
     )
-    repo_org.guardar_organizacion(org_free_priv)
     planta_free_priv = Planta(id="planta-free-priv", organizacion_id="org-free-priv", nombre="Planta Privada")
     repo_org.guardar_planta(planta_free_priv)
     dev_free_priv = Dispositivo(
@@ -687,18 +706,16 @@ def test_consultar_telemetria_con_fechas_naive_en_bd():
     repo_telem = MockTelemetriaRepo()
     repo_disp = MockDispositivosRepo()
     repo_org = MockOrganizacionesRepo()
+    repo_sus = MockSuscripcionesRepo()
 
     # Fechas naive como las que devuelve MySQL / SQLite sin timezone
     venc_naive = datetime(2026, 12, 31, 23, 59, 59)
     ahora_naive = datetime(2026, 8, 23, 10, 0, 0)
 
-    org = Organizacion(
-        id="org-naive",
-        nombre="Org Naive",
-        pro_vence_en=venc_naive,
-        modo_free=ModoFreeTier.PRIVADO_BASICO,
+    repo_org.guardar_organizacion(Organizacion(id="org-naive", nombre="Org Naive"))
+    repo_sus.guardar(
+        Suscripcion(organizacion_id="org-naive", pro_vence_en=venc_naive, modo_free=ModoFreeTier.PRIVADO_BASICO)
     )
-    repo_org.guardar_organizacion(org)
     planta = Planta(id="planta-naive", organizacion_id="org-naive", nombre="Planta Naive")
     repo_org.guardar_planta(planta)
     dev = Dispositivo(
@@ -713,7 +730,7 @@ def test_consultar_telemetria_con_fechas_naive_en_bd():
         LecturaInstantanea(1, dev.id, ahora_naive, MedicionFase(), MedicionFase(), MedicionFase())
     )
 
-    consultar_uc = ConsultarTelemetriaUseCase(repo_telem, repo_disp, repo_org)
+    consultar_uc = ConsultarTelemetriaUseCase(repo_telem, repo_disp, repo_org, repo_suscripciones=repo_sus)
 
     # Llamada con hours=24 (genera 'desde' con timezone.utc)
     desde_aware = datetime.now(timezone.utc) - timedelta(hours=24)

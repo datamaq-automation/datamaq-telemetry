@@ -4,7 +4,6 @@
 organizaciones:
   - id: "09c09578-a860-4c61-8e97-2a13240adb8f"
     nombre: "Hogar (medidor doméstico)"
-    modo_free: "VITRINA_ANONIMA"
     email_contacto: "invitado@datamaq.com.ar"
     plantas:
       - id: "2a4dd726-3e21-4b24-8993-51c2f5d4d65f"
@@ -31,7 +30,6 @@ organizaciones:
 
   - id: "cf82b4be-0798-4beb-8978-2a27612d5761"
     nombre: "Vajillas Durax S.A."
-    modo_free: "PRIVADO_BASICO"
     email_contacto: "instrumental@vajillasdurax.com.ar"
     plantas:
       - id: "c64fd625-0037-4caa-b68a-800e8e0ee548"
@@ -107,7 +105,6 @@ organizaciones:
 
   - id: "edebb9a0-85e5-4bde-a370-e64bd9b9608c"
     nombre: "Cooperativa de Trabajo Unión Papelera Platense Ltda"
-    modo_free: "PRIVADO_BASICO"
     email_contacto: "unionpapeleraplatense@hotmail.com"
     plantas:
       - id: "4f68f653-a604-4834-8154-31f938248572"
