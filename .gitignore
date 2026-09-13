@@ -46,3 +46,8 @@ htmlcov/
 # Backups & Data
 backups/
 tmp/
+
+# Config local de scripts/deploy-server.sh y scripts/logs.sh — nunca trackear:
+# terminó commiteado una vez (eccc85d) con DEPLOY_SSH_USER=root, rompiendo el
+# guard anti-root del propio script y el pipeline de CD por ~14 horas.
+scripts/.env.deploy
