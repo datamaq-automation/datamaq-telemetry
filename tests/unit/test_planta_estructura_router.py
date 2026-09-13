@@ -7,8 +7,6 @@ from fastapi.testclient import TestClient
 from src.application.dtos.planta_estructura_dto import (
     CoordenadasZonaDTO,
     DispositivoLayoutDTO,
-    GuardarLayoutRequestDTO,
-    GuardarUnifilarRequestDTO,
     LayoutPlantaDTO,
     NodoUnifilarDTO,
     PosicionLayoutDTO,
@@ -17,7 +15,6 @@ from src.application.dtos.planta_estructura_dto import (
     ZonaPlantaDTO,
 )
 from src.domain.telemetria.exceptions import (
-    EstructuraUnifilarInvalidaError,
     NodoUnifilarNoEncontradoError,
     PlantaNoEncontradaError,
 )
@@ -172,76 +169,12 @@ def test_get_unifilar_by_planta_error_interno():
     assert "error interno" in response.json()["detail"].lower()
 
 
-def test_update_unifilar_exitoso():
-    client, mock_use_case = _cliente(rol="admin")
-    dto = _sample_unifilar_dto(planta_id="planta-42")
-    mock_use_case.guardar_unifilar.return_value = dto
-
-    payload = {
-        "nodos": [
-            {
-                "id": "n-1",
-                "parent_id": None,
-                "nombre": "Acometida MT",
-                "tipo": "acometida",
-                "device_id": "dev-100",
-                "tension_nominal_V": 13200.0,
-                "capacidad_nominal_kVA": 1000.0,
-                "orden": 0,
-            }
-        ]
-    }
-
-    response = client.put("/api/v1/plantas/planta-42/unifilar", json=payload)
-
-    assert response.status_code == 200
-    mock_use_case.guardar_unifilar.assert_called_once()
-    call_args = mock_use_case.guardar_unifilar.call_args
-    assert call_args.kwargs["planta_id"] == "planta-42"
-    assert isinstance(call_args.kwargs["dto"], GuardarUnifilarRequestDTO)
-    assert len(call_args.kwargs["dto"].nodos) == 1
-    assert response.json()["planta_id"] == "planta-42"
-
-
-def test_update_unifilar_rol_invitado_forbidden():
-    client, mock_use_case = _cliente(rol="invitado")
-    payload = {"nodos": []}
-
-    response = client.put("/api/v1/plantas/planta-42/unifilar", json=payload)
-
-    assert response.status_code == 403
+def test_put_unifilar_ya_no_existe():
+    """La estructura se edita por commit al YAML; la API no expone escritura."""
+    client, mock_use_case = _cliente()
+    response = client.put("/api/v1/plantas/planta-42/unifilar", json={"nodos": []})
+    assert response.status_code == 405
     mock_use_case.guardar_unifilar.assert_not_called()
-
-
-def test_update_unifilar_payload_invalido():
-    client, mock_use_case = _cliente(rol="admin")
-    # Falta 'nodos' en el body
-    response = client.put("/api/v1/plantas/planta-42/unifilar", json={})
-
-    assert response.status_code == 422
-    mock_use_case.guardar_unifilar.assert_not_called()
-
-
-def test_update_unifilar_planta_no_encontrada():
-    client, mock_use_case = _cliente(rol="admin")
-    mock_use_case.guardar_unifilar.side_effect = PlantaNoEncontradaError("Planta no encontrada")
-
-    payload = {"nodos": []}
-    response = client.put("/api/v1/plantas/planta-999/unifilar", json=payload)
-
-    assert response.status_code == 404
-    assert "Planta no encontrada" in response.json()["detail"]
-
-
-def test_update_unifilar_error_interno():
-    client, mock_use_case = _cliente(rol="admin")
-    mock_use_case.guardar_unifilar.side_effect = RuntimeError("Falla al guardar unifilar")
-
-    payload = {"nodos": []}
-    response = client.put("/api/v1/plantas/planta-42/unifilar", json=payload)
-
-    assert response.status_code == 500
-    assert "error interno" in response.json()["detail"].lower()
 
 
 # ============================================================================
@@ -328,102 +261,11 @@ def test_get_layout_by_planta_error_interno():
     assert "error interno" in response.json()["detail"].lower()
 
 
-def test_update_layout_exitoso():
-    client, mock_use_case = _cliente(rol="admin")
-    dto = _sample_layout_dto(planta_id="planta-88")
-    mock_use_case.guardar_layout.return_value = dto
-
-    payload = {
-        "plano_svg_url": "https://cdn.datamaq.com.ar/svg/layout.svg",
-        "zonas": [
-            {
-                "id": "z-1",
-                "nombre": "Nave A",
-                "coordenadas": {
-                    "x_porcentaje": 10.0,
-                    "y_porcentaje": 15.0,
-                    "ancho_porcentaje": 40.0,
-                    "alto_porcentaje": 30.0,
-                },
-            }
-        ],
-        "dispositivos": [
-            {
-                "device_id": "dev-100",
-                "zona_id": "z-1",
-                "posicion": {
-                    "x_porcentaje": 20.0,
-                    "y_porcentaje": 25.0,
-                },
-            }
-        ],
-    }
-
-    response = client.put("/api/v1/plantas/planta-88/layout", json=payload)
-
-    assert response.status_code == 200
-    mock_use_case.guardar_layout.assert_called_once()
-    call_args = mock_use_case.guardar_layout.call_args
-    assert call_args.kwargs["planta_id"] == "planta-88"
-    assert isinstance(call_args.kwargs["dto"], GuardarLayoutRequestDTO)
-    assert response.json()["planta_id"] == "planta-88"
-
-
-def test_update_layout_rol_invitado_forbidden():
-    client, mock_use_case = _cliente(rol="invitado")
-    payload = {"plano_svg_url": None, "zonas": [], "dispositivos": []}
-
-    response = client.put("/api/v1/plantas/planta-88/layout", json=payload)
-
-    assert response.status_code == 403
+def test_put_layout_ya_no_existe():
+    client, mock_use_case = _cliente()
+    response = client.put("/api/v1/plantas/planta-88/layout", json={"zonas": []})
+    assert response.status_code == 405
     mock_use_case.guardar_layout.assert_not_called()
-
-
-def test_update_layout_coordenadas_invalidas_validation_error():
-    client, mock_use_case = _cliente(rol="admin")
-    payload = {
-        "plano_svg_url": None,
-        "zonas": [
-            {
-                "id": "z-1",
-                "nombre": "Nave Invalida",
-                "coordenadas": {
-                    "x_porcentaje": 150.0,  # Máximo es 100.0
-                    "y_porcentaje": 10.0,
-                    "ancho_porcentaje": 20.0,
-                    "alto_porcentaje": 20.0,
-                },
-            }
-        ],
-        "dispositivos": [],
-    }
-
-    response = client.put("/api/v1/plantas/planta-88/layout", json=payload)
-
-    assert response.status_code == 422
-    mock_use_case.guardar_layout.assert_not_called()
-
-
-def test_update_layout_planta_no_encontrada():
-    client, mock_use_case = _cliente(rol="admin")
-    mock_use_case.guardar_layout.side_effect = PlantaNoEncontradaError("Planta 88 no existe")
-
-    payload = {"plano_svg_url": None, "zonas": [], "dispositivos": []}
-    response = client.put("/api/v1/plantas/planta-88/layout", json=payload)
-
-    assert response.status_code == 404
-    assert "Planta 88 no existe" in response.json()["detail"]
-
-
-def test_update_layout_error_interno():
-    client, mock_use_case = _cliente(rol="admin")
-    mock_use_case.guardar_layout.side_effect = RuntimeError("Error guardando layout")
-
-    payload = {"plano_svg_url": None, "zonas": [], "dispositivos": []}
-    response = client.put("/api/v1/plantas/planta-88/layout", json=payload)
-
-    assert response.status_code == 500
-    assert "error interno" in response.json()["detail"].lower()
 
 
 # ============================================================================
@@ -481,18 +323,6 @@ def test_get_areas_estadisticas_by_planta_exitoso():
 # ============================================================================
 # TELEMETRÍA AGREGADA POR NODO DEL UNIFILAR
 # ============================================================================
-
-
-def test_put_unifilar_invalido_devuelve_422():
-    client, mock_use_case = _cliente()
-    mock_use_case.guardar_unifilar.side_effect = EstructuraUnifilarInvalidaError("ciclo")
-
-    response = client.put(
-        "/api/v1/plantas/planta-1/unifilar",
-        json={"nodos": [{"id": "a", "parent_id": "a", "nombre": "A", "tipo": "carga", "tension_nominal_V": 380.0}]},
-    )
-
-    assert response.status_code == 422
 
 
 def test_resumen_nodo_unifilar_exitoso():

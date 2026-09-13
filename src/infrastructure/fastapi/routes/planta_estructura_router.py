@@ -5,8 +5,6 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from src.application.dtos.planta_estructura_dto import (
-    GuardarLayoutRequestDTO,
-    GuardarUnifilarRequestDTO,
     LayoutPlantaDTO,
     PlantaAreasEstadisticasResponseDTO,
     PuntoPotenciaNodoUnifilarDTO,
@@ -21,7 +19,6 @@ from src.infrastructure.fastapi.dependencies import (
     get_consultar_nodo_unifilar_use_case,
     get_planta_estructura_use_case,
     get_usuario_actual,
-    requiere_rol_escritura,
 )
 from src.infrastructure.fastapi.error_handler import manejar_error_http
 
@@ -62,22 +59,6 @@ def get_unifilar_by_planta(
 ):
     try:
         return use_case.obtener_unifilar(planta_id=planta_id)
-    except Exception as e:
-        manejar_error_http(e)
-
-
-@router.put(
-    "/plantas/{planta_id}/unifilar",
-    response_model=UnifilarPlantaDTO,
-    dependencies=[Depends(requiere_rol_escritura)],
-)
-def update_unifilar(
-    planta_id: str,
-    dto: GuardarUnifilarRequestDTO,
-    use_case: Annotated[GestionarPlantaEstructuraUseCase, Depends(get_planta_estructura_use_case)],
-):
-    try:
-        return use_case.guardar_unifilar(planta_id=planta_id, dto=dto)
     except Exception as e:
         manejar_error_http(e)
 
@@ -141,22 +122,6 @@ def get_layout_by_planta(
 ):
     try:
         return use_case.obtener_layout(planta_id=planta_id)
-    except Exception as e:
-        manejar_error_http(e)
-
-
-@router.put(
-    "/plantas/{planta_id}/layout",
-    response_model=LayoutPlantaDTO,
-    dependencies=[Depends(requiere_rol_escritura)],
-)
-def update_layout(
-    planta_id: str,
-    dto: GuardarLayoutRequestDTO,
-    use_case: Annotated[GestionarPlantaEstructuraUseCase, Depends(get_planta_estructura_use_case)],
-):
-    try:
-        return use_case.guardar_layout(planta_id=planta_id, dto=dto)
     except Exception as e:
         manejar_error_http(e)
 

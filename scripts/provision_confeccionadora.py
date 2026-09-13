@@ -22,15 +22,17 @@ if str(ROOT_DIR) not in sys.path:
 
 from src.application.dtos.dispositivo_dto import DispositivoCreateDTO  # noqa: E402
 from src.application.dtos.maquina_dto import MaquinaCreateDTO  # noqa: E402
-from src.application.dtos.organizacion_dto import OrganizacionCreateDTO, PlantaCreateDTO  # noqa: E402
 from src.application.use_cases.gestionar_dispositivos import GestionarDispositivosUseCase  # noqa: E402
 from src.application.use_cases.gestionar_maquinas import GestionarMaquinasUseCase  # noqa: E402
 from src.domain.telemetria.value_objects import MacAddress  # noqa: E402
 from src.infrastructure.sqlalchemy.database import get_session_factory  # noqa: E402
+from src.infrastructure.sqlalchemy.models import FacilityModel, OrganizationModel  # noqa: E402
 from src.infrastructure.sqlalchemy.mysql_repositories import (  # noqa: E402
     MySQLDispositivosRepository,
     MySQLMaquinasRepository,
-    MySQLOrganizacionesRepository,
+)
+from src.infrastructure.yaml.repositories.organizaciones_repository import (  # noqa: E402
+    YamlOrganizacionesRepository,
 )
 
 
@@ -54,7 +56,7 @@ def provisionar_planta_y_maquina(
     session_factory = get_session_factory()
     db = session_factory()
     try:
-        repo_orgs = MySQLOrganizacionesRepository(db)
+        repo_orgs = YamlOrganizacionesRepository()
         repo_devs = MySQLDispositivosRepository(db)
         repo_maquinas = MySQLMaquinasRepository(db)
 
@@ -67,35 +69,25 @@ def provisionar_planta_y_maquina(
             repo_dispositivos=repo_devs,
         )
 
-        # 1. Organización
-        orgs = repo_orgs.listar_organizaciones()
-        org = next((o for o in orgs if o.nombre == org_nombre), None)
-        if org:
-            print(f"[=] Organización existente: '{org_nombre}' ({org.id})")
-            org_id = org.id
-        else:
-            if dry_run:
-                print(f"[DRY] Crearía Organización '{org_nombre}'")
-                org_id = "DRY-ORG-ID"
-            else:
-                nueva_org = use_case_devs.crear_organizacion(OrganizacionCreateDTO(nombre=org_nombre))
-                org_id = nueva_org.id
-                print(f"[+] Organización creada: '{org_nombre}' ({org_id})")
-
-        # 2. Planta
-        plantas = repo_orgs.listar_plantas(organizacion_id=org_id)
-        planta = next((p for p in plantas if p.nombre == planta_nombre), None)
-        if planta:
-            print(f"[=] Planta existente: '{planta_nombre}' ({planta.id})")
-            planta_id = planta.id
-        else:
-            if dry_run:
-                print(f"[DRY] Crearía Planta '{planta_nombre}'")
-                planta_id = "DRY-PLANTA-ID"
-            else:
-                nueva_planta = use_case_devs.crear_planta(PlantaCreateDTO(organizacion_id=org_id, nombre=planta_nombre))
-                planta_id = nueva_planta.id
-                print(f"[+] Planta creada: '{planta_nombre}' ({planta_id})")
+        # 1 y 2. Organización y planta: declaradas en data/organizaciones.yml (no se crean por script)
+        org = next((o for o in repo_orgs.listar_organizaciones() if o.nombre == org_nombre), None)
+        if org is None:
+            print(f"[!] La organización '{org_nombre}' no está en data/organizaciones.yml", file=sys.stderr)
+            sys.exit(1)
+        org_id = org.id
+        planta = next((p for p in repo_orgs.listar_plantas(organizacion_id=org_id) if p.nombre == planta_nombre), None)
+        if planta is None:
+            print(f"[!] La planta '{planta_nombre}' no está declarada bajo '{org_nombre}' en el YAML", file=sys.stderr)
+            sys.exit(1)
+        planta_id = planta.id
+        print(f"[=] Organización '{org_nombre}' ({org_id}) y planta '{planta_nombre}' ({planta_id}) en YAML")
+        if not dry_run:
+            # Filas espejo: anclas de FK para devices.facility_id / users.organization_id
+            if db.query(OrganizationModel).filter(OrganizationModel.id == org_id).first() is None:
+                db.add(OrganizationModel(id=org_id, name=org.nombre))
+            if db.query(FacilityModel).filter(FacilityModel.id == planta_id).first() is None:
+                db.add(FacilityModel(id=planta_id, organization_id=org_id, name=planta.nombre))
+            db.commit()
 
         # 3. Dispositivo Smart Plus
         sp_mac_norm = _normalizar_mac(smartplus_mac)

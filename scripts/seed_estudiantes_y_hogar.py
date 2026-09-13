@@ -1,7 +1,7 @@
 """Crea las dos cuentas de solo lectura pedidas:
 
 - invitado@datamaq.com.ar (rol "invitado"): solo ve el medidor doméstico D48C49F03564,
-  vía una organización/planta "Hogar" dedicada a ese dispositivo.
+  vía la organización/planta "Hogar" declarada en data/organizaciones.yml.
 - estudiantes@datamaq.com.ar (rol "invitado_global"): ve todos los medidores de todas
   las organizaciones, sin poder escribir nada (bloqueado por requiere_rol_escritura).
 
@@ -10,7 +10,6 @@ Idempotente: se puede correr varias veces sin duplicar datos.
 
 import os
 import sys
-import uuid
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -20,9 +19,10 @@ from src.application.use_cases.gestionar_usuarios import GestionarUsuariosUseCas
 from src.domain.auth.services import HashContrasenaService
 from src.domain.telemetria.entities import Organizacion, Planta
 from src.infrastructure.sqlalchemy.database import get_session_factory
+from src.infrastructure.sqlalchemy.models import FacilityModel, OrganizationModel
 from src.infrastructure.sqlalchemy.repositories.dispositivos_repository import MySQLDispositivosRepository
-from src.infrastructure.sqlalchemy.repositories.organizaciones_repository import MySQLOrganizacionesRepository
 from src.infrastructure.sqlalchemy.repositories.usuarios_repository import MySQLUsuariosRepository
+from src.infrastructure.yaml.repositories.organizaciones_repository import YamlOrganizacionesRepository
 
 USUARIO_HOGAR = "invitado@datamaq.com.ar"
 USUARIO_ESTUDIANTES = "estudiantes@datamaq.com.ar"
@@ -31,20 +31,29 @@ ORG_HOGAR_NOMBRE = "Hogar (medidor doméstico)"
 PLANTA_HOGAR_NOMBRE = "Casa"
 
 
-def obtener_o_crear_org_hogar(repo_org) -> Organizacion:
+def obtener_org_hogar(repo_org: YamlOrganizacionesRepository) -> Organizacion:
     for org in repo_org.listar_organizaciones():
         if org.nombre == ORG_HOGAR_NOMBRE:
             return org
-    org = Organizacion(id=str(uuid.uuid4()), nombre=ORG_HOGAR_NOMBRE)
-    return repo_org.guardar_organizacion(org)
+    print(f"[!] La organización '{ORG_HOGAR_NOMBRE}' no está en data/organizaciones.yml", file=sys.stderr)
+    sys.exit(1)
 
 
-def obtener_o_crear_planta_hogar(repo_org, organizacion_id: str) -> Planta:
+def obtener_planta_hogar(repo_org: YamlOrganizacionesRepository, organizacion_id: str) -> Planta:
     for planta in repo_org.listar_plantas(organizacion_id):
         if planta.nombre == PLANTA_HOGAR_NOMBRE:
             return planta
-    planta = Planta(id=str(uuid.uuid4()), organizacion_id=organizacion_id, nombre=PLANTA_HOGAR_NOMBRE)
-    return repo_org.guardar_planta(planta)
+    print(f"[!] La planta '{PLANTA_HOGAR_NOMBRE}' no está declarada en data/organizaciones.yml", file=sys.stderr)
+    sys.exit(1)
+
+
+def asegurar_filas_espejo(db, org: Organizacion, planta: Planta) -> None:
+    """`users.organization_id` y `devices.facility_id` tienen FK a MySQL: se crea el ancla con el id del YAML."""
+    if db.query(OrganizationModel).filter(OrganizationModel.id == org.id).first() is None:
+        db.add(OrganizationModel(id=org.id, name=org.nombre))
+    if db.query(FacilityModel).filter(FacilityModel.id == planta.id).first() is None:
+        db.add(FacilityModel(id=planta.id, organization_id=org.id, name=planta.nombre))
+    db.commit()
 
 
 def asegurar_dispositivo_en_planta(
@@ -89,13 +98,14 @@ def main() -> None:
     db = session_factory()
     try:
         repo_usuarios = MySQLUsuariosRepository(db)
-        repo_org = MySQLOrganizacionesRepository(db)
+        repo_org = YamlOrganizacionesRepository()
         repo_dispositivos = MySQLDispositivosRepository(db)
         use_case_usuarios = GestionarUsuariosUseCase(repo_usuarios, HashContrasenaService())
         use_case_dispositivos = GestionarDispositivosUseCase(repo_dispositivos, repo_org)
 
-        org_hogar = obtener_o_crear_org_hogar(repo_org)
-        planta_hogar = obtener_o_crear_planta_hogar(repo_org, org_hogar.id)
+        org_hogar = obtener_org_hogar(repo_org)
+        planta_hogar = obtener_planta_hogar(repo_org, org_hogar.id)
+        asegurar_filas_espejo(db, org_hogar, planta_hogar)
         asegurar_dispositivo_en_planta(use_case_dispositivos, repo_dispositivos, planta_hogar.id)
 
         contrasena_hogar = obtener_contrasena("GUEST_HOGAR_PASSWORD", "invitado")

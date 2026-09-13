@@ -184,16 +184,18 @@ class RepositorioTelemetriaPort(ABC):
 
 
 class RepositorioOrganizacionesPort(ABC):
+    """Lectura del modelo declarativo de activos (`data/organizaciones.yml`).
+
+    Solo lectura a propósito: la estructura de planta se modifica por commit al
+    YAML, no por API. No hay `guardar_*`.
+    """
+
     @abstractmethod
     def obtener_por_id(self, organizacion_id: str) -> Organizacion | None:
         pass
 
     @abstractmethod
     def listar_organizaciones(self) -> list[Organizacion]:
-        pass
-
-    @abstractmethod
-    def guardar_organizacion(self, org: Organizacion) -> Organizacion:
         pass
 
     @abstractmethod
@@ -205,15 +207,7 @@ class RepositorioOrganizacionesPort(ABC):
         pass
 
     @abstractmethod
-    def guardar_planta(self, planta: Planta) -> Planta:
-        pass
-
-    @abstractmethod
     def obtener_nodos_unifilar(self, planta_id: str) -> list[NodoUnifilar]:
-        pass
-
-    @abstractmethod
-    def guardar_nodos_unifilar(self, planta_id: str, nodos: list[NodoUnifilar]) -> list[NodoUnifilar]:
         pass
 
     @abstractmethod
@@ -222,16 +216,6 @@ class RepositorioOrganizacionesPort(ABC):
 
     @abstractmethod
     def obtener_dispositivos_layout(self, planta_id: str) -> list[DispositivoLayout]:
-        pass
-
-    @abstractmethod
-    def guardar_layout_planta(
-        self,
-        planta_id: str,
-        plano_svg_url: str | None,
-        zonas: list[ZonaPlanta],
-        dispositivos: list[DispositivoLayout],
-    ) -> None:
         pass
 
 

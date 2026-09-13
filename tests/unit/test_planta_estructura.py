@@ -3,15 +3,6 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from src.application.dtos.planta_estructura_dto import (
-    CoordenadasZonaDTO,
-    DispositivoLayoutDTO,
-    GuardarLayoutRequestDTO,
-    GuardarUnifilarRequestDTO,
-    NodoUnifilarDTO,
-    PosicionLayoutDTO,
-    ZonaPlantaDTO,
-)
 from src.application.mappers.planta_estructura_mapper import PlantaEstructuraMapper
 from src.application.use_cases.gestionar_planta_estructura import (
     GestionarPlantaEstructuraUseCase,
@@ -26,6 +17,7 @@ from src.domain.telemetria.entities import (
 )
 from src.domain.telemetria.exceptions import CoordenadaInvalidaError, EstructuraUnifilarInvalidaError
 from src.domain.telemetria.ports import RepositorioOrganizacionesPort
+from src.domain.telemetria.servicios.arbol_unifilar import ArbolUnifilarService
 from src.domain.telemetria.value_objects import (
     CoordenadasZona,
     PosicionLayout,
@@ -158,9 +150,7 @@ def test_mapper_nodo_unifilar():
     assert dto.tipo == "acometida"
     assert dto.tension_nominal_V == 13200.0
 
-    nodo_rebuilt = PlantaEstructuraMapper.dto_to_nodo(dto, "plant-1")
-    assert nodo_rebuilt.id == "node-1"
-    assert nodo_rebuilt.tipo == TipoNodoUnifilar.ACOMETIDA
+    assert dto.es_virtual is False
 
 
 def test_mapper_zona_y_dispositivo_layout():
@@ -202,42 +192,45 @@ def test_gestionar_unifilar_use_case():
     assert res_inicial.nombre_planta == "Planta Garín"
     assert len(res_inicial.nodos) == 0
 
-    # 2. Guardar estructura unifilar en árbol
-    req = GuardarUnifilarRequestDTO(
-        nodos=[
-            NodoUnifilarDTO(
+    # 2. Estructura declarada en el repo (el unifilar se edita por commit al YAML, no por API)
+    repo.guardar_nodos_unifilar(
+        "plant-1",
+        [
+            NodoUnifilar(
                 id="n1",
-                parent_id=None,
+                planta_id="plant-1",
                 nombre="Acometida MT",
-                tipo="acometida",
+                tipo=TipoNodoUnifilar.ACOMETIDA,
+                tension_nominal_v=13200.0,
                 device_id="dev-1",
-                tension_nominal_V=13200.0,
-                capacidad_nominal_kVA=1000.0,
+                capacidad_nominal_kva=1000.0,
                 orden=0,
             ),
-            NodoUnifilarDTO(
+            NodoUnifilar(
                 id="n2",
+                planta_id="plant-1",
                 parent_id="n1",
                 nombre="Transformador Trafo-1",
-                tipo="transformador",
+                tipo=TipoNodoUnifilar.TRANSFORMADOR,
+                tension_nominal_v=380.0,
                 device_id="dev-2",
-                tension_nominal_V=380.0,
-                capacidad_nominal_kVA=800.0,
+                capacidad_nominal_kva=800.0,
                 orden=1,
             ),
-            NodoUnifilarDTO(
+            NodoUnifilar(
                 id="n3",
+                planta_id="plant-1",
                 parent_id="n2",
                 nombre="TGBT Principal",
-                tipo="tgbt",
+                tipo=TipoNodoUnifilar.TGBT,
+                tension_nominal_v=380.0,
                 device_id="dev-3",
-                tension_nominal_V=380.0,
-                capacidad_nominal_kVA=800.0,
+                capacidad_nominal_kva=800.0,
                 orden=2,
             ),
-        ]
+        ],
     )
-    res_guardado = use_case.guardar_unifilar("plant-1", req)
+    res_guardado = use_case.obtener_unifilar("plant-1")
     assert len(res_guardado.nodos) == 3
     assert res_guardado.nodos[1].parent_id == "n1"
 
@@ -247,89 +240,97 @@ def test_gestionar_unifilar_use_case():
     assert len(res_default.nodos) == 3
 
 
-def test_guardar_unifilar_con_nodo_virtual_marca_es_virtual():
+def test_obtener_unifilar_con_nodo_virtual_marca_es_virtual():
     repo = MockOrganizacionesRepo()
     repo.guardar_planta(Planta(id="plant-1", organizacion_id="org-1", nombre="Planta Durax"))
-    use_case = GestionarPlantaEstructuraUseCase(repo)
-
-    req = GuardarUnifilarRequestDTO(
-        nodos=[
-            NodoUnifilarDTO(id="mt", nombre="Acometida MT", tipo="acometida", tension_nominal_V=13200.0),
-            NodoUnifilarDTO(
+    repo.guardar_nodos_unifilar(
+        "plant-1",
+        [
+            NodoUnifilar(
+                id="mt",
+                planta_id="plant-1",
+                nombre="Acometida MT",
+                tipo=TipoNodoUnifilar.ACOMETIDA,
+                tension_nominal_v=13200.0,
+            ),
+            NodoUnifilar(
                 id="t1",
+                planta_id="plant-1",
                 parent_id="mt",
                 nombre="Trafo 1",
-                tipo="transformador",
+                tipo=TipoNodoUnifilar.TRANSFORMADOR,
+                tension_nominal_v=380.0,
                 device_id="dev-1",
-                tension_nominal_V=380.0,
             ),
-        ]
+        ],
     )
-    res = use_case.guardar_unifilar("plant-1", req)
+    res = GestionarPlantaEstructuraUseCase(repo).obtener_unifilar("plant-1")
     por_id = {n.id: n for n in res.nodos}
     assert por_id["mt"].es_virtual is True
     assert por_id["t1"].es_virtual is False
 
 
-def test_guardar_unifilar_rechaza_padre_colgante_y_ciclo():
-    repo = MockOrganizacionesRepo()
-    repo.guardar_planta(Planta(id="plant-1", organizacion_id="org-1", nombre="Planta Durax"))
-    use_case = GestionarPlantaEstructuraUseCase(repo)
-
-    colgante = GuardarUnifilarRequestDTO(
-        nodos=[NodoUnifilarDTO(id="t1", parent_id="no-existe", nombre="T1", tipo="carga", tension_nominal_V=380.0)]
-    )
+def test_validar_unifilar_rechaza_padre_colgante_y_ciclo():
+    """La validación vive en el dominio y corre en startup sobre el YAML (verificador_unifilar)."""
+    colgante = [
+        NodoUnifilar(
+            id="t1",
+            planta_id="p",
+            parent_id="no-existe",
+            nombre="T1",
+            tipo=TipoNodoUnifilar.CARGA,
+            tension_nominal_v=380.0,
+        )
+    ]
     with pytest.raises(EstructuraUnifilarInvalidaError):
-        use_case.guardar_unifilar("plant-1", colgante)
+        ArbolUnifilarService(colgante).validar()
 
-    ciclo = GuardarUnifilarRequestDTO(
-        nodos=[
-            NodoUnifilarDTO(id="a", parent_id="b", nombre="A", tipo="carga", tension_nominal_V=380.0),
-            NodoUnifilarDTO(id="b", parent_id="a", nombre="B", tipo="carga", tension_nominal_V=380.0),
-        ]
-    )
+    ciclo = [
+        NodoUnifilar(
+            id="a", planta_id="p", parent_id="b", nombre="A", tipo=TipoNodoUnifilar.CARGA, tension_nominal_v=380.0
+        ),
+        NodoUnifilar(
+            id="b", planta_id="p", parent_id="a", nombre="B", tipo=TipoNodoUnifilar.CARGA, tension_nominal_v=380.0
+        ),
+    ]
     with pytest.raises(EstructuraUnifilarInvalidaError):
-        use_case.guardar_unifilar("plant-1", ciclo)
-    assert repo.nodos_unifilar.get("plant-1", []) == []
+        ArbolUnifilarService(ciclo).validar()
 
 
 def test_gestionar_layout_use_case():
     repo = MockOrganizacionesRepo()
-    planta = Planta(id="plant-1", organizacion_id="org-1", nombre="Planta Pilar")
-    repo.guardar_planta(planta)
-
-    use_case = GestionarPlantaEstructuraUseCase(repo)
-
-    # Guardar layout
-    req = GuardarLayoutRequestDTO(
-        plano_svg_url="https://cdn.datamaq.com.ar/planos/pilar.svg",
-        zonas=[
-            ZonaPlantaDTO(
-                id="z1",
-                nombre="Nave A",
-                coordenadas=CoordenadasZonaDTO(
-                    x_porcentaje=0.0, y_porcentaje=0.0, ancho_porcentaje=50.0, alto_porcentaje=50.0
-                ),
-            )
-        ],
-        dispositivos=[
-            DispositivoLayoutDTO(
-                device_id="dev-pilar-1",
-                zona_id="z1",
-                posicion=PosicionLayoutDTO(x_porcentaje=20.0, y_porcentaje=20.0),
-            )
-        ],
+    repo.guardar_planta(
+        Planta(
+            id="plant-1",
+            organizacion_id="org-1",
+            nombre="Planta Pilar",
+            layout_svg_url="https://cdn.datamaq.com.ar/planos/pilar.svg",
+        )
     )
-    layout = use_case.guardar_layout("plant-1", req)
-    assert layout.plano_svg_url == "https://cdn.datamaq.com.ar/planos/pilar.svg"
-    assert len(layout.zonas) == 1
-    assert len(layout.dispositivos) == 1
-    assert layout.dispositivos[0].device_id == "dev-pilar-1"
+    repo.zonas["plant-1"] = [
+        ZonaPlanta(
+            id="z1",
+            planta_id="plant-1",
+            nombre="Nave A",
+            coordenadas=CoordenadasZona(
+                x_porcentaje=0.0, y_porcentaje=0.0, ancho_porcentaje=50.0, alto_porcentaje=50.0
+            ),
+        )
+    ]
+    repo.dispositivos_layout["plant-1"] = [
+        DispositivoLayout(
+            id="lay-1",
+            planta_id="plant-1",
+            device_id="dev-pilar-1",
+            zona_id="z1",
+            posicion=PosicionLayout(x_porcentaje=20.0, y_porcentaje=20.0),
+        )
+    ]
 
-    # Obtener layout
-    obtenido = use_case.obtener_layout("plant-1")
+    obtenido = GestionarPlantaEstructuraUseCase(repo).obtener_layout("plant-1")
     assert obtenido.plano_svg_url == "https://cdn.datamaq.com.ar/planos/pilar.svg"
     assert len(obtenido.zonas) == 1
+    assert obtenido.dispositivos[0].device_id == "dev-pilar-1"
 
 
 def test_planta_no_encontrada_error():
@@ -364,11 +365,11 @@ def api_test_client():
     app.dependency_overrides[get_usuario_actual] = lambda: {"username": "admin", "rol": "administrador"}
     app.dependency_overrides[requiere_rol_escritura] = lambda: {"username": "admin", "rol": "administrador"}
 
-    return TestClient(app), use_case
+    return TestClient(app), repo
 
 
 def test_routes_unifilar_y_layout(api_test_client):
-    client, _ = api_test_client
+    client, repo = api_test_client
 
     # 1. GET /api/v1/planta/unifilar
     res = client.get("/api/v1/planta/unifilar")
@@ -377,59 +378,49 @@ def test_routes_unifilar_y_layout(api_test_client):
     assert data["planta_id"] == "plant-test"
     assert data["nodos"] == []
 
-    # 2. PUT /api/v1/plantas/plant-test/unifilar
-    payload_unifilar = {
-        "nodos": [
-            {
-                "id": "node-1",
-                "parent_id": None,
-                "nombre": "Acometida General",
-                "tipo": "acometida",
-                "device_id": "D48C49F03564",
-                "tension_nominal_V": 380.0,
-                "capacidad_nominal_kVA": 500.0,
-                "orden": 0,
-            }
-        ]
-    }
-    res_put = client.put("/api/v1/plantas/plant-test/unifilar", json=payload_unifilar)
-    assert res_put.status_code == 200
-    assert len(res_put.json()["nodos"]) == 1
+    # 2. La estructura no se escribe por API: PUT ya no existe (405 sobre una ruta que solo tiene GET)
+    assert client.put("/api/v1/plantas/plant-test/unifilar", json={"nodos": []}).status_code == 405
+    assert client.put("/api/v1/plantas/plant-test/layout", json={"zonas": []}).status_code == 405
+    repo.guardar_nodos_unifilar(
+        "plant-test",
+        [
+            NodoUnifilar(
+                id="node-1",
+                planta_id="plant-test",
+                nombre="Acometida General",
+                tipo=TipoNodoUnifilar.ACOMETIDA,
+                tension_nominal_v=380.0,
+                device_id="D48C49F03564",
+                capacidad_nominal_kva=500.0,
+            )
+        ],
+    )
 
     # 3. GET /api/v1/plantas/plant-test/unifilar
     res_get = client.get("/api/v1/plantas/plant-test/unifilar")
     assert res_get.status_code == 200
     assert res_get.json()["nodos"][0]["nombre"] == "Acometida General"
 
-    # 4. PUT /api/v1/plantas/plant-test/layout
-    payload_layout = {
-        "plano_svg_url": "https://cdn.datamaq.com.ar/svg/layout.svg",
-        "zonas": [
-            {
-                "id": "z-1",
-                "nombre": "Sala de Compresores",
-                "coordenadas": {
-                    "x_porcentaje": 10.0,
-                    "y_porcentaje": 20.0,
-                    "ancho_porcentaje": 30.0,
-                    "alto_porcentaje": 25.0,
-                },
-            }
-        ],
-        "dispositivos": [
-            {
-                "device_id": "D48C49F03564",
-                "zona_id": "z-1",
-                "posicion": {
-                    "x_porcentaje": 15.0,
-                    "y_porcentaje": 22.0,
-                },
-            }
-        ],
-    }
-    res_put_layout = client.put("/api/v1/plantas/plant-test/layout", json=payload_layout)
-    assert res_put_layout.status_code == 200
-    assert res_put_layout.json()["plano_svg_url"] == "https://cdn.datamaq.com.ar/svg/layout.svg"
+    # 4. Layout declarado en el repo
+    repo.zonas["plant-test"] = [
+        ZonaPlanta(
+            id="z-1",
+            planta_id="plant-test",
+            nombre="Sala de Compresores",
+            coordenadas=CoordenadasZona(
+                x_porcentaje=10.0, y_porcentaje=20.0, ancho_porcentaje=30.0, alto_porcentaje=25.0
+            ),
+        )
+    ]
+    repo.dispositivos_layout["plant-test"] = [
+        DispositivoLayout(
+            id="lay-1",
+            planta_id="plant-test",
+            device_id="D48C49F03564",
+            zona_id="z-1",
+            posicion=PosicionLayout(x_porcentaje=15.0, y_porcentaje=22.0),
+        )
+    ]
 
     # 5. GET /api/v1/planta/layout
     res_get_layout = client.get("/api/v1/planta/layout")

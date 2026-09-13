@@ -15,10 +15,6 @@ class OrganizacionBaseDTO(BaseModel):
     modo_free: str = "PRIVADO_BASICO"
 
 
-class OrganizacionCreateDTO(OrganizacionBaseDTO):
-    pass
-
-
 class OrganizacionResponseDTO(OrganizacionBaseDTO):
     id: str
     creado_en: FechaHoraUTC
@@ -32,10 +28,6 @@ class PlantaBaseDTO(BaseModel):
     direccion: str | None = None
     latitud: float | None = None
     longitud: float | None = None
-
-
-class PlantaCreateDTO(PlantaBaseDTO):
-    pass
 
 
 class PlantaResponseDTO(PlantaBaseDTO):

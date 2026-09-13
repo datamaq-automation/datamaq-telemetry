@@ -3,7 +3,6 @@
 from unittest.mock import MagicMock
 
 import pytest
-from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from src.application.dtos.planta_estructura_dto import NodoUnifilarDTO
@@ -12,8 +11,6 @@ from src.domain.disponibilidad.entities import Maquina
 from src.domain.telemetria.entities import NodoUnifilar, Planta
 from src.domain.telemetria.servicios.arbol_unifilar import ArbolUnifilarService
 from src.domain.telemetria.value_objects import TipoNodoUnifilar
-from src.infrastructure.fastapi.dependencies import get_planta_estructura_use_case, get_usuario_actual
-from src.infrastructure.fastapi.server import create_app
 from src.infrastructure.yaml.repositories.organizaciones_repository import YamlOrganizacionesRepository
 
 PLANTA = Planta(id="planta-1", organizacion_id="org-1", nombre="Planta Test")
@@ -46,14 +43,6 @@ def test_dto_acepta_solo_tipos_del_vocabulario():
         assert NodoUnifilarDTO(id="n", nombre="n", tipo=tipo, tension_nominal_V=380.0).tipo == tipo
     with pytest.raises(ValidationError):
         NodoUnifilarDTO(id="n", nombre="n", tipo="alimentador", tension_nominal_V=380.0)
-
-
-def test_put_unifilar_con_tipo_desconocido_devuelve_422():
-    app = create_app()
-    app.dependency_overrides[get_planta_estructura_use_case] = lambda: MagicMock()
-    app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "u", "rol": "admin", "org": "org-1"}
-    body = {"nodos": [{"id": "n1", "nombre": "X", "tipo": "tablero", "tension_nominal_V": 380.0}]}
-    assert TestClient(app).put("/api/v1/plantas/planta-1/unifilar", json=body).status_code == 422
 
 
 # --- Nombre de máquina en el nodo medido (R-03) ---

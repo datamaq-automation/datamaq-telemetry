@@ -15,24 +15,18 @@ from src.domain.telemetria.entities import (
     AcumuladoEnergia,
     AlertaDispositivo,
     Dispositivo,
-    DispositivoLayout,
     LecturaInstantanea,
     LogEstadoDispositivo,
     MedicionFase,
-    Organizacion,
-    Planta,
     PlanTelemetria,
-    ZonaPlanta,
 )
 from src.domain.telemetria.value_objects import (
-    CoordenadasZona,
     Corriente,
     EnergiaActiva,
     EnergiaReactiva,
     EstadoDispositivo,
     FactorPotencia,
     MacAddress,
-    PosicionLayout,
     PotenciaActiva,
     PotenciaAparente,
     PotenciaReactiva,
@@ -45,6 +39,7 @@ from src.infrastructure.sqlalchemy.models import (
     DeviceAlertModel,
     DeviceModel,
     DeviceStatusLogModel,
+    FacilityModel,
     MachineAvailabilityEventModel,
     PlanModel,
     TelemetryEnergyModel,
@@ -54,7 +49,6 @@ from src.infrastructure.sqlalchemy.mysql_repositories import (
     MySQLDispositivosRepository,
     MySQLEventosDisponibilidadRepository,
     MySQLMaquinasRepository,
-    MySQLOrganizacionesRepository,
     MySQLParadasProgramadasRepository,
     MySQLPlanesRepository,
     MySQLTelemetriaRepository,
@@ -183,8 +177,8 @@ def test_dispositivo_listar_con_y_sin_filtro(db: Session) -> None:
 
 
 def test_dispositivo_contar_por_organizacion(db: Session) -> None:
-    org_repo = MySQLOrganizacionesRepository(db)
-    org_repo.guardar_planta(Planta(id="plant-1", organizacion_id="org-1", nombre="Planta 1"))
+    db.add(FacilityModel(id="plant-1", organization_id="org-1", name="Planta 1"))
+    db.commit()
 
     repo = MySQLDispositivosRepository(db)
     repo.guardar(_dispositivo(planta_id="plant-1"))
@@ -493,79 +487,6 @@ def test_purgar_sin_datos_devuelve_cero(db: Session) -> None:
     assert repo.purgar_alertas_resueltas_anteriores_a(_fecha(2, 0)) == 0
 
 
-def test_organizacion_guardar_y_obtener(db: Session) -> None:
-    repo = MySQLOrganizacionesRepository(db)
-    repo.guardar_organizacion(
-        Organizacion(id="org-1", nombre="Org Uno", cuit="30-12345678-9", email_contacto="a@b.com")
-    )
-
-    obtenida = repo.obtener_por_id("org-1")
-
-    assert obtenida is not None
-    assert obtenida.nombre == "Org Uno"
-    assert obtenida.cuit == "30-12345678-9"
-    assert repo.obtener_por_id("inexistente") is None
-
-
-def test_organizacion_guardar_actualiza(db: Session) -> None:
-    repo = MySQLOrganizacionesRepository(db)
-    repo.guardar_organizacion(Organizacion(id="org-1", nombre="Org Uno"))
-
-    repo.guardar_organizacion(Organizacion(id="org-1", nombre="Org Renombrada"))
-
-    obtenida = repo.obtener_por_id("org-1")
-    assert obtenida is not None
-    assert obtenida.nombre == "Org Renombrada"
-
-
-def test_organizacion_listar(db: Session) -> None:
-    repo = MySQLOrganizacionesRepository(db)
-    repo.guardar_organizacion(Organizacion(id="org-1", nombre="Org Uno"))
-    repo.guardar_organizacion(Organizacion(id="org-2", nombre="Org Dos"))
-
-    assert len(repo.listar_organizaciones()) == 2
-
-
-def test_planta_guardar_y_obtener(db: Session) -> None:
-    repo = MySQLOrganizacionesRepository(db)
-    repo.guardar_planta(
-        Planta(id="plant-1", organizacion_id="org-1", nombre="Planta Uno", latitud=-34.6, longitud=-58.4)
-    )
-
-    obtenida = repo.obtener_planta_por_id("plant-1")
-
-    assert obtenida is not None
-    assert obtenida.nombre == "Planta Uno"
-    assert obtenida.latitud == pytest.approx(-34.6)
-    assert obtenida.longitud == pytest.approx(-58.4)
-    assert repo.obtener_planta_por_id("inexistente") is None
-
-
-def test_planta_guardar_actualiza(db: Session) -> None:
-    repo = MySQLOrganizacionesRepository(db)
-    repo.guardar_planta(Planta(id="plant-1", organizacion_id="org-1", nombre="Planta Uno"))
-
-    repo.guardar_planta(Planta(id="plant-1", organizacion_id="org-2", nombre="Planta Renombrada"))
-
-    obtenida = repo.obtener_planta_por_id("plant-1")
-    assert obtenida is not None
-    assert obtenida.nombre == "Planta Renombrada"
-    assert obtenida.organizacion_id == "org-2"
-
-
-def test_planta_listar_con_y_sin_filtro(db: Session) -> None:
-    repo = MySQLOrganizacionesRepository(db)
-    repo.guardar_planta(Planta(id="plant-1", organizacion_id="org-1", nombre="Planta Uno"))
-    repo.guardar_planta(Planta(id="plant-2", organizacion_id="org-2", nombre="Planta Dos"))
-
-    todas = repo.listar_plantas()
-    filtradas = repo.listar_plantas(organizacion_id="org-1")
-
-    assert len(todas) == 2
-    assert len(filtradas) == 1
-    assert filtradas[0].id == "plant-1"
-
-
 def test_plan_guardar_y_obtener(db: Session) -> None:
     repo = MySQLPlanesRepository(db)
     repo.guardar_plan(
@@ -655,77 +576,6 @@ def test_plan_visibilidad_invalida_fallback(db: Session) -> None:
 
     assert obtenido is not None
     assert obtenido.visibilidad == VisibilidadPlan.PUBLICO
-
-
-def test_unifilar_nodos_no_soportado_por_backend_sql(db: Session) -> None:
-    # El diagrama unifilar vive en YamlOrganizacionesRepository (dependencies.py); el
-    # backend SQL declara explícitamente que no lo soporta en vez de persistirlo a medias.
-    org_repo = MySQLOrganizacionesRepository(db)
-    org_repo.guardar_organizacion(Organizacion(id="org-uni", nombre="Org Unifilar"))
-    org_repo.guardar_planta(Planta(id="plant-uni", organizacion_id="org-uni", nombre="Planta Unifilar"))
-
-    with pytest.raises(NotImplementedError):
-        org_repo.obtener_nodos_unifilar("plant-uni")
-
-    with pytest.raises(NotImplementedError):
-        org_repo.guardar_nodos_unifilar("plant-uni", [])
-
-
-def test_layout_planta_guardar_y_obtener(db: Session) -> None:
-    org_repo = MySQLOrganizacionesRepository(db)
-    org_repo.guardar_organizacion(Organizacion(id="org-lay", nombre="Org Layout"))
-    org_repo.guardar_planta(Planta(id="plant-lay", organizacion_id="org-lay", nombre="Planta Layout"))
-
-    zonas = [
-        ZonaPlanta(
-            id="zone-1",
-            planta_id="plant-lay",
-            nombre="Nave A",
-            coordenadas=CoordenadasZona(
-                x_porcentaje=5.0,
-                y_porcentaje=10.0,
-                ancho_porcentaje=45.0,
-                alto_porcentaje=30.0,
-            ),
-        )
-    ]
-    disp_repo = MySQLDispositivosRepository(db)
-    disp_repo.guardar(
-        Dispositivo(
-            id="dev-lay-1",
-            device_uid=MacAddress("A1B2C3D4E5F6"),
-            nombre="Medidor 1",
-            planta_id="plant-lay",
-        )
-    )
-    dispositivos = [
-        DispositivoLayout(
-            id="dl-1",
-            planta_id="plant-lay",
-            device_id="dev-lay-1",
-            zona_id="zone-1",
-            posicion=PosicionLayout(x_porcentaje=12.0, y_porcentaje=18.0),
-        )
-    ]
-
-    org_repo.guardar_layout_planta(
-        "plant-lay",
-        "https://cdn.datamaq.com.ar/plano.svg",
-        zonas,
-        dispositivos,
-    )
-
-    planta_act = org_repo.obtener_planta_por_id("plant-lay")
-    assert planta_act is not None
-    assert planta_act.layout_svg_url == "https://cdn.datamaq.com.ar/plano.svg"
-
-    zonas_rec = org_repo.obtener_zonas_planta("plant-lay")
-    assert len(zonas_rec) == 1
-    assert zonas_rec[0].nombre == "Nave A"
-
-    disp_rec = org_repo.obtener_dispositivos_layout("plant-lay")
-    assert len(disp_rec) == 1
-    assert disp_rec[0].device_id == "dev-lay-1"
 
 
 def test_maquina_guardar_y_obtener_por_id(db: Session) -> None:

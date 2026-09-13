@@ -9,10 +9,6 @@ from src.application.dtos.organizacion_dto import (
     OrganizacionResponseDTO,
     PlantaResponseDTO,
 )
-from src.domain.telemetria.exceptions import (
-    DominioTelemetriaException,
-    PlantaNoEncontradaError,
-)
 from src.infrastructure.fastapi.dependencies import (
     get_dispositivos_use_case,
     get_usuario_actual,
@@ -114,90 +110,21 @@ def test_listar_organizaciones_vacio():
     mock_use_case.listar_organizaciones.assert_called_once()
 
 
-# --- CREAR ORGANIZACION ---
+# --- ALTA POR API ELIMINADA (la estructura se declara en data/organizaciones.yml) ---
 
 
-def test_crear_organizacion_exitoso():
-    client, mock_use_case = _cliente()
-    mock_use_case.crear_organizacion.return_value = _org_dto(
-        id="org-nueva",
-        nombre="Nueva Organizacion S.A.",
-        cuit="30-98765432-1",
-    )
-
-    payload = {
-        "nombre": "Nueva Organizacion S.A.",
-        "cuit": "30-98765432-1",
-        "plan_id": "plan-basic",
-        "email_contacto": "info@nuevaorg.com",
-        "telefono_contacto": "+541122334455",
-        "modo_free": "PRIVADO_BASICO",
-    }
-    response = client.post("/api/v1/organizaciones", json=payload)
-
-    assert response.status_code == 200
-    data = response.json()
-    assert data["id"] == "org-nueva"
-    assert data["nombre"] == "Nueva Organizacion S.A."
-    assert data["cuit"] == "30-98765432-1"
-    mock_use_case.crear_organizacion.assert_called_once()
-    dto_llamado = mock_use_case.crear_organizacion.call_args[0][0]
-    assert dto_llamado.nombre == "Nueva Organizacion S.A."
-    assert dto_llamado.cuit == "30-98765432-1"
+def test_post_organizaciones_ya_no_existe():
+    client, mock_use_case = _cliente(rol="admin")
+    response = client.post("/api/v1/organizaciones", json={"nombre": "Nueva Org"})
+    assert response.status_code == 405
+    assert not hasattr(mock_use_case, "crear_organizacion") or not mock_use_case.crear_organizacion.called
 
 
-def test_crear_organizacion_rol_invitado_rechazado_403():
-    client, mock_use_case = _cliente(rol="invitado")
-
-    payload = {"nombre": "Org No Permitida"}
-    response = client.post("/api/v1/organizaciones", json=payload)
-
-    assert response.status_code == 403
-    assert response.json()["detail"] == "forbidden"
-    mock_use_case.crear_organizacion.assert_not_called()
-
-
-def test_crear_organizacion_rol_invitado_global_rechazado_403():
-    client, mock_use_case = _cliente(rol="invitado_global")
-
-    payload = {"nombre": "Org No Permitida"}
-    response = client.post("/api/v1/organizaciones", json=payload)
-
-    assert response.status_code == 403
-    assert response.json()["detail"] == "forbidden"
-    mock_use_case.crear_organizacion.assert_not_called()
-
-
-def test_crear_organizacion_error_dominio_422():
-    client, mock_use_case = _cliente()
-    mock_use_case.crear_organizacion.side_effect = DominioTelemetriaException("Organizacion duplicada")
-
-    payload = {"nombre": "Org Duplicada"}
-    response = client.post("/api/v1/organizaciones", json=payload)
-
-    assert response.status_code == 422
-    assert response.json()["detail"] == "Organizacion duplicada"
-
-
-def test_crear_organizacion_error_inesperado_500():
-    client, mock_use_case = _cliente()
-    mock_use_case.crear_organizacion.side_effect = RuntimeError("Fallo de conexion a base de datos")
-
-    payload = {"nombre": "Org Inesperada"}
-    response = client.post("/api/v1/organizaciones", json=payload)
-
-    assert response.status_code == 500
-    assert response.json()["detail"] == "Ocurrió un error interno en el servidor"
-
-
-def test_crear_organizacion_payload_invalido_422():
-    client, mock_use_case = _cliente()
-
-    # 'nombre' es campo requerido
-    response = client.post("/api/v1/organizaciones", json={})
-
-    assert response.status_code == 422
-    mock_use_case.crear_organizacion.assert_not_called()
+def test_post_plantas_ya_no_existe():
+    client, mock_use_case = _cliente(rol="admin")
+    response = client.post("/api/v1/plantas", json={"organizacion_id": "org-1", "nombre": "Planta"})
+    assert response.status_code == 405
+    assert not mock_use_case.crear_planta.called
 
 
 # --- LISTAR PLANTAS ---
@@ -268,120 +195,3 @@ def test_listar_plantas_vacio():
     assert response.status_code == 200
     assert response.json() == []
     mock_use_case.listar_plantas.assert_called_once_with(None)
-
-
-# --- CREAR PLANTA ---
-
-
-def test_crear_planta_exitoso():
-    client, mock_use_case = _cliente()
-    mock_use_case.crear_planta.return_value = _planta_dto(
-        id="planta-nueva",
-        organizacion_id="org-1",
-        nombre="Planta Centro",
-        direccion="Ruta 9 Km 200",
-        latitud=-32.5,
-        longitud=-60.5,
-    )
-
-    payload = {
-        "organizacion_id": "org-1",
-        "nombre": "Planta Centro",
-        "direccion": "Ruta 9 Km 200",
-        "latitud": -32.5,
-        "longitud": -60.5,
-    }
-    response = client.post("/api/v1/plantas", json=payload)
-
-    assert response.status_code == 200
-    data = response.json()
-    assert data["id"] == "planta-nueva"
-    assert data["organizacion_id"] == "org-1"
-    assert data["nombre"] == "Planta Centro"
-    assert data["direccion"] == "Ruta 9 Km 200"
-    assert data["latitud"] == -32.5
-    assert data["longitud"] == -60.5
-    mock_use_case.crear_planta.assert_called_once()
-    dto_llamado = mock_use_case.crear_planta.call_args[0][0]
-    assert dto_llamado.nombre == "Planta Centro"
-    assert dto_llamado.organizacion_id == "org-1"
-
-
-def test_crear_planta_rol_invitado_rechazado_403():
-    client, mock_use_case = _cliente(rol="invitado")
-
-    payload = {
-        "organizacion_id": "org-1",
-        "nombre": "Planta No Permitida",
-    }
-    response = client.post("/api/v1/plantas", json=payload)
-
-    assert response.status_code == 403
-    assert response.json()["detail"] == "forbidden"
-    mock_use_case.crear_planta.assert_not_called()
-
-
-def test_crear_planta_rol_invitado_global_rechazado_403():
-    client, mock_use_case = _cliente(rol="invitado_global")
-
-    payload = {
-        "organizacion_id": "org-1",
-        "nombre": "Planta No Permitida",
-    }
-    response = client.post("/api/v1/plantas", json=payload)
-
-    assert response.status_code == 403
-    assert response.json()["detail"] == "forbidden"
-    mock_use_case.crear_planta.assert_not_called()
-
-
-def test_crear_planta_error_dominio_422():
-    client, mock_use_case = _cliente()
-    mock_use_case.crear_planta.side_effect = DominioTelemetriaException("Planta duplicada")
-
-    payload = {
-        "organizacion_id": "org-1",
-        "nombre": "Planta Duplicada",
-    }
-    response = client.post("/api/v1/plantas", json=payload)
-
-    assert response.status_code == 422
-    assert response.json()["detail"] == "Planta duplicada"
-
-
-def test_crear_planta_no_encontrada_404():
-    client, mock_use_case = _cliente()
-    mock_use_case.crear_planta.side_effect = PlantaNoEncontradaError("Planta padre no encontrada")
-
-    payload = {
-        "organizacion_id": "org-1",
-        "nombre": "Planta Inexistente",
-    }
-    response = client.post("/api/v1/plantas", json=payload)
-
-    assert response.status_code == 404
-    assert response.json()["detail"] == "Planta padre no encontrada"
-
-
-def test_crear_planta_error_inesperado_500():
-    client, mock_use_case = _cliente()
-    mock_use_case.crear_planta.side_effect = RuntimeError("Error imprevisto")
-
-    payload = {
-        "organizacion_id": "org-1",
-        "nombre": "Planta Inesperada",
-    }
-    response = client.post("/api/v1/plantas", json=payload)
-
-    assert response.status_code == 500
-    assert response.json()["detail"] == "Ocurrió un error interno en el servidor"
-
-
-def test_crear_planta_payload_invalido_422():
-    client, mock_use_case = _cliente()
-
-    # Faltan campos requeridos ('organizacion_id', 'nombre')
-    response = client.post("/api/v1/plantas", json={})
-
-    assert response.status_code == 422
-    mock_use_case.crear_planta.assert_not_called()

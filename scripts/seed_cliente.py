@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """Script idempotente de alta de cliente en Datamaq Telemetry.
 
-Crea (o verifica que existan) los siguientes recursos en orden:
-  1. Organización
-  2. Planta
-  3. Usuario operador
-  4. N x Dispositivos (por MAC address)
+La organización y la planta se declaran ANTES en `data/organizaciones.yml` (modelo
+declarativo ISA-95, fuente de verdad). Este script no las crea: las busca por nombre
+en el YAML y crea lo que sí es transaccional:
+
+  1. Fila espejo en MySQL (`organizations`, `facilities`) — solo el id, como ancla de
+     las FKs de `users` y `devices`.
+  2. Usuario operador.
+  3. N x Dispositivos (por MAC address).
 
 Uso:
   venv/bin/python scripts/seed_cliente.py \\
@@ -16,7 +19,7 @@ Uso:
     --dispositivo "AA:BB:CC:DD:EE:01" "SmartPlus Trifásico #1" \\
     --dispositivo "AA:BB:CC:DD:EE:02" "SmartPlus Trifásico #2"
 
-Para el medidor domiciliario existente sin planta asignada:
+Para un medidor ya registrado sin planta asignada:
   venv/bin/python scripts/seed_cliente.py \\
     --org-nombre "Datamaq Uso Interno" \\
     --planta-nombre "Domicilio Agustín" \\
@@ -36,21 +39,19 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from src.application.dtos.dispositivo_dto import DispositivoCreateDTO  # noqa: E402
-from src.application.dtos.organizacion_dto import (  # noqa: E402
-    OrganizacionCreateDTO,
-    PlantaCreateDTO,
-)
 from src.application.use_cases.gestionar_dispositivos import (  # noqa: E402
     GestionarDispositivosUseCase,
 )
 from src.application.use_cases.gestionar_usuarios import GestionarUsuariosUseCase  # noqa: E402
 from src.domain.auth.services import HashContrasenaService  # noqa: E402
 from src.infrastructure.sqlalchemy.database import get_session_factory  # noqa: E402
-from src.infrastructure.sqlalchemy.models import DeviceModel  # noqa: E402
+from src.infrastructure.sqlalchemy.models import DeviceModel, FacilityModel, OrganizationModel  # noqa: E402
 from src.infrastructure.sqlalchemy.mysql_repositories import (  # noqa: E402
     MySQLDispositivosRepository,
-    MySQLOrganizacionesRepository,
     MySQLUsuariosRepository,
+)
+from src.infrastructure.yaml.repositories.organizaciones_repository import (  # noqa: E402
+    YamlOrganizacionesRepository,
 )
 
 
@@ -100,7 +101,7 @@ def alta_cliente(
     session_factory = get_session_factory()
     db = session_factory()
     try:
-        repo_orgs = MySQLOrganizacionesRepository(db)
+        repo_orgs = YamlOrganizacionesRepository()
         repo_devs = MySQLDispositivosRepository(db)
         repo_users = MySQLUsuariosRepository(db)
 
@@ -110,47 +111,45 @@ def alta_cliente(
         )
         use_case_users = GestionarUsuariosUseCase(repo_users, HashContrasenaService())
 
-        # ── 1. Organización ────────────────────────────────────────────────
-        orgs_existentes = repo_orgs.listar_organizaciones()
-        org_existente = next((o for o in orgs_existentes if o.nombre == org_nombre), None)
+        # ── 1. Organización y planta: deben estar declaradas en el YAML ────
+        org = next((o for o in repo_orgs.listar_organizaciones() if o.nombre == org_nombre), None)
+        if org is None:
+            print(
+                f"[!] La organización '{org_nombre}' no está en data/organizaciones.yml. "
+                "Declarala ahí (con su planta) y volvé a correr el script.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        org_id = org.id
+        planta = next((p for p in repo_orgs.listar_plantas(org_id) if p.nombre == planta_nombre), None)
+        if planta is None:
+            print(
+                f"[!] La planta '{planta_nombre}' no está declarada bajo '{org_nombre}' en data/organizaciones.yml.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        planta_id = planta.id
+        print(
+            f"[=] Organización '{org_nombre}' (id={org_id[:8]}...) y planta '{planta_nombre}' (id={planta_id[:8]}...) en YAML"
+        )
+        if org_cuit or org_email_contacto or planta_direccion:
+            print("[i] --org-cuit/--org-email/--planta-direccion se ignoran: esos datos viven en el YAML.")
 
-        if org_existente:
-            print(f"[=] Organización ya existe: '{org_nombre}' (id={org_existente.id[:8]}...)")
-            org_id = org_existente.id
-        else:
+        # ── 2. Filas espejo en MySQL (anclas de FK de users y devices) ─────
+        if db.query(OrganizationModel).filter(OrganizationModel.id == org_id).first() is None:
             if dry_run:
-                print(f"[DRY] Crearía organización: '{org_nombre}'")
-                org_id = "DRY-ORG-ID"
+                print(f"[DRY] Crearía fila espejo en organizations para {org_id[:8]}...")
             else:
-                org_dto = OrganizacionCreateDTO(
-                    nombre=org_nombre,
-                    cuit=org_cuit,
-                    email_contacto=org_email_contacto,
-                )
-                org_creada = use_case_devs.crear_organizacion(org_dto)
-                org_id = org_creada.id
-                print(f"[+] Organización creada: '{org_nombre}' (id={org_id[:8]}...)")
-
-        # ── 2. Planta ──────────────────────────────────────────────────────
-        plantas_existentes = repo_orgs.listar_plantas(organizacion_id=org_id)
-        planta_existente = next((p for p in plantas_existentes if p.nombre == planta_nombre), None)
-
-        if planta_existente:
-            print(f"[=] Planta ya existe: '{planta_nombre}' (id={planta_existente.id[:8]}...)")
-            planta_id = planta_existente.id
-        else:
+                db.add(OrganizationModel(id=org_id, name=org.nombre))
+                db.commit()
+                print(f"[+] Fila espejo creada en organizations ({org_id[:8]}...)")
+        if db.query(FacilityModel).filter(FacilityModel.id == planta_id).first() is None:
             if dry_run:
-                print(f"[DRY] Crearía planta: '{planta_nombre}' en org '{org_nombre}'")
-                planta_id = "DRY-PLANTA-ID"
+                print(f"[DRY] Crearía fila espejo en facilities para {planta_id[:8]}...")
             else:
-                planta_dto = PlantaCreateDTO(
-                    organizacion_id=org_id,
-                    nombre=planta_nombre,
-                    direccion=planta_direccion,
-                )
-                planta_creada = use_case_devs.crear_planta(planta_dto)
-                planta_id = planta_creada.id
-                print(f"[+] Planta creada: '{planta_nombre}' (id={planta_id[:8]}...)")
+                db.add(FacilityModel(id=planta_id, organization_id=org_id, name=planta.nombre))
+                db.commit()
+                print(f"[+] Fila espejo creada en facilities ({planta_id[:8]}...)")
 
         # ── 3. Usuario operador ────────────────────────────────────────────
         if usuario_email and password:

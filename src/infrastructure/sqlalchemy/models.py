@@ -69,10 +69,6 @@ class FacilityModel(Base):
 
     organization: Mapped["OrganizationModel"] = relationship(back_populates="facilities")
     devices: Mapped[list["DeviceModel"]] = relationship(back_populates="facility")
-    zones: Mapped[list["FacilityZoneModel"]] = relationship(back_populates="facility", cascade="all, delete-orphan")
-    device_layouts: Mapped[list["FacilityDeviceLayoutModel"]] = relationship(
-        back_populates="facility", cascade="all, delete-orphan"
-    )
     device_groups: Mapped[list["DeviceGroupModel"]] = relationship(
         back_populates="facility", cascade="all, delete-orphan"
     )
@@ -104,50 +100,6 @@ class DeviceGroupMemberModel(Base):
 
     group: Mapped["DeviceGroupModel"] = relationship(back_populates="members")
     device: Mapped["DeviceModel"] = relationship()
-
-
-class FacilityZoneModel(Base):
-    __tablename__ = "facility_zones"
-    __table_args__ = (Index("idx_zone_facility", "facility_id"),)
-
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
-    facility_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("facilities.id", ondelete="CASCADE"), nullable=False
-    )
-    name: Mapped[str] = mapped_column(String(150), nullable=False)
-    x_pct: Mapped[Decimal] = mapped_column(Numeric(6, 2), nullable=False)
-    y_pct: Mapped[Decimal] = mapped_column(Numeric(6, 2), nullable=False)
-    width_pct: Mapped[Decimal] = mapped_column(Numeric(6, 2), nullable=False)
-    height_pct: Mapped[Decimal] = mapped_column(Numeric(6, 2), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, onupdate=ahora_utc, nullable=False)
-
-    facility: Mapped["FacilityModel"] = relationship(back_populates="zones")
-
-
-class FacilityDeviceLayoutModel(Base):
-    __tablename__ = "facility_device_layouts"
-    __table_args__ = (
-        Index("idx_layout_facility", "facility_id"),
-        Index("idx_layout_device", "device_id"),
-    )
-
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
-    facility_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("facilities.id", ondelete="CASCADE"), nullable=False
-    )
-    device_id: Mapped[str] = mapped_column(String(36), ForeignKey("devices.id", ondelete="CASCADE"), nullable=False)
-    zone_id: Mapped[str | None] = mapped_column(
-        String(36), ForeignKey("facility_zones.id", ondelete="SET NULL"), nullable=True
-    )
-    pos_x_pct: Mapped[Decimal] = mapped_column(Numeric(6, 2), nullable=False)
-    pos_y_pct: Mapped[Decimal] = mapped_column(Numeric(6, 2), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, onupdate=ahora_utc, nullable=False)
-
-    facility: Mapped["FacilityModel"] = relationship(back_populates="device_layouts")
-    device: Mapped["DeviceModel"] = relationship()
-    zone: Mapped[Optional["FacilityZoneModel"]] = relationship()
 
 
 class DeviceModel(Base):

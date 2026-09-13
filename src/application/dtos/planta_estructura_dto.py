@@ -36,10 +36,6 @@ class UnifilarPlantaDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class GuardarUnifilarRequestDTO(BaseModel):
-    nodos: list[NodoUnifilarDTO]
-
-
 class CoordenadasZonaDTO(BaseModel):
     x_porcentaje: float = Field(ge=0.0, le=100.0)
     y_porcentaje: float = Field(ge=0.0, le=100.0)
@@ -73,12 +69,6 @@ class LayoutPlantaDTO(BaseModel):
     zonas: list[ZonaPlantaDTO] = Field(default_factory=list)
     dispositivos: list[DispositivoLayoutDTO] = Field(default_factory=list)
     model_config = ConfigDict(from_attributes=True)
-
-
-class GuardarLayoutRequestDTO(BaseModel):
-    plano_svg_url: str | None = None
-    zonas: list[ZonaPlantaDTO] = Field(default_factory=list)
-    dispositivos: list[DispositivoLayoutDTO] = Field(default_factory=list)
 
 
 class AreaEstadisticasDTO(BaseModel):

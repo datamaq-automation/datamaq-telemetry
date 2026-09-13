@@ -15,29 +15,22 @@ from src.infrastructure.sqlalchemy.mysql_repositories import (
     MySQLEventosDisponibilidadRepository,
     MySQLGruposDispositivosRepository,
     MySQLMaquinasRepository,
-    MySQLOrganizacionesRepository,
 )
 from src.infrastructure.yaml.repositories.organizaciones_repository import (
     YamlOrganizacionesRepository,
 )
 
 
-def _resolver_organizacion_planta(planta_id: str | None, db: Session) -> str | None:
-    """Resuelve el ID de organización asociado a una planta.
+def _resolver_organizacion_planta(planta_id: str | None) -> str | None:
+    """Resuelve el ID de organización de una planta contra el YAML, única fuente de estructura.
 
-    Prioriza el modelo declarativo YAML (fuente de verdad ISA-95/GitOps) y realiza
-    fallback a la base de datos relacional MySQL para entornos de prueba, seeds o
-    dispositivos provisionados dinámicamente.
+    Una planta que no está declarada en `data/organizaciones.yml` no existe: el
+    dispositivo queda sin organización y la verificación de propiedad lo rechaza.
     """
     if not planta_id:
         return None
-    repo_yaml = YamlOrganizacionesRepository()
-    planta = repo_yaml.obtener_planta_por_id(planta_id)
-    if planta:
-        return planta.organizacion_id
-    repo_sql = MySQLOrganizacionesRepository(db)
-    planta_sql = repo_sql.obtener_planta_por_id(planta_id)
-    return planta_sql.organizacion_id if planta_sql else None
+    planta = YamlOrganizacionesRepository().obtener_planta_por_id(planta_id)
+    return planta.organizacion_id if planta else None
 
 
 def _organizacion_de_dispositivo(db: Session, dispositivo_id: str | None) -> str | None:
@@ -48,7 +41,7 @@ def _organizacion_de_dispositivo(db: Session, dispositivo_id: str | None) -> str
     dispositivo = repo_dispositivos.obtener_por_id(dispositivo_id)
     if dispositivo is None or not dispositivo.planta_id:
         return None
-    return _resolver_organizacion_planta(dispositivo.planta_id, db)
+    return _resolver_organizacion_planta(dispositivo.planta_id)
 
 
 def verificar_propiedad_dispositivo(
@@ -80,7 +73,7 @@ def verificar_propiedad_dispositivo(
     if dispositivo is None:
         raise HTTPException(status_code=404, detail="dispositivo_no_encontrado")
 
-    organizacion_dispositivo = _resolver_organizacion_planta(dispositivo.planta_id, db)
+    organizacion_dispositivo = _resolver_organizacion_planta(dispositivo.planta_id)
 
     if not debe_recibir_evento(False, claims.get("org"), organizacion_dispositivo):
         raise HTTPException(status_code=404, detail="dispositivo_no_encontrado")
@@ -106,7 +99,7 @@ def verificar_propiedad_grupo_dispositivos(
     if grupo is None:
         raise HTTPException(status_code=404, detail="grupo_no_encontrado")
 
-    organizacion_grupo = _resolver_organizacion_planta(grupo.planta_id, db)
+    organizacion_grupo = _resolver_organizacion_planta(grupo.planta_id)
 
     if not debe_recibir_evento(False, claims.get("org"), organizacion_grupo):
         raise HTTPException(status_code=404, detail="grupo_no_encontrado")

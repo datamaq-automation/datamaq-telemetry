@@ -13,7 +13,6 @@ erDiagram
     DEVICES ||--o{ DEVICE_ALERTS : "FK_device_id"
     DEVICES ||--o{ DEVICE_GROUP_MEMBERS : "FK_device_id"
     DEVICES ||--o{ DEVICE_STATUS_LOGS : "FK_device_id"
-    DEVICES ||--o{ FACILITY_DEVICE_LAYOUTS : "FK_device_id"
     DEVICES ||--o{ LOADS : "FK_device_id"
     DEVICES ||--o{ LOAD_ACTIVITY_INTERVALS : "FK_device_id"
     DEVICES ||--o{ MACHINES : "FK_device_id"
@@ -22,9 +21,6 @@ erDiagram
     DEVICE_GROUPS ||--o{ DEVICE_GROUP_MEMBERS : "FK_group_id"
     FACILITIES ||--o{ DEVICES : "FK_facility_id"
     FACILITIES ||--o{ DEVICE_GROUPS : "FK_facility_id"
-    FACILITIES ||--o{ FACILITY_DEVICE_LAYOUTS : "FK_facility_id"
-    FACILITIES ||--o{ FACILITY_ZONES : "FK_facility_id"
-    FACILITY_ZONES ||--o{ FACILITY_DEVICE_LAYOUTS : "FK_zone_id"
     LOADS ||--o{ CHARACTERIZATION_CAMPAIGNS : "FK_load_id"
     LOADS ||--o{ LOAD_ACTIVITY_INTERVALS : "FK_load_id"
     MACHINES ||--o{ MACHINE_AVAILABILITY_EVENTS : "FK_machine_id"
@@ -149,29 +145,6 @@ erDiagram
         decimal latitude
         decimal longitude
         string layout_svg_url
-        datetime created_at
-        datetime updated_at
-    }
-
-    FACILITY_DEVICE_LAYOUTS {
-        string id PK
-        string facility_id FK
-        string device_id FK
-        string zone_id FK
-        decimal pos_x_pct
-        decimal pos_y_pct
-        datetime created_at
-        datetime updated_at
-    }
-
-    FACILITY_ZONES {
-        string id PK
-        string facility_id FK
-        string name
-        decimal x_pct
-        decimal y_pct
-        decimal width_pct
-        decimal height_pct
         datetime created_at
         datetime updated_at
     }
@@ -517,40 +490,6 @@ erDiagram
 | `layout_svg_url` | `VARCHAR(500)` | - | Sí |
 | `created_at` | `DATETIME` | - | No |
 | `updated_at` | `DATETIME` | - | No |
-
-### Tabla `facility_device_layouts`
-
-| Columna | Tipo SQL | Clave / Restricción | Nullable |
-| :--- | :--- | :--- | :--- |
-| `id` | `VARCHAR(36)` | **PRIMARY KEY** | No |
-| `facility_id` | `VARCHAR(36)` | FK -> `facilities.id` | No |
-| `device_id` | `VARCHAR(36)` | FK -> `devices.id` | No |
-| `zone_id` | `VARCHAR(36)` | FK -> `facility_zones.id` | Sí |
-| `pos_x_pct` | `NUMERIC(6, 2)` | - | No |
-| `pos_y_pct` | `NUMERIC(6, 2)` | - | No |
-| `created_at` | `DATETIME` | - | No |
-| `updated_at` | `DATETIME` | - | No |
-
-**Índices:**
-- `idx_layout_device`: (`device_id`)
-- `idx_layout_facility`: (`facility_id`)
-
-### Tabla `facility_zones`
-
-| Columna | Tipo SQL | Clave / Restricción | Nullable |
-| :--- | :--- | :--- | :--- |
-| `id` | `VARCHAR(36)` | **PRIMARY KEY** | No |
-| `facility_id` | `VARCHAR(36)` | FK -> `facilities.id` | No |
-| `name` | `VARCHAR(150)` | - | No |
-| `x_pct` | `NUMERIC(6, 2)` | - | No |
-| `y_pct` | `NUMERIC(6, 2)` | - | No |
-| `width_pct` | `NUMERIC(6, 2)` | - | No |
-| `height_pct` | `NUMERIC(6, 2)` | - | No |
-| `created_at` | `DATETIME` | - | No |
-| `updated_at` | `DATETIME` | - | No |
-
-**Índices:**
-- `idx_zone_facility`: (`facility_id`)
 
 ### Tabla `load_activity_intervals`
 

@@ -8,16 +8,14 @@ from src.application.dtos.dispositivo_dto import (
     DispositivoUpdateDTO,
 )
 from src.application.dtos.organizacion_dto import (
-    OrganizacionCreateDTO,
     OrganizacionResponseDTO,
-    PlantaCreateDTO,
     PlantaResponseDTO,
 )
 from src.application.mappers.dispositivo_mapper import (
     DispositivoMapper,
     OrganizacionMapper,
 )
-from src.domain.telemetria.entities import Dispositivo, Organizacion, Planta
+from src.domain.telemetria.entities import Dispositivo
 from src.domain.telemetria.exceptions import (
     DispositivoNoEncontradoError,
     LimiteDispositivosExcedidoError,
@@ -27,7 +25,7 @@ from src.domain.telemetria.ports import (
     RepositorioOrganizacionesPort,
     RepositorioPlanesPort,
 )
-from src.domain.telemetria.value_objects import MacAddress, ModoFreeTier
+from src.domain.telemetria.value_objects import MacAddress
 
 
 class GestionarDispositivosUseCase:
@@ -149,37 +147,6 @@ class GestionarDispositivosUseCase:
         orgs = self.repo_organizaciones.listar_organizaciones()
         return [OrganizacionMapper.org_to_dto(o) for o in orgs]
 
-    def crear_organizacion(self, dto: OrganizacionCreateDTO) -> OrganizacionResponseDTO:
-        modo_free_vo = (
-            ModoFreeTier(dto.modo_free)
-            if dto.modo_free in [m.value for m in ModoFreeTier]
-            else ModoFreeTier.PRIVADO_BASICO
-        )
-        entity = Organizacion(
-            id=str(uuid.uuid4()),
-            nombre=dto.nombre,
-            plan_id=dto.plan_id,
-            cuit=dto.cuit,
-            email_contacto=dto.email_contacto,
-            telefono_contacto=dto.telefono_contacto,
-            pro_vence_en=dto.pro_vence_en,
-            modo_free=modo_free_vo,
-        )
-        saved = self.repo_organizaciones.guardar_organizacion(entity)
-        return OrganizacionMapper.org_to_dto(saved)
-
     def listar_plantas(self, organizacion_id: str | None = None) -> list[PlantaResponseDTO]:
         plantas = self.repo_organizaciones.listar_plantas(organizacion_id)
         return [OrganizacionMapper.planta_to_dto(p) for p in plantas]
-
-    def crear_planta(self, dto: PlantaCreateDTO) -> PlantaResponseDTO:
-        entity = Planta(
-            id=str(uuid.uuid4()),
-            organizacion_id=dto.organizacion_id,
-            nombre=dto.nombre,
-            direccion=dto.direccion,
-            latitud=dto.latitud,
-            longitud=dto.longitud,
-        )
-        saved = self.repo_organizaciones.guardar_planta(entity)
-        return OrganizacionMapper.planta_to_dto(saved)

@@ -6,7 +6,6 @@ from decimal import Decimal
 import pytest
 
 from src.application.dtos.dispositivo_dto import DispositivoCreateDTO
-from src.application.dtos.organizacion_dto import OrganizacionCreateDTO, PlantaCreateDTO
 from src.application.dtos.purga_dto import PurgaRequestDTO
 from src.application.use_cases.consultar_telemetria import ConsultarTelemetriaUseCase
 from src.application.use_cases.gestionar_dispositivos import GestionarDispositivosUseCase
@@ -381,9 +380,11 @@ def test_validacion_cupo_max_dispositivos():
 
     use_case = GestionarDispositivosUseCase(repo_disp, repo_org, repo_planes)
 
-    # Crear organización con Plan 1 (max 1 dispositivo)
-    org_dto = use_case.crear_organizacion(OrganizacionCreateDTO(nombre="Empresa Test", plan_id="plan-1"))
-    planta_dto = use_case.crear_planta(PlantaCreateDTO(organizacion_id=org_dto.id, nombre="Planta Central"))
+    # Organización con Plan 1 (max 1 dispositivo), declarada en el repo (no hay alta por API)
+    repo_org.guardar_organizacion(Organizacion(id="org-test", nombre="Empresa Test", plan_id="plan-1"))
+    planta_dto = repo_org.guardar_planta(
+        Planta(id="planta-central", organizacion_id="org-test", nombre="Planta Central")
+    )
 
     # 1. Registrar primer dispositivo (debe tener éxito)
     dev1 = use_case.registrar_dispositivo(

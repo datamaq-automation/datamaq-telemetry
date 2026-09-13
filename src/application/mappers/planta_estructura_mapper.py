@@ -1,7 +1,5 @@
 """src/application/mappers/planta_estructura_mapper.py."""
 
-import uuid
-
 from src.application.dtos.planta_estructura_dto import (
     CoordenadasZonaDTO,
     DispositivoLayoutDTO,
@@ -19,8 +17,6 @@ from src.domain.telemetria.entities import (
     ZonaPlanta,
 )
 from src.domain.telemetria.value_objects import (
-    CoordenadasZona,
-    PosicionLayout,
     TipoNodoUnifilar,
 )
 
@@ -46,24 +42,6 @@ class PlantaEstructuraMapper:
         )
 
     @staticmethod
-    def dto_to_nodo(dto: NodoUnifilarDTO, planta_id: str) -> NodoUnifilar:
-        return NodoUnifilar(
-            id=dto.id or str(uuid.uuid4()),
-            planta_id=planta_id,
-            parent_id=dto.parent_id,
-            nombre=dto.nombre,
-            tipo=TipoNodoUnifilar(dto.tipo),
-            device_id=dto.device_id,
-            tension_nominal_v=dto.tension_nominal_V,
-            capacidad_nominal_kva=dto.capacidad_nominal_kVA,
-            potencia_nominal_kw=dto.potencia_nominal_kw,
-            uso_significativo=dto.uso_significativo,
-            categoria_uso=dto.categoria_uso,
-            variable_relevante=dto.variable_relevante,
-            orden=dto.orden,
-        )
-
-    @staticmethod
     def zona_to_dto(entity: ZonaPlanta) -> ZonaPlantaDTO:
         return ZonaPlantaDTO(
             id=entity.id,
@@ -77,20 +55,6 @@ class PlantaEstructuraMapper:
         )
 
     @staticmethod
-    def dto_to_zona(dto: ZonaPlantaDTO, planta_id: str) -> ZonaPlanta:
-        return ZonaPlanta(
-            id=dto.id or str(uuid.uuid4()),
-            planta_id=planta_id,
-            nombre=dto.nombre,
-            coordenadas=CoordenadasZona(
-                x_porcentaje=dto.coordenadas.x_porcentaje,
-                y_porcentaje=dto.coordenadas.y_porcentaje,
-                ancho_porcentaje=dto.coordenadas.ancho_porcentaje,
-                alto_porcentaje=dto.coordenadas.alto_porcentaje,
-            ),
-        )
-
-    @staticmethod
     def disp_layout_to_dto(entity: DispositivoLayout) -> DispositivoLayoutDTO:
         return DispositivoLayoutDTO(
             device_id=entity.device_id,
@@ -98,19 +62,6 @@ class PlantaEstructuraMapper:
             posicion=PosicionLayoutDTO(
                 x_porcentaje=entity.posicion.x_porcentaje,
                 y_porcentaje=entity.posicion.y_porcentaje,
-            ),
-        )
-
-    @staticmethod
-    def dto_to_disp_layout(dto: DispositivoLayoutDTO, planta_id: str) -> DispositivoLayout:
-        return DispositivoLayout(
-            id=str(uuid.uuid4()),
-            planta_id=planta_id,
-            device_id=dto.device_id,
-            zona_id=dto.zona_id,
-            posicion=PosicionLayout(
-                x_porcentaje=dto.posicion.x_porcentaje,
-                y_porcentaje=dto.posicion.y_porcentaje,
             ),
         )
 

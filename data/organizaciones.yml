@@ -59,6 +59,7 @@ organizaciones:
             nombre: "Acometida MT"
             tipo: "acometida"
             tension_nominal_v: 13200.0  # fuente: confirmado por el usuario, 2026-09-12
+          # Esta planta es "Cristal Avellaneda" (confirmado por el usuario, 2026-09-13).
           # TOPOLOGÍA DE MEDICIÓN (fuente: usuario, 2026-09-13). Cada Powermeter NO mide
           # un trafo: sus TI están sobre un circuito sumador de intensidades preexistente
           # (el del regulador del banco de capacitores), que suma los secundarios de DOS

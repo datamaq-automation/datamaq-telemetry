@@ -45,8 +45,6 @@ def test_endpoints_escritura_exigen_rol_escritura():
         (dispositivos_router.router, "POST", "/api/v1/dispositivos"),
         (dispositivos_router.router, "PUT", "/api/v1/dispositivos/{device_id}"),
         (dispositivos_router.router, "PATCH", "/api/v1/dispositivos/{device_id}"),
-        (organizaciones_router.router, "POST", "/api/v1/organizaciones"),
-        (organizaciones_router.router, "POST", "/api/v1/plantas"),
         (planes_router.router, "POST", "/api/v1/planes"),
         (alertas_router.router, "POST", "/api/v1/alertas/{alerta_id}/resolver"),
         (disponibilidad_router.router, "POST", "/api/v1/disponibilidad/maquinas"),

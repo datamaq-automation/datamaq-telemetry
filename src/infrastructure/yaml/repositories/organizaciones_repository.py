@@ -65,9 +65,6 @@ class YamlOrganizacionesRepository(RepositorioOrganizacionesPort):
                 orgs.append(self._dict_to_organizacion(raw))
         return orgs
 
-    def guardar_organizacion(self, org: Organizacion) -> Organizacion:
-        return org
-
     def obtener_planta_por_id(self, planta_id: str) -> Planta | None:
         for raw in self._cargar_organizaciones_raw():
             plantas = raw.get("plantas", [])
@@ -104,9 +101,6 @@ class YamlOrganizacionesRepository(RepositorioOrganizacionesPort):
                 )
         return plantas
 
-    def guardar_planta(self, planta: Planta) -> Planta:
-        return planta
-
     def obtener_nodos_unifilar(self, planta_id: str) -> list[NodoUnifilar]:
         for raw in self._cargar_organizaciones_raw():
             for p in raw.get("plantas", []):
@@ -142,9 +136,6 @@ class YamlOrganizacionesRepository(RepositorioOrganizacionesPort):
 
                     return nodos
         return []
-
-    def guardar_nodos_unifilar(self, planta_id: str, nodos: list[NodoUnifilar]) -> list[NodoUnifilar]:
-        return nodos
 
     def obtener_zonas_planta(self, planta_id: str) -> list[ZonaPlanta]:
         for raw in self._cargar_organizaciones_raw():
@@ -192,12 +183,3 @@ class YamlOrganizacionesRepository(RepositorioOrganizacionesPort):
                         )
                     return disps
         return []
-
-    def guardar_layout_planta(
-        self,
-        planta_id: str,
-        plano_svg_url: str | None,
-        zonas: list[ZonaPlanta],
-        dispositivos: list[DispositivoLayout],
-    ) -> None:
-        pass

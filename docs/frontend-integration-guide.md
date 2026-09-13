@@ -62,10 +62,11 @@ Por directiva de arquitectura del ecosistema DataMaq:
 | Consultas de Telemetría (`/api/v1/telemetria/*`, `/ws/live`) | ✅ Lectura | ✅ Lectura | ✅ Lectura |
 | Consulta de Dispositivos, Plantas, Organizaciones y Planes (`GET`) | ✅ Lectura | ✅ Lectura | ✅ Lectura |
 | Alta y Edición de Dispositivos y Metrología (`POST`, `PUT`, `PATCH`) | ❌ 403 Forbidden | ✅ Escritura | ✅ Escritura |
-| Gestión de Plantas, Organizaciones y Planes (`POST`) | ❌ 403 Forbidden | ✅ Escritura | ✅ Escritura |
+| Gestión de Planes (`POST /api/v1/planes`) | ❌ 403 Forbidden | ✅ Escritura | ✅ Escritura |
+| Alta de Plantas y Organizaciones | — | — | **No existe por API**: se declaran en `data/organizaciones.yml` (commit al backend). |
 | Consulta de Alertas (`GET /api/v1/alertas`) | ✅ Lectura | ✅ Lectura | ✅ Lectura |
 | Resolución de Alertas (`PATCH /api/v1/alertas/{id}/resolver`) | ❌ 403 Forbidden | ✅ Escritura | ✅ Escritura |
-| Modificación de Diagrama Unifilar y Layout (`PUT /api/v1/plantas/*`) | ❌ 403 Forbidden | ✅ Escritura | ✅ Escritura |
+| Modificación de Diagrama Unifilar y Layout | — | — | **No existe por API** (los `PUT` respondían 200 sin persistir; eliminados el 2026-09-13). Responden `405`. |
 | Purga de Telemetría (`POST /api/v1/system/purge`) | ❌ 403 Forbidden | ❌ 403 Forbidden | ✅ Admin |
 
 ---
@@ -301,9 +302,8 @@ Endpoints para persistencia y renderizado dinámico de la infraestructura de pla
   * Jerarquía real de las plantas industriales (declarada en `data/organizaciones.yml`): `acometida` MT (virtual, 13,2 kV) → `transformador` (virtual) → `tgbt` (**Tablero General de Baja Tensión**, 380 V, con `device_id`). El medidor se declara en el TGBT porque es lo que físicamente se mide; los nodos virtuales (`es_virtual: true`, `device_id: null`) suman los medidores frontera aguas abajo.
   * El unifilar es un árbol distinto del layout: `parent_id` siempre apunta a otro nodo del unifilar, nunca a una zona (`area-*`) del layout 2D.
   * `nombre_maquina` (`string | null`): nombre de la máquina asociada 1:1 al medidor del nodo (`machines.device_id` es `UNIQUE`), para mostrarla en lugar del nombre del medidor cuando exista. "Máquina" no es un nivel adicional del árbol.
-* `PUT /api/v1/plantas/{planta_id}/unifilar`: Guardar topología unifilar.
+* **La estructura de planta es solo lectura por API.** Organizaciones, plantas, zonas, layout y unifilar se declaran en `data/organizaciones.yml` del backend (modelo ISA-95 versionado en git) y cambian por commit, no por request. `POST /organizaciones`, `POST /plantas`, `PUT …/unifilar` y `PUT …/layout` se eliminaron el 2026-09-13: nunca persistieron (respondían 200 contra un repositorio de solo lectura). Un `PUT`/`POST` a esas rutas responde `405`.
 * `GET /api/v1/planta/layout?planta_id=...`: Zonas de planta y ubicación porcentual (`pos_x_pct`, `pos_y_pct`) de los tableros sobre el plano SVG.
-* `PUT /api/v1/plantas/{planta_id}/layout`: Guardar distribución espacial 2D.
 
 ---
 
