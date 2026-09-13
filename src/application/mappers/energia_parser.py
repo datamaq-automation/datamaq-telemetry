@@ -73,18 +73,34 @@ class EnergiaPayloadParser:
         payload: dict[str, Any],
         dispositivo_id: str,
         recorded_at: datetime,
+        fases_con_ti: set[str] | None = None,
+        fuente: str | None = None,
     ) -> AcumuladoEnergia:
+        """``fases_con_ti`` filtra qué fases suma el array ``f`` de ``acc`` (solo aplica
+        a ese formato: ``energyio`` ya llega como total del equipo, sin desglose por
+        fase). Sin ``fases_con_ti`` se suman todas las fases presentes, como antes.
+
+        ``fuente`` identifica el subtópico de origen ("acc" / "energyio") para que
+        el repositorio decida qué serie prioriza al persistir (D1: energyio manda).
+        """
         total = payload.get("total") if isinstance(payload.get("total"), dict) else payload
         total_dict = total if isinstance(total, dict) else {}
 
         e_act, e_react, e_act_imp, e_act_exp, e_react_imp, e_react_exp = cls._extraer_energias_totales(total_dict)
 
         if isinstance(payload.get("f"), list):
+            fases_items = payload["f"]
+            if fases_con_ti is not None:
+                fases_items = [
+                    item
+                    for item in fases_items
+                    if isinstance(item, dict) and str(item.get("n", "")).strip().upper() in fases_con_ti
+                ]
             phases_act = [
-                float(item["a"]) for item in payload["f"] if isinstance(item, dict) and item.get("a") is not None
+                float(item["a"]) for item in fases_items if isinstance(item, dict) and item.get("a") is not None
             ]
             phases_react = [
-                float(item["r"]) for item in payload["f"] if isinstance(item, dict) and item.get("r") is not None
+                float(item["r"]) for item in fases_items if isinstance(item, dict) and item.get("r") is not None
             ]
             if e_act is None and phases_act:
                 e_act = sum(phases_act)
@@ -105,4 +121,5 @@ class EnergiaPayloadParser:
             energia_activa_exportada=EnergiaActiva(kwh=e_act_exp) if e_act_exp is not None else None,
             energia_reactiva_importada=EnergiaReactiva(kvarh=e_react_imp) if e_react_imp is not None else None,
             energia_reactiva_exportada=EnergiaReactiva(kvarh=e_react_exp) if e_react_exp is not None else None,
+            fuente=fuente,
         )

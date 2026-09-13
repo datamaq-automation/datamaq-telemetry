@@ -223,7 +223,9 @@ class ConsultarTelemetriaUseCase:
 
         desde = datetime.now(timezone.utc) - timedelta(days=dias) if dias else None
         desde_efectivo = self._acotar_fecha_desde(dev, desde)
-        acumulados = self.repo_telemetria.listar_acumulados_para_agregacion(dev.id, desde_efectivo)
+        acumulados = self.repo_telemetria.listar_ultimos_acumulados_por_periodo(
+            dev.id, desde_efectivo, granularidad=granularidad_enum.value, zona=zona
+        )
         agregados = AgregacionEnergiaService.agregar_por_periodo(acumulados, granularidad_enum, zona_info)
         return [TelemetriaMapper.energia_agregada_to_dto(a) for a in agregados]
 

@@ -1,7 +1,7 @@
 # Índice Maestro de Documentación Técnica — Datamaq Telemetry
 
 > **Repositorio:** `datamaq-telemetry` (Backend FastAPI, Ingestión MQTT y Motor de Analítica)  
-> **Última Actualización:** 2026-09-04  
+> **Última Actualización:** 2026-09-13  
 > **Estado:** Documentación Centralizada y Sincronizada
 
 Bienvenido al centro de documentación técnica del backend de telemetría de energía DataMaq. Los documentos canónicos vivos están organizados temáticamente según el área técnica:
@@ -45,6 +45,8 @@ Bienvenido al centro de documentación técnica del backend de telemetría de en
   *Arquitectura de Datos SGE e ISA-95:* Jerarquía industrial de activos (Empresa -> Sitio/Planta -> Área/Topología Eléctrica -> Unidad/Medidor IoT), requisitos de ISO 50001 (Fronteras, USEs, Línea de Base y EnPIs) y persistencia GitOps declarativa en `./data/`.
 * 📄 [`docs/database_erd.md`](file:///home/agustin/proyectos_software/datamaq-telemetry/docs/database_erd.md)  
   *Diagrama Entidad-Relación (ERD):* Diagrama Mermaid autogenerado de todas las tablas MySQL, índices B-Tree, columnas de ingeniería y matriz de políticas de retención.
+* 📄 [`docs/adr-001-no-redis-cache.md`](file:///home/agustin/proyectos_software/datamaq-telemetry/docs/adr-001-no-redis-cache.md)  
+  *ADR-001 — No incorporar Redis como cache sobre MySQL:* Decisión fundamentada con métricas reales de producción (buffer pool hit 99,999 %, 7 q/s, base de 79 MB en RAM). Define los disparadores concretos (múltiples workers, múltiples instancias, colas diferidas) que sí justificarían revisarla.
 * 📄 [`docs/to_www-datamaq.md`](file:///home/agustin/proyectos_software/datamaq-telemetry/docs/to_www-datamaq.md)  
   *Directiva de Negocio y Modelo Freemium:* Especificación del modelo comercial de DataMaq ($0 de por vida, Ciclo PRO de 60 días incluido en obras/consultorías, bifurcación Free entre Vitrina Pública Anonimizada de 30 días y Monitoreo Privado Básico de 14 días).
 

@@ -33,6 +33,7 @@ from src.domain.telemetria.ports import (
     RepositorioTelemetriaPort,
 )
 from src.domain.telemetria.services import FiltroPersistenciaTemporalService
+from src.domain.telemetria.servicios.analizador_calidad_metrologica import AnalizadorMetrologicoService
 
 
 class IngestarTelemetriaUseCase:
@@ -130,7 +131,7 @@ class IngestarTelemetriaUseCase:
         if subtopico == "inst":
             self._procesar_instantanea(topico, mac_raw, payload, dispositivo, recorded_at)
         elif subtopico in ("acc", "energyio"):
-            self._procesar_energia(payload, dispositivo, recorded_at)
+            self._procesar_energia(payload, dispositivo, recorded_at, fuente=subtopico)
         elif subtopico == "status":
             self._procesar_status(payload, dispositivo, recorded_at)
         elif subtopico == "event":
@@ -198,15 +199,44 @@ class IngestarTelemetriaUseCase:
         payload: dict[str, Any],
         dispositivo: Dispositivo,
         recorded_at: datetime,
+        fuente: str,
     ) -> None:
-        acumulado = TelemetriaPayloadParser.parsear_acumulado(payload, dispositivo.id, recorded_at)
-        self.repo_telemetria.guardar_energia(acumulado)
+        fases_con_ti = AnalizadorMetrologicoService.fases_con_ti_como_lista(
+            getattr(dispositivo, "fases_con_ti", "R,S,T")
+        )
+        acumulado = TelemetriaPayloadParser.parsear_acumulado(
+            payload, dispositivo.id, recorded_at, fases_con_ti=fases_con_ti, fuente=fuente
+        )
+
+        # WP3 (D5, nivel ③): el medidor publica acumulados cada ~2 s, pero para
+        # energía diaria/mensual solo importa el último valor de cada ventana —
+        # el mismo throttle que ya usa _procesar_instantanea. La clave incluye
+        # `fuente`: acc y energyio tienen ventanas independientes, si no, el que
+        # llega primero en la ventana "gana el turno" y descarta al otro aunque
+        # sea el prioritario (D1) el que quedó afuera — la prioridad la resuelve
+        # guardar_energia en el momento en que SÍ llega a persistir, no acá.
+        debe_persistir = True
+        clave_throttle = f"{dispositivo.id}:energia:{fuente}"
+        if self.granularidad_segundos > 0:
+            with self._lock:
+                ultima = self._ultimas_persistencias.get(clave_throttle)
+                if ultima is not None and (recorded_at - ultima).total_seconds() < self.granularidad_segundos:
+                    debe_persistir = False
+
+        if debe_persistir:
+            # D1: energyio (registro total del equipo) prioriza sobre acc (suma de
+            # fases, respaldo) cuando ambos publican el mismo instante.
+            self.repo_telemetria.guardar_energia(acumulado, prioritario=(fuente == "energyio"))
+            with self._lock:
+                self._ultimas_persistencias[clave_throttle] = recorded_at
+
         if self.logger:
             e_act = acumulado.energia_activa_neta.kwh if acumulado.energia_activa_neta else None
             self.logger.debug(
-                "telemetria_energia_guardada",
+                "telemetria_energia_procesada",
                 device_uid=dispositivo.device_uid.valor,
                 kwh=float(e_act) if e_act is not None else None,
+                persistido_db=debe_persistir,
             )
 
     def _procesar_status(

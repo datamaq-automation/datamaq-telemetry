@@ -65,7 +65,7 @@ class _RepoTelemetriaFakeSoloDb(RepositorioTelemetriaPort):
     def guardar_instantanea(self, lectura: LecturaInstantanea) -> None:
         self._instantaneas.append(lectura)
 
-    def guardar_energia(self, acumulado: object) -> None:
+    def guardar_energia(self, acumulado: object, prioritario: bool = True) -> None:
         pass
 
     def guardar_log_estado(self, log: object) -> None:
@@ -94,7 +94,9 @@ class _RepoTelemetriaFakeSoloDb(RepositorioTelemetriaPort):
     def listar_energias(self, dispositivo_id: str, limite: int, desde: datetime | None = None) -> list:
         return []
 
-    def listar_acumulados_para_agregacion(self, dispositivo_id: str, desde: datetime | None = None) -> list:
+    def listar_ultimos_acumulados_por_periodo(
+        self, dispositivo_id: str, desde: datetime | None = None, granularidad: str = "day", zona: str = "UTC"
+    ) -> list:
         return []
 
     def listar_potencias_para_histograma(

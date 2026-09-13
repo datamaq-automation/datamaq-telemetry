@@ -145,6 +145,7 @@ def energia_to_entity(m: TelemetryEnergyModel) -> AcumuladoEnergia:
         energia_reactiva_importada=EnergiaReactiva(kvarh=float(m.imported_reactive_energy_kvarh))
         if m.imported_reactive_energy_kvarh is not None
         else None,
+        fuente=m.source,
         energia_reactiva_exportada=EnergiaReactiva(kvarh=float(m.exported_reactive_energy_kvarh))
         if m.exported_reactive_energy_kvarh is not None
         else None,

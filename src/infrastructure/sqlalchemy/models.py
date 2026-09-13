@@ -250,6 +250,13 @@ class TelemetryEnergyModel(Base):
     __table_args__ = (
         Index("idx_telemetry_energy_dev_time", "device_id", "recorded_at"),
         Index("idx_telemetry_energy_time", "recorded_at"),
+        # Un solo acumulado por medidor e instante, sin importar qué subtópico lo
+        # publicó (D1): acc y energyio del mismo timestamp compiten por la misma
+        # fila, no coexisten. La prioridad entre ambos la resuelve guardar_energia
+        # (upsert si prioritario, INSERT IGNORE si no) — ver WP2. Índice único (no
+        # UniqueConstraint) por portabilidad: SQLite, donde corren los tests de
+        # migraciones, no soporta ADD CONSTRAINT fuera de batch mode.
+        Index("uq_energy_dev_time", "device_id", "recorded_at", unique=True),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
@@ -262,6 +269,9 @@ class TelemetryEnergyModel(Base):
     exported_active_energy_kwh: Mapped[Decimal | None] = mapped_column(Numeric(14, 3), nullable=True)
     imported_reactive_energy_kvarh: Mapped[Decimal | None] = mapped_column(Numeric(14, 3), nullable=True)
     exported_reactive_energy_kvarh: Mapped[Decimal | None] = mapped_column(Numeric(14, 3), nullable=True)
+    source: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    """Subtópico MQTT de origen ("energyio" prioritario, "acc" respaldo, ver D1).
+    NULL en filas anteriores a WP2, que no rastreaban esto."""
 
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
 
