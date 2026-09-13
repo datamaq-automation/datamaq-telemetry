@@ -297,7 +297,7 @@ def get_planta_estructura_use_case(
     db: Annotated[Session, Depends(get_db_session)],
 ) -> GestionarPlantaEstructuraUseCase:
     repo_org = YamlOrganizacionesRepository()
-    return GestionarPlantaEstructuraUseCase(repo_org)
+    return GestionarPlantaEstructuraUseCase(repo_org, MySQLMaquinasRepository(db))
 
 
 def get_consultar_nodo_unifilar_use_case(

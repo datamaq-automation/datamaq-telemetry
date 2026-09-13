@@ -27,15 +27,15 @@ from src.domain.telemetria.value_objects import (
 
 class PlantaEstructuraMapper:
     @staticmethod
-    def nodo_to_dto(entity: NodoUnifilar) -> NodoUnifilarDTO:
-        tipo_val = entity.tipo.value if hasattr(entity.tipo, "value") else str(entity.tipo)
+    def nodo_to_dto(entity: NodoUnifilar, nombre_maquina: str | None = None) -> NodoUnifilarDTO:
         return NodoUnifilarDTO(
             id=entity.id,
             parent_id=entity.parent_id,
             nombre=entity.nombre,
-            tipo=tipo_val,
+            tipo=TipoNodoUnifilar(entity.tipo).value,
             device_id=entity.device_id,
             es_virtual=entity.device_id is None,
+            nombre_maquina=nombre_maquina,
             tension_nominal_V=entity.tension_nominal_v,
             capacidad_nominal_kVA=entity.capacidad_nominal_kva,
             potencia_nominal_kw=entity.potencia_nominal_kw,
@@ -47,15 +47,12 @@ class PlantaEstructuraMapper:
 
     @staticmethod
     def dto_to_nodo(dto: NodoUnifilarDTO, planta_id: str) -> NodoUnifilar:
-        tipo_enum = (
-            TipoNodoUnifilar(dto.tipo) if dto.tipo in [t.value for t in TipoNodoUnifilar] else TipoNodoUnifilar.CARGA
-        )
         return NodoUnifilar(
             id=dto.id or str(uuid.uuid4()),
             planta_id=planta_id,
             parent_id=dto.parent_id,
             nombre=dto.nombre,
-            tipo=tipo_enum,
+            tipo=TipoNodoUnifilar(dto.tipo),
             device_id=dto.device_id,
             tension_nominal_v=dto.tension_nominal_V,
             capacidad_nominal_kva=dto.capacidad_nominal_kVA,

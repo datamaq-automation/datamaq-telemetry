@@ -1,18 +1,24 @@
 """src/application/dtos/planta_estructura_dto.py."""
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.application.dtos.telemetria_dto import EnergiaAgregadaDTO
 from src.application.dtos.tipos import FechaHoraUTC
+
+TipoNodoUnifilarLiteral = Literal["acometida", "transformador", "tgbt", "seccional", "carga"]
 
 
 class NodoUnifilarDTO(BaseModel):
     id: str
     parent_id: str | None = None
     nombre: str
-    tipo: str  # acometida, transformador, tgbt, seccional, carga
+    tipo: TipoNodoUnifilarLiteral
     device_id: str | None = None
     es_virtual: bool = False
+    # R-03: nombre de la máquina asociada 1:1 al medidor (`machines.device_id` UNIQUE), si existe.
+    nombre_maquina: str | None = None
     tension_nominal_V: float
     capacidad_nominal_kVA: float | None = None
     potencia_nominal_kw: float | None = None

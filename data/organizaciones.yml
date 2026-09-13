@@ -24,7 +24,8 @@ organizaciones:
             tipo: "acometida"
             tension_nominal_v: 220.0
             device_id: "2812d2af-b1cf-4daa-a379-40102fdb152d"
-            potencia_nominal_kw: 5.5
+            # potencia_nominal_kw: sin dato (el 5.5 anterior era inventado). Cargar solo con
+            # el valor real (potencia contratada del suministro), nunca estimado.
             uso_significativo: false
             categoria_uso: "ILUMINACION"
 
@@ -57,23 +58,49 @@ organizaciones:
           - id: "nodo-durax-acometida-mt"
             nombre: "Acometida MT"
             tipo: "acometida"
-            tension_nominal_v: 13200.0  # asumido, pendiente de confirmar (ver tmp/dudas.md)
+            tension_nominal_v: 13200.0  # fuente: confirmado por el usuario, 2026-09-12
+          # TOPOLOGÍA DE MEDICIÓN (fuente: usuario, 2026-09-13). Cada Powermeter NO mide
+          # un trafo: sus TI están sobre un circuito sumador de intensidades preexistente
+          # (el del regulador del banco de capacitores), que suma los secundarios de DOS
+          # transformadores. Es decir: cada nodo "transformador" de abajo representa un
+          # GRUPO de dos trafos en paralelo sobre una misma barra, no una máquina.
+          # El modelo actual (un solo parent_id) no puede declarar los dos trafos por
+          # separado alimentando la misma barra — limitación registrada en tmp/dudas.md §12.
+          # SIN DATO DE PLACA: los "300 kW / 150 kW" que figuraban acá eran una
+          # alucinación de un LLM (2026-09-13), no lectura de chapa. No cargar
+          # capacidad_nominal_kva hasta tener foto de la placa de cada transformador.
           - id: "nodo-durax-trifasico-1"
-            nombre: "Trafo Usina"
+            nombre: "Transformación Usina (2 trafos en paralelo)"
             tipo: "transformador"
             tension_nominal_v: 380.0
             parent_id: "nodo-durax-acometida-mt"
+          - id: "nodo-durax-powermeter-bf2c"
+            nombre: "Transformación Horno (2 trafos en paralelo)"
+            tipo: "transformador"
+            tension_nominal_v: 380.0
+            parent_id: "nodo-durax-acometida-mt"
+          # TGBT = barra de BT común a los dos trafos del grupo. El Powermeter mide la
+          # sumatoria vía TI sobre TI (secundario del sumador del banco de capacitores),
+          # aguas arriba del banco: la Q que ve es la YA COMPENSADA por el banco.
+          # Relación de TI del sumador: no registrada. Escala verificada en campo: la
+          # corriente del Powermeter coincide con pinza amperométrica (usuario,
+          # 2026-09-13; fecha y valores del contraste sin registrar). Esa verificación
+          # cubre |I| (y por lo tanto la escala de P, Q y energía); NO cubre el error
+          # de ángulo del TI sobre TI ni el signo de Q (ver tmp/dudas.md §13).
+          - id: "nodo-durax-tgbt-usina"
+            nombre: "TGBT Usina"
+            tipo: "tgbt"
+            tension_nominal_v: 380.0
+            parent_id: "nodo-durax-trifasico-1"
             device_id: "51048a93-f1f3-4283-a708-24cbd39c7192"
-            potencia_nominal_kw: 300.0
             uso_significativo: true
             categoria_uso: "FUERZA_MOTRIZ"
-          - id: "nodo-durax-powermeter-bf2c"
-            nombre: "Trafo Horno"
-            tipo: "transformador"
+          - id: "nodo-durax-tgbt-horno"
+            nombre: "TGBT Horno"
+            tipo: "tgbt"
             tension_nominal_v: 380.0
-            parent_id: "nodo-durax-acometida-mt"
+            parent_id: "nodo-durax-powermeter-bf2c"
             device_id: "b5f4bcd6-b017-4796-bb3d-efcfb50dc8f0"
-            potencia_nominal_kw: 150.0
             uso_significativo: true
             categoria_uso: "FUERZA_MOTRIZ"
 
@@ -103,22 +130,36 @@ organizaciones:
           - id: "nodo-upp-acometida-mt"
             nombre: "Acometida MT"
             tipo: "acometida"
-            tension_nominal_v: 13200.0  # asumido, pendiente de confirmar (ver tmp/dudas.md)
+            tension_nominal_v: 13200.0  # fuente: confirmado por el usuario, 2026-09-12
+          # Trafos 13,2 kV / 380 V: nodos virtuales; el medidor está en el TGBT de cada uno.
+          # TOPOLOGÍA DE MEDICIÓN (fuente: usuario, 2026-09-13): los TI de cada Powermeter
+          # están directamente en la salida del secundario de su transformador. Cada
+          # medidor ve el 100 % de su trafo; el modelo trafo → tgbt es exacto acá.
+          # SIN DATO DE PLACA: los "800 kW" que figuraban acá eran inventados (ver Durax).
           - id: "nodo-upp-trafo-arriba"
             nombre: "Trafo Arriba"
             tipo: "transformador"
             tension_nominal_v: 380.0
             parent_id: "nodo-upp-acometida-mt"
-            device_id: "a01b1642-ed29-4c3e-a793-f57de09504f8"
-            potencia_nominal_kw: 800.0
-            uso_significativo: true
-            categoria_uso: "FUERZA_MOTRIZ"
           - id: "nodo-upp-trafo-abajo"
             nombre: "Trafo Abajo"
             tipo: "transformador"
             tension_nominal_v: 380.0
             parent_id: "nodo-upp-acometida-mt"
+          # TGBT: punto de medición real de cada trafo.
+          - id: "nodo-upp-tgbt-arriba"
+            nombre: "TGBT Arriba"
+            tipo: "tgbt"
+            tension_nominal_v: 380.0
+            parent_id: "nodo-upp-trafo-arriba"
+            device_id: "a01b1642-ed29-4c3e-a793-f57de09504f8"
+            uso_significativo: true
+            categoria_uso: "FUERZA_MOTRIZ"
+          - id: "nodo-upp-tgbt-abajo"
+            nombre: "TGBT Abajo"
+            tipo: "tgbt"
+            tension_nominal_v: 380.0
+            parent_id: "nodo-upp-trafo-abajo"
             device_id: "ce7e5a9a-c5e8-4936-be9a-a2057ccf8b4c"
-            potencia_nominal_kw: 800.0
             uso_significativo: true
             categoria_uso: "FUERZA_MOTRIZ"

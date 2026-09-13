@@ -35,7 +35,7 @@ def test_dispositivo_area_id_and_nodo_unifilar_id_mapping():
 
     assert len(dtos) == 2
     assert dtos[0].area_id == "area-durax-trafo-1"
-    assert dtos[0].nodo_unifilar_id == "nodo-durax-trifasico-1"
+    assert dtos[0].nodo_unifilar_id == "nodo-durax-tgbt-usina"
 
     assert dtos[1].area_id == "area-durax-trafo-2"
-    assert dtos[1].nodo_unifilar_id == "nodo-durax-powermeter-bf2c"
+    assert dtos[1].nodo_unifilar_id == "nodo-durax-tgbt-horno"
