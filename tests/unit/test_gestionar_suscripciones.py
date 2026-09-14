@@ -92,12 +92,12 @@ def test_cancelar_baja_inmediata_sin_esperar_vencimiento():
     assert cancelada.plan_id == plan_id  # conserva el plan para poder reactivar sin re-elegirlo
 
 
-def test_expirar_vencidas_baja_solo_las_que_ya_vencieron():
+def test_expirar_vencidas_baja_solo_las_que_ya_vencieron_hace_mas_de_la_gracia():
     db = _session()
     plan_id = _crear_plan(db)
     uc = _use_case(db)
     ahora = datetime.now(timezone.utc)
-    uc.activar_o_extender("org-vencida", plan_id, ahora - timedelta(days=1))
+    uc.activar_o_extender("org-vencida", plan_id, ahora - timedelta(days=10))
     uc.activar_o_extender("org-vigente", plan_id, ahora + timedelta(days=10))
 
     afectadas = uc.expirar_vencidas(ahora)
@@ -108,12 +108,39 @@ def test_expirar_vencidas_baja_solo_las_que_ya_vencieron():
     assert repo.obtener_por_organizacion("org-vigente").pro_vence_en is not None
 
 
-def test_expirar_vencidas_es_idempotente_no_reprocesa_ya_expiradas():
+def test_expirar_vencidas_respeta_el_periodo_de_gracia():
+    """Vencida hace 1 día: dentro de la gracia de 6 días por defecto, no se toca todavía."""
+    db = _session()
+    plan_id = _crear_plan(db)
+    uc = _use_case(db)
+    ahora = datetime.now(timezone.utc)
+    uc.activar_o_extender("org-en-gracia", plan_id, ahora - timedelta(days=1))
+
+    afectadas = uc.expirar_vencidas(ahora)
+
+    assert afectadas == []
+    repo = MySQLSuscripcionesRepository(db)
+    assert repo.obtener_por_organizacion("org-en-gracia").pro_vence_en is not None
+
+
+def test_expirar_vencidas_permite_ajustar_los_dias_de_gracia():
     db = _session()
     plan_id = _crear_plan(db)
     uc = _use_case(db)
     ahora = datetime.now(timezone.utc)
     uc.activar_o_extender("org-vencida", plan_id, ahora - timedelta(days=1))
+
+    afectadas = uc.expirar_vencidas(ahora, dias_gracia=0)
+
+    assert [s.organizacion_id for s in afectadas] == ["org-vencida"]
+
+
+def test_expirar_vencidas_es_idempotente_no_reprocesa_ya_expiradas():
+    db = _session()
+    plan_id = _crear_plan(db)
+    uc = _use_case(db)
+    ahora = datetime.now(timezone.utc)
+    uc.activar_o_extender("org-vencida", plan_id, ahora - timedelta(days=10))
 
     primera_pasada = uc.expirar_vencidas(ahora)
     segunda_pasada = uc.expirar_vencidas(ahora)

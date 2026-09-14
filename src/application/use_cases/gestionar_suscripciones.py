@@ -1,6 +1,6 @@
 """src/application/use_cases/gestionar_suscripciones.py."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from src.domain.telemetria.entities import Suscripcion, ahora_utc
 from src.domain.telemetria.exceptions import PlanNoEncontradoError
@@ -14,6 +14,10 @@ class GestionarSuscripcionesUseCase:
     No conoce Mercado Pago ni ningún proveedor de pago — recibe organizacion_id/plan_id/fecha
     ya resueltos por el adaptador de pagos correspondiente (webhook, cron, o alta manual).
     """
+
+    DIAS_GRACIA_POR_DEFECTO: int = 6
+    """Ventana entre el vencimiento y la baja efectiva a modo_free (rango acordado: 5-7 días),
+    para dar margen a los reintentos automáticos de cobro del proveedor de pagos."""
 
     def __init__(self, repo_suscripciones: RepositorioSuscripcionesPort, repo_planes: RepositorioPlanesPort):
         self.repo_suscripciones = repo_suscripciones
@@ -46,12 +50,13 @@ class GestionarSuscripcionesUseCase:
             )
         )
 
-    def expirar_vencidas(self, ahora: datetime | None = None) -> list[Suscripcion]:
-        """Baja a `PRIVADO_BASICO` toda suscripción cuyo `pro_vence_en` ya pasó.
-
-        Se llama desde un cron/systemd-timer (ver `scripts/expirar_suscripciones.py`), después
-        de que el período de gracia post-rechazo de pago ya haya corrido en el proveedor de pagos.
+    def expirar_vencidas(self, ahora: datetime | None = None, dias_gracia: int | None = None) -> list[Suscripcion]:
+        """Baja a `PRIVADO_BASICO` toda suscripción cuyo `pro_vence_en` pasó hace más de
+        `dias_gracia` días. Pensado para correr desde un cron/systemd-timer (ver
+        `scripts/expirar_suscripciones.py`).
         """
         ahora = ahora or ahora_utc()
-        vencidas = self.repo_suscripciones.listar_vencidas(ahora)
+        gracia = self.DIAS_GRACIA_POR_DEFECTO if dias_gracia is None else dias_gracia
+        corte = ahora - timedelta(days=gracia)
+        vencidas = self.repo_suscripciones.listar_vencidas(corte)
         return [self.cancelar(s.organizacion_id) for s in vencidas]
