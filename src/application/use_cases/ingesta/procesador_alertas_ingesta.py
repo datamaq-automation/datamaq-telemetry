@@ -1,5 +1,6 @@
 """src/application/use_cases/ingesta/procesador_alertas_ingesta.py."""
 
+from collections.abc import Callable
 from datetime import datetime
 from typing import Any, ClassVar
 
@@ -30,6 +31,9 @@ def _notificar_alerta_si_corresponde(
     notif = ProcesadorAlertasIngesta._notificador
     dests = ProcesadorAlertasIngesta._destinatarios
     if alerta.severidad == SeveridadAlerta.CRITICAL and notif is not None and dispositivo is not None and dests:
+        verificador = ProcesadorAlertasIngesta._verificador_plan
+        if verificador is not None and not verificador(alerta.dispositivo_id):
+            return
         cd = ProcesadorAlertasIngesta._cooldown_notificaciones
         if cd.debe_notificar(alerta.dispositivo_id, alerta.tipo_alerta):
             notif.notificar_alerta_critica(alerta, dispositivo, dests)
@@ -246,6 +250,7 @@ class ProcesadorAlertasIngesta:
     _cooldown_notificaciones: ClassVar[CooldownNotificacionesAlertasService] = CooldownNotificacionesAlertasService()
     _notificador: ClassVar[NotificadorAlertasPort | None] = None
     _destinatarios: ClassVar[list[str]] = []
+    _verificador_plan: ClassVar[Callable[[str], bool] | None] = None
 
     _evaluar_tension = staticmethod(_evaluar_tension_fn)
     _evaluar_desbalance = staticmethod(_evaluar_desbalance_fn)
@@ -258,9 +263,11 @@ class ProcesadorAlertasIngesta:
         cls,
         notificador: NotificadorAlertasPort | None,
         destinatarios: list[str] | None = None,
+        verificador_plan: Callable[[str], bool] | None = None,
     ) -> None:
         cls._notificador = notificador
         cls._destinatarios = destinatarios or []
+        cls._verificador_plan = verificador_plan
 
     @classmethod
     def _auto_resolver_todas_normalizadas(

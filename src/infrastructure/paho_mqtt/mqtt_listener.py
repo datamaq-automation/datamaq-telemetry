@@ -76,6 +76,9 @@ class MQTTListener:
             ProcesadorAlertasIngesta,
         )
         from src.infrastructure.auth.email_service import SmtpEmailService
+        from src.infrastructure.paho_mqtt.verificador_notificaciones import (
+            construir_verificador_notificaciones,
+        )
 
         notificador = SmtpEmailService(
             host=self.settings.SMTP_HOST,
@@ -87,7 +90,8 @@ class MQTTListener:
             app_env=self.settings.APP_ENV,
         )
         dests = [d.strip() for d in self.settings.ALERTAS_EMAIL_DESTINATARIOS.split(",") if d.strip()]
-        ProcesadorAlertasIngesta.configurar_notificador(notificador, dests)
+        verificador_plan = construir_verificador_notificaciones(self.session_factory)
+        ProcesadorAlertasIngesta.configurar_notificador(notificador, dests, verificador_plan=verificador_plan)
 
     def _on_connect(self, client, userdata, flags, reason_code, properties=None):
         if reason_code == 0:

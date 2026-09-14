@@ -189,6 +189,56 @@ def test_alerta_warning_no_despacha_email():
     assert mock_notif.notificar_alerta_critica.call_count == 0
 
 
+def test_verificador_plan_bloquea_notificacion_en_organizacion_free():
+    mock_notif = MagicMock(spec=NotificadorAlertasPort)
+    mock_repo = MagicMock(spec=RepositorioTelemetriaPort)
+
+    ProcesadorAlertasIngesta.configurar_notificador(
+        mock_notif, ["guardia@datamaq.com.ar"], verificador_plan=lambda dispositivo_id: False
+    )
+    disp = _dispositivo()
+
+    t0 = datetime(2026, 9, 7, 10, 0, 0, tzinfo=timezone.utc)
+    ProcesadorAlertasIngesta.procesar_alertas(
+        dispositivo=disp,
+        mac_raw="AABBCCDDEEFF",
+        lectura=_lectura_falta_fase(t0),
+        recorded_at=t0,
+        repo_telemetria=mock_repo,
+    )
+
+    assert mock_notif.notificar_alerta_critica.call_count == 0
+
+
+def test_verificador_plan_permite_notificacion_en_organizacion_pro():
+    mock_notif = MagicMock(spec=NotificadorAlertasPort)
+    mock_repo = MagicMock(spec=RepositorioTelemetriaPort)
+
+    ProcesadorAlertasIngesta.configurar_notificador(
+        mock_notif, ["guardia@datamaq.com.ar"], verificador_plan=lambda dispositivo_id: True
+    )
+    disp = _dispositivo()
+
+    t0 = datetime(2026, 9, 7, 10, 0, 0, tzinfo=timezone.utc)
+    t1 = t0 + timedelta(seconds=4)
+    ProcesadorAlertasIngesta.procesar_alertas(
+        dispositivo=disp,
+        mac_raw="AABBCCDDEEFF",
+        lectura=_lectura_falta_fase(t0),
+        recorded_at=t0,
+        repo_telemetria=mock_repo,
+    )
+    ProcesadorAlertasIngesta.procesar_alertas(
+        dispositivo=disp,
+        mac_raw="AABBCCDDEEFF",
+        lectura=_lectura_falta_fase(t1),
+        recorded_at=t1,
+        repo_telemetria=mock_repo,
+    )
+
+    assert mock_notif.notificar_alerta_critica.call_count == 2
+
+
 def test_construir_mensaje_alerta_critica_formato():
     disp = _dispositivo()
     alerta = AlertaDispositivo(
