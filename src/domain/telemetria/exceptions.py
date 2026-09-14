@@ -71,3 +71,7 @@ class EstructuraUnifilarInvalidaError(DominioTelemetriaException):
 
 class CampoGestionadoPorYamlError(DominioTelemetriaException):
     """Lanzada cuando se intenta escribir por API un campo que el YAML declara para ese medidor."""
+
+
+class PlanNoEncontradoError(DominioTelemetriaException):
+    """Lanzada al activar/extender una suscripción con un plan_id que no existe en el catálogo."""

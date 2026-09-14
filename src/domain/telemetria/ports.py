@@ -19,7 +19,11 @@ from src.domain.telemetria.entities import (
     Suscripcion,
     ZonaPlanta,
 )
-from src.domain.telemetria.value_objects import EstadoDispositivo, LecturaPotenciaTemporal, MacAddress
+from src.domain.telemetria.value_objects import (
+    EstadoDispositivo,
+    LecturaPotenciaTemporal,
+    MacAddress,
+)
 
 
 class RepositorioDispositivosPort(ABC):
@@ -232,6 +236,15 @@ class RepositorioSuscripcionesPort(ABC):
 
     @abstractmethod
     def guardar(self, suscripcion: Suscripcion) -> Suscripcion:
+        pass
+
+    @abstractmethod
+    def listar_vencidas(self, ahora: datetime) -> list[Suscripcion]:
+        """Suscripciones con `pro_vence_en` no nulo y ya pasado.
+
+        Idempotente por construcción: `cancelar()` deja `pro_vence_en=None`, así que una
+        suscripción ya procesada no vuelve a aparecer en la próxima corrida del cron.
+        """
         pass
 
 
