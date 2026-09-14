@@ -81,6 +81,12 @@ class Settings(BaseSettings):
     LOG_FORMAT: str | None = None  # "console" (clean CLI) o "json" (VPS production)
     LOG_LEVEL: str | None = None
 
+    # Mercado Pago (suscripciones recurrentes / preapproval)
+    MP_ACCESS_TOKEN: str = ""
+    MP_WEBHOOK_SECRET: str = ""
+    MP_BASE_URL: str = "https://api.mercadopago.com"
+    MP_BACK_URL_EXITO: str = "https://app.datamaq.com.ar/facturacion?estado=ok"
+
     model_config = SettingsConfigDict(
         env_file=os.path.join(
             os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))), ".env"
