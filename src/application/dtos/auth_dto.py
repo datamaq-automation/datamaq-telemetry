@@ -61,6 +61,10 @@ class MeResponseDTO(BaseModel):
     organizacion_nombre: str | None = None
     plantas: list[PlantaAccesoDTO] = Field(default_factory=list)
     planta_activa_id: str | None = None
+    plan_nombre: str | None = None
+    modo_free: bool = True
+    retention_days: int = 7
+    notificaciones_habilitadas: bool = False
 
 
 class Verificar2FARequestDTO(BaseModel):

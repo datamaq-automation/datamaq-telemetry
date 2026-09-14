@@ -33,6 +33,8 @@ from src.infrastructure.sqlalchemy.database import get_db_session
 from src.infrastructure.sqlalchemy.mysql_repositories import (
     MySQLAccesosPlantaRepository,
     MySQLDispositivosConfiablesRepository,
+    MySQLPlanesRepository,
+    MySQLSuscripcionesRepository,
     MySQLUsuariosRepository,
 )
 from src.infrastructure.yaml.repositories.organizaciones_repository import YamlOrganizacionesRepository
@@ -69,6 +71,7 @@ def get_auth_use_case(
         RepositorioDispositivosConfiablesPort, Depends(get_dispositivos_confiables_repository)
     ],
     acceso_plantas: Annotated[GestionarAccesoPlantasUseCase, Depends(get_acceso_plantas_use_case)],
+    db: Annotated[Session, Depends(get_db_session)],
 ) -> AutenticarUsuarioUseCase:
     settings = get_settings()
     rate_limiter = get_rate_limiter()
@@ -81,6 +84,8 @@ def get_auth_use_case(
         guest_organizacion_id=settings.GUEST_ORGANIZATION_ID,
         repo_dispositivos=repo_dispositivos,
         acceso_plantas=acceso_plantas,
+        repo_suscripciones=MySQLSuscripcionesRepository(db),
+        repo_planes=MySQLPlanesRepository(db),
     )
 
 

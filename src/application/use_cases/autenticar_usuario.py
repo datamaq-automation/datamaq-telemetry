@@ -18,6 +18,9 @@ from src.domain.auth.services import (
     TokenDispositivoService,
 )
 from src.domain.auth.value_objects import NombreUsuario
+from src.domain.telemetria.entities import Suscripcion
+from src.domain.telemetria.ports import RepositorioPlanesPort, RepositorioSuscripcionesPort
+from src.domain.telemetria.servicios.politicas_suscripcion import PoliticaSuscripcionService
 
 ROLES_VALIDOS = frozenset(
     {
@@ -44,6 +47,8 @@ class AutenticarUsuarioUseCase:
         guest_organizacion_id: str | None = None,
         repo_dispositivos: RepositorioDispositivosConfiablesPort | None = None,
         acceso_plantas: GestionarAccesoPlantasUseCase | None = None,
+        repo_suscripciones: RepositorioSuscripcionesPort | None = None,
+        repo_planes: RepositorioPlanesPort | None = None,
     ):
         self.repo_usuarios = repo_usuarios
         self.hash_service = hash_service
@@ -53,6 +58,8 @@ class AutenticarUsuarioUseCase:
         self.guest_organizacion_id = guest_organizacion_id
         self.repo_dispositivos = repo_dispositivos
         self.acceso_plantas = acceso_plantas
+        self.repo_suscripciones = repo_suscripciones
+        self.repo_planes = repo_planes
 
     def _registrar_intento(self, clave: str) -> None:
         if self.rate_limiter is not None:
@@ -165,6 +172,8 @@ class AutenticarUsuarioUseCase:
         if self.acceso_plantas is not None:
             plantas = self.acceso_plantas.resolver(user.id if user else None, str(rol), org_id)
 
+        plan_nombre, modo_free, retention_days, notificaciones_habilitadas = self._resolver_estado_plan(org_id)
+
         return MeResponseDTO(
             usuario=usuario,
             rol=rol,
@@ -173,4 +182,25 @@ class AutenticarUsuarioUseCase:
             organizacion_nombre=org_nombre,
             plantas=plantas,
             planta_activa_id=GestionarAccesoPlantasUseCase.planta_activa(plantas),
+            plan_nombre=plan_nombre,
+            modo_free=modo_free,
+            retention_days=retention_days,
+            notificaciones_habilitadas=notificaciones_habilitadas,
         )
+
+    def _resolver_estado_plan(self, org_id: str | None) -> tuple[str | None, bool, int, bool]:
+        """Consulta en vivo (no embebido en el JWT): el billing es sensible a tiempo, un
+        downgrade debe reflejarse en /me sin esperar a que expire el token (D5)."""
+        if not org_id or not self.repo_suscripciones:
+            return None, True, 7, False
+
+        sus = self.repo_suscripciones.obtener_por_organizacion(org_id) or Suscripcion.por_defecto(org_id)
+        es_pro = PoliticaSuscripcionService.es_pro_vigente(sus.pro_vence_en, ahora_utc())
+        retention_days = PoliticaSuscripcionService.resolver_retencion_dias(es_pro, sus.modo_free)
+
+        plan_nombre = None
+        if es_pro and sus.plan_id and self.repo_planes:
+            plan = self.repo_planes.obtener_por_id(sus.plan_id)
+            plan_nombre = plan.nombre if plan else None
+
+        return plan_nombre, not es_pro, retention_days, es_pro
