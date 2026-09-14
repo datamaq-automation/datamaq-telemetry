@@ -309,6 +309,13 @@ erDiagram
         datetime updated_at
     }
 
+    WEBHOOK_EVENTS {
+        string id PK
+        string provider
+        string event_id
+        datetime processed_at
+    }
+
 ```
 
 ## 2. Detalle de Tablas e Índices
@@ -676,6 +683,15 @@ erDiagram
 
 **Índices:**
 - `ix_users_username` (UNIQUE): (`username`)
+
+### Tabla `webhook_events`
+
+| Columna | Tipo SQL | Clave / Restricción | Nullable |
+| :--- | :--- | :--- | :--- |
+| `id` | `VARCHAR(36)` | **PRIMARY KEY** | No |
+| `provider` | `VARCHAR(30)` | - | No |
+| `event_id` | `VARCHAR(100)` | - | No |
+| `processed_at` | `DATETIME` | - | No |
 
 ## 3. Matriz de Políticas de Retención y Granularidad (Modelo Activo PRO 60d / Free)
 

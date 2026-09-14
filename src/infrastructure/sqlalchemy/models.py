@@ -14,6 +14,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -372,3 +373,16 @@ class UserFacilityAccessModel(Base):
     facility_id: Mapped[str] = mapped_column(String(36), primary_key=True)
     can_switch: Mapped[bool] = mapped_column(default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
+
+
+class WebhookEventModel(Base):
+    """Idempotencia de webhooks de proveedores de pago (Mercado Pago): un `event_id`
+    reenviado por el proveedor no debe disparar dos veces la misma activación/baja."""
+
+    __tablename__ = "webhook_events"
+    __table_args__ = (UniqueConstraint("provider", "event_id", name="uq_webhook_events_provider_event"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    provider: Mapped[str] = mapped_column(String(30), nullable=False)
+    event_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    processed_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
