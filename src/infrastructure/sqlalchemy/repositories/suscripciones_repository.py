@@ -1,5 +1,7 @@
 """src/infrastructure/sqlalchemy/repositories/suscripciones_repository.py."""
 
+from datetime import datetime
+
 from sqlalchemy.orm import Session
 
 from src.domain.telemetria.entities import Suscripcion
@@ -41,3 +43,12 @@ class MySQLSuscripcionesRepository(RepositorioSuscripcionesPort):
         self.db.commit()
         self.db.refresh(m)
         return self._to_entity(m)
+
+    def listar_vencidas(self, ahora: datetime) -> list[Suscripcion]:
+        filas = (
+            self.db.query(OrganizationModel)
+            .filter(OrganizationModel.pro_expires_at.isnot(None))
+            .filter(OrganizationModel.pro_expires_at < ahora)
+            .all()
+        )
+        return [self._to_entity(m) for m in filas]

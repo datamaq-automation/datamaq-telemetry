@@ -130,6 +130,9 @@ class MockSuscripcionesRepo(RepositorioSuscripcionesPort):
         self.suscripciones[suscripcion.organizacion_id] = suscripcion
         return suscripcion
 
+    def listar_vencidas(self, ahora):
+        return [s for s in self.suscripciones.values() if s.pro_vence_en is not None and s.pro_vence_en < ahora]
+
 
 class MockDispositivosRepo(RepositorioDispositivosPort):
     def __init__(self):
