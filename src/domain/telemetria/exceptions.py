@@ -75,3 +75,7 @@ class CampoGestionadoPorYamlError(DominioTelemetriaException):
 
 class PlanNoEncontradoError(DominioTelemetriaException):
     """Lanzada al activar/extender una suscripción con un plan_id que no existe en el catálogo."""
+
+
+class OrganizacionNoEncontradaError(DominioTelemetriaException):
+    """Lanzada al operar sobre una organización que no existe en el dato maestro (YAML)."""
