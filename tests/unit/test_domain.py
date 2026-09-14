@@ -501,8 +501,8 @@ def test_politica_suscripcion_pro_freemium_bifurcado():
     assert PoliticaSuscripcionService.resolver_retencion_dias(False, ModoFreeTier.VITRINA_ANONIMA) == 30
     assert PoliticaSuscripcionService.resolver_intervalo_minimo_segundos(False, ModoFreeTier.VITRINA_ANONIMA) == 0
 
-    # Free - Opción B (Privado Básico por defecto): 14 días retención, granularidad agregada (3600s = 1 hora)
-    assert PoliticaSuscripcionService.resolver_retencion_dias(False, ModoFreeTier.PRIVADO_BASICO) == 14
+    # Free - Opción B (Privado Básico por defecto): 7 días retención, granularidad agregada (3600s = 1 hora)
+    assert PoliticaSuscripcionService.resolver_retencion_dias(False, ModoFreeTier.PRIVADO_BASICO) == 7
     assert PoliticaSuscripcionService.resolver_intervalo_minimo_segundos(False, ModoFreeTier.PRIVADO_BASICO) == 3600
 
 

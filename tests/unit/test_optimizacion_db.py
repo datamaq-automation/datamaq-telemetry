@@ -699,7 +699,7 @@ def test_consultar_telemetria_modo_pro_y_free_bifurcado():
         )
     )
 
-    # Privado Básico: la retención es de 14 días (la lectura de hace 20 días no entra) y fuerza agregación (mínimo 1 hora)
+    # Privado Básico: la retención es de 7 días (la lectura de hace 20 días no entra) y fuerza agregación (mínimo 1 hora)
     lecturas_free_priv = consultar_uc.listar_instantaneas(
         dev_free_priv.id, limite=100, desde=ahora - timedelta(days=30), granularidad="raw"
     )

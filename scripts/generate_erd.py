@@ -132,10 +132,10 @@ def generate_full_markdown() -> str:
     )
     md_lines.append("| :--- | :--- | :---: | :---: | :---: | :--- |")
     md_lines.append(
-        "| `telemetry_instantaneous` | Series Temporales (V, I, P, FP) | 14 días (gran. horaria/5m) | 30 días (gran. 5 min / 1s) | 365 días (máxima resolución) | Batched `DELETE ... LIMIT 1000` |"
+        "| `telemetry_instantaneous` | Series Temporales (V, I, P, FP) | 7 días (gran. horaria/5m) | 30 días (gran. 5 min / 1s) | 365 días (máxima resolución) | Batched `DELETE ... LIMIT 1000` |"
     )
     md_lines.append(
-        "| `telemetry_energy` | Acumulados de Energía (kWh) | 14 días | 30 días | 365 días | Batched `DELETE ... LIMIT 1000` |"
+        "| `telemetry_energy` | Acumulados de Energía (kWh) | 7 días | 30 días | 365 días | Batched `DELETE ... LIMIT 1000` |"
     )
     md_lines.append(
         "| `device_status_logs` | Diagnóstico de Conectividad (Wi-Fi, IP) | 7 días | 15 días | 30 días | Batched `DELETE ... LIMIT 1000` |"

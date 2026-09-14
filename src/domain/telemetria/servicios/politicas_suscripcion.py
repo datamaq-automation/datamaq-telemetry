@@ -71,7 +71,7 @@ class PoliticaSuscripcionService:
             return 365
         if modo_free == ModoFreeTier.VITRINA_ANONIMA:
             return 30
-        return 14
+        return 7
 
     @staticmethod
     def resolver_intervalo_minimo_segundos(es_pro: bool, modo_free: ModoFreeTier) -> int:

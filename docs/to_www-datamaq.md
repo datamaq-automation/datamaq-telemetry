@@ -46,8 +46,8 @@ Al expirar los 60 días de la versión PRO sin una nueva consultoría, el client
 ### Opción B — Monitoreo Privado Básico (Por Defecto)
 * **Propuesta:** Los datos se mantienen **100% privados y confidenciales**, pero con resolución agregada para monitoreo general.
 * **Granularidad:** Resúmenes agregados horarios y diarios (no curvas sub-minutales).
-* **Retención:** 14 días de historial.
-* **Alertas:** Resumen semanal por email (sin alertas de micro-eventos por WhatsApp).
+* **Retención:** 7 días de historial.
+* **Alertas:** Sin notificaciones (email/WhatsApp deshabilitados; se reactivan con el plan pago).
 * **Efecto Comercial ("Gatillo de Consultoría"):** Cuando el cliente detecta un desvío o pico en su factura de luz, la baja resolución le indica que hubo un evento pero requiere la consultoría de DataMaq para hacer el diagnóstico fino y reactivar los 60 días de PRO.
 
 ---
