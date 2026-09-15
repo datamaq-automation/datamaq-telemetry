@@ -7,7 +7,19 @@ cd "$ROOT_DIR"
 
 if [ -d "venv" ]; then
     source venv/bin/activate
+    # `source activate` no garantiza que venv/bin quede primero en PATH (algunos shells
+    # reordenan tras el activate, ej. ~/.local/bin adelante) — sin esto, "pytest"/"pyright"
+    # a secas pueden resolver a un binario global sin las dependencias del proyecto
+    # instaladas, y el gauntlet falla con ImportError en vez de con un resultado real.
+    export PATH="$ROOT_DIR/venv/bin:$PATH"
 fi
+
+# Invocación por módulo (`python3 -m X`), no el script `venv/bin/X`: si el repo se movió
+# de carpeta después de crear el venv, el shebang de esos scripts queda apuntando a la
+# ruta vieja ("bad interpreter") mientras que `venv/bin/python3` (symlink al intérprete
+# del sistema) sigue siendo válido.
+PYTEST="python3 -m pytest"
+PYRIGHT="python3 -m pyright"
 
 export PYTHONPATH=.
 
@@ -59,19 +71,19 @@ run_stage() {
 run_stage "0" "Guard: sin .env reales trackeados" "bash scripts/guard_secrets.sh"
 
 # Stage 1: Integridad
-run_stage "1" "Integridad: __init__.py de 0 bytes" "pytest tests/test_empty_inits.py -q --no-header"
+run_stage "1" "Integridad: __init__.py de 0 bytes" "$PYTEST tests/test_empty_inits.py -q --no-header"
 
 # Stage 2: Estilo y Formato
 run_stage "2" "Estilo & Formato: ruff check + format" "ruff check . && ruff format --check ."
 
 # Stage 3: Tipado Estricto
-run_stage "3" "Tipado Estricto: pyright" "pyright"
+run_stage "3" "Tipado Estricto: pyright" "$PYRIGHT"
 
 # Stage 4: Tests Unitarios con Cobertura
-run_stage "4" "Tests Unitarios & Cobertura (>=85%)" "pytest tests/unit -n auto --cov=src --cov-report=term-missing:skip-covered --cov-fail-under=85 -o console_output_style=progress"
+run_stage "4" "Tests Unitarios & Cobertura (>=85%)" "$PYTEST tests/unit -n auto --cov=src --cov-report=term-missing:skip-covered --cov-fail-under=85 -o console_output_style=progress"
 
 # Stage 5: Tests de Integración
-run_stage "5" "Tests de Integración" "pytest tests/integration -n auto -q --no-header"
+run_stage "5" "Tests de Integración" "$PYTEST tests/integration -n auto -q --no-header"
 
 # Stage 6: Reglas de Arquitectura y Tamaño
 run_stage "6" "Clean Architecture & Tamaño de Código" "python3 scripts/verify_architecture.py && python3 scripts/verify_code_size.py"
