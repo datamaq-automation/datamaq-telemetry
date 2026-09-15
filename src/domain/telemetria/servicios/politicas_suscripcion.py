@@ -25,33 +25,17 @@ class PoliticaRetencionService:
 
 
 class PoliticaSuscripcionService:
-    """Reglas de ciclo de vida del Plan PRO y transición al modelo Freemium bifurcado.
+    """Reglas de vigencia del plan pago único y de la política Free por defecto.
 
-    - Toda nueva instalación incluye 60 días (2 meses) de Plan PRO.
-    - Cada consultoría garantiza 60 días de Plan PRO a partir de la fecha de realización (no acumulable).
-    - Vencido el plazo sin consultoría, la organización pasa al modo Free configurado (PRIVADO_BASICO por defecto o VITRINA_ANONIMA).
+    Sin PRO vigente, la organización opera en modo Free: 7 días de retención,
+    granularidad mínima de 1 hora, sin notificaciones.
     """
-
-    DURACION_INSTALACION_INICIAL_DIAS: int = 60
-    DURACION_CONSULTORIA_DIAS: int = 60
 
     @staticmethod
     def _normalizar_utc(dt: datetime) -> datetime:
         if dt.tzinfo is None:
             return dt.replace(tzinfo=timezone.utc)
         return dt.astimezone(timezone.utc)
-
-    @staticmethod
-    def calcular_vencimiento_inicial(fecha_instalacion: datetime) -> datetime:
-        return fecha_instalacion + timedelta(days=PoliticaSuscripcionService.DURACION_INSTALACION_INICIAL_DIAS)
-
-    @staticmethod
-    def extender_por_consultoria(vencimiento_actual: datetime, fecha_consultoria: datetime) -> datetime:
-        v_act = PoliticaSuscripcionService._normalizar_utc(vencimiento_actual)
-        f_cons = PoliticaSuscripcionService._normalizar_utc(fecha_consultoria)
-        nuevo_vencimiento = f_cons + timedelta(days=PoliticaSuscripcionService.DURACION_CONSULTORIA_DIAS)
-        res = max(v_act, nuevo_vencimiento)
-        return res if vencimiento_actual.tzinfo is not None else res.replace(tzinfo=None)
 
     @staticmethod
     def es_pro_vigente(vencimiento: datetime | None, ahora: datetime) -> bool:
