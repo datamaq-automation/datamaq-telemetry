@@ -51,14 +51,8 @@ class PoliticaSuscripcionService:
 
     @staticmethod
     def resolver_retencion_dias(es_pro: bool, modo_free: ModoFreeTier) -> int:
-        if es_pro:
-            return 365
-        if modo_free == ModoFreeTier.VITRINA_ANONIMA:
-            return 30
-        return 7
+        return 365 if es_pro else 7
 
     @staticmethod
     def resolver_intervalo_minimo_segundos(es_pro: bool, modo_free: ModoFreeTier) -> int:
-        if es_pro or modo_free == ModoFreeTier.VITRINA_ANONIMA:
-            return 0
-        return 3600  # En Privado Básico la granularidad mínima es de 1 hora
+        return 0 if es_pro else 3600

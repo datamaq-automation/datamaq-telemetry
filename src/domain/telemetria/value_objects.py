@@ -40,7 +40,6 @@ class VisibilidadPlan(str, Enum):
 
 
 class ModoFreeTier(str, Enum):
-    VITRINA_ANONIMA = "VITRINA_ANONIMA"
     PRIVADO_BASICO = "PRIVADO_BASICO"
 
 

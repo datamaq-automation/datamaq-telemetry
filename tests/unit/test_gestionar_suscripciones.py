@@ -70,13 +70,12 @@ def test_activar_o_extender_preserva_modo_free_previo():
     hasta = datetime.now(timezone.utc) + timedelta(days=30)
     uc.activar_o_extender("org-1", plan_id, hasta)
 
-    # Simula que la organización tenía vitrina anónima antes de pagar.
     actual = repo_suscripciones.obtener_por_organizacion("org-1")
-    actual.modo_free = ModoFreeTier.VITRINA_ANONIMA
+    actual.modo_free = ModoFreeTier.PRIVADO_BASICO
     repo_suscripciones.guardar(actual)
 
     extendida = uc.activar_o_extender("org-1", plan_id, hasta + timedelta(days=30))
-    assert extendida.modo_free is ModoFreeTier.VITRINA_ANONIMA
+    assert extendida.modo_free is ModoFreeTier.PRIVADO_BASICO
 
 
 def test_cancelar_baja_inmediata_sin_esperar_vencimiento():

@@ -29,9 +29,9 @@ def test_guardar_crea_y_actualiza():
     repo = MySQLSuscripcionesRepository(_session())
     vence = datetime(2026, 12, 31, tzinfo=timezone.utc)
     creada = repo.guardar(
-        Suscripcion(organizacion_id="org-1", plan_id=None, pro_vence_en=vence, modo_free=ModoFreeTier.VITRINA_ANONIMA)
+        Suscripcion(organizacion_id="org-1", plan_id=None, pro_vence_en=vence, modo_free=ModoFreeTier.PRIVADO_BASICO)
     )
-    assert creada.modo_free is ModoFreeTier.VITRINA_ANONIMA
+    assert creada.modo_free is ModoFreeTier.PRIVADO_BASICO
     assert creada.pro_vence_en is not None and creada.pro_vence_en.date() == vence.date()
 
     repo.guardar(Suscripcion(organizacion_id="org-1", modo_free=ModoFreeTier.PRIVADO_BASICO))
