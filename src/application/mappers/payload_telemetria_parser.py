@@ -6,6 +6,7 @@ from typing import Any
 from src.application.mappers.energia_parser import EnergiaPayloadParser
 from src.application.mappers.fase_parser import (
     acotar_payload_bruto,
+    invertir_fase_ct,
     parse_fase,
     parse_timestamp,
     sanear_entero,
@@ -300,6 +301,16 @@ class TelemetriaPayloadParser:
         fase_r = parse_fase(data_r, suffix="_r")
         fase_s = parse_fase(data_s, suffix="_s")
         fase_t = parse_fase(data_t, suffix="_t")
+
+        fases_invertidas = {
+            f.strip().upper() for f in (getattr(dispositivo, "ct_fases_invertidas", "") or "").split(",") if f.strip()
+        }
+        if "R" in fases_invertidas:
+            fase_r = invertir_fase_ct(fase_r)
+        if "S" in fases_invertidas:
+            fase_s = invertir_fase_ct(fase_s)
+        if "T" in fases_invertidas:
+            fase_t = invertir_fase_ct(fase_t)
 
         if "R" not in fases_con_ti_set:
             fase_r = AnalizadorCalidadEnergiaService.sanear_fase_sin_ti(fase_r)

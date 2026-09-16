@@ -88,6 +88,27 @@ def _extraer_metrica(data: dict[str, Any], metrica: str, suffix: str = "") -> An
     return None
 
 
+def invertir_fase_ct(fase: MedicionFase) -> MedicionFase:
+    """Corrige una fase cuyo TI está clampeado al revés (180° de fase).
+
+    Un TI invertido reporta P y Q con signo opuesto al real; V, I y S no
+    dependen del sentido del TI y quedan sin cambios.
+    """
+    p = fase.potencia_activa
+    q = fase.potencia_reactiva
+    fp = fase.factor_potencia
+    return MedicionFase(
+        tension=fase.tension,
+        corriente=fase.corriente,
+        potencia_activa=PotenciaActiva(vatios=-p.vatios) if p is not None else None,
+        potencia_reactiva=PotenciaReactiva(var=-q.var) if q is not None else None,
+        potencia_aparente=fase.potencia_aparente,
+        factor_potencia=FactorPotencia(valor=-fp.valor) if fp is not None else None,
+        thd_v_porcentaje=fase.thd_v_porcentaje,
+        thd_i_porcentaje=fase.thd_i_porcentaje,
+    )
+
+
 def parse_fase(data: Any, suffix: str = "") -> MedicionFase:
     """Parsea mediciones de una fase individual soportando múltiples convenciones de firmware."""
     if not isinstance(data, dict):

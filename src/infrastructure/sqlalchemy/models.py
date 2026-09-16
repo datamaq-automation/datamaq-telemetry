@@ -94,6 +94,7 @@ class DeviceModel(Base):
     last_seen_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
     installation_type: Mapped[str] = mapped_column(String(30), default="CONSUMO", nullable=False)
     phases_with_ct: Mapped[str] = mapped_column(String(20), default="R,S,T", nullable=False)
+    ct_inverted_phases: Mapped[str] = mapped_column(String(20), default="", nullable=False)
     categoria_tarifaria: Mapped[str] = mapped_column(String(10), default="T2", nullable=False)
     penalizacion_reactiva_aplica: Mapped[bool] = mapped_column(default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)

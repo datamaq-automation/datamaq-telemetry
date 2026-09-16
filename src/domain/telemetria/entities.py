@@ -194,6 +194,7 @@ class Dispositivo:
     visto_por_ultima_vez: datetime | None = None
     tipo_instalacion: str = "CONSUMO"
     fases_con_ti: str = "R,S,T"
+    ct_fases_invertidas: str = ""
     potencia_contratada_kw: float | None = None
     tarifa: str | None = None
     categoria_tarifaria: str | None = "T2"
