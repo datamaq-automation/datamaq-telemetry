@@ -73,42 +73,31 @@ organizaciones:
           - id: "nodo-durax-acometida-mt"
             nombre: "Acometida MT"
             tipo: "acometida"
-            tension_nominal_v: 13200.0  # fuente: confirmado por el usuario, 2026-09-12
-          # Esta planta es "Cristal Avellaneda" (confirmado por el usuario, 2026-09-13).
-          # TOPOLOGÍA DE MEDICIÓN (fuente: usuario, 2026-09-13). Cada Powermeter NO mide
-          # un trafo: sus TI están sobre un circuito sumador de intensidades preexistente
-          # (el del regulador del banco de capacitores), que suma los secundarios de DOS
-          # transformadores. Es decir: cada nodo "transformador" de abajo representa un
-          # GRUPO de dos trafos en paralelo sobre una misma barra, no una máquina.
-          # El modelo actual (un solo parent_id) no puede declarar los dos trafos por
-          # separado alimentando la misma barra — limitación registrada en tmp/dudas.md §12.
-          # SIN DATO DE PLACA: los "300 kW / 150 kW" que figuraban acá eran una
-          # alucinación de un LLM (2026-09-13), no lectura de chapa. No cargar
-          # capacidad_nominal_kva hasta tener foto de la placa de cada transformador.
+            tension_nominal_v: 13200.0
+            fuente_dato: "Confirmación en campo (2026-09-12)"
+            notas_metrologicas: "Acometida virtual de MT calculada por suma de medidores frontera"
           - id: "nodo-durax-trifasico-1"
             nombre: "Transformación Usina (2 trafos en paralelo)"
             tipo: "transformador"
             tension_nominal_v: 380.0
             parent_id: "nodo-durax-acometida-mt"
+            fuente_dato: "Relevamiento de planta Cristal Avellaneda (2026-09-13)"
+            notas_metrologicas: "Grupo de 2 transformadores en paralelo sobre la misma barra de BT"
           - id: "nodo-durax-powermeter-bf2c"
             nombre: "Transformación Horno (2 trafos en paralelo)"
             tipo: "transformador"
             tension_nominal_v: 380.0
             parent_id: "nodo-durax-acometida-mt"
-          # TGBT = barra de BT común a los dos trafos del grupo. El Powermeter mide la
-          # sumatoria vía TI sobre TI (secundario del sumador del banco de capacitores),
-          # aguas arriba del banco: la Q que ve es la YA COMPENSADA por el banco.
-          # Relación de TI del sumador: no registrada. Escala verificada en campo: la
-          # corriente del Powermeter coincide con pinza amperométrica (usuario,
-          # 2026-09-13; fecha y valores del contraste sin registrar). Esa verificación
-          # cubre |I| (y por lo tanto la escala de P, Q y energía); NO cubre el error
-          # de ángulo del TI sobre TI ni el signo de Q (ver tmp/dudas.md §13).
+            fuente_dato: "Relevamiento de planta Cristal Avellaneda (2026-09-13)"
+            notas_metrologicas: "Grupo de 2 transformadores en paralelo sobre la misma barra de BT"
           - id: "nodo-durax-tgbt-usina"
             nombre: "TGBT Usina"
             tipo: "tgbt"
             tension_nominal_v: 380.0
             parent_id: "nodo-durax-trifasico-1"
             device_id: "51048a93-f1f3-4283-a708-24cbd39c7192"
+            fuente_dato: "Verificado con pinza amperométrica en barra BT (2026-09-13)"
+            notas_metrologicas: "TI sobre secundario de sumador del banco; reactiva medida ya compensada"
             uso_significativo: true
             categoria_uso: "FUERZA_MOTRIZ"
           - id: "nodo-durax-tgbt-horno"

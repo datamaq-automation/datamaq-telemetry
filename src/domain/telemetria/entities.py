@@ -112,6 +112,8 @@ class NodoUnifilar:
     # suministro). Los medidores aguas abajo lo heredan por el árbol.
     categoria_tarifaria: str | None = None
     penalizacion_reactiva_aplica: bool | None = None
+    fuente_dato: str | None = None
+    notas_metrologicas: str | None = None
     creado_en: datetime = field(default_factory=ahora_utc)
     actualizado_en: datetime = field(default_factory=ahora_utc)
 

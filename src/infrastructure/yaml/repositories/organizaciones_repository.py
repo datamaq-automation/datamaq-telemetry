@@ -119,6 +119,8 @@ class YamlOrganizacionesRepository(RepositorioOrganizacionesPort):
                                     if n.get("penalizacion_reactiva_aplica") is not None
                                     else None
                                 ),
+                                fuente_dato=n.get("fuente_dato"),
+                                notas_metrologicas=n.get("notas_metrologicas"),
                             )
                         )
 

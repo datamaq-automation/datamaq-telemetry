@@ -39,6 +39,8 @@ class PlantaEstructuraMapper:
             categoria_uso=entity.categoria_uso,
             variable_relevante=entity.variable_relevante,
             orden=entity.orden,
+            fuente_dato=entity.fuente_dato,
+            notas_metrologicas=entity.notas_metrologicas,
         )
 
     @staticmethod

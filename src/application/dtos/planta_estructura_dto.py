@@ -26,6 +26,8 @@ class NodoUnifilarDTO(BaseModel):
     categoria_uso: str | None = None
     variable_relevante: str | None = None
     orden: int = 0
+    fuente_dato: str | None = None
+    notas_metrologicas: str | None = None
     model_config = ConfigDict(from_attributes=True)
 
 
