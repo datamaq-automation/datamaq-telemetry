@@ -178,3 +178,6 @@ organizaciones:
             device_id: "ce7e5a9a-c5e8-4936-be9a-a2057ccf8b4c"
             uso_significativo: true
             categoria_uso: "FUERZA_MOTRIZ"
+  - id: "20857cb6-eff2-4bd4-8cb9-36e4c63bcee3"
+    nombre: "Cooperativa de Trabajo Los Constituyentes Ltda."
+    plantas: []
