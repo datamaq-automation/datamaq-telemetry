@@ -259,5 +259,8 @@ class ConsultarTelemetriaUseCase:
                 fase_t=MedicionFase(),
             )
 
-        diag = AnalizadorFasorialService.diagnosticar_lectura(dev.id, lectura)
+        fases_ti = (
+            [f.strip().upper() for f in dev.fases_con_ti.split(",")] if getattr(dev, "fases_con_ti", None) else None
+        )
+        diag = AnalizadorFasorialService.diagnosticar_lectura(dev.id, lectura, fases_con_ti=fases_ti)
         return TelemetriaMapper.diagnostico_fasorial_to_dto(diag)

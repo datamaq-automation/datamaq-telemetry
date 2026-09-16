@@ -163,7 +163,7 @@ def _evaluar_ti_fn(
     repo: RepositorioTelemetriaPort,
     pub: PublicadorEventosPort | None,
     log: LoggerPort | None,
-) -> tuple[list[AlertaDispositivo], list[AlertaDispositivo], list[AlertaDispositivo]]:
+) -> tuple[list[AlertaDispositivo], list[AlertaDispositivo], list[AlertaDispositivo], list[AlertaDispositivo]]:
     tipo_inst = getattr(dispositivo, "tipo_instalacion", "CONSUMO")
     fases_ti_list = [f.strip().upper() for f in getattr(dispositivo, "fases_con_ti", "R,S,T").split(",")]
     alertas_ti_raw = AnalizadorCalidadEnergiaService.evaluar_alerta_ti_invertido(
@@ -205,7 +205,19 @@ def _evaluar_ti_fn(
         if a_filtrada:
             _despachar_alerta_fn(a_filtrada, mac_raw, repo, pub, log, dispositivo)
 
-    return alertas_ti_raw, alertas_cruce_raw, alertas_misma_fase_raw
+    alertas_desconectado_raw = AnalizadorCalidadEnergiaService.evaluar_alerta_ti_desconectado(
+        dispositivo_id=dispositivo.id,
+        lectura=lectura,
+        fases_con_ti=fases_ti_list,
+    )
+    for a_desc in alertas_desconectado_raw:
+        a_filtrada = ProcesadorAlertasIngesta._filtro_persistencia.procesar_alerta(
+            dispositivo.id, a_desc, categoria=f"TI_DESCONECTADO_{a_desc.mensaje[:50]}", ahora=recorded_at
+        )
+        if a_filtrada:
+            _despachar_alerta_fn(a_filtrada, mac_raw, repo, pub, log, dispositivo)
+
+    return alertas_ti_raw, alertas_cruce_raw, alertas_misma_fase_raw, alertas_desconectado_raw
 
 
 def _evaluar_fp_fn(
@@ -290,7 +302,9 @@ class ProcesadorAlertasIngesta:
         recorded_at: datetime,
         tension_raw: AlertaDispositivo | None,
         desbalance_raw: tuple[AlertaDispositivo | None, AlertaDispositivo | None],
-        ti_raw: tuple[list[AlertaDispositivo], list[AlertaDispositivo], list[AlertaDispositivo]],
+        ti_raw: tuple[
+            list[AlertaDispositivo], list[AlertaDispositivo], list[AlertaDispositivo], list[AlertaDispositivo]
+        ],
         fp_raw: tuple[AlertaDispositivo | None, AlertaDispositivo | None],
         thd_raw: list[AlertaDispositivo],
         repo: RepositorioTelemetriaPort,
@@ -314,13 +328,15 @@ class ProcesadorAlertasIngesta:
                 pub,
                 log,
             )
-        ti_inv, ti_cruce, ti_misma_fase = ti_raw
+        ti_inv, ti_cruce, ti_misma_fase, ti_desconectado = ti_raw
         if not ti_inv:
             cls._auto_resolver_alertas(dispositivo_id, mac_raw, ["TI_INVERTIDO"], recorded_at, repo, pub, log)
         if not ti_cruce:
             cls._auto_resolver_alertas(dispositivo_id, mac_raw, ["CRUCE_TI_FASE"], recorded_at, repo, pub, log)
         if not ti_misma_fase:
             cls._auto_resolver_alertas(dispositivo_id, mac_raw, ["TIS_EN_MISMA_FASE"], recorded_at, repo, pub, log)
+        if not ti_desconectado:
+            cls._auto_resolver_alertas(dispositivo_id, mac_raw, ["TI_DESCONECTADO"], recorded_at, repo, pub, log)
         fp_bajo, fp_sobrecomp = fp_raw
         if fp_bajo is None:
             cls._auto_resolver_alertas(dispositivo_id, mac_raw, ["BAJO_FACTOR_POTENCIA"], recorded_at, repo, pub, log)

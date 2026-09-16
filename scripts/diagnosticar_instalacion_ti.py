@@ -53,6 +53,72 @@ def calcular_angulo_fp(fp: float | None) -> float:
     return math.degrees(math.acos(val))
 
 
+def _evaluar_ti_desconectado(
+    dispositivo_id: str,
+    lectura: LecturaInstantanea,
+    fases_con_ti: list[str] | set[str] | None = None,
+) -> list[object]:
+    if hasattr(AnalizadorCalidadEnergiaService, "evaluar_alerta_ti_desconectado"):
+        return AnalizadorCalidadEnergiaService.evaluar_alerta_ti_desconectado(
+            dispositivo_id=dispositivo_id,
+            lectura=lectura,
+            fases_con_ti=fases_con_ti,
+        )
+
+    # Fallback si el script corre contra un entorno remoto que no desplegó la versión más reciente
+    from datetime import datetime, timezone
+
+    from src.domain.telemetria.entities import AlertaDispositivo
+    from src.domain.telemetria.value_objects import SeveridadAlerta
+
+    fases_activas = {f.strip().upper() for f in fases_con_ti} if fases_con_ti else {"R", "S", "T"}
+    fases_map = {"R": lectura.fase_r, "S": lectura.fase_s, "T": lectura.fase_t}
+
+    corrientes_activas = [
+        med.corriente.amperios
+        for nombre, med in fases_map.items()
+        if nombre in fases_activas and med.corriente and med.corriente.amperios is not None
+    ]
+    if not corrientes_activas:
+        return []
+
+    i_max = max(corrientes_activas)
+    if i_max < 10.0:
+        return []
+
+    t_disparo = lectura.registrado_en if (lectura and lectura.registrado_en is not None) else datetime.now(timezone.utc)
+    alertas: list[object] = []
+
+    for nombre, med in fases_map.items():
+        if nombre not in fases_activas:
+            continue
+        v = med.tension.voltios if med.tension else None
+        i = med.corriente.amperios if med.corriente else 0.0
+        if v is not None and v >= 180.0 and i <= 0.5:
+            alertas.append(
+                AlertaDispositivo(
+                    id=None,
+                    dispositivo_id=dispositivo_id,
+                    tipo_alerta="TI_DESCONECTADO",
+                    severidad=SeveridadAlerta.CRITICAL,
+                    mensaje=(
+                        f"Posible Transformador de Corriente (TI) desconectado en Fase {nombre}: "
+                        f"Tensión nominal presente ({v:.1f} V) pero corriente nula ({i:.1f} A) "
+                        f"mientras otras fases registran carga ({i_max:.1f} A). "
+                        f"Circuito secundario abierto o TI no abrazando el conductor."
+                    ),
+                    disparada_en=t_disparo,
+                    fase=nombre,
+                    valor_medido=round(i, 2),
+                    valor_umbral=0.5,
+                    unidad="A",
+                    categoria="INSTALACION",
+                    observaciones=f"Verificar cableado de bornera y conexión del núcleo toroidal en Fase {nombre}.",
+                )
+            )
+    return alertas
+
+
 def diagnosticar_lectura(
     lectura: LecturaInstantanea,
     fases_con_ti: list[str],
@@ -112,7 +178,21 @@ def diagnosticar_lectura(
                 f"y la entrada de corriente (I) del medidor."
             )
 
-    # 4. Evaluar Sobrecompensación reactiva
+    # 4. Evaluar TI Desconectado
+    alertas_desconectado = _evaluar_ti_desconectado(
+        dispositivo_id=lectura.dispositivo_id or "diagnostico",
+        lectura=lectura,
+        fases_con_ti=fases_con_ti,
+    )
+    for a in alertas_desconectado:
+        es_critico = True
+        hallazgos.append(f"[CRÍTICO] TI Desconectado: {a.mensaje}")
+        recomendaciones.append(
+            f"Fase {a.fase}: Verificar el cableado en tablero. Tensión presente pero corriente nula con carga en otras fases. "
+            f"Asegurar apriete en bornera del medidor y verificar que el núcleo del TI esté cerrado y abrazando el conductor."
+        )
+
+    # 5. Evaluar Sobrecompensación reactiva
     alerta_sobrecomp = AnalizadorCalidadEnergiaService.evaluar_alerta_sobrecompensacion_reactiva(
         dispositivo_id=lectura.dispositivo_id or "diagnostico",
         lectura=lectura,
@@ -302,7 +382,7 @@ def main() -> int:
             if args.mac:
                 from src.domain.telemetria.value_objects import MacAddress
 
-                dispositivo = repo_disp.obtener_por_mac(MacAddress(args.mac))
+                dispositivo = repo_disp.obtener_por_uid(MacAddress(args.mac))
             elif args.dispositivo_id:
                 dispositivo = repo_disp.obtener_por_id(args.dispositivo_id)
 
@@ -310,7 +390,7 @@ def main() -> int:
                 print(f"Error: Dispositivo no encontrado ({args.mac or args.dispositivo_id}).")
                 return 1
 
-            lectura = repo_telem.obtener_ultima_lectura(dispositivo.id)
+            lectura = repo_telem.obtener_ultima_instantanea(dispositivo.id)
             if not lectura:
                 print(f"No se encontraron lecturas de telemetría para el dispositivo {dispositivo.id}.")
                 return 1

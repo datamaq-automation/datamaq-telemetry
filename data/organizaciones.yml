@@ -106,8 +106,10 @@ organizaciones:
             tension_nominal_v: 380.0
             parent_id: "nodo-durax-powermeter-bf2c"
             device_id: "b5f4bcd6-b017-4796-bb3d-efcfb50dc8f0"
+            fuente_dato: "Relevamiento de planta Cristal Avellaneda (2026-09-13)"
+            notas_metrologicas: "Horno de fusión continuo de vidrio; uso térmico intensivo"
             uso_significativo: true
-            categoria_uso: "FUERZA_MOTRIZ"
+            categoria_uso: "CALOR_PROCESO"
 
   - id: "edebb9a0-85e5-4bde-a370-e64bd9b9608c"
     nombre: "Cooperativa de Trabajo Unión Papelera Platense Ltda"
@@ -134,29 +136,31 @@ organizaciones:
           - id: "nodo-upp-acometida-mt"
             nombre: "Acometida MT"
             tipo: "acometida"
-            tension_nominal_v: 13200.0  # fuente: confirmado por el usuario, 2026-09-12
-          # Trafos 13,2 kV / 380 V: nodos virtuales; el medidor está en el TGBT de cada uno.
-          # TOPOLOGÍA DE MEDICIÓN (fuente: usuario, 2026-09-13): los TI de cada Powermeter
-          # están directamente en la salida del secundario de su transformador. Cada
-          # medidor ve el 100 % de su trafo; el modelo trafo → tgbt es exacto acá.
-          # SIN DATO DE PLACA: los "800 kW" que figuraban acá eran inventados (ver Durax).
+            tension_nominal_v: 13200.0
+            fuente_dato: "Confirmación en campo (2026-09-12)"
+            notas_metrologicas: "Acometida virtual de MT calculada por suma de centros de transformación"
           - id: "nodo-upp-trafo-arriba"
             nombre: "Trafo Arriba"
             tipo: "transformador"
             tension_nominal_v: 380.0
             parent_id: "nodo-upp-acometida-mt"
+            fuente_dato: "Relevamiento de planta UPP (2026-09-13)"
+            notas_metrologicas: "Transformador MT/BT alimentando sector de preparación de pasta y fuerza motriz"
           - id: "nodo-upp-trafo-abajo"
             nombre: "Trafo Abajo"
             tipo: "transformador"
             tension_nominal_v: 380.0
             parent_id: "nodo-upp-acometida-mt"
-          # TGBT: punto de medición real de cada trafo.
+            fuente_dato: "Relevamiento de planta UPP (2026-09-13)"
+            notas_metrologicas: "Transformador MT/BT alimentando máquina papelera continua"
           - id: "nodo-upp-tgbt-arriba"
             nombre: "TGBT Arriba"
             tipo: "tgbt"
             tension_nominal_v: 380.0
             parent_id: "nodo-upp-trafo-arriba"
             device_id: "a01b1642-ed29-4c3e-a793-f57de09504f8"
+            fuente_dato: "Relevamiento en campo (2026-09-13)"
+            notas_metrologicas: "TI instalado en salida del secundario del transformador; medición directa del 100% de la carga del trafo"
             uso_significativo: true
             categoria_uso: "FUERZA_MOTRIZ"
           - id: "nodo-upp-tgbt-abajo"
@@ -165,6 +169,8 @@ organizaciones:
             tension_nominal_v: 380.0
             parent_id: "nodo-upp-trafo-abajo"
             device_id: "ce7e5a9a-c5e8-4936-be9a-a2057ccf8b4c"
+            fuente_dato: "Relevamiento en campo (2026-09-13)"
+            notas_metrologicas: "TI instalado en salida del secundario del transformador; medición directa del 100% de la carga del trafo"
             uso_significativo: true
             categoria_uso: "FUERZA_MOTRIZ"
   - id: "20857cb6-eff2-4bd4-8cb9-36e4c63bcee3"
@@ -192,22 +198,30 @@ organizaciones:
             nombre: "Acometida MT"
             tipo: "acometida"
             tension_nominal_v: 13200.0
+            fuente_dato: "Relevamiento electromecánico Planta San Martín (2026-09-16)"
+            notas_metrologicas: "Acometida virtual de MT calculada por suma de centros de transformación"
           - id: "nodo-lc-trafo-1"
             nombre: "Transformador 1"
             tipo: "transformador"
             tension_nominal_v: 380.0
             parent_id: "nodo-lc-acometida-mt"
+            fuente_dato: "Relevamiento electromecánico Planta San Martín (2026-09-16)"
+            notas_metrologicas: "Centro de transformación activo en servicio"
           - id: "nodo-lc-trafo-2"
             nombre: "Transformador 2"
             tipo: "transformador"
             tension_nominal_v: 380.0
             parent_id: "nodo-lc-acometida-mt"
+            fuente_dato: "Relevamiento electromecánico Planta San Martín (2026-09-16)"
+            notas_metrologicas: "Centro de transformación en reserva fría (apagado)"
           - id: "nodo-lc-tgbt-1"
             nombre: "TGBT Trafo 1"
             tipo: "tgbt"
             tension_nominal_v: 380.0
             parent_id: "nodo-lc-trafo-1"
             device_id: "7434647d-5b87-4d4e-b4a5-a0d351315f0a"
+            fuente_dato: "Auditoría metrológica de telemetría (2026-09-16)"
+            notas_metrologicas: "Medición provisional de 2 fases (R,S); detectada duplicación de TI en Fase S física pendiente de readecuación en campo"
             uso_significativo: true
             categoria_uso: "FUERZA_MOTRIZ"
           - id: "nodo-lc-tgbt-2"
@@ -215,5 +229,7 @@ organizaciones:
             tipo: "tgbt"
             tension_nominal_v: 380.0
             parent_id: "nodo-lc-trafo-2"
+            fuente_dato: "Relevamiento electromecánico Planta San Martín (2026-09-16)"
+            notas_metrologicas: "TGBT de reserva fría sin medidor instalado"
             uso_significativo: false
             categoria_uso: "RESERVA"

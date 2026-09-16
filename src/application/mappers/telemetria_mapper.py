@@ -147,8 +147,9 @@ class TelemetriaMapper:
         from src.application.dtos.telemetria_dto import DiagnosticoFaseDTO
 
         def _map_fase(fase_diag: object) -> DiagnosticoFaseDTO:
+            fp_orig = getattr(fase_diag, "fp_original", None)
             return DiagnosticoFaseDTO(
-                fp_original=getattr(fase_diag, "fp_original", None),
+                fp_original=fp_orig,
                 angulo_phi_grados=getattr(fase_diag, "phi_deg_original", None),
                 potencia_activa_w=getattr(fase_diag, "potencia_activa_w", None),
                 potencia_reactiva_var=getattr(fase_diag, "potencia_reactiva_var", None),
@@ -157,15 +158,33 @@ class TelemetriaMapper:
                 potencia_activa_con_rotacion_optima_w=getattr(fase_diag, "p_con_rotacion_optima_w", None),
                 potencia_reactiva_con_rotacion_optima_var=getattr(fase_diag, "q_con_rotacion_optima_var", None),
                 rotaciones_evaluadas=getattr(fase_diag, "rotaciones_evaluadas", None),
+                tension_v=getattr(fase_diag, "tension_v", None),
+                corriente_a=getattr(fase_diag, "corriente_a", None),
+                factor_potencia=fp_orig,
+                angulo_fasorial_grados=getattr(fase_diag, "angulo_fasorial_grados", None),
+                tc_invertido_180=getattr(fase_diag, "tc_invertido_180", False),
+                estado_ti=getattr(fase_diag, "estado_ti", "CORRECTO"),
             )
 
         evaluado = diag.evaluado_en or datetime.now(timezone.utc)
+        fase_r_dto = _map_fase(diag.fase_r)
+        fase_s_dto = _map_fase(diag.fase_s)
+        fase_t_dto = _map_fase(diag.fase_t)
+
         return DiagnosticoFasesDispositivoDTO(
             dispositivo_id=diag.dispositivo_id,
             evaluado_en=evaluado,
-            fase_r=_map_fase(diag.fase_r),
-            fase_s=_map_fase(diag.fase_s),
-            fase_t=_map_fase(diag.fase_t),
+            fase_r=fase_r_dto,
+            fase_s=fase_s_dto,
+            fase_t=fase_t_dto,
             diagnostico_general=diag.diagnostico_general,
             recomendacion_hardware=diag.recomendacion_hardware,
+            fases={
+                "R": fase_r_dto,
+                "S": fase_s_dto,
+                "T": fase_t_dto,
+            },
+            secuencia_fases=getattr(diag, "secuencia_fases", "DIRECTA"),
+            rotacion_correcta=getattr(diag, "rotacion_correcta", True),
+            alertas_fasoriales=list(getattr(diag, "alertas_fasoriales", ())),
         )

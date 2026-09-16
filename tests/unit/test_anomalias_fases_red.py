@@ -592,3 +592,63 @@ def test_procesador_alertas_ingesta_tis_en_misma_fase():
     )
 
     assert alerta_guardada.esta_resuelta is True
+
+
+def test_evaluar_alerta_ti_desconectado():
+    ahora = datetime.now(timezone.utc)
+
+    # Caso Constituyentes: Fase R=285A, Fase S=284A, Fase T=0A con tension normal 220V
+    lectura_ti_desconectado = LecturaInstantanea(
+        id=None,
+        dispositivo_id="dev-constituyentes",
+        registrado_en=ahora,
+        fase_r=MedicionFase(
+            tension=Tension(220.3),
+            corriente=Corriente(285.2),
+            potencia_activa=PotenciaActiva(1188.0),
+            factor_potencia=FactorPotencia(0.02),
+        ),
+        fase_s=MedicionFase(
+            tension=Tension(219.1),
+            corriente=Corriente(283.7),
+            potencia_activa=PotenciaActiva(52575.0),
+            factor_potencia=FactorPotencia(0.85),
+        ),
+        fase_t=MedicionFase(
+            tension=Tension(217.2),
+            corriente=Corriente(0.0),
+            potencia_activa=PotenciaActiva(0.0),
+            factor_potencia=FactorPotencia(1.0),
+        ),
+    )
+
+    alertas = AnalizadorCalidadEnergiaService.evaluar_alerta_ti_desconectado(
+        "dev-constituyentes", lectura_ti_desconectado, fases_con_ti=["R", "S", "T"]
+    )
+    assert len(alertas) == 1
+    alerta = alertas[0]
+    assert alerta.tipo_alerta == "TI_DESCONECTADO"
+    assert alerta.severidad == SeveridadAlerta.CRITICAL
+    assert alerta.fase == "T"
+    assert "Fase T" in alerta.mensaje
+    assert "corriente nula" in alerta.mensaje
+
+    # Si la fase T no estaba habilitada en fases_con_ti (ej. instalacion bifasica intencional), no debe alertar
+    alertas_bifasico = AnalizadorCalidadEnergiaService.evaluar_alerta_ti_desconectado(
+        "dev-constituyentes", lectura_ti_desconectado, fases_con_ti=["R", "S"]
+    )
+    assert len(alertas_bifasico) == 0
+
+    # Si todas las fases estan apagadas o carga < 10A, no debe alertar desconexion de TI
+    lectura_apagada = LecturaInstantanea(
+        id=None,
+        dispositivo_id="dev-constituyentes",
+        registrado_en=ahora,
+        fase_r=MedicionFase(tension=Tension(220.0), corriente=Corriente(0.0)),
+        fase_s=MedicionFase(tension=Tension(220.0), corriente=Corriente(0.0)),
+        fase_t=MedicionFase(tension=Tension(220.0), corriente=Corriente(0.0)),
+    )
+    alertas_apagado = AnalizadorCalidadEnergiaService.evaluar_alerta_ti_desconectado(
+        "dev-constituyentes", lectura_apagada, fases_con_ti=["R", "S", "T"]
+    )
+    assert len(alertas_apagado) == 0

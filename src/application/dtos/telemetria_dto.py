@@ -106,6 +106,12 @@ class DiagnosticoFaseDTO(BaseModel):
     potencia_activa_con_rotacion_optima_w: float | None = None
     potencia_reactiva_con_rotacion_optima_var: float | None = None
     rotaciones_evaluadas: dict[str, dict[str, float]] | None = None
+    tension_v: float | None = None
+    corriente_a: float | None = None
+    factor_potencia: float | None = None
+    angulo_fasorial_grados: float | None = None
+    tc_invertido_180: bool = False
+    estado_ti: str = "CORRECTO"
 
 
 class DiagnosticoFasesDispositivoDTO(BaseModel):
@@ -116,3 +122,7 @@ class DiagnosticoFasesDispositivoDTO(BaseModel):
     fase_t: DiagnosticoFaseDTO
     diagnostico_general: str
     recomendacion_hardware: str
+    fases: dict[str, DiagnosticoFaseDTO] | None = None
+    secuencia_fases: str = "DIRECTA"
+    rotacion_correcta: bool = True
+    alertas_fasoriales: list[str] = []
