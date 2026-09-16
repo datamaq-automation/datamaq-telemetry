@@ -6,6 +6,9 @@ from src.domain.telemetria.entities import AlertaDispositivo, LecturaInstantanea
 from src.domain.telemetria.servicios.analizador_calidad_metrologica import (
     AnalizadorMetrologicoService,
 )
+from src.domain.telemetria.servicios.evaluador_tis_misma_fase import (
+    EvaluadorTisMismaFaseService,
+)
 from src.domain.telemetria.value_objects import SeveridadAlerta
 
 
@@ -93,6 +96,8 @@ class EvaluadorAnomaliasFasesService:
                     )
 
         return alertas
+
+    evaluar_alerta_tis_en_misma_fase = EvaluadorTisMismaFaseService.evaluar_alerta_tis_en_misma_fase
 
     @staticmethod
     def evaluar_alerta_desbalance_corriente(

@@ -34,6 +34,9 @@ from src.domain.telemetria.servicios.evaluador_alertas_calidad import (
 from src.domain.telemetria.servicios.evaluador_anomalias_fases import (
     EvaluadorAnomaliasFasesService,
 )
+from src.domain.telemetria.servicios.evaluador_tis_misma_fase import (
+    EvaluadorTisMismaFaseService,
+)
 from src.domain.telemetria.servicios.persistencia_alertas import (
     FiltroPersistenciaTemporalService,
 )
@@ -64,6 +67,7 @@ __all__ = [
     "EvaluacionRotacionFase",
     "EvaluadorAlertasCalidadService",
     "EvaluadorAnomaliasFasesService",
+    "EvaluadorTisMismaFaseService",
     "FiltroDeduplicacionService",
     "FiltroPersistenciaTemporalService",
     "PoliticaRetencionService",
