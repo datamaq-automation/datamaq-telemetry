@@ -23,7 +23,7 @@ class GestionarPlantaEstructuraUseCase:
         self.repo_organizaciones = repo_organizaciones
         self.repo_maquinas = repo_maquinas
 
-    def _resolver_planta(self, planta_id: str | None = None, organizacion_id: str | None = None) -> Planta:
+    def _resolver_planta(self, planta_id: str | None = None, organizacion_id: str | None = None) -> Planta | None:
         if planta_id:
             planta = self.repo_organizaciones.obtener_planta_por_id(planta_id)
             if planta:
@@ -33,10 +33,12 @@ class GestionarPlantaEstructuraUseCase:
         plantas = self.repo_organizaciones.listar_plantas(organizacion_id)
         if plantas:
             return plantas[0]
-        raise PlantaNoEncontradaError("No se encontraron plantas configuradas.")
+        return None
 
     def obtener_unifilar(self, planta_id: str | None = None, organizacion_id: str | None = None) -> UnifilarPlantaDTO:
         planta = self._resolver_planta(planta_id, organizacion_id)
+        if planta is None:
+            return UnifilarPlantaDTO(planta_id="", nombre_planta="", nodos=[])
         nodos = self.repo_organizaciones.obtener_nodos_unifilar(planta.id)
         nombres_maquina = self._nombres_maquina_por_dispositivo(planta, nodos)
         return UnifilarPlantaDTO(
@@ -53,6 +55,8 @@ class GestionarPlantaEstructuraUseCase:
 
     def obtener_layout(self, planta_id: str | None = None, organizacion_id: str | None = None) -> LayoutPlantaDTO:
         planta = self._resolver_planta(planta_id, organizacion_id)
+        if planta is None:
+            return LayoutPlantaDTO(planta_id="", nombre_planta="", plano_svg_url=None, zonas=[], dispositivos=[])
         zonas = self.repo_organizaciones.obtener_zonas_planta(planta.id)
         dispositivos = self.repo_organizaciones.obtener_dispositivos_layout(planta.id)
         return LayoutPlantaDTO(
@@ -67,6 +71,8 @@ class GestionarPlantaEstructuraUseCase:
         self, planta_id: str | None = None, organizacion_id: str | None = None
     ) -> PlantaAreasEstadisticasResponseDTO:
         planta = self._resolver_planta(planta_id, organizacion_id)
+        if planta is None:
+            return PlantaAreasEstadisticasResponseDTO(planta_id="", superficie_total_m2=None, areas=[])
         zonas = self.repo_organizaciones.obtener_zonas_planta(planta.id)
         dispositivos = self.repo_organizaciones.obtener_dispositivos_layout(planta.id)
         nodos = self.repo_organizaciones.obtener_nodos_unifilar(planta.id)

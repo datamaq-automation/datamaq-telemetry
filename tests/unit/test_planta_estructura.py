@@ -343,8 +343,10 @@ def test_planta_no_encontrada_error():
     with pytest.raises(PlantaNoEncontradaError):
         use_case.obtener_unifilar("planta-inexistente")
 
-    with pytest.raises(PlantaNoEncontradaError):
-        use_case.obtener_layout()
+    # Sin ID explícito y sin plantas en la org: devuelve DTO vacío (Empty State 200)
+    layout = use_case.obtener_layout()
+    assert layout.planta_id == ""
+    assert layout.zonas == []
 
 
 # --- 4. Tests de Rutas FastAPI ---
