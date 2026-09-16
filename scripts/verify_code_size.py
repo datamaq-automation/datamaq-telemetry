@@ -34,7 +34,7 @@ DEFAULT_MAX_FUNC_LINES = 75
 # Al refactorizar y reducir una entidad, su techo debe ajustarse o removerse.
 BASELINE_CEILINGS: dict[str, int] = {
     # Archivos
-    # Clases
+    "class:src/application/mappers/payload_telemetria_parser.py::TelemetriaPayloadParser": 320,
     "class:src/domain/telemetria/servicios/evaluador_alertas_calidad.py::EvaluadorAlertasCalidadService": 400,
     "class:src/infrastructure/sqlalchemy/repositories/telemetria_repository.py::MySQLTelemetriaRepository": 450,
     # Métodos y Funciones

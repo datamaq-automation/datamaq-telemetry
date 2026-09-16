@@ -38,11 +38,18 @@ def upgrade() -> None:
                 "devices",
                 sa.Column("phases_with_ct", sa.String(20), server_default="R,S,T", nullable=False),
             )
+        if not _tiene_columna(inspector, "devices", "ct_inverted_phases"):
+            op.add_column(
+                "devices",
+                sa.Column("ct_inverted_phases", sa.String(10), nullable=True),
+            )
 
 
 def downgrade() -> None:
     inspector = sa.inspect(op.get_bind())
     if inspector.has_table("devices"):
+        if _tiene_columna(inspector, "devices", "ct_inverted_phases"):
+            op.drop_column("devices", "ct_inverted_phases")
         if _tiene_columna(inspector, "devices", "phases_with_ct"):
             op.drop_column("devices", "phases_with_ct")
         if _tiene_columna(inspector, "devices", "installation_type"):
