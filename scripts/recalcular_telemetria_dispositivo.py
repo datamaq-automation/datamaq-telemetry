@@ -17,7 +17,7 @@ RAIZ = Path(__file__).resolve().parents[1]
 if str(RAIZ) not in sys.path:
     sys.path.insert(0, str(RAIZ))
 
-from src.infrastructure.sqlalchemy.database import SessionLocal  # noqa: E402
+from src.infrastructure.sqlalchemy.database import get_session_factory  # noqa: E402
 from src.infrastructure.sqlalchemy.models import (  # noqa: E402
     DeviceModel,
     TelemetryEnergyModel,
@@ -44,7 +44,8 @@ def rotar_pq(
 
 
 def recalcular_dispositivo(dispositivo_id: str, correccion: str, dry_run: bool = False) -> None:
-    db = SessionLocal()
+    session_factory = get_session_factory()
+    db = session_factory()
     try:
         dev_model = db.query(DeviceModel).filter(DeviceModel.id == dispositivo_id).first()
         if not dev_model:
