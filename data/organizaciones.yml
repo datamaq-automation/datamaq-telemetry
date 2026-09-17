@@ -190,9 +190,12 @@ organizaciones:
             posicion: { x: 30, y: 50 }
         medidores:
           - id: "7434647d-5b87-4d4e-b4a5-a0d351315f0a"
+            alias_ids: ["364", "D48C49F035A8"]
+            device_uid: "D4:8C:49:F0:35:A8"
             tag_ubicacion: "TGBT Trafo 1"
             tipo_instalacion: "CONSUMO"
             fases_con_ti: "R,S"
+            correccion_angular_fases: "R:-60,S:180"
         nodos_unifilar:
           - id: "nodo-lc-acometida-mt"
             nombre: "Acometida MT"

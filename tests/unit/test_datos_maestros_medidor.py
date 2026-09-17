@@ -55,6 +55,18 @@ def test_instalacion_declarada_pisa_mysql_y_lo_no_declarado_queda():
     assert DatosMaestrosMedidorService.aplicar_instalacion(dev, None) is dev
 
 
+def test_instalacion_declarada_aplica_correccion_angular_y_fases_invertidas():
+    dev = _dev(correccion_angular_fases="", ct_fases_invertidas="")
+    inst = InstalacionMedidor(
+        dispositivo_id="364",
+        correccion_angular_fases="R:-60,S:180",
+        ct_fases_invertidas="S",
+    )
+    res = DatosMaestrosMedidorService.aplicar_instalacion(dev, inst)
+    assert res.correccion_angular_fases == "R:-60,S:180"
+    assert res.ct_fases_invertidas == "S"
+
+
 def test_contrato_se_hereda_de_la_acometida_por_el_arbol():
     dev = _dev(categoria_tarifaria="T2", penalizacion_reactiva_aplica=False)
     res = DatosMaestrosMedidorService.aplicar_contrato(dev, ARBOL)

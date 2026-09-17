@@ -131,6 +131,8 @@ class InstalacionMedidor:
     tag_ubicacion: str | None = None
     tipo_instalacion: str | None = None
     fases_con_ti: str | None = None
+    ct_fases_invertidas: str | None = None
+    correccion_angular_fases: str | None = None
 
     def campos_declarados(self) -> set[str]:
         return {
@@ -139,6 +141,8 @@ class InstalacionMedidor:
                 ("ubicacion_tag", self.tag_ubicacion),
                 ("tipo_instalacion", self.tipo_instalacion),
                 ("fases_con_ti", self.fases_con_ti),
+                ("ct_fases_invertidas", self.ct_fases_invertidas),
+                ("correccion_angular_fases", self.correccion_angular_fases),
             )
             if valor is not None
         }

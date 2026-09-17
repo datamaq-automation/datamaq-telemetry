@@ -175,14 +175,24 @@ class YamlOrganizacionesRepository(RepositorioOrganizacionesPort):
         return []
 
     def obtener_instalacion_medidor(self, dispositivo_id: str) -> InstalacionMedidor | None:
+        disp_id_norm = str(dispositivo_id).replace(":", "").upper()
         for raw in self._cargar_organizaciones_raw():
             for p in raw.get("plantas", []):
                 for m in p.get("medidores", []) or []:
-                    if str(m.get("id")) == str(dispositivo_id):
+                    m_id = str(m.get("id", ""))
+                    alias_ids = [str(a) for a in m.get("alias_ids", [])]
+                    device_uid = str(m.get("device_uid", "")).replace(":", "").upper()
+                    if (
+                        str(dispositivo_id) == m_id
+                        or str(dispositivo_id) in alias_ids
+                        or (disp_id_norm and disp_id_norm == device_uid)
+                    ):
                         return InstalacionMedidor(
-                            dispositivo_id=str(m["id"]),
+                            dispositivo_id=str(dispositivo_id),
                             tag_ubicacion=m.get("tag_ubicacion"),
                             tipo_instalacion=m.get("tipo_instalacion"),
                             fases_con_ti=m.get("fases_con_ti"),
+                            ct_fases_invertidas=m.get("ct_fases_invertidas"),
+                            correccion_angular_fases=m.get("correccion_angular_fases"),
                         )
         return None

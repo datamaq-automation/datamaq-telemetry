@@ -231,3 +231,22 @@ dispositivos:
     assert len(disp_layout) == 1
     assert disp_layout[0].device_id == "dev-horno-1"
     assert disp_layout[0].posicion.x_porcentaje == 15.0
+
+
+def test_obtener_instalacion_medidor_los_constituyentes():
+    repo = YamlOrganizacionesRepository()
+    # Debe resolver por UUID
+    inst_uuid = repo.obtener_instalacion_medidor("7434647d-5b87-4d4e-b4a5-a0d351315f0a")
+    assert inst_uuid is not None
+    assert inst_uuid.correccion_angular_fases == "R:-60,S:180"
+    assert inst_uuid.fases_con_ti == "R,S"
+
+    # Debe resolver por alias '364'
+    inst_alias = repo.obtener_instalacion_medidor("364")
+    assert inst_alias is not None
+    assert inst_alias.correccion_angular_fases == "R:-60,S:180"
+
+    # Debe resolver por MAC/device_uid
+    inst_mac = repo.obtener_instalacion_medidor("D4:8C:49:F0:35:A8")
+    assert inst_mac is not None
+    assert inst_mac.correccion_angular_fases == "R:-60,S:180"

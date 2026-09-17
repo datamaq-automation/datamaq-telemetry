@@ -29,6 +29,10 @@ class DatosMaestrosMedidorService:
             cambios["tipo_instalacion"] = instalacion.tipo_instalacion
         if instalacion.fases_con_ti is not None:
             cambios["fases_con_ti"] = instalacion.fases_con_ti
+        if instalacion.ct_fases_invertidas is not None:
+            cambios["ct_fases_invertidas"] = instalacion.ct_fases_invertidas
+        if instalacion.correccion_angular_fases is not None:
+            cambios["correccion_angular_fases"] = instalacion.correccion_angular_fases
         return replace(dispositivo, **cambios) if cambios else dispositivo
 
     @staticmethod
