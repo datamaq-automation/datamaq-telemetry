@@ -11,6 +11,7 @@ from src.domain.telemetria.value_objects import (
     AnaliticaCalidadEnergia,
     Corriente,
     EstadoFactorPotencia,
+    EstadoMetrologicoLectura,
     EstadoTension,
     PotenciaActiva,
 )
@@ -260,12 +261,26 @@ class AnalizadorMetrologicoService:
         dispositivo: object | None = None,
         ventana_evaluacion_min: int = 15,
         vigente_desde: datetime | None = None,
+        diagnostico_instalacion: object | None = None,
     ) -> AnaliticaCalidadEnergia:
         """Calcula el bloque analítico completo de calidad de energía y compensación de reactiva."""
         p_activa_w, p_activa_kw, fp_val = cls._obtener_potencia_y_fp(lectura)
         motivo_abstencion = cls._evaluar_abstencion_enre(dispositivo)
 
-        if motivo_abstencion is not None:
+        diag = diagnostico_instalacion or getattr(lectura, "diagnostico_instalacion", None)
+        es_metrologia_degradada = False
+        if diag is not None:
+            estado_met = getattr(diag, "estado_metrologico", None)
+            if estado_met in (EstadoMetrologicoLectura.DEGRADADO, EstadoMetrologicoLectura.NO_CONFIABLE):
+                es_metrologia_degradada = True
+
+        if es_metrologia_degradada:
+            motivo_abstencion = "METROLOGIA_DEGRADADA"
+            requiere_comp, qc_kvar, banco_sug, penalizacion_ars, recargo_pct = False, None, None, None, 0.0
+            fp_estimado = getattr(diag, "factor_potencia_estimado_simetrico", None)
+            if fp_estimado is not None:
+                fp_val = fp_estimado
+        elif motivo_abstencion is not None:
             requiere_comp, qc_kvar, banco_sug, penalizacion_ars, recargo_pct = False, None, None, None, 0.0
         else:
             requiere_comp, qc_kvar, banco_sug, penalizacion_ars, recargo_pct = cls._evaluar_compensacion_reactiva(

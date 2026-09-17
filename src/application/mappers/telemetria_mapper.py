@@ -66,43 +66,40 @@ class TelemetriaMapper:
         analitica: AnaliticaCalidadEnergia | None = None,
         dispositivo: object | None = None,
     ) -> LecturaInstantaneaDTO:
-        if analitica is None:
-            # D-11: sin `dispositivo`, _evaluar_abstencion_enre no puede saber si el
-            # circuito está alcanzado por el régimen ENRE 184/2000 — un dispositivo
-            # T1-R/monofásico pasaría por acá con requiere_compensacion=true y un
-            # monto real en pesos, siendo que está exento por categoría tarifaria.
-            analitica = AnalizadorCalidadEnergiaService.calcular_analitica_completa(lectura, dispositivo=dispositivo)
-
         diag_inst_dto: DiagnosticoInstalacionDTO | None = None
-        diag_inst = getattr(lectura, "diagnostico_instalacion", None)
-        if diag_inst is not None:
-            diag_inst_dto = DiagnosticoInstalacionDTO(
-                estado_metrologico=diag_inst.estado_metrologico,
-                fases_validas=list(diag_inst.fases_validas),
-                fases_comprometidas=list(diag_inst.fases_comprometidas),
-                anomalias_detectadas=list(diag_inst.anomalias_detectadas),
-                potencia_estimada_simetrica_w=diag_inst.potencia_estimada_simetrica_w,
-                accion_correctiva_sugerida=diag_inst.accion_correctiva_sugerida,
-            )
-        elif dispositivo is not None:
+        diag_domain = getattr(lectura, "diagnostico_instalacion", None)
+        if diag_domain is None and dispositivo is not None:
             from src.domain.telemetria.servicios.evaluador_diagnostico_instalacion import (
                 EvaluadorDiagnosticoInstalacionService,
             )
 
             fases_con_ti = getattr(dispositivo, "fases_con_ti", None)
             fases_list = [f.strip().upper() for f in fases_con_ti.split(",")] if isinstance(fases_con_ti, str) else None
-            diag_eval = EvaluadorDiagnosticoInstalacionService.evaluar_diagnostico(
+            diag_domain = EvaluadorDiagnosticoInstalacionService.evaluar_diagnostico(
                 lectura=lectura,
                 fases_con_ti=fases_list,
                 dispositivo_id=lectura.dispositivo_id,
             )
+
+        if diag_domain is not None:
             diag_inst_dto = DiagnosticoInstalacionDTO(
-                estado_metrologico=diag_eval.estado_metrologico,
-                fases_validas=list(diag_eval.fases_validas),
-                fases_comprometidas=list(diag_eval.fases_comprometidas),
-                anomalias_detectadas=list(diag_eval.anomalias_detectadas),
-                potencia_estimada_simetrica_w=diag_eval.potencia_estimada_simetrica_w,
-                accion_correctiva_sugerida=diag_eval.accion_correctiva_sugerida,
+                estado_metrologico=diag_domain.estado_metrologico,
+                fases_validas=list(diag_domain.fases_validas),
+                fases_comprometidas=list(diag_domain.fases_comprometidas),
+                anomalias_detectadas=list(diag_domain.anomalias_detectadas),
+                potencia_estimada_simetrica_w=diag_domain.potencia_estimada_simetrica_w,
+                factor_potencia_estimado_simetrico=diag_domain.factor_potencia_estimado_simetrico,
+                accion_correctiva_sugerida=diag_domain.accion_correctiva_sugerida,
+            )
+
+        if analitica is None:
+            # D-11: sin `dispositivo`, _evaluar_abstencion_enre no puede saber si el
+            # circuito está alcanzado por el régimen ENRE 184/2000 — un dispositivo
+            # T1-R/monofásico pasaría por acá con requiere_compensacion=true y un
+            # monto real en pesos, siendo que está exento por categoría tarifaria.
+            # Además se propaga diag_domain para abstención por metrología degradada.
+            analitica = AnalizadorCalidadEnergiaService.calcular_analitica_completa(
+                lectura, dispositivo=dispositivo, diagnostico_instalacion=diag_domain
             )
 
         return LecturaInstantaneaDTO(

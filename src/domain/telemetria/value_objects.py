@@ -217,4 +217,5 @@ class DiagnosticoInstalacion:
     fases_comprometidas: tuple[str, ...] = ()
     anomalias_detectadas: tuple[str, ...] = ()
     potencia_estimada_simetrica_w: float | None = None
+    factor_potencia_estimado_simetrico: float | None = None
     accion_correctiva_sugerida: str | None = None

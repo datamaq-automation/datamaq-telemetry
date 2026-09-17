@@ -91,6 +91,7 @@ def test_diagnostico_instalacion_ti_duplicado_y_desconectado():
     assert diag.fases_validas == ("S",)
     assert set(diag.fases_comprometidas) == {"R", "T"}
     assert diag.potencia_estimada_simetrica_w == pytest.approx(177000.0, rel=1e-2)
+    assert diag.factor_potencia_estimado_simetrico == 0.94
     assert diag.accion_correctiva_sugerida is not None
     assert "Reubicar sensor toroidal del canal R" in diag.accion_correctiva_sugerida
     assert "Fase T" in diag.accion_correctiva_sugerida
@@ -112,6 +113,7 @@ def test_diagnostico_instalacion_no_confiable(monkeypatch):
     assert diag.estado_metrologico == EstadoMetrologicoLectura.NO_CONFIABLE
     assert diag.fases_validas == ()
     assert set(diag.fases_comprometidas) == {"R", "S", "T"}
+    assert diag.factor_potencia_estimado_simetrico is None
 
 
 def test_telemetria_mapper_incluye_diagnostico_instalacion():
@@ -132,3 +134,19 @@ def test_telemetria_mapper_incluye_diagnostico_instalacion():
     assert dto.diagnostico_instalacion.fases_validas == ["S"]
     assert set(dto.diagnostico_instalacion.fases_comprometidas) == {"R", "T"}
     assert dto.diagnostico_instalacion.potencia_estimada_simetrica_w == pytest.approx(177000.0, rel=1e-2)
+    assert dto.diagnostico_instalacion.factor_potencia_estimado_simetrico == 0.94
+
+
+def test_analitica_abstencion_metrologia_degradada():
+    from src.domain.telemetria.servicios.analizador_calidad_metrologica import AnalizadorMetrologicoService
+
+    lectura = _crear_lectura_constituyentes()
+    diag = EvaluadorDiagnosticoInstalacionService.evaluar_diagnostico(lectura, fases_con_ti=["R", "S", "T"])
+    analitica = AnalizadorMetrologicoService.calcular_analitica_completa(lectura, diagnostico_instalacion=diag)
+
+    assert analitica.motivo_abstencion == "METROLOGIA_DEGRADADA"
+    assert analitica.requiere_compensacion is False
+    assert analitica.banco_sugerido_kvar is None
+    assert analitica.penalizacion_estimada_ars is None
+    assert analitica.recargo_porcentaje == 0.0
+    assert analitica.factor_potencia_integrado == 0.94

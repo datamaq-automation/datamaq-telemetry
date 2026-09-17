@@ -82,6 +82,16 @@ class EvaluadorDiagnosticoInstalacionService:
             return round(3.0 * med.potencia_activa.vatios, 1)
         return None
 
+    @staticmethod
+    def _estimar_factor_potencia_simetrico(fases_validas: list[str], lectura: LecturaInstantanea) -> float | None:
+        if len(fases_validas) != 1:
+            return None
+        fases_map = {"R": lectura.fase_r, "S": lectura.fase_s, "T": lectura.fase_t}
+        med = fases_map.get(fases_validas[0])
+        if med and med.factor_potencia and med.factor_potencia.valor is not None and med.factor_potencia.valor > 0.0:
+            return round(med.factor_potencia.valor, 2)
+        return None
+
     @classmethod
     def evaluar_diagnostico(
         cls,
@@ -105,6 +115,7 @@ class EvaluadorDiagnosticoInstalacionService:
             estado = EstadoMetrologicoLectura.DEGRADADO
 
         p_estimada = cls._estimar_potencia_simetrica(validas, lectura)
+        fp_estimado = cls._estimar_factor_potencia_simetrico(validas, lectura)
         accion_final = " ".join(acciones) if acciones else None
 
         return DiagnosticoInstalacion(
@@ -113,5 +124,6 @@ class EvaluadorDiagnosticoInstalacionService:
             fases_comprometidas=tuple(sorted(comprometidas)),
             anomalias_detectadas=tuple(anomalias),
             potencia_estimada_simetrica_w=p_estimada,
+            factor_potencia_estimado_simetrico=fp_estimado,
             accion_correctiva_sugerida=accion_final,
         )

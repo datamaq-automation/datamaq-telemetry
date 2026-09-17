@@ -47,6 +47,7 @@ class DiagnosticoInstalacionDTO(BaseModel):
     fases_comprometidas: list[str] = []
     anomalias_detectadas: list[str] = []
     potencia_estimada_simetrica_w: float | None = None
+    factor_potencia_estimado_simetrico: float | None = None
     accion_correctiva_sugerida: str | None = None
     model_config = ConfigDict(from_attributes=True)
 
