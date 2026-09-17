@@ -45,6 +45,47 @@ echo -e "${BOLD}${CYAN}=========================================================
 echo -e "${BOLD}${CYAN}  ⚡ DATAMAQ TELEMETRY — GAUNTLET PRE-PUSH (VERIFICACIÓN LOCAL)       ${RESET}"
 echo -e "${BOLD}${CYAN}======================================================================${RESET}"
 
+# Detección de cambios de configuración (GitOps) vs código de producto
+UPSTREAM=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null || echo "origin/main")
+CHANGED_FILES=$(git diff --name-only "$UPSTREAM"...HEAD 2>/dev/null || true)
+
+if [ -z "$CHANGED_FILES" ]; then
+    CHANGED_FILES=$(git diff --name-only --cached 2>/dev/null || true)
+fi
+if [ -z "$CHANGED_FILES" ]; then
+    CHANGED_FILES=$(git diff --name-only 2>/dev/null || true)
+fi
+if [ -z "$CHANGED_FILES" ]; then
+    CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || true)
+fi
+
+ES_SOLO_CONFIG=false
+if [ -n "$CHANGED_FILES" ]; then
+    if ! echo "$CHANGED_FILES" | grep -qvE "^data/|^docs/|\.md$|^tests/unit/test_yaml_|^tests/unit/test_verificador_unifilar"; then
+        ES_SOLO_CONFIG=true
+    fi
+fi
+
+if [ "$ES_SOLO_CONFIG" = true ]; then
+    echo -e "${BOLD}${YELLOW}ℹ Modo GitOps detectado (solo configuración YAML / docs). Ejecutando verificación rápida...${RESET}"
+    
+    # 1. Guard de secretos
+    bash scripts/guard_secrets.sh
+    
+    # 2. Validación de sintaxis YAML
+    python3 -c "import glob, yaml; [yaml.safe_load(open(f)) for f in glob.glob('data/*.yml') + glob.glob('data/*.yaml')]"
+    
+    # 3. Tests específicos de configuración y repositorio YAML
+    $PYTEST tests/unit/test_yaml_organizaciones_repository.py tests/unit/test_verificador_unifilar.py -q --no-header
+    
+    END_ALL=$(_time_now)
+    TOTAL_DUR=$(_calc_duration "$START_ALL" "$END_ALL")
+    echo -e "\n${BOLD}${GREEN}======================================================================${RESET}"
+    echo -e "${BOLD}${GREEN}  ✓ GAUNTLET RÁPIDO (GITOPS CONFIG) SUPERADO — Tiempo total: ${TOTAL_DUR}  ${RESET}"
+    echo -e "${BOLD}${GREEN}======================================================================${RESET}\n"
+    exit 0
+fi
+
 TOTAL_STAGES=7
 
 run_stage() {
