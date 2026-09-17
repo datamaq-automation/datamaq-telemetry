@@ -250,3 +250,13 @@ def test_obtener_instalacion_medidor_los_constituyentes():
     inst_mac = repo.obtener_instalacion_medidor("D4:8C:49:F0:35:A8")
     assert inst_mac is not None
     assert inst_mac.correccion_angular_fases == "R:-60,S:60"
+
+    # Trafo 2 (2do medidor): R:180,S:120 y fases R,S
+    inst_trafo2 = repo.obtener_instalacion_medidor("c91713f1-0621-4a33-9279-c5327a317d96")
+    assert inst_trafo2 is not None
+    assert inst_trafo2.correccion_angular_fases == "R:180,S:120"
+    assert inst_trafo2.fases_con_ti == "R,S"
+
+    inst_trafo2_alias = repo.obtener_instalacion_medidor("369")
+    assert inst_trafo2_alias is not None
+    assert inst_trafo2_alias.correccion_angular_fases == "R:180,S:120"

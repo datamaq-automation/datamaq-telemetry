@@ -205,6 +205,8 @@ organizaciones:
             device_uid: "EC:C9:FF:B5:7F:20"
             tag_ubicacion: "TGBT Trafo 2"
             tipo_instalacion: "CONSUMO"
+            fases_con_ti: "R,S"
+            correccion_angular_fases: "R:180,S:120"
         nodos_unifilar:
           - id: "nodo-lc-acometida-mt"
             nombre: "Acometida MT"
