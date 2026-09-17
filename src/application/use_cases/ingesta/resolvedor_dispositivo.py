@@ -34,6 +34,39 @@ class ResolvedorDispositivoIngesta:
             dispositivo.version_hw = dev_info.get("hw_model")
 
     @classmethod
+    def _sincronizar_dispositivo_cacheado(
+        cls,
+        dispositivo: Dispositivo,
+        mac_vo: MacAddress,
+        dev_info: dict[str, Any] | None,
+        ahora: datetime,
+        repo_dispositivos: RepositorioDispositivosPort,
+    ) -> None:
+        dispositivo_db = repo_dispositivos.obtener_por_uid(mac_vo)
+        if dispositivo_db:
+            dispositivo.planta_id = dispositivo_db.planta_id
+            dispositivo.tipo_instalacion = dispositivo_db.tipo_instalacion
+            dispositivo.fases_con_ti = dispositivo_db.fases_con_ti
+            dispositivo.ct_fases_invertidas = dispositivo_db.ct_fases_invertidas
+            dispositivo.correccion_angular_fases = dispositivo_db.correccion_angular_fases
+            dispositivo.categoria_tarifaria = dispositivo_db.categoria_tarifaria
+            dispositivo.penalizacion_reactiva_aplica = dispositivo_db.penalizacion_reactiva_aplica
+            dispositivo.esta_activo = dispositivo_db.esta_activo
+
+        dispositivo.marcar_online(ahora)
+        cls._aplicar_dev_info(dispositivo, dev_info)
+        repo_dispositivos.actualizar_heartbeat(
+            dispositivo.id,
+            dispositivo.estado,
+            dispositivo.visto_por_ultima_vez or ahora,
+            numero_serie=dispositivo.numero_serie,
+            version_fw=dispositivo.version_fw,
+            version_hw=dispositivo.version_hw,
+        )
+        cls._device_cache[mac_vo.valor] = dispositivo
+        cls._ultimos_heartbeats[dispositivo.id] = ahora
+
+    @classmethod
     def obtener_o_crear_dispositivo(
         cls,
         mac_raw: str,
@@ -53,24 +86,8 @@ class ResolvedorDispositivoIngesta:
                 dispositivo = cls._device_cache[mac_vo.valor]
                 ultimo_hb = cls._ultimos_heartbeats.get(dispositivo.id)
 
-                # Si venció la ventana de amortiguación (60s), persistir estado en DB.
-                # Usa actualizar_heartbeat() (UPDATE parcial: solo estado/last_seen_at/firmware)
-                # en vez de guardar() a propósito: `dispositivo` viene de la caché en memoria y
-                # puede tener planta_id desactualizado si alguien reasignó el equipo por fuera
-                # mientras el proceso de ingesta seguía vivo; guardar() pisaría esa reasignación.
                 if ultimo_hb is None or (ahora - ultimo_hb).total_seconds() >= 60:
-                    dispositivo.marcar_online(ahora)
-                    cls._aplicar_dev_info(dispositivo, dev_info)
-                    repo_dispositivos.actualizar_heartbeat(
-                        dispositivo.id,
-                        dispositivo.estado,
-                        dispositivo.visto_por_ultima_vez or ahora,
-                        numero_serie=dispositivo.numero_serie,
-                        version_fw=dispositivo.version_fw,
-                        version_hw=dispositivo.version_hw,
-                    )
-                    cls._device_cache[mac_vo.valor] = dispositivo
-                    cls._ultimos_heartbeats[dispositivo.id] = ahora
+                    cls._sincronizar_dispositivo_cacheado(dispositivo, mac_vo, dev_info, ahora, repo_dispositivos)
 
                 return dispositivo
 
@@ -134,6 +151,13 @@ class ResolvedorDispositivoIngesta:
         with cls._lock:
             cls._organizacion_cache[planta_id] = organizacion_id
         return organizacion_id
+
+    @classmethod
+    def invalidar_dispositivo(cls, mac_raw: str | MacAddress) -> None:
+        """Invalida la entrada de un dispositivo en la caché en memoria."""
+        mac_str = mac_raw.valor if isinstance(mac_raw, MacAddress) else str(mac_raw).upper()
+        with cls._lock:
+            cls._device_cache.pop(mac_str, None)
 
     @classmethod
     def limpiar_cache(cls) -> None:

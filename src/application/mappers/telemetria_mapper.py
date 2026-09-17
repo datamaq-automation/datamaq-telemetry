@@ -70,6 +70,7 @@ class TelemetriaMapper:
             phi_grados=_calcular_phi_grados(p, q),
             thd_v_pct=fase.thd_v_porcentaje,
             thd_i_pct=fase.thd_i_porcentaje,
+            angulo_correccion=fase.angulo_correccion,
         )
 
     @staticmethod

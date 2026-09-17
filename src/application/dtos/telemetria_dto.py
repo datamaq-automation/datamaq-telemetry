@@ -23,6 +23,7 @@ class MedicionFaseDTO(BaseModel):
     phi_grados: float | None = None
     thd_v_pct: float | None = None
     thd_i_pct: float | None = None
+    angulo_correccion: float | None = None
 
 
 class AnaliticaCalidadEnergiaDTO(BaseModel):

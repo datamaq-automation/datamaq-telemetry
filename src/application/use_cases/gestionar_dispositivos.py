@@ -156,6 +156,12 @@ class GestionarDispositivosUseCase:
             dev.esta_activo = dto.esta_activo
 
         saved = self.repo_dispositivos.guardar(dev)
+        try:
+            from src.application.use_cases.ingesta.resolvedor_dispositivo import ResolvedorDispositivoIngesta
+
+            ResolvedorDispositivoIngesta.invalidar_dispositivo(saved.device_uid)
+        except Exception:
+            pass
         return self._enriquecer_dispositivo(saved)
 
     def _rechazar_campos_gobernados_por_yaml(self, dev: Dispositivo, dto: DispositivoUpdateDTO) -> None:

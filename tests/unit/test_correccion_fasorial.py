@@ -121,3 +121,35 @@ def test_parsear_acumulado_con_correccion_angular():
     assert acumulado.energia_activa_neta is not None
     # La energía activa acumulada corregida debe ser ~123.25 kWh
     assert abs(acumulado.energia_activa_neta.kwh - 123.25) < 1.0
+
+
+def test_mapeo_dto_propaga_angulo_correccion_fases():
+    from src.application.mappers.telemetria_mapper import TelemetriaMapper
+
+    dispositivo = Dispositivo(
+        id="364",
+        device_uid=MacAddress("D4:8C:49:F0:35:A8"),
+        nombre="Planta San Martín - Trafo1",
+        correccion_angular_fases="R:-60,S:180",
+    )
+
+    payload = {
+        "fase_r": {"p": 70520.0, "q": 33950.0, "v": 216.7, "i": 383.8},
+        "fase_s": {"p": -68016.0, "q": 57190.0, "v": 216.0, "i": 429.2},
+        "fase_t": {"p": 0.0, "q": 0.0, "v": 215.1, "i": 0.0},
+    }
+
+    now = datetime.now(timezone.utc)
+    lectura = TelemetriaPayloadParser.parsear_instantanea(payload, dispositivo, now)
+    dto = TelemetriaMapper.instantanea_to_dto(lectura, dispositivo=dispositivo)
+
+    # Verificar que el DTO que se emite por WebSocket contenga angulo_correccion
+    assert dto.fase_r.angulo_correccion == -60.0
+    assert dto.fase_s.angulo_correccion == 180.0
+    assert dto.fase_t.angulo_correccion is None
+
+    # Fase S rotada +180° debe tener potencia activa positiva
+    assert dto.fase_s.net_active_power_W is not None
+    assert dto.fase_s.net_active_power_W > 0
+    assert dto.fase_s.power_factor is not None
+    assert dto.fase_s.power_factor > 0
