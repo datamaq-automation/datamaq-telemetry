@@ -200,3 +200,21 @@ class LecturaPotenciaTemporal:
     potencia_w: float
     potencia_reactiva_var: float | None = None
     factor_potencia: float | None = None
+
+
+class EstadoMetrologicoLectura(str, Enum):
+    CONFIABLE = "CONFIABLE"
+    DEGRADADO = "DEGRADADO"
+    NO_CONFIABLE = "NO_CONFIABLE"
+
+
+@dataclass(frozen=True)
+class DiagnosticoInstalacion:
+    """Diagnóstico de calidad metrológica e integridad física de la instalación."""
+
+    estado_metrologico: EstadoMetrologicoLectura = EstadoMetrologicoLectura.CONFIABLE
+    fases_validas: tuple[str, ...] = ("R", "S", "T")
+    fases_comprometidas: tuple[str, ...] = ()
+    anomalias_detectadas: tuple[str, ...] = ()
+    potencia_estimada_simetrica_w: float | None = None
+    accion_correctiva_sugerida: str | None = None

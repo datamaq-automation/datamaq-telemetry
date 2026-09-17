@@ -1,5 +1,6 @@
 """src/application/mappers/payload_telemetria_parser.py."""
 
+from dataclasses import replace
 from datetime import datetime
 from typing import Any
 
@@ -23,6 +24,9 @@ from src.domain.telemetria.entities import (
 from src.domain.telemetria.services import (
     AnalizadorCalidadEnergiaService,
     CalculadoraPotenciaService,
+)
+from src.domain.telemetria.servicios.evaluador_diagnostico_instalacion import (
+    EvaluadorDiagnosticoInstalacionService,
 )
 from src.domain.telemetria.value_objects import (
     Corriente,
@@ -328,7 +332,7 @@ class TelemetriaPayloadParser:
         )
         thd_v_prom, thd_i_tot = cls._calcular_totales_thd(total_data, payload, fase_r, fase_s, fase_t)
 
-        return LecturaInstantanea(
+        lectura = LecturaInstantanea(
             id=None,
             dispositivo_id=dispositivo.id,
             registrado_en=recorded_at,
@@ -346,6 +350,12 @@ class TelemetriaPayloadParser:
             thd_v_promedio_porcentaje=thd_v_prom,
             thd_i_total_porcentaje=thd_i_tot,
         )
+        diag_inst = EvaluadorDiagnosticoInstalacionService.evaluar_diagnostico(
+            lectura=lectura,
+            fases_con_ti=fases_con_ti_set,
+            dispositivo_id=dispositivo.id,
+        )
+        return replace(lectura, diagnostico_instalacion=diag_inst)
 
     @staticmethod
     def parsear_acumulado(

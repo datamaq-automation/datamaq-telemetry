@@ -8,6 +8,7 @@ from typing import Any
 from src.domain.telemetria.value_objects import (
     CoordenadasZona,
     Corriente,
+    DiagnosticoInstalacion,
     EnergiaActiva,
     EnergiaReactiva,
     EstadoDispositivo,
@@ -246,6 +247,7 @@ class LecturaInstantanea:
     thd_i_total_porcentaje: float | None = None
     thd_v_promedio_pct: float | None = None
     thd_i_total_pct: float | None = None
+    diagnostico_instalacion: DiagnosticoInstalacion | None = None
 
 
 @dataclass(frozen=True)

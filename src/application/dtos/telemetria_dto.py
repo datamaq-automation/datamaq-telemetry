@@ -6,7 +6,11 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict
 
 from src.application.dtos.tipos import FechaHoraUTC
-from src.domain.telemetria.value_objects import EstadoFactorPotencia, EstadoTension
+from src.domain.telemetria.value_objects import (
+    EstadoFactorPotencia,
+    EstadoMetrologicoLectura,
+    EstadoTension,
+)
 
 
 class MedicionFaseDTO(BaseModel):
@@ -37,6 +41,16 @@ class AnaliticaCalidadEnergiaDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class DiagnosticoInstalacionDTO(BaseModel):
+    estado_metrologico: EstadoMetrologicoLectura = EstadoMetrologicoLectura.CONFIABLE
+    fases_validas: list[str] = ["R", "S", "T"]
+    fases_comprometidas: list[str] = []
+    anomalias_detectadas: list[str] = []
+    potencia_estimada_simetrica_w: float | None = None
+    accion_correctiva_sugerida: str | None = None
+    model_config = ConfigDict(from_attributes=True)
+
+
 class LecturaInstantaneaDTO(BaseModel):
     id: int | None = None
     dispositivo_id: str
@@ -55,6 +69,7 @@ class LecturaInstantaneaDTO(BaseModel):
     thd_v_promedio_pct: float | None = None
     thd_i_total_pct: float | None = None
     analitica: AnaliticaCalidadEnergiaDTO | None = None
+    diagnostico_instalacion: DiagnosticoInstalacionDTO | None = None
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -112,6 +127,8 @@ class DiagnosticoFaseDTO(BaseModel):
     angulo_fasorial_grados: float | None = None
     tc_invertido_180: bool = False
     estado_ti: str = "CORRECTO"
+    duplicado_con_fase: str | None = None
+    validez_metrologica: bool = True
 
 
 class DiagnosticoFasesDispositivoDTO(BaseModel):

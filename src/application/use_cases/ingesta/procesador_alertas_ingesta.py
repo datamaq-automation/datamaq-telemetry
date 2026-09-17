@@ -228,7 +228,11 @@ def _evaluar_fp_fn(
     repo: RepositorioTelemetriaPort,
     pub: PublicadorEventosPort | None,
     log: LoggerPort | None,
+    hay_anomalia_ti: bool = False,
 ) -> tuple[AlertaDispositivo | None, AlertaDispositivo | None]:
+    if hay_anomalia_ti:
+        return None, None
+
     alerta_fp_raw = AnalizadorCalidadEnergiaService.evaluar_alerta_factor_potencia(dispositivo.id, lectura)
     alerta_fp = ProcesadorAlertasIngesta._filtro_persistencia.procesar_alerta(
         dispositivo.id, alerta_fp_raw, categoria="BAJO_FACTOR_POTENCIA", ahora=recorded_at
@@ -380,7 +384,17 @@ class ProcesadorAlertasIngesta:
             dispositivo, mac_raw, lectura, es_monofasico, recorded_at, repo_telemetria, publicador, logger
         )
         ti_raw = cls._evaluar_ti(dispositivo, mac_raw, lectura, recorded_at, repo_telemetria, publicador, logger)
-        fp_raw = cls._evaluar_fp(dispositivo, mac_raw, lectura, recorded_at, repo_telemetria, publicador, logger)
+        hay_anomalia_ti = bool(ti_raw[1] or ti_raw[2])  # ti_cruce o ti_misma_fase
+        fp_raw = cls._evaluar_fp(
+            dispositivo,
+            mac_raw,
+            lectura,
+            recorded_at,
+            repo_telemetria,
+            publicador,
+            logger,
+            hay_anomalia_ti=hay_anomalia_ti,
+        )
         thd_raw = cls._evaluar_thd(dispositivo, mac_raw, lectura, recorded_at, repo_telemetria, publicador, logger)
 
         cls._auto_resolver_todas_normalizadas(

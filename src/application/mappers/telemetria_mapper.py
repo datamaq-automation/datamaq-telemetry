@@ -6,6 +6,7 @@ from src.application.dtos.telemetria_dto import (
     AcumuladoEnergiaDTO,
     AnaliticaCalidadEnergiaDTO,
     DiagnosticoFasesDispositivoDTO,
+    DiagnosticoInstalacionDTO,
     EnergiaAgregadaDTO,
     LecturaInstantaneaDTO,
     LogEstadoDispositivoDTO,
@@ -72,6 +73,38 @@ class TelemetriaMapper:
             # monto real en pesos, siendo que está exento por categoría tarifaria.
             analitica = AnalizadorCalidadEnergiaService.calcular_analitica_completa(lectura, dispositivo=dispositivo)
 
+        diag_inst_dto: DiagnosticoInstalacionDTO | None = None
+        diag_inst = getattr(lectura, "diagnostico_instalacion", None)
+        if diag_inst is not None:
+            diag_inst_dto = DiagnosticoInstalacionDTO(
+                estado_metrologico=diag_inst.estado_metrologico,
+                fases_validas=list(diag_inst.fases_validas),
+                fases_comprometidas=list(diag_inst.fases_comprometidas),
+                anomalias_detectadas=list(diag_inst.anomalias_detectadas),
+                potencia_estimada_simetrica_w=diag_inst.potencia_estimada_simetrica_w,
+                accion_correctiva_sugerida=diag_inst.accion_correctiva_sugerida,
+            )
+        elif dispositivo is not None:
+            from src.domain.telemetria.servicios.evaluador_diagnostico_instalacion import (
+                EvaluadorDiagnosticoInstalacionService,
+            )
+
+            fases_con_ti = getattr(dispositivo, "fases_con_ti", None)
+            fases_list = [f.strip().upper() for f in fases_con_ti.split(",")] if isinstance(fases_con_ti, str) else None
+            diag_eval = EvaluadorDiagnosticoInstalacionService.evaluar_diagnostico(
+                lectura=lectura,
+                fases_con_ti=fases_list,
+                dispositivo_id=lectura.dispositivo_id,
+            )
+            diag_inst_dto = DiagnosticoInstalacionDTO(
+                estado_metrologico=diag_eval.estado_metrologico,
+                fases_validas=list(diag_eval.fases_validas),
+                fases_comprometidas=list(diag_eval.fases_comprometidas),
+                anomalias_detectadas=list(diag_eval.anomalias_detectadas),
+                potencia_estimada_simetrica_w=diag_eval.potencia_estimada_simetrica_w,
+                accion_correctiva_sugerida=diag_eval.accion_correctiva_sugerida,
+            )
+
         return LecturaInstantaneaDTO(
             id=lectura.id,
             dispositivo_id=lectura.dispositivo_id,
@@ -94,6 +127,7 @@ class TelemetriaMapper:
             thd_v_promedio_pct=lectura.thd_v_promedio_porcentaje,
             thd_i_total_pct=lectura.thd_i_total_porcentaje,
             analitica=TelemetriaMapper.analitica_to_dto(analitica),
+            diagnostico_instalacion=diag_inst_dto,
         )
 
     @staticmethod
@@ -148,6 +182,14 @@ class TelemetriaMapper:
 
         def _map_fase(fase_diag: object) -> DiagnosticoFaseDTO:
             fp_orig = getattr(fase_diag, "fp_original", None)
+            estado_ti = getattr(fase_diag, "estado_ti", "CORRECTO")
+            duplicado_con = None
+            if "DUPLICADO" in estado_ti:
+                if "Fase S" in estado_ti or "en S" in estado_ti:
+                    duplicado_con = "S"
+                elif "Fase R" in estado_ti or "en R" in estado_ti:
+                    duplicado_con = "R"
+            validez = estado_ti == "CORRECTO"
             return DiagnosticoFaseDTO(
                 fp_original=fp_orig,
                 angulo_phi_grados=getattr(fase_diag, "phi_deg_original", None),
@@ -163,7 +205,9 @@ class TelemetriaMapper:
                 factor_potencia=fp_orig,
                 angulo_fasorial_grados=getattr(fase_diag, "angulo_fasorial_grados", None),
                 tc_invertido_180=getattr(fase_diag, "tc_invertido_180", False),
-                estado_ti=getattr(fase_diag, "estado_ti", "CORRECTO"),
+                estado_ti=estado_ti,
+                duplicado_con_fase=duplicado_con,
+                validez_metrologica=validez,
             )
 
         evaluado = diag.evaluado_en or datetime.now(timezone.utc)
