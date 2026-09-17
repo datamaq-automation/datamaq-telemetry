@@ -156,13 +156,13 @@ def test_telemetria_mapper_calcula_phi_grados():
     lectura = _crear_lectura_constituyentes()
     dto: LecturaInstantaneaDTO = TelemetriaMapper.instantanea_to_dto(lectura)
 
-    # Fase R: P=2500, Q=-62800 -> phi aprox -87.7°
+    # Fase R: P=2500, Q=-62800 -> phi aprox +87.7° (capacitivo, corriente adelanta)
     assert dto.fase_r.phi_grados is not None
-    assert -88.0 <= dto.fase_r.phi_grados <= -87.0
+    assert 87.0 <= dto.fase_r.phi_grados <= 88.0
 
-    # Fase S: P=59000, Q=20000 -> phi aprox 18.7°
+    # Fase S: P=59000, Q=20000 -> phi aprox -18.7° (inductivo, corriente atrasa)
     assert dto.fase_s.phi_grados is not None
-    assert 18.0 <= dto.fase_s.phi_grados <= 19.0
+    assert -19.0 <= dto.fase_s.phi_grados <= -18.0
 
     # Fase T: P=0, Q=0 -> phi = 0.0
     assert dto.fase_t.phi_grados == 0.0

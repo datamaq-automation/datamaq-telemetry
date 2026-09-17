@@ -32,7 +32,7 @@ def _calcular_phi_grados(p: float | None, q: float | None) -> float | None:
         return None
     if p == 0.0 and q == 0.0:
         return 0.0
-    return round(math.degrees(math.atan2(q, p)), 1)
+    return round(-math.degrees(math.atan2(q, p)), 1)
 
 
 class TelemetriaMapper:
