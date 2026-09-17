@@ -195,7 +195,7 @@ organizaciones:
             tag_ubicacion: "TGBT Trafo 1"
             tipo_instalacion: "CONSUMO"
             fases_con_ti: "R,S"
-            correccion_angular_fases: "R:-60,S:180"
+            correccion_angular_fases: "R:-60,S:-60"
         nodos_unifilar:
           - id: "nodo-lc-acometida-mt"
             nombre: "Acometida MT"
