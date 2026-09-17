@@ -103,6 +103,7 @@ erDiagram
         string installation_type
         string phases_with_ct
         string ct_inverted_phases
+        string ct_phase_angle_offsets
         string categoria_tarifaria
         boolean penalizacion_reactiva_aplica
         datetime created_at
@@ -419,6 +420,7 @@ erDiagram
 | `installation_type` | `VARCHAR(30)` | - | No |
 | `phases_with_ct` | `VARCHAR(20)` | - | No |
 | `ct_inverted_phases` | `VARCHAR(20)` | - | No |
+| `ct_phase_angle_offsets` | `VARCHAR(50)` | - | No |
 | `categoria_tarifaria` | `VARCHAR(10)` | - | No |
 | `penalizacion_reactiva_aplica` | `BOOLEAN` | - | No |
 | `created_at` | `DATETIME` | - | No |

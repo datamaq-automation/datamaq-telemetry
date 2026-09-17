@@ -1,10 +1,64 @@
 """src/application/mappers/energia_parser.py."""
 
+import math
 from datetime import datetime
 from typing import Any
 
 from src.domain.telemetria.entities import AcumuladoEnergia
 from src.domain.telemetria.value_objects import EnergiaActiva, EnergiaReactiva
+
+
+def _parse_angulos_map(correccion_angular: str | dict[str, float] | None) -> dict[str, float]:
+    if isinstance(correccion_angular, dict):
+        return {k.upper(): float(v) for k, v in correccion_angular.items()}
+    if isinstance(correccion_angular, str) and correccion_angular:
+        angulos_map: dict[str, float] = {}
+        for item in correccion_angular.split(","):
+            if ":" in item:
+                k, v = item.split(":", 1)
+                try:
+                    angulos_map[k.strip().upper()] = float(v.strip())
+                except ValueError:
+                    pass
+        return angulos_map
+    return {}
+
+
+def _procesar_fases_acumuladas(
+    fases_items: list[Any],
+    fases_con_ti: set[str] | None,
+    angulos_map: dict[str, float],
+) -> tuple[list[float], list[float]]:
+    if fases_con_ti is not None:
+        fases_items = [
+            item
+            for item in fases_items
+            if isinstance(item, dict) and str(item.get("n", "")).strip().upper() in fases_con_ti
+        ]
+    phases_act, phases_react = [], []
+    for item in fases_items:
+        if not isinstance(item, dict):
+            continue
+        n_fase = str(item.get("n", "")).strip().upper()
+        a_val = float(item["a"]) if item.get("a") is not None else None
+        r_val = float(item["r"]) if item.get("r") is not None else None
+
+        if (a_val is not None or r_val is not None) and n_fase in angulos_map:
+            alpha = angulos_map[n_fase]
+            rad = math.radians(alpha)
+            cos_a, sin_a = math.cos(rad), math.sin(rad)
+            a_prim = (a_val or 0.0) * cos_a + (r_val or 0.0) * sin_a
+            r_prim = (r_val or 0.0) * cos_a - (a_val or 0.0) * sin_a
+            if a_val is not None:
+                phases_act.append(a_prim)
+            if r_val is not None:
+                phases_react.append(r_prim)
+        else:
+            if a_val is not None:
+                phases_act.append(a_val)
+            if r_val is not None:
+                phases_react.append(r_val)
+    return phases_act, phases_react
 
 
 class EnergiaPayloadParser:
@@ -75,6 +129,7 @@ class EnergiaPayloadParser:
         recorded_at: datetime,
         fases_con_ti: set[str] | None = None,
         fuente: str | None = None,
+        correccion_angular: str | dict[str, float] | None = None,
     ) -> AcumuladoEnergia:
         """``fases_con_ti`` filtra qué fases suma el array ``f`` de ``acc`` (solo aplica
         a ese formato: ``energyio`` ya llega como total del equipo, sin desglose por
@@ -82,31 +137,22 @@ class EnergiaPayloadParser:
 
         ``fuente`` identifica el subtópico de origen ("acc" / "energyio") para que
         el repositorio decida qué serie prioriza al persistir (D1: energyio manda).
+
+        ``correccion_angular`` aplica la rotación trigonométrica fasorial a la energía de cada fase.
         """
         total = payload.get("total") if isinstance(payload.get("total"), dict) else payload
         total_dict = total if isinstance(total, dict) else {}
 
         e_act, e_react, e_act_imp, e_act_exp, e_react_imp, e_react_exp = cls._extraer_energias_totales(total_dict)
+        angulos_map = _parse_angulos_map(correccion_angular)
 
         if isinstance(payload.get("f"), list):
-            fases_items = payload["f"]
-            if fases_con_ti is not None:
-                fases_items = [
-                    item
-                    for item in fases_items
-                    if isinstance(item, dict) and str(item.get("n", "")).strip().upper() in fases_con_ti
-                ]
-            phases_act = [
-                float(item["a"]) for item in fases_items if isinstance(item, dict) and item.get("a") is not None
-            ]
-            phases_react = [
-                float(item["r"]) for item in fases_items if isinstance(item, dict) and item.get("r") is not None
-            ]
-            if e_act is None and phases_act:
+            phases_act, phases_react = _procesar_fases_acumuladas(payload["f"], fases_con_ti, angulos_map)
+            if phases_act:
                 e_act = sum(phases_act)
                 if e_act_imp is None:
                     e_act_imp = e_act
-            if e_react is None and phases_react:
+            if phases_react:
                 e_react = sum(phases_react)
                 if e_react_imp is None:
                     e_react_imp = e_react

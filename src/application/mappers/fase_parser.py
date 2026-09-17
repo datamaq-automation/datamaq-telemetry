@@ -1,6 +1,7 @@
 """src/application/mappers/fase_parser.py."""
 
 import ipaddress
+import math
 from datetime import datetime, timezone
 from typing import Any
 
@@ -106,6 +107,47 @@ def invertir_fase_ct(fase: MedicionFase) -> MedicionFase:
         factor_potencia=FactorPotencia(valor=-fp.valor) if fp is not None else None,
         thd_v_porcentaje=fase.thd_v_porcentaje,
         thd_i_porcentaje=fase.thd_i_porcentaje,
+        thd_v_pct=fase.thd_v_pct,
+        thd_i_pct=fase.thd_i_pct,
+    )
+
+
+def rotar_fase_fasorial(fase: MedicionFase, angulo_grados: float) -> MedicionFase:
+    """Aplica una rotación fasorial trigonométrica continua de angulo_grados a P y Q."""
+    if not angulo_grados:
+        return fase
+    p_val = fase.potencia_activa.vatios if fase.potencia_activa is not None else None
+    q_val = fase.potencia_reactiva.var if fase.potencia_reactiva is not None else None
+    if p_val is None and q_val is None:
+        return fase
+
+    rad = math.radians(angulo_grados)
+    cos_a = math.cos(rad)
+    sin_a = math.sin(rad)
+
+    p_in = p_val or 0.0
+    q_in = q_val or 0.0
+
+    p_prim = p_in * cos_a + q_in * sin_a
+    q_prim = q_in * cos_a - p_in * sin_a
+
+    s_val = fase.potencia_aparente.va if fase.potencia_aparente is not None else math.hypot(p_prim, q_prim)
+    fp_val = p_prim / s_val if s_val and s_val > 0 else None
+    if fp_val is not None:
+        fp_val = max(-1.0, min(1.0, fp_val))
+
+    return MedicionFase(
+        tension=fase.tension,
+        corriente=fase.corriente,
+        potencia_activa=PotenciaActiva(vatios=p_prim) if p_val is not None else None,
+        potencia_reactiva=PotenciaReactiva(var=q_prim) if q_val is not None else None,
+        potencia_aparente=fase.potencia_aparente,
+        factor_potencia=FactorPotencia(valor=fp_val) if fp_val is not None else None,
+        thd_v_porcentaje=fase.thd_v_porcentaje,
+        thd_i_porcentaje=fase.thd_i_porcentaje,
+        thd_v_pct=fase.thd_v_pct,
+        thd_i_pct=fase.thd_i_pct,
+        angulo_correccion=angulo_grados,
     )
 
 

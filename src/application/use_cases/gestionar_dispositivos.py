@@ -144,6 +144,10 @@ class GestionarDispositivosUseCase:
             dev.tipo_instalacion = dto.tipo_instalacion
         if dto.fases_con_ti is not None:
             dev.fases_con_ti = dto.fases_con_ti
+        if dto.ct_fases_invertidas is not None:
+            dev.ct_fases_invertidas = dto.ct_fases_invertidas
+        if dto.correccion_angular_fases is not None:
+            dev.correccion_angular_fases = dto.correccion_angular_fases
         if dto.categoria_tarifaria is not None:
             dev.categoria_tarifaria = dto.categoria_tarifaria
         if dto.penalizacion_reactiva_aplica is not None:

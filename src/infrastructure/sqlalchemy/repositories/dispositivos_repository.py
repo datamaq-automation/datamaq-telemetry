@@ -33,6 +33,7 @@ class MySQLDispositivosRepository(RepositorioDispositivosPort):
             tipo_instalacion=getattr(model, "installation_type", "CONSUMO") or "CONSUMO",
             fases_con_ti=getattr(model, "phases_with_ct", "R,S,T") or "R,S,T",
             ct_fases_invertidas=getattr(model, "ct_inverted_phases", "") or "",
+            correccion_angular_fases=getattr(model, "ct_phase_angle_offsets", "") or "",
             categoria_tarifaria=getattr(model, "categoria_tarifaria", "T2") or "T2",
             penalizacion_reactiva_aplica=getattr(model, "penalizacion_reactiva_aplica", True),
             creado_en=model.created_at,
@@ -84,6 +85,7 @@ class MySQLDispositivosRepository(RepositorioDispositivosPort):
                 installation_type=dispositivo.tipo_instalacion,
                 phases_with_ct=dispositivo.fases_con_ti,
                 ct_inverted_phases=dispositivo.ct_fases_invertidas,
+                ct_phase_angle_offsets=dispositivo.correccion_angular_fases,
                 categoria_tarifaria=dispositivo.categoria_tarifaria or "T2",
                 penalizacion_reactiva_aplica=dispositivo.penalizacion_reactiva_aplica,
             )
@@ -102,6 +104,7 @@ class MySQLDispositivosRepository(RepositorioDispositivosPort):
             model.installation_type = dispositivo.tipo_instalacion
             model.phases_with_ct = dispositivo.fases_con_ti
             model.ct_inverted_phases = dispositivo.ct_fases_invertidas
+            model.ct_phase_angle_offsets = dispositivo.correccion_angular_fases
             model.categoria_tarifaria = dispositivo.categoria_tarifaria or "T2"
             model.penalizacion_reactiva_aplica = dispositivo.penalizacion_reactiva_aplica
 

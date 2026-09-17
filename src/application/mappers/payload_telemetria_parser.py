@@ -10,6 +10,7 @@ from src.application.mappers.fase_parser import (
     invertir_fase_ct,
     parse_fase,
     parse_timestamp,
+    rotar_fase_fasorial,
     sanear_entero,
     sanear_ip,
 )
@@ -73,12 +74,46 @@ def _calcular_derivadas_red(
     )
 
     if es_monofasico:
-        desbalance_v = None
-        voltage_linea_V = None
-        i_neutro = None
-        v_neutro = None
+        return None, None, None, None
 
     return desbalance_v, voltage_linea_V, i_neutro, v_neutro
+
+
+def _aplicar_fases_invertidas(
+    fase_r: MedicionFase, fase_s: MedicionFase, fase_t: MedicionFase, dispositivo: Dispositivo
+) -> tuple[MedicionFase, MedicionFase, MedicionFase]:
+    fases_invertidas = {
+        f.strip().upper() for f in (getattr(dispositivo, "ct_fases_invertidas", "") or "").split(",") if f.strip()
+    }
+    if "R" in fases_invertidas:
+        fase_r = invertir_fase_ct(fase_r)
+    if "S" in fases_invertidas:
+        fase_s = invertir_fase_ct(fase_s)
+    if "T" in fases_invertidas:
+        fase_t = invertir_fase_ct(fase_t)
+    return fase_r, fase_s, fase_t
+
+
+def _aplicar_rotacion_angulos(
+    fase_r: MedicionFase, fase_s: MedicionFase, fase_t: MedicionFase, dispositivo: Dispositivo
+) -> tuple[MedicionFase, MedicionFase, MedicionFase]:
+    angulos_raw = getattr(dispositivo, "correccion_angular_fases", "") or ""
+    angulos_map: dict[str, float] = {}
+    if angulos_raw:
+        for item in str(angulos_raw).split(","):
+            if ":" in item:
+                k, v = item.split(":", 1)
+                try:
+                    angulos_map[k.strip().upper()] = float(v.strip())
+                except ValueError:
+                    pass
+    if "R" in angulos_map:
+        fase_r = rotar_fase_fasorial(fase_r, angulos_map["R"])
+    if "S" in angulos_map:
+        fase_s = rotar_fase_fasorial(fase_s, angulos_map["S"])
+    if "T" in angulos_map:
+        fase_t = rotar_fase_fasorial(fase_t, angulos_map["T"])
+    return fase_r, fase_s, fase_t
 
 
 class TelemetriaPayloadParser:
@@ -306,15 +341,8 @@ class TelemetriaPayloadParser:
         fase_s = parse_fase(data_s, suffix="_s")
         fase_t = parse_fase(data_t, suffix="_t")
 
-        fases_invertidas = {
-            f.strip().upper() for f in (getattr(dispositivo, "ct_fases_invertidas", "") or "").split(",") if f.strip()
-        }
-        if "R" in fases_invertidas:
-            fase_r = invertir_fase_ct(fase_r)
-        if "S" in fases_invertidas:
-            fase_s = invertir_fase_ct(fase_s)
-        if "T" in fases_invertidas:
-            fase_t = invertir_fase_ct(fase_t)
+        fase_r, fase_s, fase_t = _aplicar_fases_invertidas(fase_r, fase_s, fase_t, dispositivo)
+        fase_r, fase_s, fase_t = _aplicar_rotacion_angulos(fase_r, fase_s, fase_t, dispositivo)
 
         if "R" not in fases_con_ti_set:
             fase_r = AnalizadorCalidadEnergiaService.sanear_fase_sin_ti(fase_r)

@@ -198,6 +198,7 @@ class Dispositivo:
     tipo_instalacion: str = "CONSUMO"
     fases_con_ti: str = "R,S,T"
     ct_fases_invertidas: str = ""
+    correccion_angular_fases: str = ""
     potencia_contratada_kw: float | None = None
     tarifa: str | None = None
     categoria_tarifaria: str | None = "T2"
@@ -225,6 +226,7 @@ class MedicionFase:
     thd_i_porcentaje: float | None = None
     thd_v_pct: float | None = None
     thd_i_pct: float | None = None
+    angulo_correccion: float | None = None
 
 
 @dataclass(frozen=True)

@@ -19,6 +19,8 @@ class DispositivoBaseDTO(BaseModel):
     esta_activo: bool = True
     tipo_instalacion: str = "CONSUMO"
     fases_con_ti: str = "R,S,T"
+    ct_fases_invertidas: str = ""
+    correccion_angular_fases: str = ""
     categoria_tarifaria: str | None = "T2"
     penalizacion_reactiva_aplica: bool = True
 
@@ -33,6 +35,8 @@ class DispositivoUpdateDTO(BaseModel):
     numero_serie: str | None = Field(None, max_length=100)
     tipo_instalacion: str | None = Field(None, description="3P4W, 3P3W, 1P2W, CONSUMO, GENERACION")
     fases_con_ti: str | None = Field(None, description="R,S,T o S,T o R,T")
+    ct_fases_invertidas: str | None = Field(None, description="R,S,T o R o S")
+    correccion_angular_fases: str | None = Field(None, description="Ej: R:-60,S:60")
     categoria_tarifaria: str | None = Field(None, description="T1-R, T1-G, T2, T3")
     penalizacion_reactiva_aplica: bool | None = None
     esta_activo: bool | None = None
