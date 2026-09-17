@@ -109,7 +109,8 @@ class PoliticaAccesoPlantasService:
                 continue
             vistas.add(planta.id)
             resultado.append((planta, acceso.puede_cambiar))
-        return resultado
+        # Si las filas de asignaciones no coinciden con ninguna planta válida, fallback a todas las propias
+        return resultado if resultado else [(p, True) for p in propias]
 
 
 class PoliticaExpiracionService:
