@@ -47,6 +47,27 @@ def verificar_consistencia_organizaciones(
             orgs_validas_yaml=len(ids_yaml_validos),
         )
 
+    # Sincronización declarativa GitOps: asegurar que facilities y devices coincidan con YAML
+    from src.infrastructure.sqlalchemy.models import DeviceModel, FacilityModel
+
+    plantas_yaml = yaml_repo.listar_plantas()
+    for p in plantas_yaml:
+        fac = db.query(FacilityModel).filter(FacilityModel.id == p.id).first()
+        if not fac:
+            db.add(FacilityModel(id=p.id, organization_id=p.organizacion_id, name=p.nombre))
+
+        disps = yaml_repo.obtener_dispositivos_layout(p.id)
+        for d in disps:
+            dev = (
+                db.query(DeviceModel)
+                .filter((DeviceModel.id == d.device_id) | (DeviceModel.device_uid == d.device_id))
+                .first()
+            )
+            if dev and dev.facility_id != p.id:
+                dev.facility_id = p.id
+
+    db.commit()
+
     return {
         "total_usuarios_con_org": len(usuarios),
         "usuarios_huerfanos": huerfanos_count,
