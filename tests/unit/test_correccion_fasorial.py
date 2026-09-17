@@ -60,6 +60,27 @@ def test_rotar_fase_fasorial_matematica_fase_s():
     assert abs(fase_s_corr.factor_potencia.valor - 1.00) < 0.02
 
 
+def test_rotar_fase_fasorial_matematica_fase_s_orden_fases_120():
+    # Fase S con secuencia/orden de fases invertido: P = -67501 W, Q = 53500 VAR (FP = -0.75)
+    fase_s = MedicionFase(
+        potencia_activa=PotenciaActiva(vatios=-67501.0),
+        potencia_reactiva=PotenciaReactiva(var=53500.0),
+        potencia_aparente=PotenciaAparente(va=86133.4),
+        factor_potencia=FactorPotencia(valor=-0.75),
+    )
+
+    # Rotación de +120° (resta 120° al ángulo del fasor, llevando de +141.6° a +21.6°)
+    fase_s_corr = rotar_fase_fasorial(fase_s, 120.0)
+
+    # P' = (-67501) * (-0.5) + 53500 * (0.866025) = 33750.5 + 46332.3 = 80082.8 W (~80.08 kW)
+    assert fase_s_corr.potencia_activa is not None
+    assert abs(fase_s_corr.potencia_activa.vatios - 80082.8) < 100.0
+    assert fase_s_corr.potencia_activa.vatios > 0  # Potencia se vuelve activa y positiva
+
+    assert fase_s_corr.factor_potencia is not None
+    assert abs(fase_s_corr.factor_potencia.valor - 0.93) < 0.03
+
+
 def test_parsear_instantanea_con_correccion_angular_dispositivo():
     dispositivo = Dispositivo(
         id="364",
