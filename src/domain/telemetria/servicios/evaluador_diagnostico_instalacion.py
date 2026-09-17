@@ -66,7 +66,14 @@ class EvaluadorDiagnosticoInstalacionService:
         )
         for a in alertas_cruce:
             anomalias.append(f"CRUCE_TI_FASE: {a.mensaje}")
-            if a.fase:
+            if a.fase and "-" in a.fase:
+                partes = a.fase.split("-")
+                for p in partes:
+                    comprometidas.add(p)
+                acciones.append(
+                    f"Verificar secuencia y bornes de tensión o rotar TIs entre fases {partes[0]} y {partes[1]}."
+                )
+            elif a.fase:
                 comprometidas.add(a.fase)
                 acciones.append(f"Corregir cruce de bornes en canal de Fase {a.fase}.")
 

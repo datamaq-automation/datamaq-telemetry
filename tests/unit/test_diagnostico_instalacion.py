@@ -150,3 +150,57 @@ def test_analitica_abstencion_metrologia_degradada():
     assert analitica.penalizacion_estimada_ars is None
     assert analitica.recargo_porcentaje == 0.0
     assert analitica.factor_potencia_integrado == 0.94
+
+
+def test_telemetria_mapper_calcula_phi_grados():
+    lectura = _crear_lectura_constituyentes()
+    dto: LecturaInstantaneaDTO = TelemetriaMapper.instantanea_to_dto(lectura)
+
+    # Fase R: P=2500, Q=-62800 -> phi aprox -87.7°
+    assert dto.fase_r.phi_grados is not None
+    assert -88.0 <= dto.fase_r.phi_grados <= -87.0
+
+    # Fase S: P=59000, Q=20000 -> phi aprox 18.7°
+    assert dto.fase_s.phi_grados is not None
+    assert 18.0 <= dto.fase_s.phi_grados <= 19.0
+
+    # Fase T: P=0, Q=0 -> phi = 0.0
+    assert dto.fase_t.phi_grados == 0.0
+
+
+def test_deteccion_desfasaje_cruzado_60_grados():
+    # Caso Sala de trafo1: Fase R (P=22kW, Q=-55kvar, FP=0.37), Fase S (P=32kW, Q=+55kvar, FP=0.50)
+    fase_r = MedicionFase(
+        tension=Tension(223.6),
+        corriente=Corriente(271.9),
+        potencia_activa=PotenciaActiva(22250.0),
+        potencia_reactiva=PotenciaReactiva(-55791.0),
+        factor_potencia=FactorPotencia(0.37),
+    )
+    fase_s = MedicionFase(
+        tension=Tension(223.0),
+        corriente=Corriente(288.8),
+        potencia_activa=PotenciaActiva(32044.0),
+        potencia_reactiva=PotenciaReactiva(55178.0),
+        factor_potencia=FactorPotencia(0.50),
+    )
+    fase_t = MedicionFase(
+        tension=Tension(222.0),
+        corriente=Corriente(0.0),
+        potencia_activa=PotenciaActiva(0.0),
+        potencia_reactiva=PotenciaReactiva(0.0),
+        factor_potencia=FactorPotencia(1.0),
+    )
+    lectura = LecturaInstantanea(
+        id=999,
+        dispositivo_id="dev-trafo1",
+        registrado_en=datetime.now(timezone.utc),
+        fase_r=fase_r,
+        fase_s=fase_s,
+        fase_t=fase_t,
+    )
+
+    diag = EvaluadorDiagnosticoInstalacionService.evaluar_diagnostico(lectura, fases_con_ti=["R", "S"])
+    assert diag.estado_metrologico == EstadoMetrologicoLectura.NO_CONFIABLE
+    assert "R" in diag.fases_comprometidas and "S" in diag.fases_comprometidas
+    assert any("60°" in a or "CRUCE_TI_FASE" in a for a in diag.anomalias_detectadas)

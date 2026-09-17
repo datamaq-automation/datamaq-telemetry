@@ -20,6 +20,7 @@ class MedicionFaseDTO(BaseModel):
     net_reactive_power_VAR: float | None = None
     net_apparent_power_VA: float | None = None
     power_factor: float | None = None
+    phi_grados: float | None = None
     thd_v_pct: float | None = None
     thd_i_pct: float | None = None
 
@@ -63,6 +64,7 @@ class LecturaInstantaneaDTO(BaseModel):
     potencia_reactiva_total_VAR: float | None = None
     potencia_aparente_total_VA: float | None = None
     factor_potencia_total: float | None = None
+    phi_total_grados: float | None = None
     desbalance_tension_porcentaje: float | None = None
     corriente_neutro_estimada_A: float | None = None
     voltage_linea_V: float | None = None
