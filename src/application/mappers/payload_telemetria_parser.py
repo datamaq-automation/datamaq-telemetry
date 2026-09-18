@@ -414,8 +414,7 @@ class TelemetriaPayloadParser:
             )
         return float(fp_tot) if fp_tot is not None else None
 
-    @classmethod
-    pass
+    
 
     @classmethod
     def parsear_instantanea(
@@ -457,11 +456,11 @@ class TelemetriaPayloadParser:
         total = payload.get("total") or payload.get("tot")
         total_data = total if isinstance(total, dict) else payload
 
-        p_tot, q_tot, s_tot, fp_tot = cls._calcular_totales_potencia(total_data, fase_r, fase_s, fase_t, has_phases)
+        p_tot, q_tot, s_tot, fp_tot = _calcular_totales_potencia(total_data, fase_r, fase_s, fase_t, has_phases)
         desbalance_v, voltage_linea_V, i_neutro, v_neutro = _calcular_derivadas_red(
             fase_r, fase_s, fase_t, es_monofasico
         )
-        thd_v_prom, thd_i_tot = cls._calcular_totales_thd(total_data, payload, fase_r, fase_s, fase_t)
+        thd_v_prom, thd_i_tot = _calcular_totales_thd(total_data, payload, fase_r, fase_s, fase_t)
 
         lectura = LecturaInstantanea(
             id=None,
