@@ -23,6 +23,8 @@ class DispositivoBaseDTO(BaseModel):
     correccion_angular_fases: str = ""
     categoria_tarifaria: str | None = "T2"
     penalizacion_reactiva_aplica: bool = True
+    invertido: bool = False
+    orden_fases: list[str] | None = None
 
 
 class DispositivoCreateDTO(DispositivoBaseDTO):
@@ -37,6 +39,8 @@ class DispositivoUpdateDTO(BaseModel):
     fases_con_ti: str | None = Field(None, description="R,S,T o S,T o R,T")
     ct_fases_invertidas: str | None = Field(None, description="R,S,T o R o S")
     correccion_angular_fases: str | None = Field(None, description="Ej: R:-60,S:60")
+    invertido: bool | None = None
+    orden_fases: list[str] | None = None
     categoria_tarifaria: str | None = Field(None, description="T1-R, T1-G, T2, T3")
     penalizacion_reactiva_aplica: bool | None = None
     esta_activo: bool | None = None

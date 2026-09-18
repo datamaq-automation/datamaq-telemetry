@@ -38,6 +38,8 @@ class DispositivoMapper:
             fases_con_ti=entity.fases_con_ti,
             ct_fases_invertidas=getattr(entity, "ct_fases_invertidas", "") or "",
             correccion_angular_fases=getattr(entity, "correccion_angular_fases", "") or "",
+            invertido=getattr(entity, "invertido", False),
+            orden_fases=getattr(entity, "orden_fases", None),
             categoria_tarifaria=getattr(entity, "categoria_tarifaria", "T2"),
             penalizacion_reactiva_aplica=getattr(entity, "penalizacion_reactiva_aplica", True),
             estado=entity.estado.value,
@@ -64,6 +66,8 @@ class DispositivoMapper:
             fases_con_ti=dto.fases_con_ti or "R,S,T",
             ct_fases_invertidas=dto.ct_fases_invertidas or "",
             correccion_angular_fases=dto.correccion_angular_fases or "",
+            invertido=dto.invertido if hasattr(dto, "invertido") else False,
+            orden_fases=dto.orden_fases if hasattr(dto, "orden_fases") else None,
             categoria_tarifaria=dto.categoria_tarifaria or "T2",
             penalizacion_reactiva_aplica=dto.penalizacion_reactiva_aplica
             if dto.penalizacion_reactiva_aplica is not None

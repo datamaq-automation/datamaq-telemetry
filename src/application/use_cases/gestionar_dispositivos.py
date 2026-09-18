@@ -148,6 +148,10 @@ class GestionarDispositivosUseCase:
             dev.ct_fases_invertidas = dto.ct_fases_invertidas
         if dto.correccion_angular_fases is not None:
             dev.correccion_angular_fases = dto.correccion_angular_fases
+        if dto.invertido is not None:
+            dev.invertido = dto.invertido
+        if dto.orden_fases is not None:
+            dev.orden_fases = dto.orden_fases
         if dto.categoria_tarifaria is not None:
             dev.categoria_tarifaria = dto.categoria_tarifaria
         if dto.penalizacion_reactiva_aplica is not None:
