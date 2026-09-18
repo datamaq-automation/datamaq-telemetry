@@ -414,8 +414,6 @@ class TelemetriaPayloadParser:
             )
         return float(fp_tot) if fp_tot is not None else None
 
-    
-
     @classmethod
     def parsear_instantanea(
         cls,
