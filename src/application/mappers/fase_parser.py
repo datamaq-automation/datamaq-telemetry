@@ -151,6 +151,63 @@ def rotar_fase_fasorial(fase: MedicionFase, angulo_grados: float) -> MedicionFas
     )
 
 
+def aplicar_configuracion_ti(
+    fase_r: MedicionFase,
+    fase_s: MedicionFase,
+    fase_t: MedicionFase,
+    invertido: bool | None = False,
+    orden_fases: list[str] | None = None,
+) -> tuple[MedicionFase, MedicionFase, MedicionFase]:
+    """Aplica reordenación de fases y/o inversión global del TI.
+
+    - `orden_fases` es la lista que describe a qué fase lógica corresponde
+      cada medición en el orden bruto [R, S, T]. Ej: ['S','T','R'].
+    - La reordenación reetiqueta las mediciones y aplica una rotación fasorial
+      proporcional a los desplazamientos cíclicos: angulo = -120 * shift.
+    - Si `invertido` es True, invierte P/Q en todas las fases (uso global).
+    """
+    entradas = [fase_r, fase_s, fase_t]
+    if not orden_fases:
+        # Ninguna reordenación: aplicar solo inversión si corresponde
+        if invertido:
+            return invertir_fase_ct(fase_r), invertir_fase_ct(fase_s), invertir_fase_ct(fase_t)
+        return fase_r, fase_s, fase_t
+
+    # Normalizar orden_fases a lista de etiquetas mayúsculas
+    orden_norm: list[str] = []
+    if isinstance(orden_fases, str):
+        try:
+            orden_norm = [s.strip().upper() for s in orden_fases.split(",") if s.strip()]
+        except Exception:
+            orden_norm = []
+    else:
+        orden_norm = [str(s).strip().upper() for s in orden_fases if str(s).strip()]
+
+    etiquetas = ["R", "S", "T"]
+    salida: dict[str, MedicionFase] = {"R": fase_r, "S": fase_s, "T": fase_t}
+
+    # Reetiquetar: para cada etiqueta lógica buscar su posición en orden_norm
+    for i, etiqueta in enumerate(etiquetas):
+        if etiqueta in orden_norm:
+            pos = orden_norm.index(etiqueta)
+            fase_origen = entradas[pos]
+            shift = pos - i
+            if shift != 0:
+                angulo = -120.0 * shift
+                fase_origen = rotar_fase_fasorial(fase_origen, angulo)
+            salida[etiqueta] = fase_origen
+        else:
+            # etiqueta no presente en orden_norm: mantener la fase original
+            salida[etiqueta] = salida[etiqueta]
+
+    fr, fs, ft = salida["R"], salida["S"], salida["T"]
+
+    if invertido:
+        fr, fs, ft = invertir_fase_ct(fr), invertir_fase_ct(fs), invertir_fase_ct(ft)
+
+    return fr, fs, ft
+
+
 def parse_fase(data: Any, suffix: str = "") -> MedicionFase:
     """Parsea mediciones de una fase individual soportando múltiples convenciones de firmware."""
     if not isinstance(data, dict):

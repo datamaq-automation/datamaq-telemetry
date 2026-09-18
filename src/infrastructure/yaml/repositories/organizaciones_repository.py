@@ -194,5 +194,7 @@ class YamlOrganizacionesRepository(RepositorioOrganizacionesPort):
                             fases_con_ti=m.get("fases_con_ti"),
                             ct_fases_invertidas=m.get("ct_fases_invertidas"),
                             correccion_angular_fases=m.get("correccion_angular_fases"),
+                            invertido=m.get("invertido"),
+                            orden_fases=m.get("orden_fases"),
                         )
         return None

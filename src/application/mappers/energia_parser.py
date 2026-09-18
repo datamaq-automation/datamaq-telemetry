@@ -28,6 +28,7 @@ def _procesar_fases_acumuladas(
     fases_items: list[Any],
     fases_con_ti: set[str] | None,
     angulos_map: dict[str, float],
+    invertido: bool = False,
 ) -> tuple[list[float], list[float]]:
     if fases_con_ti is not None:
         fases_items = [
@@ -49,15 +50,25 @@ def _procesar_fases_acumuladas(
             cos_a, sin_a = math.cos(rad), math.sin(rad)
             a_prim = (a_val or 0.0) * cos_a + (r_val or 0.0) * sin_a
             r_prim = (r_val or 0.0) * cos_a - (a_val or 0.0) * sin_a
+            # Si el TI está invertido globalmente, invertir signos de P y Q
+            if invertido:
+                a_prim = -a_prim
+                r_prim = -r_prim
             if a_val is not None:
                 phases_act.append(a_prim)
             if r_val is not None:
                 phases_react.append(r_prim)
         else:
-            if a_val is not None:
-                phases_act.append(a_val)
-            if r_val is not None:
-                phases_react.append(r_val)
+            if invertido:
+                if a_val is not None:
+                    phases_act.append(-float(a_val))
+                if r_val is not None:
+                    phases_react.append(-float(r_val))
+            else:
+                if a_val is not None:
+                    phases_act.append(a_val)
+                if r_val is not None:
+                    phases_react.append(r_val)
     return phases_act, phases_react
 
 
@@ -130,6 +141,7 @@ class EnergiaPayloadParser:
         fases_con_ti: set[str] | None = None,
         fuente: str | None = None,
         correccion_angular: str | dict[str, float] | None = None,
+        invertido: bool = False,
     ) -> AcumuladoEnergia:
         """``fases_con_ti`` filtra qué fases suma el array ``f`` de ``acc`` (solo aplica
         a ese formato: ``energyio`` ya llega como total del equipo, sin desglose por
@@ -147,7 +159,9 @@ class EnergiaPayloadParser:
         angulos_map = _parse_angulos_map(correccion_angular)
 
         if isinstance(payload.get("f"), list):
-            phases_act, phases_react = _procesar_fases_acumuladas(payload["f"], fases_con_ti, angulos_map)
+            phases_act, phases_react = _procesar_fases_acumuladas(
+                payload["f"], fases_con_ti, angulos_map, invertido=invertido
+            )
             if phases_act:
                 e_act = sum(phases_act)
                 if e_act_imp is None:

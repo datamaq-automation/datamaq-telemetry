@@ -133,6 +133,8 @@ class InstalacionMedidor:
     fases_con_ti: str | None = None
     ct_fases_invertidas: str | None = None
     correccion_angular_fases: str | None = None
+    invertido: bool | None = None
+    orden_fases: list[str] | None = None
 
     def campos_declarados(self) -> set[str]:
         return {
@@ -143,6 +145,8 @@ class InstalacionMedidor:
                 ("fases_con_ti", self.fases_con_ti),
                 ("ct_fases_invertidas", self.ct_fases_invertidas),
                 ("correccion_angular_fases", self.correccion_angular_fases),
+                ("invertido", self.invertido),
+                ("orden_fases", self.orden_fases),
             )
             if valor is not None
         }
@@ -203,6 +207,8 @@ class Dispositivo:
     fases_con_ti: str = "R,S,T"
     ct_fases_invertidas: str = ""
     correccion_angular_fases: str = ""
+    invertido: bool = False
+    orden_fases: list[str] | None = None
     potencia_contratada_kw: float | None = None
     tarifa: str | None = None
     categoria_tarifaria: str | None = "T2"

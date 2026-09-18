@@ -49,6 +49,9 @@ class ResolvedorDispositivoIngesta:
             dispositivo.fases_con_ti = dispositivo_db.fases_con_ti
             dispositivo.ct_fases_invertidas = dispositivo_db.ct_fases_invertidas
             dispositivo.correccion_angular_fases = dispositivo_db.correccion_angular_fases
+            # nuevos campos TI
+            dispositivo.invertido = getattr(dispositivo_db, "invertido", False)
+            dispositivo.orden_fases = getattr(dispositivo_db, "orden_fases", None)
             dispositivo.categoria_tarifaria = dispositivo_db.categoria_tarifaria
             dispositivo.penalizacion_reactiva_aplica = dispositivo_db.penalizacion_reactiva_aplica
             dispositivo.esta_activo = dispositivo_db.esta_activo

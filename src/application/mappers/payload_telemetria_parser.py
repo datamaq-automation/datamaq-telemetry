@@ -13,6 +13,7 @@ from src.application.mappers.fase_parser import (
     rotar_fase_fasorial,
     sanear_entero,
     sanear_ip,
+    aplicar_configuracion_ti,
 )
 from src.domain.telemetria.entities import (
     AcumuladoEnergia,
@@ -341,8 +342,17 @@ class TelemetriaPayloadParser:
         fase_s = parse_fase(data_s, suffix="_s")
         fase_t = parse_fase(data_t, suffix="_t")
 
-        fase_r, fase_s, fase_t = _aplicar_fases_invertidas(fase_r, fase_s, fase_t, dispositivo)
-        fase_r, fase_s, fase_t = _aplicar_rotacion_angulos(fase_r, fase_s, fase_t, dispositivo)
+        # Preferencia nueva: si el dispositivo declara `orden_fases` o `invertido`,
+        # aplicar la configuración consolidada que reordena/rota/invierte según esos campos.
+        orden = getattr(dispositivo, "orden_fases", None)
+        invertido_flag = getattr(dispositivo, "invertido", False)
+        if orden is not None or invertido_flag:
+            fase_r, fase_s, fase_t = aplicar_configuracion_ti(
+                fase_r, fase_s, fase_t, invertido=invertido_flag, orden_fases=orden
+            )
+        else:
+            fase_r, fase_s, fase_t = _aplicar_fases_invertidas(fase_r, fase_s, fase_t, dispositivo)
+            fase_r, fase_s, fase_t = _aplicar_rotacion_angulos(fase_r, fase_s, fase_t, dispositivo)
 
         if "R" not in fases_con_ti_set:
             fase_r = AnalizadorCalidadEnergiaService.sanear_fase_sin_ti(fase_r)
@@ -389,6 +399,29 @@ class TelemetriaPayloadParser:
     def parsear_acumulado(
         payload: dict[str, Any], dispositivo_id: str, recorded_at: datetime, **kwargs: Any
     ) -> AcumuladoEnergia:
+        # Si se pasó `orden_fases` (array o string) y/o `invertido`, convertirlo a
+        # la forma entendida por EnergiaPayloadParser: `correccion_angular` (dict)
+        orden = kwargs.pop("orden_fases", None)
+        invertido = kwargs.pop("invertido", False)
+        if orden:
+            # normalizar orden
+            if isinstance(orden, str):
+                orden_norm = [s.strip().upper() for s in orden.split(",") if s.strip()]
+            else:
+                orden_norm = [str(s).strip().upper() for s in orden if str(s).strip()]
+            etiquetas = ["R", "S", "T"]
+            angulos_map: dict[str, float] = {}
+            for i, etiqueta in enumerate(etiquetas):
+                if etiqueta in orden_norm:
+                    pos = orden_norm.index(etiqueta)
+                    shift = pos - i
+                    if shift != 0:
+                        angulos_map[etiqueta] = float(-120.0 * shift)
+            if angulos_map:
+                kwargs["correccion_angular"] = angulos_map
+        if invertido:
+            kwargs["invertido"] = True
+
         return EnergiaPayloadParser.parsear_acumulado(payload, dispositivo_id, recorded_at, **kwargs)
 
     @staticmethod

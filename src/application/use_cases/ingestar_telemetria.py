@@ -206,7 +206,13 @@ class IngestarTelemetriaUseCase:
             getattr(dispositivo, "fases_con_ti", "R,S,T")
         )
         acumulado = TelemetriaPayloadParser.parsear_acumulado(
-            payload, dispositivo.id, recorded_at, fases_con_ti=fases_con_ti, fuente=fuente
+            payload,
+            dispositivo.id,
+            recorded_at,
+            fases_con_ti=fases_con_ti,
+            fuente=fuente,
+            orden_fases=getattr(dispositivo, "orden_fases", None),
+            invertido=getattr(dispositivo, "invertido", False),
         )
 
         # WP3 (D5, nivel ③): el medidor publica acumulados cada ~2 s, pero para
