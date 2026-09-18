@@ -1,4 +1,5 @@
 import math
+
 from src.application.mappers.fase_parser import aplicar_configuracion_ti
 from src.domain.telemetria.entities import MedicionFase
 from src.domain.telemetria.value_objects import PotenciaActiva, PotenciaReactiva
@@ -18,7 +19,7 @@ def test_identidad_no_cambia():
 
 def test_invertido_invierte_signo_pq():
     r, s, t = _mf(10, 5), _mf(20, 2), _mf(30, 3)
-    fr, fs, ft = aplicar_configuracion_ti(r, s, t, invertido=True, orden_fases=None)
+    fr, _fs, _ft = aplicar_configuracion_ti(r, s, t, invertido=True, orden_fases=None)
     assert fr.potencia_activa.vatios == -10
     assert fr.potencia_reactiva.var == -5
 

@@ -7,13 +7,13 @@ from typing import Any
 from src.application.mappers.energia_parser import EnergiaPayloadParser
 from src.application.mappers.fase_parser import (
     acotar_payload_bruto,
+    aplicar_configuracion_ti,
     invertir_fase_ct,
     parse_fase,
     parse_timestamp,
     rotar_fase_fasorial,
     sanear_entero,
     sanear_ip,
-    aplicar_configuracion_ti,
 )
 from src.domain.telemetria.entities import (
     AcumuladoEnergia,
