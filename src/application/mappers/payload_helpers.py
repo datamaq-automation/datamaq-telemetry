@@ -1,4 +1,5 @@
 """Helpers for power/THD extraction used by payload parsers."""
+
 from typing import Any
 
 # acotar_payload_bruto no se usa aquí; import eliminado para pasar ruff
