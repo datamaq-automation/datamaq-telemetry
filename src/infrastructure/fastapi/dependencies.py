@@ -1,5 +1,6 @@
 """src/infrastructure/fastapi/dependencies.py."""
 
+from datetime import datetime, timezone
 from functools import lru_cache
 from typing import Annotated, Any
 
@@ -22,6 +23,10 @@ from src.application.use_cases.exportar_cargas import ExportarCargasUseCase
 from src.application.use_cases.exportar_disponibilidad import ExportarDisponibilidadUseCase
 from src.application.use_cases.exportar_telemetria import ExportarTelemetriaUseCase
 from src.application.use_cases.gestionar_alertas import GestionarAlertasUseCase
+from src.application.use_cases.gestionar_auditoria import (
+    ConsultarAuditLogsUseCase,
+    RegistrarEventoAuditoriaUseCase,
+)
 from src.application.use_cases.gestionar_cargas import GestionarCargasUseCase
 from src.application.use_cases.gestionar_disponibilidad import GestionarDisponibilidadUseCase
 from src.application.use_cases.gestionar_dispositivos import GestionarDispositivosUseCase
@@ -34,6 +39,7 @@ from src.application.use_cases.recuperar_contrasena import (
     RestablecerContrasenaUseCase,
     SolicitarRecuperacionContrasenaUseCase,
 )
+from src.domain.auditoria.ports import RepositorioAuditoriaPort
 from src.domain.auth.ports import (
     GeneradorTokenPort,
     RepositorioUsuariosPort,
@@ -48,6 +54,7 @@ from src.infrastructure.settings.config import Settings, get_settings
 from src.infrastructure.settings.logger import get_logger
 from src.infrastructure.sqlalchemy.database import get_db_session
 from src.infrastructure.sqlalchemy.mysql_repositories import (
+    MySQLAuditoriaRepository,
     MySQLCampanasRepository,
     MySQLCargasRepository,
     MySQLDispositivosRepository,
@@ -302,10 +309,24 @@ def get_consultar_nodo_unifilar_use_case(
     )
 
 
-def get_usuarios_repository(
-    db: Annotated[Session, Depends(get_db_session)],
-) -> RepositorioUsuariosPort:
+def get_usuarios_repository(db: Annotated[Session, Depends(get_db_session)]) -> RepositorioUsuariosPort:
     return MySQLUsuariosRepository(db)
+
+
+def get_auditoria_repository(db: Annotated[Session, Depends(get_db_session)]) -> RepositorioAuditoriaPort:
+    return MySQLAuditoriaRepository(db)
+
+
+def get_registrar_auditoria_use_case(
+    repo_auditoria: Annotated[RepositorioAuditoriaPort, Depends(get_auditoria_repository)],
+) -> RegistrarEventoAuditoriaUseCase:
+    return RegistrarEventoAuditoriaUseCase(repo_auditoria=repo_auditoria)
+
+
+def get_consultar_auditoria_use_case(
+    repo_auditoria: Annotated[RepositorioAuditoriaPort, Depends(get_auditoria_repository)],
+) -> ConsultarAuditLogsUseCase:
+    return ConsultarAuditLogsUseCase(repo_auditoria=repo_auditoria)
 
 
 @lru_cache(maxsize=1)
@@ -408,6 +429,7 @@ def token_valido(
 def get_usuario_actual(
     authorization: Annotated[str | None, Header()] = None,
     datamaq_token: Annotated[str | None, Cookie()] = None,
+    repo_usuarios: Annotated[RepositorioUsuariosPort | None, Depends(get_usuarios_repository)] = None,
 ) -> dict[str, Any]:
     settings = get_settings()
     if not settings.AUTH_REQUIRED:
@@ -421,11 +443,31 @@ def get_usuario_actual(
     if claims is None:
         raise HTTPException(status_code=401, detail="credenciales_invalidas")
 
-    # Verificación de revocación de sesión por cambio de contraseña o logout
+    sub = str(claims.get("sub", ""))
+    iat = int(claims.get("iat", 0))
+
+    # Verificación de revocación de sesión por cambio de contraseña o logout en memoria
     revocation = get_token_revocation_service()
-    if revocation.esta_revocado(str(claims.get("sub", "")), int(claims.get("iat", 0))):
+    if revocation.esta_revocado(sub, iat):
         raise HTTPException(status_code=401, detail="credenciales_invalidas")
 
+    # Verificación de revocación global persistida en base de datos (ISO 27001 A.5.15)
+    if repo_usuarios is not None and sub:
+        usuario = repo_usuarios.obtener_por_id(sub)
+        if usuario is not None and usuario.sesiones_revocadas_antes_de is not None:
+            rev_dt = usuario.sesiones_revocadas_antes_de
+            if rev_dt.tzinfo is None:
+                rev_dt = rev_dt.replace(tzinfo=timezone.utc)
+            token_iat = datetime.fromtimestamp(iat, tz=timezone.utc)
+            if token_iat < rev_dt:
+                raise HTTPException(status_code=401, detail="credenciales_invalidas")
+
+    return claims
+
+
+def requiere_rol_auditor_o_superadmin(claims: Annotated[dict[str, Any], Depends(get_usuario_actual)]) -> dict[str, Any]:
+    if claims.get("rol") not in ("superadmin", "auditor"):
+        raise HTTPException(status_code=403, detail="forbidden")
     return claims
 
 
@@ -447,12 +489,7 @@ def requiere_rol_escritura(claims: Annotated[dict[str, Any], Depends(get_usuario
     return claims
 
 
-def no_permitido_para_invitados_2fa(
-    claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
-) -> dict[str, Any]:
-    """Rechaza con 403 intentos de configuración, activación o desactivación de 2FA
-    por parte de usuarios con roles efímeros o no persistentes (invitado e invitado_global).
-    """
+def no_permitido_para_invitados_2fa(claims: Annotated[dict[str, Any], Depends(get_usuario_actual)]) -> dict[str, Any]:
     if claims.get("rol") in ("invitado", "invitado_global"):
         raise HTTPException(status_code=403, detail="2fa_no_disponible_para_invitado")
     return claims

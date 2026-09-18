@@ -32,6 +32,7 @@ from src.infrastructure.fastapi.error_handler import manejar_404
 from src.infrastructure.fastapi.middleware import RequestIdMiddleware
 from src.infrastructure.fastapi.routes.alertas_router import router as alertas_router
 from src.infrastructure.fastapi.routes.analitica_router import router as analitica_router
+from src.infrastructure.fastapi.routes.audit_router import router as audit_router
 from src.infrastructure.fastapi.routes.auth_router import router as auth_router
 from src.infrastructure.fastapi.routes.billing_router import router as billing_router
 from src.infrastructure.fastapi.routes.cargas_router import router as cargas_router
@@ -470,7 +471,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_exception_handler(StarletteHTTPException, manejar_404)
 
     # Register Routers
-    routers = (system_router, disponibilidad_router, cargas_router, telemetria_router, dispositivos_router, organizaciones_router, planta_estructura_router, planes_router, alertas_router, auth_router, sge_router, usuarios_router, analitica_router, copilot_router, billing_router)  # fmt: skip
+    routers = (system_router, disponibilidad_router, cargas_router, telemetria_router, dispositivos_router, organizaciones_router, planta_estructura_router, planes_router, alertas_router, auth_router, audit_router, sge_router, usuarios_router, analitica_router, copilot_router, billing_router)  # fmt: skip
     for r in routers:
         app.include_router(r)
 

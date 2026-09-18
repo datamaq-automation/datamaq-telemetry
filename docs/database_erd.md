@@ -28,6 +28,21 @@ erDiagram
     USERS ||--o{ DISPOSITIVOS_CONFIABLES : "FK_usuario_id"
     USERS ||--o{ USER_FACILITY_ACCESS : "FK_user_id"
 
+    AUDIT_LOGS {
+        string id PK
+        datetime registrado_en
+        string actor_usuario_id
+        string actor_email
+        string actor_ip
+        string actor_user_agent
+        string categoria
+        string accion
+        string resultado
+        string recurso_tipo
+        string recurso_id
+        json metadatos
+    }
+
     CAMPAIGN_SAMPLES {
         bigint id PK
         string campaign_id FK
@@ -306,6 +321,7 @@ erDiagram
         string totp_secret
         boolean totp_enabled
         json totp_backup_codes
+        datetime sesiones_revocadas_antes_de
         string organization_id FK
         datetime created_at
         datetime updated_at
@@ -321,6 +337,31 @@ erDiagram
 ```
 
 ## 2. Detalle de Tablas e Índices
+
+### Tabla `audit_logs`
+
+| Columna | Tipo SQL | Clave / Restricción | Nullable |
+| :--- | :--- | :--- | :--- |
+| `id` | `VARCHAR(36)` | **PRIMARY KEY** | No |
+| `registrado_en` | `DATETIME` | - | No |
+| `actor_usuario_id` | `VARCHAR(36)` | - | Sí |
+| `actor_email` | `VARCHAR(255)` | - | Sí |
+| `actor_ip` | `VARCHAR(45)` | - | Sí |
+| `actor_user_agent` | `VARCHAR(255)` | - | Sí |
+| `categoria` | `VARCHAR(50)` | - | No |
+| `accion` | `VARCHAR(100)` | - | No |
+| `resultado` | `VARCHAR(20)` | - | No |
+| `recurso_tipo` | `VARCHAR(50)` | - | Sí |
+| `recurso_id` | `VARCHAR(100)` | - | Sí |
+| `metadatos` | `JSON` | - | Sí |
+
+**Índices:**
+- `idx_audit_actor_fecha`: (`actor_usuario_id`, `registrado_en`)
+- `idx_audit_recurso`: (`recurso_tipo`, `recurso_id`)
+- `ix_audit_logs_accion`: (`accion`)
+- `ix_audit_logs_actor_usuario_id`: (`actor_usuario_id`)
+- `ix_audit_logs_categoria`: (`categoria`)
+- `ix_audit_logs_recurso_id`: (`recurso_id`)
 
 ### Tabla `campaign_samples`
 
@@ -681,6 +722,7 @@ erDiagram
 | `totp_secret` | `VARCHAR(255)` | - | Sí |
 | `totp_enabled` | `BOOLEAN` | - | No |
 | `totp_backup_codes` | `JSON` | - | Sí |
+| `sesiones_revocadas_antes_de` | `DATETIME` | - | Sí |
 | `organization_id` | `VARCHAR(36)` | FK -> `organizations.id` | Sí |
 | `created_at` | `DATETIME` | - | No |
 | `updated_at` | `DATETIME` | - | No |

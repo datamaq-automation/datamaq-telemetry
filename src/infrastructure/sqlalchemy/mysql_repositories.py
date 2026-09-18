@@ -8,6 +8,9 @@ Single Responsibility (SRP) y Screaming Architecture.
 from src.infrastructure.sqlalchemy.repositories.accesos_planta_repository import (
     MySQLAccesosPlantaRepository,
 )
+from src.infrastructure.sqlalchemy.repositories.auditoria_repository import (
+    MySQLAuditoriaRepository,
+)
 from src.infrastructure.sqlalchemy.repositories.campanas_repository import (
     MySQLCampanasRepository,
 )
@@ -47,6 +50,7 @@ from src.infrastructure.sqlalchemy.repositories.webhook_events_repository import
 
 __all__ = [
     "MySQLAccesosPlantaRepository",
+    "MySQLAuditoriaRepository",
     "MySQLCampanasRepository",
     "MySQLCargasRepository",
     "MySQLDispositivosConfiablesRepository",

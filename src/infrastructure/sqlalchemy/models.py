@@ -353,6 +353,7 @@ class UserModel(Base):
     totp_secret: Mapped[str | None] = mapped_column(String(255), nullable=True)
     totp_enabled: Mapped[bool] = mapped_column(default=False, nullable=False)
     totp_backup_codes: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    sesiones_revocadas_antes_de: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
     organization_id: Mapped[str | None] = mapped_column(
         String(36), ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True
     )
@@ -388,3 +389,35 @@ class WebhookEventModel(Base):
     provider: Mapped[str] = mapped_column(String(30), nullable=False)
     event_id: Mapped[str] = mapped_column(String(100), nullable=False)
     processed_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
+
+
+class AuditLogModel(Base):
+    """Registro inmutable append-only de auditoría (ISO 27001 A.8.15 / Ley 25.326)."""
+
+    __tablename__ = "audit_logs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    registrado_en: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
+
+    # Sujeto (Actor)
+    actor_usuario_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    actor_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    actor_ip: Mapped[str | None] = mapped_column(String(45), nullable=True)
+    actor_user_agent: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    # Evento
+    categoria: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    accion: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    resultado: Mapped[str] = mapped_column(String(20), nullable=False)
+
+    # Objeto de la Acción
+    recurso_tipo: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    recurso_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+
+    # Metadatos del Cambio (Diff seguro — PROHIBIDO registrar passwords o secrets)
+    metadatos: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+
+    __table_args__ = (
+        Index("idx_audit_actor_fecha", "actor_usuario_id", "registrado_en"),
+        Index("idx_audit_recurso", "recurso_tipo", "recurso_id"),
+    )

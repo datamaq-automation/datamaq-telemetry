@@ -6,13 +6,16 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.application.dtos.audit_dto import RegistrarAuditLogDTO
 from src.application.dtos.auth_dto import AsignarPlantasRequestDTO, PlantaAccesoDTO
 from src.application.use_cases.gestionar_acceso_plantas import GestionarAccesoPlantasUseCase
+from src.application.use_cases.gestionar_auditoria import RegistrarEventoAuditoriaUseCase
 from src.domain.auth.entities import UsuarioAuth
 from src.domain.auth.ports import RepositorioUsuariosPort
 from src.domain.auth.services import HashContrasenaService
 from src.infrastructure.fastapi.auth_dependencies import get_acceso_plantas_use_case
 from src.infrastructure.fastapi.dependencies import (
+    get_registrar_auditoria_use_case,
     get_usuario_actual,
     get_usuarios_repository,
     requiere_rol_admin,
@@ -25,6 +28,10 @@ class CrearUsuarioRequestDTO(BaseModel):
     usuario: str = Field(..., min_length=3, max_length=50)
     rol: str = Field("operador", description="operador, admin, mantenimiento, ingeniero, etc.")
     organizacion_id: str | None = None
+
+
+class CambiarRolUsuarioDTO(BaseModel):
+    rol: str = Field(..., min_length=2, max_length=50, description="Nuevo rol asignado")
 
 
 class UsuarioResponseDTO(BaseModel):
@@ -49,6 +56,7 @@ def crear_usuario(
     dto: CrearUsuarioRequestDTO,
     claims: Annotated[dict, Depends(get_usuario_actual)],
     repo_usuarios: Annotated[RepositorioUsuariosPort, Depends(get_usuarios_repository)],
+    audit_use_case: Annotated[RegistrarEventoAuditoriaUseCase | None, Depends(get_registrar_auditoria_use_case)] = None,
 ) -> UsuarioResponseDTO:
     existente = repo_usuarios.obtener_por_usuario(dto.usuario)
     if existente:
@@ -71,6 +79,112 @@ def crear_usuario(
     )
 
     guardado = repo_usuarios.guardar(nuevo_usuario)
+
+    if audit_use_case is not None:
+        try:
+            audit_use_case.ejecutar(
+                RegistrarAuditLogDTO(
+                    categoria="USUARIOS",
+                    accion="ALTA",
+                    resultado="EXITO",
+                    actor_usuario_id=claims.get("sub"),
+                    actor_email=claims.get("usuario"),
+                    recurso_tipo="usuario",
+                    recurso_id=guardado.id,
+                    metadatos={
+                        "usuario": guardado.usuario,
+                        "rol": guardado.rol,
+                        "organizacion_id": guardado.organizacion_id,
+                    },
+                )
+            )
+        except Exception:
+            pass
+
+    return UsuarioResponseDTO(
+        id=guardado.id,
+        usuario=guardado.usuario,
+        rol=guardado.rol,
+        organizacion_id=guardado.organizacion_id,
+        esta_activo=guardado.esta_activo,
+    )
+
+
+@router.delete(
+    "/{usuario_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(requiere_rol_admin)],
+)
+def dar_baja_usuario(
+    usuario_id: str,
+    claims: Annotated[dict, Depends(get_usuario_actual)],
+    repo_usuarios: Annotated[RepositorioUsuariosPort, Depends(get_usuarios_repository)],
+    audit_use_case: Annotated[RegistrarEventoAuditoriaUseCase | None, Depends(get_registrar_auditoria_use_case)] = None,
+):
+    _verificar_misma_organizacion(claims, usuario_id, repo_usuarios)
+    usuario = repo_usuarios.obtener_por_id(usuario_id)
+    if not usuario:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado.")
+
+    usuario.esta_activo = False
+    repo_usuarios.guardar(usuario)
+
+    if audit_use_case is not None:
+        try:
+            audit_use_case.ejecutar(
+                RegistrarAuditLogDTO(
+                    categoria="USUARIOS",
+                    accion="BAJA",
+                    resultado="EXITO",
+                    actor_usuario_id=claims.get("sub"),
+                    actor_email=claims.get("usuario"),
+                    recurso_tipo="usuario",
+                    recurso_id=usuario_id,
+                    metadatos={"usuario": usuario.usuario},
+                )
+            )
+        except Exception:
+            pass
+
+
+@router.patch(
+    "/{usuario_id}/rol",
+    response_model=UsuarioResponseDTO,
+    dependencies=[Depends(requiere_rol_admin)],
+)
+def cambiar_rol_usuario(
+    usuario_id: str,
+    dto: CambiarRolUsuarioDTO,
+    claims: Annotated[dict, Depends(get_usuario_actual)],
+    repo_usuarios: Annotated[RepositorioUsuariosPort, Depends(get_usuarios_repository)],
+    audit_use_case: Annotated[RegistrarEventoAuditoriaUseCase | None, Depends(get_registrar_auditoria_use_case)] = None,
+) -> UsuarioResponseDTO:
+    _verificar_misma_organizacion(claims, usuario_id, repo_usuarios)
+    usuario = repo_usuarios.obtener_por_id(usuario_id)
+    if not usuario:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado.")
+
+    anterior_rol = usuario.rol
+    usuario.rol = dto.rol
+    guardado = repo_usuarios.guardar(usuario)
+
+    if audit_use_case is not None:
+        try:
+            audit_use_case.ejecutar(
+                RegistrarAuditLogDTO(
+                    categoria="USUARIOS",
+                    accion="CAMBIO_ROL",
+                    resultado="EXITO",
+                    actor_usuario_id=claims.get("sub"),
+                    actor_email=claims.get("usuario"),
+                    recurso_tipo="usuario",
+                    recurso_id=usuario_id,
+                    metadatos={"rol_anterior": anterior_rol, "rol_nuevo": dto.rol},
+                )
+            )
+        except Exception:
+            pass
+
     return UsuarioResponseDTO(
         id=guardado.id,
         usuario=guardado.usuario,

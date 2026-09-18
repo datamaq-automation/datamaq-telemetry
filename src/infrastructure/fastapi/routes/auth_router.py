@@ -1,10 +1,12 @@
 """src/infrastructure/fastapi/routes/auth_router.py."""
 
+from datetime import datetime, timezone
 from typing import Annotated, Any
 
 import structlog
 from fastapi import APIRouter, Cookie, Depends, Request, Response
 
+from src.application.dtos.audit_dto import RegistrarAuditLogDTO
 from src.application.dtos.auth_dto import (
     Activar2FARequestDTO,
     Desactivar2FARequestDTO,
@@ -25,6 +27,7 @@ from src.application.use_cases.gestionar_2fa import (
     Setup2FAUseCase,
     Verificar2FAUseCase,
 )
+from src.application.use_cases.gestionar_auditoria import RegistrarEventoAuditoriaUseCase
 from src.application.use_cases.gestionar_dispositivos_confiables import (
     RevocarDispositivosConfiablesUseCase,
 )
@@ -32,6 +35,8 @@ from src.application.use_cases.recuperar_contrasena import (
     RestablecerContrasenaUseCase,
     SolicitarRecuperacionContrasenaUseCase,
 )
+from src.domain.auth.ports import RepositorioUsuariosPort
+from src.infrastructure.auth.jwt_token_service import JwtTokenService
 from src.infrastructure.fastapi.auth_dependencies import (
     get_activar_2fa_use_case,
     get_auth_use_case,
@@ -41,10 +46,13 @@ from src.infrastructure.fastapi.auth_dependencies import (
     get_verificar_2fa_use_case,
 )
 from src.infrastructure.fastapi.dependencies import (
+    get_registrar_auditoria_use_case,
     get_restablecer_contrasena_use_case,
     get_settings_dep,
     get_solicitar_recuperacion_use_case,
+    get_token_revocation_service,
     get_usuario_actual,
+    get_usuarios_repository,
     no_permitido_para_invitados_2fa,
 )
 from src.infrastructure.fastapi.error_handler import manejar_error_http
@@ -97,9 +105,11 @@ def login(
     settings: Annotated[Settings, Depends(get_settings_dep)],
     request: Request = None,  # type: ignore[assignment]
     datamaq_device_trust: Annotated[str | None, Cookie()] = None,
+    audit_use_case: Annotated[RegistrarEventoAuditoriaUseCase | None, Depends(get_registrar_auditoria_use_case)] = None,
 ):
+    ip = _obtener_ip_cliente(request)
+    user_agent = request.headers.get("User-Agent", "") if request is not None else ""
     try:
-        ip = _obtener_ip_cliente(request)
         resultado = use_case.login(
             dto,
             clave_ip=ip,
@@ -113,8 +123,48 @@ def login(
         )
         if resultado.token:
             _fijar_cookie(response, settings, resultado.token)
+
+        if audit_use_case is not None:
+            try:
+                token_claims = (
+                    JwtTokenService(settings.API_SECRET_KEY).verificar(resultado.token) if resultado.token else None
+                )
+                user_id = token_claims.get("sub") if token_claims else None
+                audit_use_case.ejecutar(
+                    RegistrarAuditLogDTO(
+                        categoria="AUTH",
+                        accion="LOGIN_EXITOSO",
+                        resultado="EXITO",
+                        actor_usuario_id=user_id,
+                        actor_email=dto.usuario,
+                        actor_ip=ip,
+                        actor_user_agent=user_agent,
+                        recurso_tipo="usuario",
+                        recurso_id=user_id,
+                        metadatos={"requiere_2fa": resultado.require_2fa},
+                    )
+                )
+            except Exception as err:
+                logger.warning("error_registrando_auditoria_login", error=str(err))
+
         return resultado
     except Exception as e:
+        if audit_use_case is not None:
+            try:
+                audit_use_case.ejecutar(
+                    RegistrarAuditLogDTO(
+                        categoria="AUTH",
+                        accion="LOGIN_FALLIDO",
+                        resultado="RECHAZADO",
+                        actor_email=dto.usuario,
+                        actor_ip=ip,
+                        actor_user_agent=user_agent,
+                        recurso_tipo="usuario",
+                        metadatos={"motivo": type(e).__name__},
+                    )
+                )
+            except Exception as err:
+                logger.warning("error_registrando_auditoria_login_fallido", error=str(err))
         manejar_error_http(e)
 
 
@@ -141,9 +191,89 @@ def guest(
 
 
 @router.post("/logout")
-def logout(response: Response, settings: Annotated[Settings, Depends(get_settings_dep)]) -> dict[str, str]:
+def logout(
+    response: Response,
+    settings: Annotated[Settings, Depends(get_settings_dep)],
+    request: Request = None,  # type: ignore[assignment]
+    audit_use_case: Annotated[RegistrarEventoAuditoriaUseCase | None, Depends(get_registrar_auditoria_use_case)] = None,
+) -> dict[str, str]:
     response.delete_cookie(key=settings.AUTH_COOKIE_NOMBRE)
+    if audit_use_case is not None and request is not None:
+        try:
+            ip = _obtener_ip_cliente(request)
+            user_agent = request.headers.get("User-Agent", "")
+            token = request.cookies.get(settings.AUTH_COOKIE_NOMBRE) or request.headers.get(
+                "Authorization", ""
+            ).replace("Bearer ", "")
+            usuario_id = None
+            if token:
+                c = JwtTokenService(settings.API_SECRET_KEY).verificar(token)
+                if c:
+                    usuario_id = str(c.get("sub", ""))
+            audit_use_case.ejecutar(
+                RegistrarAuditLogDTO(
+                    categoria="AUTH",
+                    accion="LOGOUT",
+                    resultado="EXITO",
+                    actor_usuario_id=usuario_id,
+                    actor_ip=ip,
+                    actor_user_agent=user_agent,
+                    recurso_tipo="usuario",
+                    recurso_id=usuario_id,
+                )
+            )
+        except Exception as err:
+            logger.warning("error_registrando_auditoria_logout", error=str(err))
     return {"detail": "sesion_cerrada"}
+
+
+@router.post("/logout-todas")
+def logout_todas(
+    claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
+    response: Response,
+    settings: Annotated[Settings, Depends(get_settings_dep)],
+    repo_usuarios: Annotated[RepositorioUsuariosPort, Depends(get_usuarios_repository)],
+    audit_use_case: Annotated[RegistrarEventoAuditoriaUseCase | None, Depends(get_registrar_auditoria_use_case)] = None,
+    request: Request = None,  # type: ignore[assignment]
+) -> dict[str, str]:
+    usuario_id = str(claims.get("sub", ""))
+    ahora = datetime.now(timezone.utc)
+
+    usuario = repo_usuarios.obtener_por_id(usuario_id)
+    if usuario is not None:
+        usuario.sesiones_revocadas_antes_de = ahora
+        repo_usuarios.guardar(usuario)
+
+    # Invalida también en memoria
+    revocation = get_token_revocation_service()
+    revocation.revocar_usuario(usuario_id, int(ahora.timestamp()))
+
+    # Limpia la cookie del cliente invocador
+    response.delete_cookie(key=settings.AUTH_COOKIE_NOMBRE)
+
+    # Registra evento inmutable en audit_logs (ISO 27001 A.5.15 & A.8.15)
+    if audit_use_case is not None:
+        try:
+            ip = _obtener_ip_cliente(request)
+            user_agent = request.headers.get("User-Agent", "") if request is not None else ""
+            audit_use_case.ejecutar(
+                RegistrarAuditLogDTO(
+                    categoria="AUTH",
+                    accion="LOGOUT_TODAS_SESIONES",
+                    resultado="EXITO",
+                    actor_usuario_id=usuario_id,
+                    actor_email=str(claims.get("usuario") or ""),
+                    actor_ip=ip,
+                    actor_user_agent=user_agent,
+                    recurso_tipo="usuario",
+                    recurso_id=usuario_id,
+                    metadatos={"sesiones_revocadas_antes_de": ahora.isoformat()},
+                )
+            )
+        except Exception as err:
+            logger.warning("error_registrando_auditoria_logout_todas", error=str(err))
+
+    return {"detail": "todas_las_sesiones_revocadas"}
 
 
 @router.get("/me", response_model=MeResponseDTO)
@@ -164,17 +294,58 @@ def verificar_2fa(
     response: Response,
     settings: Annotated[Settings, Depends(get_settings_dep)],
     request: Request = None,  # type: ignore[assignment]
+    audit_use_case: Annotated[RegistrarEventoAuditoriaUseCase | None, Depends(get_registrar_auditoria_use_case)] = None,
 ) -> LoginResponseDTO:
+    ip = _obtener_ip_cliente(request)
+    user_agent = request.headers.get("User-Agent", "") if request is not None else ""
     try:
-        ip = _obtener_ip_cliente(request)
-        user_agent = request.headers.get("User-Agent", "") if request is not None else ""
         resultado = use_case.verificar(dto, ip_origen=ip, user_agent=user_agent)
         if resultado.token:
             _fijar_cookie(response, settings, resultado.token)
         if resultado.device_trust_token:
             _fijar_cookie_dispositivo(response, settings, resultado.device_trust_token)
+
+        if audit_use_case is not None:
+            try:
+                token_claims = (
+                    JwtTokenService(settings.API_SECRET_KEY).verificar(resultado.token) if resultado.token else None
+                )
+                user_id = token_claims.get("sub") if token_claims else None
+                user_email = token_claims.get("usuario") if token_claims else None
+                audit_use_case.ejecutar(
+                    RegistrarAuditLogDTO(
+                        categoria="AUTH",
+                        accion="LOGIN_EXITOSO",
+                        resultado="EXITO",
+                        actor_usuario_id=user_id,
+                        actor_email=user_email,
+                        actor_ip=ip,
+                        actor_user_agent=user_agent,
+                        recurso_tipo="usuario",
+                        recurso_id=user_id,
+                        metadatos={"mfa": True},
+                    )
+                )
+            except Exception as err:
+                logger.warning("error_registrando_auditoria_2fa_exitoso", error=str(err))
+
         return resultado
     except Exception as e:
+        if audit_use_case is not None:
+            try:
+                audit_use_case.ejecutar(
+                    RegistrarAuditLogDTO(
+                        categoria="AUTH",
+                        accion="LOGIN_FALLIDO",
+                        resultado="RECHAZADO",
+                        actor_ip=ip,
+                        actor_user_agent=user_agent,
+                        recurso_tipo="usuario",
+                        metadatos={"mfa": True, "motivo": type(e).__name__},
+                    )
+                )
+            except Exception as err:
+                logger.warning("error_registrando_auditoria_2fa_fallido", error=str(err))
         manejar_error_http(e)
 
 
@@ -203,10 +374,35 @@ def activar_2fa(
     dto: Activar2FARequestDTO,
     claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
     use_case: Annotated[Activar2FAUseCase, Depends(get_activar_2fa_use_case)],
+    audit_use_case: Annotated[RegistrarEventoAuditoriaUseCase | None, Depends(get_registrar_auditoria_use_case)] = None,
+    request: Request = None,  # type: ignore[assignment]
 ) -> Operacion2FAResponseDTO:
     try:
         usuario = str(claims.get("usuario") or claims.get("sub"))
-        return use_case.ejecutar(usuario, dto)
+        usuario_id = str(claims.get("sub", ""))
+        resultado = use_case.ejecutar(usuario, dto)
+
+        if audit_use_case is not None:
+            try:
+                ip = _obtener_ip_cliente(request)
+                user_agent = request.headers.get("User-Agent", "") if request is not None else ""
+                audit_use_case.ejecutar(
+                    RegistrarAuditLogDTO(
+                        categoria="AUTH",
+                        accion="2FA_ACTIVADO",
+                        resultado="EXITO",
+                        actor_usuario_id=usuario_id,
+                        actor_email=str(claims.get("usuario") or ""),
+                        actor_ip=ip,
+                        actor_user_agent=user_agent,
+                        recurso_tipo="usuario",
+                        recurso_id=usuario_id,
+                    )
+                )
+            except Exception as err:
+                logger.warning("error_registrando_auditoria_2fa_activado", error=str(err))
+
+        return resultado
     except Exception as e:
         manejar_error_http(e)
 
@@ -220,10 +416,35 @@ def desactivar_2fa(
     dto: Desactivar2FARequestDTO,
     claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
     use_case: Annotated[Desactivar2FAUseCase, Depends(get_desactivar_2fa_use_case)],
+    audit_use_case: Annotated[RegistrarEventoAuditoriaUseCase | None, Depends(get_registrar_auditoria_use_case)] = None,
+    request: Request = None,  # type: ignore[assignment]
 ) -> Operacion2FAResponseDTO:
     try:
         usuario = str(claims.get("usuario") or claims.get("sub"))
-        return use_case.ejecutar(usuario, dto)
+        usuario_id = str(claims.get("sub", ""))
+        resultado = use_case.ejecutar(usuario, dto)
+
+        if audit_use_case is not None:
+            try:
+                ip = _obtener_ip_cliente(request)
+                user_agent = request.headers.get("User-Agent", "") if request is not None else ""
+                audit_use_case.ejecutar(
+                    RegistrarAuditLogDTO(
+                        categoria="AUTH",
+                        accion="2FA_DESACTIVADO",
+                        resultado="EXITO",
+                        actor_usuario_id=usuario_id,
+                        actor_email=str(claims.get("usuario") or ""),
+                        actor_ip=ip,
+                        actor_user_agent=user_agent,
+                        recurso_tipo="usuario",
+                        recurso_id=usuario_id,
+                    )
+                )
+            except Exception as err:
+                logger.warning("error_registrando_auditoria_2fa_desactivado", error=str(err))
+
+        return resultado
     except Exception as e:
         manejar_error_http(e)
 

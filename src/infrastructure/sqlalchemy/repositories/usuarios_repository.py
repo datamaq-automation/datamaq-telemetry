@@ -22,6 +22,7 @@ class MySQLUsuariosRepository(RepositorioUsuariosPort):
             totp_secret=model.totp_secret,
             totp_enabled=model.totp_enabled,
             totp_backup_codes=model.totp_backup_codes,
+            sesiones_revocadas_antes_de=model.sesiones_revocadas_antes_de,
             creado_en=model.created_at,
             actualizado_en=model.updated_at,
         )
@@ -47,6 +48,7 @@ class MySQLUsuariosRepository(RepositorioUsuariosPort):
                 totp_secret=usuario.totp_secret,
                 totp_enabled=usuario.totp_enabled,
                 totp_backup_codes=usuario.totp_backup_codes,
+                sesiones_revocadas_antes_de=usuario.sesiones_revocadas_antes_de,
             )
             self.db.add(model)
         else:
@@ -58,6 +60,7 @@ class MySQLUsuariosRepository(RepositorioUsuariosPort):
             model.totp_secret = usuario.totp_secret
             model.totp_enabled = usuario.totp_enabled
             model.totp_backup_codes = usuario.totp_backup_codes
+            model.sesiones_revocadas_antes_de = usuario.sesiones_revocadas_antes_de
 
         self.db.commit()
         self.db.refresh(model)

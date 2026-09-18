@@ -19,6 +19,7 @@ class UsuarioAuth:
     totp_secret: str | None = None
     totp_enabled: bool = False
     totp_backup_codes: list[str] | None = None
+    sesiones_revocadas_antes_de: datetime | None = None
     creado_en: datetime = field(default_factory=ahora_utc)
     actualizado_en: datetime = field(default_factory=ahora_utc)
 
