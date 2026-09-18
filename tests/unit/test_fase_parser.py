@@ -6,7 +6,10 @@ from src.domain.telemetria.value_objects import PotenciaActiva, PotenciaReactiva
 
 
 def _mf(p, q):
-    return MedicionFase(potencia_activa=PotenciaActiva(vatios=float(p)), potencia_reactiva=PotenciaReactiva(var=float(q)))
+    return MedicionFase(
+        potencia_activa=PotenciaActiva(vatios=float(p)),
+        potencia_reactiva=PotenciaReactiva(var=float(q)),
+    )
 
 
 def test_identidad_no_cambia():
@@ -27,7 +30,9 @@ def test_invertido_invierte_signo_pq():
 def test_reordenacion_permute_y_rota():
     # entradas: R=1, S=2, T=3; orden_fases = ['S','T','R'] -> expect transformed values
     r, s, t = _mf(1, 0), _mf(2, 0), _mf(3, 0)
-    fr, fs, ft = aplicar_configuracion_ti(r, s, t, invertido=False, orden_fases=["S", "T", "R"])
+    fr, fs, ft = aplicar_configuracion_ti(
+        r, s, t, invertido=False, orden_fases=["S", "T", "R"]
+    )
 
     # Expected (manual): fr comes from entrada T (3) rotated by -240deg (== +120deg)
     # cos(120) = -0.5 -> p' = 3 * -0.5 = -1.5
@@ -42,7 +47,9 @@ def test_reordenacion_permute_y_rota():
 
 def test_reordenacion_mas_inversion_aplica_ambas():
     r, s, t = _mf(1, 0), _mf(2, 0), _mf(3, 0)
-    fr, fs, ft = aplicar_configuracion_ti(r, s, t, invertido=True, orden_fases=["S", "T", "R"])
+    fr, fs, ft = aplicar_configuracion_ti(
+        r, s, t, invertido=True, orden_fases=["S", "T", "R"]
+    )
     assert math.isclose(fr.potencia_activa.vatios, 1.5, rel_tol=1e-6)
     assert math.isclose(fs.potencia_activa.vatios, 0.5, rel_tol=1e-6)
     assert math.isclose(ft.potencia_activa.vatios, 1.0, rel_tol=1e-6)
