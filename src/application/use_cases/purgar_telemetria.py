@@ -29,16 +29,23 @@ class PurgarTelemetriaExpiradaUseCase:
         if dto.corte_hasta is not None:
             if dto.corte_hasta > ahora:
                 raise CortePurgaFuturoError(f"corte_hasta ({dto.corte_hasta.isoformat()}) es posterior a ahora")
-            corte_telemetria = dto.corte_hasta
+            corte_instantaneas = dto.corte_hasta
+            corte_energia = dto.corte_hasta
             corte_logs = dto.corte_hasta
             corte_alertas = dto.corte_hasta
         elif dto.dias_retencion_override is not None:
-            corte_telemetria = ahora - timedelta(days=dto.dias_retencion_override)
+            corte_instantaneas = ahora - timedelta(days=dto.dias_retencion_override)
+            corte_energia = ahora - timedelta(days=dto.dias_retencion_override)
             corte_logs = ahora - timedelta(days=dto.dias_retencion_override)
             corte_alertas = ahora - timedelta(days=dto.dias_retencion_override)
         else:
-            # Por defecto: 7 días para telemetría y status logs, 30 días para alertas resueltas
-            corte_telemetria = ahora - timedelta(days=7)
+            # Por defecto: 45 días para instantáneas crudas (ISO 27001 A.8.10),
+            # 5 años (1825 días) para agregados energéticos (ISO 50001),
+            # 7 días para status logs y 30 días para alertas resueltas.
+            dias_inst = dto.dias_retencion_instantaneas if dto.dias_retencion_instantaneas is not None else 45
+            dias_ene = dto.dias_retencion_energia if dto.dias_retencion_energia is not None else (5 * 365)
+            corte_instantaneas = ahora - timedelta(days=dias_inst)
+            corte_energia = ahora - timedelta(days=dias_ene)
             corte_logs = PoliticaRetencionService.fecha_corte_status_logs(ahora, dias=7)
             corte_alertas = PoliticaRetencionService.fecha_corte_alertas_resueltas(ahora, dias=30)
 
@@ -47,7 +54,7 @@ class PurgarTelemetriaExpiradaUseCase:
         # 2. Drenado por lotes de instantaneas
         total_inst = 0
         while True:
-            borrados = self.repo_telemetria.purgar_instantaneas_anteriores_a(corte_telemetria, batch_size=batch_size)
+            borrados = self.repo_telemetria.purgar_instantaneas_anteriores_a(corte_instantaneas, batch_size=batch_size)
             total_inst += borrados
             if borrados < batch_size:
                 break
@@ -55,7 +62,7 @@ class PurgarTelemetriaExpiradaUseCase:
         # 3. Drenado por lotes de energias
         total_energia = 0
         while True:
-            borrados = self.repo_telemetria.purgar_energias_anteriores_a(corte_telemetria, batch_size=batch_size)
+            borrados = self.repo_telemetria.purgar_energias_anteriores_a(corte_energia, batch_size=batch_size)
             total_energia += borrados
             if borrados < batch_size:
                 break

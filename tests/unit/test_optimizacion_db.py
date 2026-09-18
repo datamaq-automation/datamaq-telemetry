@@ -426,10 +426,10 @@ def test_purgar_telemetria_expirada():
     use_case = PurgarTelemetriaExpiradaUseCase(repo_telem)
 
     ahora = datetime.now(timezone.utc)
-    antiguo = ahora - timedelta(days=15)
+    antiguo = ahora - timedelta(days=60)
     reciente = ahora - timedelta(days=2)
 
-    # Agregar instantáneas: 2 viejas (>7d), 1 reciente
+    # Agregar instantáneas: 2 viejas (>45d), 1 reciente
     repo_telem.guardar_instantanea(
         LecturaInstantanea(None, "dev1", antiguo, MedicionFase(), MedicionFase(), MedicionFase())
     )
@@ -463,7 +463,7 @@ def test_purgar_telemetria_expirada():
     repo_telem.guardar_alerta(alerta_resuelta_vieja)
     repo_telem.guardar_alerta(alerta_activa_vieja)
 
-    # Ejecutar purga por defecto (7 días telemetría, 30 días alertas resueltas)
+    # Ejecutar purga por defecto (45 días telemetría, 30 días alertas resueltas)
     req = PurgaRequestDTO(batch_size=100)
     res = use_case.ejecutar(req)
 

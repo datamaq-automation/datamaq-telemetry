@@ -27,19 +27,35 @@ def parsear_corte_hasta(valor: str) -> datetime:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Script CLI de purgado seguro de telemetría y logs expirados en Datamaq Telemetry."
+        description=(
+            "Script CLI de purgado seguro de telemetría y logs expirados en Datamaq Telemetry "
+            "(Cumplimiento ISO 27001 A.8.10 y minimización de datos). "
+            "Recomendado para ejecución en cron diario a las 03:00 UTC."
+        )
     )
     parser.add_argument(
         "--days",
         type=int,
         default=None,
-        help="Días de retención para sobreescribir la política por defecto (ej. 7 o 30).",
+        help="Días de retención para sobreescribir globalmente todas las políticas (ej. 7 o 30).",
+    )
+    parser.add_argument(
+        "--days-instantaneas",
+        type=int,
+        default=None,
+        help="Días de retención para telemetría instantánea cruda (default: 45 días).",
+    )
+    parser.add_argument(
+        "--days-energy",
+        type=int,
+        default=None,
+        help="Días de retención para telemetría acumulada (default: 1825 días / 5 años).",
     )
     parser.add_argument(
         "--batch-size",
         type=int,
-        default=1000,
-        help="Tamaño de lote para borrados por transacción (default: 1000).",
+        default=50000,
+        help="Tamaño de lote para borrados por transacción (default: 50000).",
     )
     parser.add_argument(
         "--hasta",
@@ -60,6 +76,8 @@ def main():
 
         req_dto = PurgaRequestDTO(
             dias_retencion_override=args.days,
+            dias_retencion_instantaneas=args.days_instantaneas,
+            dias_retencion_energia=args.days_energy,
             corte_hasta=parsear_corte_hasta(args.hasta) if args.hasta else None,
             batch_size=args.batch_size,
         )
