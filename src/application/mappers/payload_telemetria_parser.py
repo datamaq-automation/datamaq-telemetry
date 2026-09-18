@@ -81,7 +81,6 @@ def _calcular_derivadas_red(
     return desbalance_v, voltage_linea_V, i_neutro, v_neutro
 
 
-
 def _aplicar_fases_invertidas(
     fase_r: MedicionFase, fase_s: MedicionFase, fase_t: MedicionFase, dispositivo: Dispositivo
 ) -> tuple[MedicionFase, MedicionFase, MedicionFase]:
