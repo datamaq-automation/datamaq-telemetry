@@ -15,6 +15,7 @@ from src.application.mappers.fase_parser import (
     sanear_entero,
     sanear_ip,
 )
+from src.application.mappers.payload_helpers import _calcular_totales_potencia, _calcular_totales_thd
 from src.domain.telemetria.entities import (
     AcumuladoEnergia,
     AlertaDispositivo,
@@ -27,7 +28,6 @@ from src.domain.telemetria.services import (
     AnalizadorCalidadEnergiaService,
     CalculadoraPotenciaService,
 )
-from src.application.mappers.payload_helpers import _calcular_totales_potencia, _calcular_totales_thd
 from src.domain.telemetria.servicios.evaluador_diagnostico_instalacion import (
     EvaluadorDiagnosticoInstalacionService,
 )
