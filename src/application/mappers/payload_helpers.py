@@ -1,7 +1,7 @@
 """Helpers for power/THD extraction used by payload parsers."""
 from typing import Any
 
-from src.application.mappers.fase_parser import acotar_payload_bruto
+# acotar_payload_bruto no se usa aquí; import eliminado para pasar ruff
 from src.domain.telemetria.entities import MedicionFase
 from src.domain.telemetria.services import CalculadoraPotenciaService
 
