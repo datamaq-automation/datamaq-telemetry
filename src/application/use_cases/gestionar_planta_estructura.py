@@ -10,8 +10,12 @@ from src.application.dtos.planta_estructura_dto import (
 from src.application.mappers.planta_estructura_mapper import PlantaEstructuraMapper
 from src.domain.disponibilidad.ports import RepositorioMaquinasPort
 from src.domain.telemetria.entities import NodoUnifilar, Planta
-from src.domain.telemetria.exceptions import PlantaNoEncontradaError
+from src.domain.telemetria.exceptions import (
+    EstructuraUnifilarInvalidaError,
+    PlantaNoEncontradaError,
+)
 from src.domain.telemetria.ports import RepositorioOrganizacionesPort
+from src.domain.telemetria.servicios.arbol_unifilar import ArbolUnifilarService
 
 
 class GestionarPlantaEstructuraUseCase:
@@ -41,10 +45,16 @@ class GestionarPlantaEstructuraUseCase:
             return UnifilarPlantaDTO(planta_id="", nombre_planta="", nodos=[])
         nodos = self.repo_organizaciones.obtener_nodos_unifilar(planta.id)
         nombres_maquina = self._nombres_maquina_por_dispositivo(planta, nodos)
+        try:
+            ArbolUnifilarService(nodos).validar()
+            topologia_valida = True
+        except EstructuraUnifilarInvalidaError:
+            topologia_valida = False
         return UnifilarPlantaDTO(
             planta_id=planta.id,
             nombre_planta=planta.nombre,
             nodos=[PlantaEstructuraMapper.nodo_to_dto(n, nombres_maquina.get(n.device_id or "")) for n in nodos],
+            topologia_valida=topologia_valida,
         )
 
     def _nombres_maquina_por_dispositivo(self, planta: Planta, nodos: list[NodoUnifilar]) -> dict[str, str]:

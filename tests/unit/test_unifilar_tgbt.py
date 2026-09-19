@@ -45,6 +45,47 @@ def test_dto_acepta_solo_tipos_del_vocabulario():
         NodoUnifilarDTO(id="n", nombre="n", tipo="alimentador", tension_nominal_V=380.0)
 
 
+# --- Nivel de tensión MT/BT derivado (respuesta a pregunta 3 del frontend) ---
+
+
+def test_obtener_unifilar_deriva_nivel_tension_mt_bt():
+    nodos = [
+        NodoUnifilar(
+            id="mt", planta_id="planta-1", nombre="mt", tipo=TipoNodoUnifilar.ACOMETIDA, tension_nominal_v=13200.0
+        ),
+        NodoUnifilar(
+            id="bt",
+            planta_id="planta-1",
+            nombre="bt",
+            tipo=TipoNodoUnifilar.TGBT,
+            tension_nominal_v=380.0,
+            parent_id="mt",
+            device_id="dev-1",
+        ),
+    ]
+    res = GestionarPlantaEstructuraUseCase(_repo_org(nodos)).obtener_unifilar("planta-1")
+    por_id = {n.id: n for n in res.nodos}
+    assert por_id["mt"].nivel_tension == "MT"
+    assert por_id["bt"].nivel_tension == "BT"
+
+
+# --- topologia_valida (respuesta a pregunta 1 del frontend: señal de estructura completa) ---
+
+
+def test_unifilar_topologia_valida_false_si_hay_padre_colgante():
+    nodos = [
+        _nodo("hijo", TipoNodoUnifilar.TGBT, parent_id="padre-inexistente", device_id="dev-1"),
+    ]
+    res = GestionarPlantaEstructuraUseCase(_repo_org(nodos)).obtener_unifilar("planta-1")
+    assert res.topologia_valida is False
+
+
+def test_unifilar_topologia_valida_true_si_arbol_es_consistente():
+    nodos = [_nodo("mt", TipoNodoUnifilar.ACOMETIDA, device_id="dev-1")]
+    res = GestionarPlantaEstructuraUseCase(_repo_org(nodos)).obtener_unifilar("planta-1")
+    assert res.topologia_valida is True
+
+
 # --- Nombre de máquina en el nodo medido (R-03) ---
 
 

@@ -8,6 +8,10 @@ from src.application.dtos.telemetria_dto import EnergiaAgregadaDTO
 from src.application.dtos.tipos import FechaHoraUTC
 
 TipoNodoUnifilarLiteral = Literal["acometida", "transformador", "tgbt", "seccional", "carga"]
+NivelTensionLiteral = Literal["MT", "BT"]
+
+# Umbral de clasificación MT/BT (IEC 60038): >1000 V AC es Media Tensión.
+UMBRAL_MEDIA_TENSION_V = 1000.0
 
 
 class NodoUnifilarDTO(BaseModel):
@@ -20,6 +24,8 @@ class NodoUnifilarDTO(BaseModel):
     # R-03: nombre de la máquina asociada 1:1 al medidor (`machines.device_id` UNIQUE), si existe.
     nombre_maquina: str | None = None
     tension_nominal_V: float
+    # Derivado de tension_nominal_V contra UMBRAL_MEDIA_TENSION_V; no persistido.
+    nivel_tension: NivelTensionLiteral = "BT"
     capacidad_nominal_kVA: float | None = None
     potencia_nominal_kw: float | None = None
     uso_significativo: bool = False
@@ -35,6 +41,8 @@ class UnifilarPlantaDTO(BaseModel):
     planta_id: str
     nombre_planta: str
     nodos: list[NodoUnifilarDTO] = Field(default_factory=list)
+    # True si ArbolUnifilarService.validar() no encontró duplicados, padres colgantes ni ciclos.
+    topologia_valida: bool = True
     model_config = ConfigDict(from_attributes=True)
 
 

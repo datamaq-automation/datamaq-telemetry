@@ -1,4 +1,6 @@
 # src/infrastructure/yaml/repositories/organizaciones_repository.py
+import structlog
+
 from src.domain.telemetria.entities import (
     DispositivoLayout,
     InstalacionMedidor,
@@ -14,6 +16,8 @@ from src.domain.telemetria.value_objects import (
     TipoNodoUnifilar,
 )
 from src.infrastructure.yaml.loaders import cargar_organizaciones_completas
+
+logger = structlog.get_logger(__name__)
 
 
 class YamlOrganizacionesRepository(RepositorioOrganizacionesPort):
@@ -91,11 +95,17 @@ class YamlOrganizacionesRepository(RepositorioOrganizacionesPort):
                     nodos = []
                     for n in p.get("nodos_unifilar", []):
                         tipo_raw = str(n.get("tipo", "CARGA")).upper()
-                        tipo = (
-                            TipoNodoUnifilar[tipo_raw]
-                            if tipo_raw in TipoNodoUnifilar.__members__
-                            else TipoNodoUnifilar.CARGA
-                        )
+                        if tipo_raw in TipoNodoUnifilar.__members__:
+                            tipo = TipoNodoUnifilar[tipo_raw]
+                        else:
+                            structlog.get_logger(__name__).warning(
+                                "unifilar_tipo_no_reconocido",
+                                planta_id=planta_id,
+                                nodo_id=n.get("id"),
+                                tipo_raw=tipo_raw,
+                                fallback="carga",
+                            )
+                            tipo = TipoNodoUnifilar.CARGA
                         nodos.append(
                             NodoUnifilar(
                                 id=str(n["id"]),
