@@ -1,6 +1,7 @@
 """tests/unit/test_sge_documentacion.py."""
 
 from datetime import datetime, timedelta, timezone
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -14,6 +15,7 @@ from src.domain.sge.exceptions import (
 )
 from src.domain.sge.ports import RepositorioDocumentacionSgePort
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
+from src.infrastructure.fastapi.dependencies import get_usuarios_repository
 from src.infrastructure.fastapi.server import create_app
 from src.infrastructure.settings.config import get_settings
 
@@ -149,6 +151,9 @@ def test_use_case_operador_previsualiza_su_propio_rol(articulos_muestra):
 @pytest.fixture
 def client():
     app = create_app()
+    mock_repo_usuarios = MagicMock()
+    mock_repo_usuarios.obtener_por_id.return_value = None
+    app.dependency_overrides[get_usuarios_repository] = lambda: mock_repo_usuarios
     return TestClient(app)
 
 
