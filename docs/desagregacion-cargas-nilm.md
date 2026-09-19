@@ -186,4 +186,6 @@ Las rutas fijas (`/perfil`, `/atribucion`, `/analisis`, `/intervalos/...`, `/cam
 * El sobre-conteo por anidamiento se detecta pero no se corrige. Corregirlo requiere un modelo de estados conjunto (HSMM, §5.5 del doc conceptual).
 * Pava e iluminación no son atribuibles por evento a esta cadencia. Se podrían estimar estadísticamente por franja horaria.
 * El tópico `/harmonics` del medidor trae 25 armónicos de V e I por fase y **viene deshabilitado de fábrica**. Sería un discriminador NILM fuerte (separa electrónica de resistivo de motor mejor que Q sola).
-* ML supervisado: recién después de acumular correcciones humanas, y arrancando por árbol de decisión, según la doctrina de la §7 del doc conceptual.
+* **Maquinaria Industrial y Variables de Proceso [Resuelto en Dominio, 2026-09-19]:** Se implementó `ModeloMotorFisicoService` y `CatalogoPresetsIndustriales` para física electromecánica ($LF = P/P_{nom}$, reactiva de magnetización) y `DesagregadorAsistidoService` en conjunto con el dominio `produccion` (`CalculadorEnPIService`, SEC en kWh/m y kWh/corte) para desambiguar TGBT con sensores inductivos.
+* **Techo Determinístico en TGBT y Transición a ML (ISO 50006) [Decisión 2026-09-19]:** Se formalizó el agotamiento de la clasificación por reglas sobre medidores agregados en TGBT (`decisions/2026-09-19_clasificacion-energia-industrial-enpi-ml.md`). La descomposición de cargas no instrumentadas y la detección de anomalías se delegarán a modelos de regresión multivariable y análisis de residuos en `datamaq-hub`.
+

@@ -166,8 +166,10 @@ El espacio combinatorio teórico (2ⁿ) casi nunca se da completo en la práctic
 2. **Motor de reglas de disponibilidad:** clasificar eventos instantáneos en marcha/parada según umbral calibrado con filtro anti-transitorios (`FiltroPersistenciaEstadoService`). Cruce con calendario de paradas programadas.
 3. **Corrección humana y feedback loop:** endpoint para corregir clasificaciones erróneas guardando autoría y motivo, construyendo el dataset etiquetado.
 4. **Desagregación NILM y modelos de estados:** ~~extensión con $k > 2$ para medidores agregados~~ **[implementado]** — ver [`docs/desagregacion-cargas-nilm.md`](file:///home/agustin/proyectos_software/datamaq-telemetry/docs/desagregacion-cargas-nilm.md) y el contexto `src/domain/cargas/`. Queda pendiente la exploración de modelos HSMM supervisados sobre el historial etiquetado, que ahora sí tiene de dónde salir: las correcciones humanas sobre `load_activity_intervals`.
+5. **Variables de Proceso e Indicadores ISO 50001/50006 [Implementado 2026-09-19]:** Incorporación de sensórica inductiva (longitud/cortes) en `src/domain/produccion/` (`CalculadorEnPIService`) y `DesagregadorAsistidoService` para vincular potencia de TGBT con eventos reales de máquina y cálculo de EnPI (SEC en kWh/m y kWh/corte) — ver [`decisions/2026-09-19_clasificacion-energia-industrial-enpi-ml.md`](file:///home/agustin/proyectos_software/datamaq/decisions/2026-09-19_clasificacion-energia-industrial-enpi-ml.md).
 
 Para medidores que agregan varias cargas (sección 6), este roadmap aplica **por carga o por línea**, no por medidor — lo que exige primero decidir, caso por caso, si corresponde desagregación algorítmica o submedición dedicada.
+
 
 ---
 
