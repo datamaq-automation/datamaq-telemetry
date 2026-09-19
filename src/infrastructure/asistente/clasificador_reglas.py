@@ -1,3 +1,4 @@
+# src/infrastructure/asistente/clasificador_reglas.py
 import re
 from typing import ClassVar
 

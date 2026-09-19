@@ -1,3 +1,4 @@
+# tests/unit/test_diagnostico_cli_ti.py
 from scripts.diagnosticar_instalacion_ti import calcular_angulo_fp, diagnosticar_lectura
 from src.domain.telemetria.entities import LecturaInstantanea, MedicionFase
 from src.domain.telemetria.value_objects import (

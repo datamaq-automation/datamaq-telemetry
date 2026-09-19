@@ -1,3 +1,4 @@
+# tests/unit/test_correccion_fasorial.py
 """Tests para corrección fasorial por software e integración de energía."""
 
 from datetime import datetime, timezone

@@ -1,3 +1,4 @@
+# src/infrastructure/fastapi/routes/analitica_router.py
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status

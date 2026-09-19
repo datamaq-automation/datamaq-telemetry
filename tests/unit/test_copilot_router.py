@@ -1,3 +1,4 @@
+# tests/unit/test_copilot_router.py
 from fastapi.testclient import TestClient
 
 from src.infrastructure.fastapi.dependencies import get_usuario_actual

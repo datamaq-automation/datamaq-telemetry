@@ -1,3 +1,4 @@
+# tests/unit/test_yaml_organizaciones_repository.py
 from src.domain.telemetria.value_objects import TipoNodoUnifilar
 from src.infrastructure.yaml.repositories.organizaciones_repository import (
     YamlOrganizacionesRepository,

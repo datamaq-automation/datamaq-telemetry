@@ -1,3 +1,4 @@
+# tests/unit/test_diagnostico_instalacion.py
 """Tests unitarios para el servicio de diagnóstico metrológico de instalación."""
 
 from datetime import datetime, timezone

@@ -1,3 +1,4 @@
+# src/infrastructure/sqlalchemy/verificador_consistencia.py
 import structlog
 from sqlalchemy.orm import Session
 

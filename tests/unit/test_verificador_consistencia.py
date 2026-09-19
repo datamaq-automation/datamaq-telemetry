@@ -1,3 +1,4 @@
+# tests/unit/test_verificador_consistencia.py
 from unittest.mock import MagicMock
 
 from src.infrastructure.sqlalchemy.verificador_consistencia import verificar_consistencia_organizaciones

@@ -1,3 +1,4 @@
+# src/infrastructure/yaml/repositories/organizaciones_repository.py
 from src.domain.telemetria.entities import (
     DispositivoLayout,
     InstalacionMedidor,

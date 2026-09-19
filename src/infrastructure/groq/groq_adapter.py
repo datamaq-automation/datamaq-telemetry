@@ -1,3 +1,4 @@
+# src/infrastructure/groq/groq_adapter.py
 from collections.abc import Iterator
 
 from src.domain.asistente.ports import GeneradorRespuestaPort

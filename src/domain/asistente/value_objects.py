@@ -1,3 +1,4 @@
+# src/domain/asistente/value_objects.py
 from dataclasses import dataclass
 from enum import Enum
 

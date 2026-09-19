@@ -1,3 +1,4 @@
+# src/domain/telemetria/servicios/evaluador_diagnostico_instalacion.py
 """Servicio de dominio para evaluar el diagnóstico metrológico y de instalación física."""
 
 from __future__ import annotations

@@ -1,3 +1,4 @@
+# src/application/dtos/copilot_dto.py
 from datetime import datetime
 
 from pydantic import BaseModel, Field

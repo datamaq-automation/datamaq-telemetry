@@ -1,3 +1,4 @@
+# src/domain/telemetria/servicios/evaluador_ti_desconectado.py
 """Servicio de dominio para evaluar la alerta de TI desconectado en fases."""
 
 from __future__ import annotations
