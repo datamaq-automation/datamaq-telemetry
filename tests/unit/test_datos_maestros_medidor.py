@@ -170,12 +170,17 @@ def test_patch_gobernado_responde_422_por_http():
     assert "Gestionado por YAML" in resp.json()["detail"]
 
 
-# --- YAML real: sin datos cargados, comportamiento idéntico al anterior ---
+# --- YAML real: coherencia de datos declarados y contratos ---
 
 
-def test_yaml_real_no_declara_instalacion_ni_contrato_todavia():
+def test_yaml_real_instalacion_y_contratos():
     repo = YamlOrganizacionesRepository(data_dir="data")
-    assert repo.obtener_instalacion_medidor("51048a93-f1f3-4283-a708-24cbd39c7192") is None
+    # Dispositivo sin bloque de medidores declarado devuelve None
+    assert repo.obtener_instalacion_medidor("id-dispositivo-no-configurado") is None
+    # Dispositivo de Durax con bloque declarado devuelve su instalación
+    inst_durax = repo.obtener_instalacion_medidor("51048a93-f1f3-4283-a708-24cbd39c7192")
+    assert inst_durax is not None
+    assert inst_durax.fases_con_ti == "R,S,T"
     for planta in repo.listar_plantas():
         for nodo in repo.obtener_nodos_unifilar(planta.id):
             assert nodo.categoria_tarifaria is None and nodo.penalizacion_reactiva_aplica is None

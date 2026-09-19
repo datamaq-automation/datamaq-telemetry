@@ -215,6 +215,56 @@ class ClasificadorCargasReglasService:
         return None
 
     @classmethod
+    def _clasificar_industrial(
+        cls,
+        p: float,
+        q: float,
+        ratio_q: float | None,
+        naturaleza: NaturalezaElectrica,
+        reglas: list[str],
+    ) -> DiagnosticoReglasCarga:
+        if naturaleza == NaturalezaElectrica.MOTOR:
+            if p >= 3000.0:
+                reglas.append(f"Motor industrial trifásico de potencia media/alta ({p:.0f} W)")
+                return DiagnosticoReglasCarga(
+                    aparato_sugerido="Fuerza Motriz / Motor Industrial",
+                    categoria=CategoriaCarga.FUERZA_MOTRIZ,
+                    naturaleza_electrica=NaturalezaElectrica.MOTOR,
+                    confianza=0.90,
+                    reglas_aplicadas=tuple(reglas),
+                )
+            reglas.append(f"Motor o accionamiento industrial ({p:.0f} W)")
+            return DiagnosticoReglasCarga(
+                aparato_sugerido="Fuerza Motriz / Motor",
+                categoria=CategoriaCarga.FUERZA_MOTRIZ,
+                naturaleza_electrica=NaturalezaElectrica.MOTOR,
+                confianza=0.85,
+                reglas_aplicadas=tuple(reglas),
+            )
+
+        if p >= 5000.0 and (
+            naturaleza == NaturalezaElectrica.RESISTIVA
+            or (ratio_q is not None and ratio_q <= cls.RATIO_RESISTIVO_MAXIMO)
+        ):
+            reglas.append(f"Carga resistiva industrial de alta potencia ({p:.0f} W) con FP unitario")
+            return DiagnosticoReglasCarga(
+                aparato_sugerido="Horno / Calefactor Resistivo Industrial",
+                categoria=CategoriaCarga.OTROS,
+                naturaleza_electrica=NaturalezaElectrica.RESISTIVA,
+                confianza=0.88,
+                reglas_aplicadas=tuple(reglas),
+            )
+        reglas.append(f"Contexto industrial: omite heurísticas domésticas para P={p:.0f} W, Q={q:.0f} VAr")
+        return DiagnosticoReglasCarga(
+            aparato_sugerido="Carga de proceso no clasificada",
+            categoria=CategoriaCarga.OTROS,
+            naturaleza_electrica=naturaleza,
+            confianza=0.40,
+            reglas_aplicadas=tuple(reglas),
+            es_ambiguo=True,
+        )
+
+    @classmethod
     def clasificar_episodio(cls, episodio: EpisodioCarga, es_industrial: bool = False) -> DiagnosticoReglasCarga:
         p = episodio.delta_w
         t = episodio.duracion_s
@@ -228,50 +278,11 @@ class ClasificadorCargasReglasService:
         if diag := cls._clasificar_iluminacion(p, q, reglas):
             return diag
 
-        if naturaleza == NaturalezaElectrica.MOTOR:
-            if es_industrial:
-                if p >= 3000.0:
-                    reglas.append(f"Motor industrial trifásico de potencia media/alta ({p:.0f} W)")
-                    return DiagnosticoReglasCarga(
-                        aparato_sugerido="Fuerza Motriz / Motor Industrial",
-                        categoria=CategoriaCarga.FUERZA_MOTRIZ,
-                        naturaleza_electrica=NaturalezaElectrica.MOTOR,
-                        confianza=0.90,
-                        reglas_aplicadas=tuple(reglas),
-                    )
-                reglas.append(f"Motor o accionamiento industrial ({p:.0f} W)")
-                return DiagnosticoReglasCarga(
-                    aparato_sugerido="Fuerza Motriz / Motor",
-                    categoria=CategoriaCarga.FUERZA_MOTRIZ,
-                    naturaleza_electrica=NaturalezaElectrica.MOTOR,
-                    confianza=0.85,
-                    reglas_aplicadas=tuple(reglas),
-                )
-            return cls._clasificar_motor(p, t, q, ratio_q, reglas)
-
         if es_industrial:
-            # En ámbito industrial se omiten caloventor, electrodomésticos de cocina y PC
-            if p >= 5000.0 and (
-                naturaleza == NaturalezaElectrica.RESISTIVA
-                or (ratio_q is not None and ratio_q <= cls.RATIO_RESISTIVO_MAXIMO)
-            ):
-                reglas.append(f"Carga resistiva industrial de alta potencia ({p:.0f} W) con FP unitario")
-                return DiagnosticoReglasCarga(
-                    aparato_sugerido="Horno / Calefactor Resistivo Industrial",
-                    categoria=CategoriaCarga.OTROS,
-                    naturaleza_electrica=NaturalezaElectrica.RESISTIVA,
-                    confianza=0.88,
-                    reglas_aplicadas=tuple(reglas),
-                )
-            reglas.append(f"Contexto industrial: omite heurísticas domésticas para P={p:.0f} W, Q={q:.0f} VAr")
-            return DiagnosticoReglasCarga(
-                aparato_sugerido="Carga de proceso no clasificada",
-                categoria=CategoriaCarga.OTROS,
-                naturaleza_electrica=naturaleza,
-                confianza=0.40,
-                reglas_aplicadas=tuple(reglas),
-                es_ambiguo=True,
-            )
+            return cls._clasificar_industrial(p, q, ratio_q, naturaleza, reglas)
+
+        if naturaleza == NaturalezaElectrica.MOTOR:
+            return cls._clasificar_motor(p, t, q, ratio_q, reglas)
 
         if diag := cls._clasificar_caloventor(p, t, q, reglas):
             return diag
