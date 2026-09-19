@@ -30,6 +30,8 @@ from src.domain.cargas.value_objects import (
     AtribucionConsumo,
     EpisodioCarga,
 )
+from src.domain.telemetria.ports import RepositorioOrganizacionesPort
+from src.domain.telemetria.value_objects import TipoNodoUnifilar
 
 ZONA_POR_DEFECTO = "America/Argentina/Buenos_Aires"
 
@@ -59,10 +61,38 @@ class AtribuirConsumoUseCase:
         repo_serie: RepositorioSeriePotenciaPort,
         repo_cargas: RepositorioCargasPort,
         repo_intervalos: RepositorioIntervalosActividadPort,
+        repo_organizaciones: RepositorioOrganizacionesPort | None = None,
     ):
         self.repo_serie = repo_serie
         self.repo_cargas = repo_cargas
         self.repo_intervalos = repo_intervalos
+        self.repo_organizaciones = repo_organizaciones
+
+    def _es_instalacion_industrial(self, dispositivo_id: str) -> bool:
+        if not self.repo_organizaciones:
+            return False
+        instalacion = self.repo_organizaciones.obtener_instalacion_medidor(dispositivo_id)
+        if instalacion and instalacion.tipo_instalacion:
+            tipo = instalacion.tipo_instalacion.upper()
+            if "INDUSTRIAL" in tipo:
+                return True
+            if "DOMESTICO" in tipo or "HOGAR" in tipo or "RESIDENCIAL" in tipo:
+                return False
+        try:
+            plantas = self.repo_organizaciones.listar_plantas()
+            for p in plantas:
+                nodos = self.repo_organizaciones.obtener_nodos_unifilar(p.id)
+                for n in nodos:
+                    if n.device_id == dispositivo_id:
+                        if (
+                            n.tipo
+                            in (TipoNodoUnifilar.TGBT, TipoNodoUnifilar.TRANSFORMADOR, TipoNodoUnifilar.SECCIONAL)
+                            or n.uso_significativo
+                        ):
+                            return True
+        except Exception:
+            pass
+        return False
 
     @staticmethod
     def _ventana(desde: datetime | None, hasta: datetime | None, dias: int) -> tuple[datetime, datetime]:
@@ -76,6 +106,7 @@ class AtribuirConsumoUseCase:
         cargas: list[Carga],
         zona: ZoneInfo,
         todas_las_cargas: list[Carga] | None = None,
+        es_industrial: bool = False,
     ) -> IntervaloActividadCarga:
         decision = EmparejadorFirmasService.decidir(episodio, cargas, zona)
         carga_id = decision.carga_id
@@ -83,7 +114,7 @@ class AtribuirConsumoUseCase:
         notas = decision.motivo
 
         if carga_id is None:
-            diag = ClasificadorCargasReglasService.clasificar_episodio(episodio)
+            diag = ClasificadorCargasReglasService.clasificar_episodio(episodio, es_industrial=es_industrial)
             if diag.aparato_sugerido != "Carga no clasificada" and diag.confianza >= 0.70:
                 confianza = round(diag.confianza, 3)
                 coincidente = None
@@ -137,8 +168,12 @@ class AtribuirConsumoUseCase:
 
         umbral = DetectorEscalonesService.umbral_escalon(lecturas) if lecturas else None
         episodios = DetectorEscalonesService.detectar_episodios(lecturas, umbral)
+        es_industrial = self._es_instalacion_industrial(dispositivo_id)
         intervalos = [
-            self._a_intervalo(dispositivo_id, e, con_firma, zona_info, todas_las_cargas=cargas) for e in episodios
+            self._a_intervalo(
+                dispositivo_id, e, con_firma, zona_info, todas_las_cargas=cargas, es_industrial=es_industrial
+            )
+            for e in episodios
         ]
         escritos = self.repo_intervalos.reemplazar_ventana(dispositivo_id, inicio, fin, intervalos)
 

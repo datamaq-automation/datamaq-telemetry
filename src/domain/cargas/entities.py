@@ -42,6 +42,7 @@ class Carga:
     potencia_nominal_w: float | None = None
     firma: FirmaCarga | None = None
     activa: bool = True
+    maquina_id: str | None = None
     creado_en: datetime = field(default_factory=ahora_utc)
     actualizado_en: datetime = field(default_factory=ahora_utc)
 

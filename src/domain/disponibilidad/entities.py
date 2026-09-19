@@ -18,6 +18,7 @@ class Maquina:
     umbral_marcha_w: float | None = None
     ventana_persistencia_lecturas: int = 2
     ventana_persistencia_segundos: float = 60.0
+    carga_id: str | None = None
     creado_en: datetime = field(default_factory=ahora_utc)
     actualizado_en: datetime = field(default_factory=ahora_utc)
 

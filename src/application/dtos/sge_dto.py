@@ -70,17 +70,23 @@ class EstadoCompetenciasUsuarioDTO(BaseModel):
 
 
 class BalanceEnergiaResponseDTO(BaseModel):
-    planta_id: str = Field(alias="plantaId")
-    nodo_padre_id: str = Field(alias="nodoPadreId")
-    nodo_padre_nombre: str = Field(alias="nodoPadreNombre")
-    energia_padre_kwh: float = Field(alias="energiaPadreKwh")
-    energia_hijos_sumada_kwh: float = Field(alias="energiaHijosSumadaKwh")
-    residual_kwh: float = Field(alias="residualKwh")
-    residual_porcentual: float = Field(alias="residualPorcentual")
+    planta_id: str = Field(validation_alias="plantaId", serialization_alias="plantaId")
+    nodo_padre_id: str = Field(validation_alias="nodoPadreId", serialization_alias="nodoPadreId")
+    nodo_padre_nombre: str = Field(validation_alias="nodoPadreNombre", serialization_alias="nodoPadreNombre")
+    energia_padre_kwh: float = Field(validation_alias="energiaPadreKwh", serialization_alias="energiaPadreKwh")
+    energia_hijos_sumada_kwh: float = Field(
+        validation_alias="energiaHijosSumadaKwh", serialization_alias="energiaHijosSumadaKwh"
+    )
+    residual_kwh: float = Field(validation_alias="residualKwh", serialization_alias="residualKwh")
+    residual_porcentual: float = Field(validation_alias="residualPorcentual", serialization_alias="residualPorcentual")
     estado: str
-    es_auditable_iso50001: bool = Field(alias="esAuditableIso50001")
+    es_auditable_iso50001: bool = Field(
+        validation_alias="esAuditableIso50001", serialization_alias="esAuditableIso50001"
+    )
     detalle: str
-    thd_i_promedio_pct: float | None = Field(default=None, alias="thdIPromedioPct")
+    thd_i_promedio_pct: float | None = Field(
+        default=None, validation_alias="thdIPromedioPct", serialization_alias="thdIPromedioPct"
+    )
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -90,10 +96,10 @@ class BalanceEnergiaResponseDTO(BaseModel):
 
 class PuntoCusumDTO(BaseModel):
     fecha: str
-    energia_real_kwh: float = Field(alias="energiaRealKwh")
-    energia_esperada_kwh: float = Field(alias="energiaEsperadaKwh")
-    ahorro_kwh: float = Field(alias="ahorroKwh")
-    cusum_acumulado_kwh: float = Field(alias="cusumAcumuladoKwh")
+    energia_real_kwh: float = Field(validation_alias="energiaRealKwh", serialization_alias="energiaRealKwh")
+    energia_esperada_kwh: float = Field(validation_alias="energiaEsperadaKwh", serialization_alias="energiaEsperadaKwh")
+    ahorro_kwh: float = Field(validation_alias="ahorroKwh", serialization_alias="ahorroKwh")
+    cusum_acumulado_kwh: float = Field(validation_alias="cusumAcumuladoKwh", serialization_alias="cusumAcumuladoKwh")
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -102,14 +108,16 @@ class PuntoCusumDTO(BaseModel):
 
 
 class AhorrosCusumResponseDTO(BaseModel):
-    planta_id: str = Field(alias="plantaId")
-    linea_base_id: str = Field(alias="lineaBaseId")
-    linea_base_nombre: str = Field(alias="lineaBaseNombre")
-    ahorro_total_kwh: float = Field(alias="ahorroTotalKwh")
-    ahorro_porcentual: float = Field(alias="ahorroPorcentual")
-    es_mejora: bool = Field(alias="esMejora")
+    planta_id: str = Field(validation_alias="plantaId", serialization_alias="plantaId")
+    linea_base_id: str = Field(validation_alias="lineaBaseId", serialization_alias="lineaBaseId")
+    linea_base_nombre: str = Field(validation_alias="lineaBaseNombre", serialization_alias="lineaBaseNombre")
+    ahorro_total_kwh: float = Field(validation_alias="ahorroTotalKwh", serialization_alias="ahorroTotalKwh")
+    ahorro_porcentual: float = Field(validation_alias="ahorroPorcentual", serialization_alias="ahorroPorcentual")
+    es_mejora: bool = Field(validation_alias="esMejora", serialization_alias="esMejora")
     detalle: str
-    puntos_cusum: list[PuntoCusumDTO] = Field(default_factory=list, alias="puntosCusum")
+    puntos_cusum: list[PuntoCusumDTO] = Field(
+        default_factory=list, validation_alias="puntosCusum", serialization_alias="puntosCusum"
+    )
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -120,16 +128,26 @@ class AhorrosCusumResponseDTO(BaseModel):
 class LineaBaseResponseDTO(BaseModel):
     id: str
     nombre: str
-    nodo_id: str = Field(alias="nodoId")
-    nodo_nombre: str = Field(alias="nodoNombre")
-    sec_referencia_kwh_unidad: float = Field(alias="secReferenciaKwhUnidad")
-    potencia_base_kw: float = Field(alias="potenciaBaseKw")
-    periodo_referencia_desde: str = Field(alias="periodoReferenciaDesde")
-    periodo_referencia_hasta: str = Field(alias="periodoReferenciaHasta")
-    congelada_en: str = Field(alias="congeladaEn")
-    autorizado_por: str | None = Field(default=None, alias="autorizadoPor")
+    nodo_id: str = Field(validation_alias="nodoId", serialization_alias="nodoId")
+    nodo_nombre: str = Field(validation_alias="nodoNombre", serialization_alias="nodoNombre")
+    sec_referencia_kwh_unidad: float = Field(
+        validation_alias="secReferenciaKwhUnidad", serialization_alias="secReferenciaKwhUnidad"
+    )
+    potencia_base_kw: float = Field(validation_alias="potenciaBaseKw", serialization_alias="potenciaBaseKw")
+    periodo_referencia_desde: str = Field(
+        validation_alias="periodoReferenciaDesde", serialization_alias="periodoReferenciaDesde"
+    )
+    periodo_referencia_hasta: str = Field(
+        validation_alias="periodoReferenciaHasta", serialization_alias="periodoReferenciaHasta"
+    )
+    congelada_en: str = Field(validation_alias="congeladaEn", serialization_alias="congeladaEn")
+    autorizado_por: str | None = Field(
+        default=None, validation_alias="autorizadoPor", serialization_alias="autorizadoPor"
+    )
     activa: bool = True
-    tolerancia_perdidas_pct: float = Field(default=0.04, alias="toleranciaPerdidasPct")
+    tolerancia_perdidas_pct: float = Field(
+        default=0.04, validation_alias="toleranciaPerdidasPct", serialization_alias="toleranciaPerdidasPct"
+    )
 
     model_config = ConfigDict(
         populate_by_name=True,

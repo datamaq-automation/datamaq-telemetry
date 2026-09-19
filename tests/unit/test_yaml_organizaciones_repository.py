@@ -260,3 +260,36 @@ def test_obtener_instalacion_medidor_los_constituyentes():
     inst_trafo2_alias = repo.obtener_instalacion_medidor("369")
     assert inst_trafo2_alias is not None
     assert inst_trafo2_alias.correccion_angular_fases == "R:180,S:-120"
+
+
+def test_obtener_instalacion_medidor_clientes_industriales_y_hogar():
+    repo = YamlOrganizacionesRepository()
+
+    # Hogar monofásico
+    hogar = repo.obtener_instalacion_medidor("2812d2af-b1cf-4daa-a379-40102fdb152d")
+    assert hogar is not None
+    assert hogar.fases_con_ti == "R"
+    assert hogar.tipo_instalacion == "CONSUMO"
+    assert hogar.tag_ubicacion == "Tablero Principal Hogar"
+
+    # Durax TGBT Usina y Horno
+    durax_usina = repo.obtener_instalacion_medidor("51048a93-f1f3-4283-a708-24cbd39c7192")
+    assert durax_usina is not None
+    assert durax_usina.fases_con_ti == "R,S,T"
+    assert durax_usina.tag_ubicacion == "TGBT Usina"
+
+    durax_horno = repo.obtener_instalacion_medidor("b5f4bcd6-b017-4796-bb3d-efcfb50dc8f0")
+    assert durax_horno is not None
+    assert durax_horno.fases_con_ti == "R,S,T"
+    assert durax_horno.tag_ubicacion == "TGBT Horno"
+
+    # UPP TGBT Arriba y Abajo
+    upp_arriba = repo.obtener_instalacion_medidor("a01b1642-ed29-4c3e-a793-f57de09504f8")
+    assert upp_arriba is not None
+    assert upp_arriba.fases_con_ti == "R,S,T"
+    assert upp_arriba.tag_ubicacion == "TGBT Arriba"
+
+    upp_abajo = repo.obtener_instalacion_medidor("ce7e5a9a-c5e8-4936-be9a-a2057ccf8b4c")
+    assert upp_abajo is not None
+    assert upp_abajo.fases_con_ti == "R,S,T"
+    assert upp_abajo.tag_ubicacion == "TGBT Abajo"

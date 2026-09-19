@@ -198,3 +198,29 @@ def test_clasificar_horno_industrial_resistivo():
     assert diag.naturaleza_electrica == NaturalezaElectrica.RESISTIVA
     assert "Horno / Calefactor Resistivo Industrial" in diag.aparato_sugerido
     assert diag.confianza >= 0.88
+
+
+def test_clasificar_omite_heuristicas_domesticas_en_contexto_industrial():
+    """En ámbito industrial, no se confunden motores de planta con heladeras ni resistencias con pavas o caloventores."""
+    # 1. Pequeño motor o actuador (150 W, típico de heladera en el hogar)
+    episodio_motor_chico = _episodio(delta_w=150.0, duracion_s=1200.0, delta_q=80.0)
+    diag_ind_motor = ClasificadorCargasReglasService.clasificar_episodio(episodio_motor_chico, es_industrial=True)
+
+    assert diag_ind_motor.categoria == CategoriaCarga.FUERZA_MOTRIZ
+    assert diag_ind_motor.aparato_sugerido == "Fuerza Motriz / Motor"
+    assert "Heladera" not in diag_ind_motor.aparato_sugerido
+
+    # 2. Resistencia de 2000 W (en hogar sería Caloventor o Pava)
+    episodio_caloventor = _episodio(delta_w=2000.0, duracion_s=3600.0, delta_q=35.0)
+    diag_ind_resistivo = ClasificadorCargasReglasService.clasificar_episodio(episodio_caloventor, es_industrial=True)
+
+    assert diag_ind_resistivo.categoria == CategoriaCarga.OTROS
+    assert diag_ind_resistivo.aparato_sugerido == "Carga de proceso no clasificada"
+    assert "Caloventor" not in diag_ind_resistivo.aparato_sugerido
+
+    # 3. Consumo electrónico con fluctuaciones (en hogar sería PC)
+    episodio_pc = _episodio(delta_w=220.0, duracion_s=7200.0, delta_q=45.0, dispersion_w=25.0)
+    diag_ind_pc = ClasificadorCargasReglasService.clasificar_episodio(episodio_pc, es_industrial=True)
+
+    assert diag_ind_pc.aparato_sugerido == "Carga de proceso no clasificada"
+    assert "Computadora" not in diag_ind_pc.aparato_sugerido
