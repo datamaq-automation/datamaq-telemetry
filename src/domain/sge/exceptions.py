@@ -15,3 +15,11 @@ class ArticuloSgeNoEncontradoError(DominioSgeException):
 
 class RolNoAutorizadoParaPrevisualizacionError(DominioSgeException):
     """El rol del usuario no tiene privilegios para previsualizar documentación de otros roles."""
+
+
+class CapacitacionNoAutorizadaParaRolError(DominioSgeException):
+    """El artículo de capacitación no corresponde al rol del usuario."""
+
+
+class CapacitacionYaRegistradaError(DominioSgeException):
+    """El usuario ya tiene registrado un acuse para esta capacitación."""

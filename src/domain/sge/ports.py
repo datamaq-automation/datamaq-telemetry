@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 
-from src.domain.sge.entities import ArticuloSge
+from src.domain.sge.entities import ArticuloSge, RegistroCapacitacionSge
 
 
 class RepositorioDocumentacionSgePort(ABC):
@@ -21,4 +21,28 @@ class RepositorioDocumentacionSgePort(ABC):
     @abstractmethod
     def obtener_por_id(self, articulo_id: str) -> ArticuloSge | None:
         """Obtiene un artículo de documentación SGE por su identificador único."""
+        ...
+
+
+class RepositorioRegistroCapacitacionesSgePort(ABC):
+    """Puerto para el registro y auditoría de evidencias de capacitación (ISO 50001 §7.2)."""
+
+    @abstractmethod
+    def registrar(self, registro: RegistroCapacitacionSge) -> None:
+        """Persiste un nuevo registro de capacitación completada."""
+        ...
+
+    @abstractmethod
+    def listar_por_usuario(self, usuario_id: str) -> list[RegistroCapacitacionSge]:
+        """Retorna las capacitaciones registradas por un usuario específico."""
+        ...
+
+    @abstractmethod
+    def obtener_por_usuario_y_articulo(self, usuario_id: str, articulo_id: str) -> RegistroCapacitacionSge | None:
+        """Obtiene el registro de capacitación de un usuario para un artículo puntual."""
+        ...
+
+    @abstractmethod
+    def listar_todos(self) -> list[RegistroCapacitacionSge]:
+        """Retorna todas las capacitaciones registradas para auditoría."""
         ...

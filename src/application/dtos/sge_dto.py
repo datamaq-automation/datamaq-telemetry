@@ -28,3 +28,42 @@ class SgeDocArticleDTO(BaseModel):
         populate_by_name=True,
         serialize_by_alias=True,
     )
+
+
+class AcuseCapacitacionRequestDTO(BaseModel):
+    articulo_id: str = Field(alias="articuloId")
+    version_doc: str = Field(alias="versionDoc")
+    comentarios: str | None = None
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+        serialize_by_alias=True,
+    )
+
+
+class RegistroCapacitacionResponseDTO(BaseModel):
+    id: str
+    usuario_id: str = Field(alias="usuarioId")
+    articulo_id: str = Field(alias="articuloId")
+    rol_usuario: str = Field(alias="rolUsuario")
+    fecha_completado: str = Field(alias="fechaCompletado")
+    version_doc: str = Field(alias="versionDoc")
+    comentarios: str | None = None
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+        serialize_by_alias=True,
+    )
+
+
+class EstadoCompetenciasUsuarioDTO(BaseModel):
+    usuario_id: str = Field(alias="usuarioId")
+    rol_usuario: str = Field(alias="rolUsuario")
+    capacitaciones_completadas: list[RegistroCapacitacionResponseDTO] = Field(alias="capacitacionesCompletadas")
+    capacitaciones_pendientes: list[SgeDocArticleDTO] = Field(alias="capacitacionesPendientes")
+    porcentaje_cumplimiento: float = Field(alias="porcentajeCumplimiento")
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+        serialize_by_alias=True,
+    )

@@ -30,6 +30,8 @@ from src.domain.disponibilidad.exceptions import (
 )
 from src.domain.sge.exceptions import (
     ArticuloSgeNoEncontradoError,
+    CapacitacionNoAutorizadaParaRolError,
+    CapacitacionYaRegistradaError,
     DominioSgeException,
     RolNoAutorizadoParaPrevisualizacionError,
 )
@@ -80,8 +82,16 @@ class ErrorPresenter:
             return 400, {"error": "ValidationError", "mensaje": exc.mensaje}
         elif isinstance(exc, CampoGestionadoPorYamlError):
             return 422, {"error": "GestionadoPorYaml", "mensaje": exc.mensaje}
-        elif isinstance(exc, RolNoAutorizadoParaPrevisualizacionError):
+        elif isinstance(
+            exc,
+            (
+                RolNoAutorizadoParaPrevisualizacionError,
+                CapacitacionNoAutorizadaParaRolError,
+            ),
+        ):
             return 403, {"error": "Forbidden", "mensaje": exc.mensaje}
+        elif isinstance(exc, CapacitacionYaRegistradaError):
+            return 409, {"error": "Conflict", "mensaje": exc.mensaje}
         elif isinstance(
             exc,
             (
