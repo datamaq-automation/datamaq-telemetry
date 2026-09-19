@@ -100,6 +100,16 @@ class ClasificadorCargasReglasService:
                 alternativas=("Heladera",),
             )
 
+        if p >= 3000.0:
+            reglas.append(f"Motor industrial trifásico de potencia media/alta ({p:.0f} W)")
+            return DiagnosticoReglasCarga(
+                aparato_sugerido="Fuerza Motriz / Motor Industrial",
+                categoria=CategoriaCarga.FUERZA_MOTRIZ,
+                naturaleza_electrica=NaturalezaElectrica.MOTOR,
+                confianza=0.88,
+                reglas_aplicadas=tuple(reglas),
+            )
+
         reglas.append(f"Motor o bomba de potencia media/alta ({p:.0f} W)")
         return DiagnosticoReglasCarga(
             aparato_sugerido="Fuerza Motriz / Motor",
@@ -167,6 +177,17 @@ class ClasificadorCargasReglasService:
                 categoria=CategoriaCarga.COCCION,
                 naturaleza_electrica=NaturalezaElectrica.RESISTIVA,
                 confianza=0.88,
+                reglas_aplicadas=tuple(reglas),
+                es_ambiguo=False,
+            )
+
+        if p > 3500.0:
+            reglas.append(f"Carga puramente resistiva de alta potencia industrial ({p:.0f} W, {t / 60:.0f} min)")
+            return DiagnosticoReglasCarga(
+                aparato_sugerido="Horno / Calefactor Resistivo Industrial",
+                categoria=CategoriaCarga.OTROS,
+                naturaleza_electrica=NaturalezaElectrica.RESISTIVA,
+                confianza=0.90,
                 reglas_aplicadas=tuple(reglas),
                 es_ambiguo=False,
             )

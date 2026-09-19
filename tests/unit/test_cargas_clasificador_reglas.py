@@ -176,3 +176,25 @@ def test_catalogo_presets_cargas_domesticas():
         assert carga.firma.potencia_w > 0
         assert carga.firma.duracion_encendido_s is not None
         assert carga.firma.esta_completa is True
+
+
+def test_clasificar_motor_industrial_alta_potencia():
+    """Motor trifásico de 11 kW al 75% (8.25 kW) con reactiva inductiva."""
+    episodio = _episodio(delta_w=8250.0, duracion_s=3600.0, delta_q=5500.0, factor_potencia=0.83)
+    diag = ClasificadorCargasReglasService.clasificar_episodio(episodio)
+
+    assert diag.categoria == CategoriaCarga.FUERZA_MOTRIZ
+    assert diag.naturaleza_electrica == NaturalezaElectrica.MOTOR
+    assert "Fuerza Motriz / Motor Industrial" in diag.aparato_sugerido
+    assert diag.confianza >= 0.85
+
+
+def test_clasificar_horno_industrial_resistivo():
+    """Horno industrial de 45 kW con factor de potencia unitario y ciclo largo."""
+    episodio = _episodio(delta_w=45000.0, duracion_s=7200.0, delta_q=50.0, factor_potencia=0.99)
+    diag = ClasificadorCargasReglasService.clasificar_episodio(episodio)
+
+    assert diag.categoria == CategoriaCarga.OTROS
+    assert diag.naturaleza_electrica == NaturalezaElectrica.RESISTIVA
+    assert "Horno / Calefactor Resistivo Industrial" in diag.aparato_sugerido
+    assert diag.confianza >= 0.88
