@@ -100,6 +100,21 @@ organizaciones:
             notas_metrologicas: "TI sobre secundario de sumador del banco; reactiva medida ya compensada"
             uso_significativo: true
             categoria_uso: "FUERZA_MOTRIZ"
+            calidad_energia:
+              thd_v_max_pct: 5.0
+              thd_i_max_pct: 15.0
+            lineas_base:
+              - id: "enb-durax-usina-2026"
+                nombre: "Línea Base Usina 2026 (Referencia)"
+                activa: true
+                autorizado_por: "admin@durax.com.ar"
+                congelada_en: "2026-03-31T00:00:00Z"
+                periodo_referencia_desde: "2026-01-01T00:00:00Z"
+                periodo_referencia_hasta: "2026-03-31T23:59:59Z"
+                sec_referencia_kwh_unidad: 0.125
+                potencia_base_kw: 15.0
+                tolerancia_perdidas_pct: 0.04
+
           - id: "nodo-durax-tgbt-horno"
             nombre: "TGBT Horno"
             tipo: "tgbt"

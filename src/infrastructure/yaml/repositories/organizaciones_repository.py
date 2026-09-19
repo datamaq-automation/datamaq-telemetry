@@ -127,6 +127,20 @@ class YamlOrganizacionesRepository(RepositorioOrganizacionesPort):
                     return nodos
         return []
 
+    def obtener_lineas_base_planta(self, planta_id: str) -> list[dict]:
+        for raw in self._cargar_organizaciones_raw():
+            for p in raw.get("plantas", []):
+                if str(p.get("id")) == str(planta_id):
+                    lineas = []
+                    for n in p.get("nodos_unifilar", []):
+                        for lb in n.get("lineas_base", []):
+                            linea_copia = dict(lb)
+                            linea_copia["nodo_id"] = n.get("id")
+                            linea_copia["nodo_nombre"] = n.get("nombre")
+                            lineas.append(linea_copia)
+                    return lineas
+        return []
+
     def obtener_zonas_planta(self, planta_id: str) -> list[ZonaPlanta]:
         for raw in self._cargar_organizaciones_raw():
             for p in raw.get("plantas", []):

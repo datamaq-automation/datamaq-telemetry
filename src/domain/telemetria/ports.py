@@ -228,6 +228,10 @@ class RepositorioOrganizacionesPort(ABC):
         """Datos de puesta en servicio declarados para un medidor (`plantas[].medidores[]`), o None."""
         pass
 
+    def obtener_lineas_base_planta(self, planta_id: str) -> list[dict]:
+        """Líneas de base energéticas (EnB) declaradas para los nodos de una planta."""
+        return []
+
 
 class RepositorioSuscripcionesPort(ABC):
     @abstractmethod

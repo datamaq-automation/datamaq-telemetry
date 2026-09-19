@@ -52,3 +52,21 @@ def test_balance_energia_con_sobreconteo_detecta_error_metrologico():
     assert bal.estado == EstadoBalanceEnergia.SOBRECONTEO
     assert bal.es_auditable_iso50001 is False
     assert bal.residual_kwh == pytest.approx(-100.0)
+
+
+def test_balance_energia_con_armonicos_elevados_explica_perdidas():
+    """Un residual del 6% con THD_I del 22% se cataloga como pérdidas por armónicos (IEEE 519)."""
+    e_padre = 1000.0
+    e_hijos = [500.0, 440.0]  # Suma = 940 kWh -> 6% residual
+    thd_i = 22.5  # % > 15% IEEE 519
+
+    bal = BalanceEnergiaService.evaluar_balance(
+        energia_padre_kwh=e_padre,
+        energias_hijos_kwh=e_hijos,
+        thd_i_promedio_pct=thd_i,
+    )
+
+    assert bal.estado == EstadoBalanceEnergia.PERDIDAS_ELEVADAS_POR_ARMONICOS
+    assert bal.es_auditable_iso50001 is True
+    assert "distorsión armónica" in bal.detalle
+    assert bal.thd_i_promedio_pct == pytest.approx(22.5)
