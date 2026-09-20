@@ -6,6 +6,7 @@ from decimal import Decimal
 from typing import Any
 
 from src.domain.telemetria.value_objects import (
+    CoordenadasNodoUnifilar,
     CoordenadasZona,
     Corriente,
     DiagnosticoInstalacion,
@@ -13,7 +14,9 @@ from src.domain.telemetria.value_objects import (
     EnergiaReactiva,
     EstadoDispositivo,
     FactorPotencia,
+    InterruptorCabecera,
     MacAddress,
+    MetadatosPlaca,
     ModoFreeTier,
     PosicionLayout,
     PotenciaActiva,
@@ -115,6 +118,10 @@ class NodoUnifilar:
     penalizacion_reactiva_aplica: bool | None = None
     fuente_dato: str | None = None
     notas_metrologicas: str | None = None
+    coordenadas: CoordenadasNodoUnifilar | None = None
+    metadatos_placa: MetadatosPlaca | None = None
+    interruptor_cabecera: InterruptorCabecera | None = None
+    es_pasante: bool = False
     creado_en: datetime = field(default_factory=ahora_utc)
     actualizado_en: datetime = field(default_factory=ahora_utc)
 

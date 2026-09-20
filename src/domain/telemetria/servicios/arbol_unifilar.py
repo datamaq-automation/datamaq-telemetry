@@ -83,3 +83,13 @@ class ArbolUnifilarService:
                 continue
             pendientes.extend(self.hijos_de(nodo.id))
         return resultado
+
+    def es_nodo_pasante(self, nodo_id: str) -> bool:
+        """Determina si un nodo es puramente pasante (tramo continuo sin ramificaciones ni medidor propio)."""
+        nodo = self.obtener(nodo_id)
+        if nodo.es_pasante:
+            return True
+        if nodo.device_id is not None:
+            return False
+        hijos = self.hijos_de(nodo_id)
+        return len(hijos) == 1

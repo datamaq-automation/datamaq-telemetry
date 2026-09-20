@@ -45,15 +45,28 @@ class GestionarPlantaEstructuraUseCase:
             return UnifilarPlantaDTO(planta_id="", nombre_planta="", nodos=[])
         nodos = self.repo_organizaciones.obtener_nodos_unifilar(planta.id)
         nombres_maquina = self._nombres_maquina_por_dispositivo(planta, nodos)
+        arbol = ArbolUnifilarService(nodos)
         try:
-            ArbolUnifilarService(nodos).validar()
+            arbol.validar()
             topologia_valida = True
         except EstructuraUnifilarInvalidaError:
             topologia_valida = False
+
+        nodos_dto = []
+        for n in nodos:
+            pasante = n.es_pasante or (topologia_valida and arbol.es_nodo_pasante(n.id))
+            nodos_dto.append(
+                PlantaEstructuraMapper.nodo_to_dto(
+                    n,
+                    nombre_maquina=nombres_maquina.get(n.device_id or ""),
+                    es_pasante=pasante,
+                )
+            )
+
         return UnifilarPlantaDTO(
             planta_id=planta.id,
             nombre_planta=planta.nombre,
-            nodos=[PlantaEstructuraMapper.nodo_to_dto(n, nombres_maquina.get(n.device_id or "")) for n in nodos],
+            nodos=nodos_dto,
             topologia_valida=topologia_valida,
         )
 

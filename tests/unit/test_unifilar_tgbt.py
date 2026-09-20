@@ -150,3 +150,100 @@ def test_yaml_plantas_industriales_miden_en_el_tgbt(planta_id: str):
     assert sorted(arbol.medidores_frontera(acometida.id)) == sorted(
         n.device_id for n in por_tipo[TipoNodoUnifilar.TGBT]
     )
+
+
+def test_unifilar_dto_v2_metadatos_placa_coordenadas_interruptor():
+    dto = NodoUnifilarDTO(
+        id="nodo-test",
+        parent_id="nodo-padre",
+        nombre="TGBT Test",
+        tipo="tgbt",
+        device_id="dev-1",
+        tension_nominal_V=380.0,
+        orden=1,
+        es_pasante=False,
+        coordenadas={"x": 100.0, "y": 200.0, "ancho": 80.0, "orientacion": "horizontal"},
+        metadatos_placa={
+            "trafo_asociado_kva": 1000.0,
+            "corriente_barra_a": 1600.0,
+            "icw_ka": 50.0,
+            "proteccion_in_a": 1600.0,
+            "marca": "Schneider",
+        },
+        interruptor_cabecera={
+            "tag": "Q0",
+            "tipo": "ACB",
+            "in_a": 1600.0,
+            "icu_ka": 65.0,
+            "estado": "cerrado",
+        },
+    )
+    assert dto.orden == 1
+    assert dto.es_pasante is False
+    assert dto.coordenadas is not None and dto.coordenadas.x == 100.0
+    assert dto.coordenadas.orientacion == "horizontal"
+    assert dto.metadatos_placa is not None
+    assert dto.metadatos_placa.trafo_asociado_kva == 1000.0
+    assert dto.metadatos_placa.corriente_nominal_a is None
+    assert getattr(dto.metadatos_placa, "marca", None) == "Schneider"
+    assert dto.interruptor_cabecera is not None
+    assert dto.interruptor_cabecera.tag == "Q0"
+    assert dto.interruptor_cabecera.in_a == 1600.0
+
+
+def test_arbol_unifilar_es_nodo_pasante():
+    acometida = _nodo("acometida", TipoNodoUnifilar.ACOMETIDA)
+    trafo1 = _nodo("trafo1", TipoNodoUnifilar.TRANSFORMADOR, parent_id="acometida")
+    trafo2 = _nodo("trafo2", TipoNodoUnifilar.TRANSFORMADOR, parent_id="acometida")
+    tgbt1 = _nodo("tgbt1", TipoNodoUnifilar.TGBT, parent_id="trafo1", device_id="dev-1")
+    tgbt2 = _nodo("tgbt2", TipoNodoUnifilar.TGBT, parent_id="trafo2", device_id="dev-2")
+
+    arbol = ArbolUnifilarService([acometida, trafo1, trafo2, tgbt1, tgbt2])
+    # Acometida tiene 2 hijos -> NO es pasante (es barra de bifurcación)
+    assert arbol.es_nodo_pasante("acometida") is False
+    # trafo1 y trafo2 son virtuales y tienen exactamente 1 hijo -> SÍ son pasantes
+    assert arbol.es_nodo_pasante("trafo1") is True
+    assert arbol.es_nodo_pasante("trafo2") is True
+    # tgbt1 y tgbt2 tienen medidor -> NO son pasantes
+    assert arbol.es_nodo_pasante("tgbt1") is False
+    assert arbol.es_nodo_pasante("tgbt2") is False
+
+
+def test_yaml_durax_incluye_metadatos_placa_y_layout():
+    repo = YamlOrganizacionesRepository(data_dir="data")
+    nodos = repo.obtener_nodos_unifilar("c64fd625-0037-4caa-b68a-800e8e0ee548")
+    por_id = {n.id: n for n in nodos}
+
+    acometida = por_id["nodo-durax-acometida-mt"]
+    assert acometida.coordenadas is not None
+    assert acometida.coordenadas.orientacion == "horizontal"
+    assert acometida.metadatos_placa is not None
+    assert acometida.metadatos_placa.tension_nominal_v == 13200.0
+    assert acometida.interruptor_cabecera is not None
+    assert acometida.interruptor_cabecera.tag == "QM-01"
+
+    trafo_usina = por_id["nodo-durax-trifasico-1"]
+    assert trafo_usina.es_pasante is True
+    assert trafo_usina.metadatos_placa is not None
+    assert trafo_usina.metadatos_placa.potencia_nominal_kva == 1000.0
+    assert trafo_usina.metadatos_placa.grupo_conexion == "Dyn11"
+
+    tgbt_usina = por_id["nodo-durax-tgbt-usina"]
+    assert tgbt_usina.es_pasante is False
+    assert tgbt_usina.metadatos_placa is not None
+    assert tgbt_usina.metadatos_placa.trafo_asociado_kva == 1000.0
+    assert tgbt_usina.interruptor_cabecera is not None
+    assert tgbt_usina.interruptor_cabecera.tag == "Q0-USINA"
+    assert tgbt_usina.interruptor_cabecera.in_a == 1600.0
+
+
+def test_obtener_unifilar_marca_trafos_pasantes():
+    use_case = GestionarPlantaEstructuraUseCase(YamlOrganizacionesRepository(data_dir="data"))
+    unifilar = use_case.obtener_unifilar("c64fd625-0037-4caa-b68a-800e8e0ee548")
+    por_id = {n.id: n for n in unifilar.nodos}
+
+    assert por_id["nodo-durax-acometida-mt"].es_pasante is False
+    assert por_id["nodo-durax-trifasico-1"].es_pasante is True
+    assert por_id["nodo-durax-powermeter-bf2c"].es_pasante is True
+    assert por_id["nodo-durax-tgbt-usina"].es_pasante is False
+    assert por_id["nodo-durax-tgbt-horno"].es_pasante is False

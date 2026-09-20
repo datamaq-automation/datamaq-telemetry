@@ -88,32 +88,86 @@ organizaciones:
             nombre: "Acometida MT"
             tipo: "acometida"
             tension_nominal_v: 13200.0
+            orden: 0
             fuente_dato: "Confirmación en campo (2026-09-12)"
             notas_metrologicas: "Acometida virtual de MT calculada por suma de medidores frontera"
+            coordenadas:
+              x: 250
+              y: 50
+              ancho: 300
+              orientacion: "horizontal"
+            metadatos_placa:
+              tension_nominal_v: 13200
+              categoria_tarifaria: "T3-MT"
+              frecuencia_hz: 50
+            interruptor_cabecera:
+              tag: "QM-01"
+              tipo: "SECCIONADOR_MT"
+              estado: "cerrado"
+
           - id: "nodo-durax-trifasico-1"
             nombre: "Transformación Usina (2 trafos en paralelo)"
             tipo: "transformador"
             tension_nominal_v: 380.0
             parent_id: "nodo-durax-acometida-mt"
+            orden: 1
+            es_pasante: true
             fuente_dato: "Relevamiento de planta Cristal Avellaneda (2026-09-13)"
             notas_metrologicas: "Grupo de 2 transformadores en paralelo sobre la misma barra de BT"
+            coordenadas:
+              x: 150
+              y: 150
+            metadatos_placa:
+              potencia_nominal_kva: 1000
+              relacion_tension_kv: "13.2 / 0.4 kV"
+              vsc_porcentaje: 4.0
+              grupo_conexion: "Dyn11"
+
           - id: "nodo-durax-powermeter-bf2c"
             nombre: "Transformación Horno (2 trafos en paralelo)"
             tipo: "transformador"
             tension_nominal_v: 380.0
             parent_id: "nodo-durax-acometida-mt"
+            orden: 2
+            es_pasante: true
             fuente_dato: "Relevamiento de planta Cristal Avellaneda (2026-09-13)"
             notas_metrologicas: "Grupo de 2 transformadores en paralelo sobre la misma barra de BT"
+            coordenadas:
+              x: 350
+              y: 150
+            metadatos_placa:
+              potencia_nominal_kva: 1000
+              relacion_tension_kv: "13.2 / 0.4 kV"
+              vsc_porcentaje: 4.0
+              grupo_conexion: "Dyn11"
+
           - id: "nodo-durax-tgbt-usina"
             nombre: "TGBT Usina"
             tipo: "tgbt"
             tension_nominal_v: 380.0
             parent_id: "nodo-durax-trifasico-1"
             device_id: "51048a93-f1f3-4283-a708-24cbd39c7192"
+            orden: 1
             fuente_dato: "Verificado con pinza amperométrica en barra BT (2026-09-13)"
             notas_metrologicas: "TI sobre secundario de sumador del banco; reactiva medida ya compensada"
             uso_significativo: true
             categoria_uso: "FUERZA_MOTRIZ"
+            coordenadas:
+              x: 150
+              y: 250
+              ancho: 160
+              orientacion: "horizontal"
+            metadatos_placa:
+              trafo_asociado_kva: 1000
+              corriente_barra_a: 1600
+              icw_ka: 50
+              proteccion_in_a: 1600
+            interruptor_cabecera:
+              tag: "Q0-USINA"
+              tipo: "ACB"
+              in_a: 1600
+              icu_ka: 65
+              estado: "cerrado"
             calidad_energia:
               thd_v_max_pct: 5.0
               thd_i_max_pct: 15.0
@@ -135,10 +189,27 @@ organizaciones:
             tension_nominal_v: 380.0
             parent_id: "nodo-durax-powermeter-bf2c"
             device_id: "b5f4bcd6-b017-4796-bb3d-efcfb50dc8f0"
+            orden: 2
             fuente_dato: "Relevamiento de planta Cristal Avellaneda (2026-09-13)"
             notas_metrologicas: "Horno de fusión continuo de vidrio; uso térmico intensivo"
             uso_significativo: true
             categoria_uso: "CALOR_PROCESO"
+            coordenadas:
+              x: 350
+              y: 250
+              ancho: 160
+              orientacion: "horizontal"
+            metadatos_placa:
+              trafo_asociado_kva: 1000
+              corriente_barra_a: 1600
+              icw_ka: 50
+              proteccion_in_a: 1600
+            interruptor_cabecera:
+              tag: "Q0-HORNO"
+              tipo: "ACB"
+              in_a: 1600
+              icu_ka: 65
+              estado: "cerrado"
 
   - id: "edebb9a0-85e5-4bde-a370-e64bd9b9608c"
     nombre: "Cooperativa de Trabajo Unión Papelera Platense Ltda"

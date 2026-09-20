@@ -4,6 +4,7 @@ import re
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
+from typing import Any
 
 from src.domain.telemetria.exceptions import (
     CoordenadaInvalidaError,
@@ -219,3 +220,46 @@ class DiagnosticoInstalacion:
     potencia_estimada_simetrica_w: float | None = None
     factor_potencia_estimado_simetrico: float | None = None
     accion_correctiva_sugerida: str | None = None
+
+
+@dataclass(frozen=True)
+class CoordenadasNodoUnifilar:
+    """Coordenadas relativas y geometría para renderizado vectorial 2D del unifilar."""
+
+    x: float
+    y: float
+    ancho: float | None = None
+    orientacion: str | None = None  # "horizontal" | "vertical"
+
+
+@dataclass(frozen=True)
+class InterruptorCabecera:
+    """Órgano de maniobra y protección en la cabecera del nodo (tablero o alimentador)."""
+
+    tag: str
+    tipo: str | None = None  # ej. "ACB", "MCCB", "SECCIONADOR"
+    in_a: float | None = None
+    icu_ka: float | None = None
+    estado: str = "cerrado"  # "cerrado", "abierto", "desconocido"
+
+
+@dataclass(frozen=True)
+class MetadatosPlaca:
+    """Parámetros electrotécnicos nominales de placa (IEC / IEEE / ANSI)."""
+
+    potencia_nominal_kva: float | None = None
+    relacion_tension_kv: str | None = None
+    vsc_porcentaje: float | None = None
+    grupo_conexion: str | None = None
+    corriente_nominal_a: float | None = None
+    icw_ka: float | None = None
+    frecuencia_hz: float | None = 50.0
+    calibre_in_a: float | None = None
+    cable_seccion: str | None = None
+    longitud_estimada_m: float | None = None
+    tension_nominal_v: float | None = None
+    categoria_tarifaria: str | None = None
+    trafo_asociado_kva: float | None = None
+    corriente_barra_a: float | None = None
+    proteccion_in_a: float | None = None
+    datos_adicionales: dict[str, Any] | None = None

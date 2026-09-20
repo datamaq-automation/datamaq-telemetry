@@ -11,13 +11,117 @@ from src.domain.telemetria.entities import (
 )
 from src.domain.telemetria.ports import RepositorioOrganizacionesPort
 from src.domain.telemetria.value_objects import (
+    CoordenadasNodoUnifilar,
     CoordenadasZona,
+    InterruptorCabecera,
+    MetadatosPlaca,
     PosicionLayout,
     TipoNodoUnifilar,
 )
 from src.infrastructure.yaml.loaders import cargar_organizaciones_completas
 
 logger = structlog.get_logger(__name__)
+
+
+def _parsear_coordenadas(n: dict) -> CoordenadasNodoUnifilar | None:
+    if "coordenadas" not in n or not isinstance(n["coordenadas"], dict):
+        return None
+    c = n["coordenadas"]
+    return CoordenadasNodoUnifilar(
+        x=float(c.get("x", 0.0)),
+        y=float(c.get("y", 0.0)),
+        ancho=float(c["ancho"]) if c.get("ancho") is not None else None,
+        orientacion=c.get("orientacion"),
+    )
+
+
+def _parsear_interruptor(n: dict) -> InterruptorCabecera | None:
+    if "interruptor_cabecera" not in n or not isinstance(n["interruptor_cabecera"], dict):
+        return None
+    ic = n["interruptor_cabecera"]
+    in_val = ic.get("in_a") if ic.get("in_a") is not None else ic.get("in_A")
+    icu_val = ic.get("icu_ka") if ic.get("icu_ka") is not None else ic.get("icu_kA")
+    return InterruptorCabecera(
+        tag=str(ic.get("tag", "")),
+        tipo=ic.get("tipo"),
+        in_a=float(in_val) if in_val is not None else None,
+        icu_ka=float(icu_val) if icu_val is not None else None,
+        estado=str(ic.get("estado", "cerrado")),
+    )
+
+
+def _parsear_metadatos_placa(n: dict) -> MetadatosPlaca | None:
+    if "metadatos_placa" not in n or not isinstance(n["metadatos_placa"], dict):
+        return None
+    mp = dict(n["metadatos_placa"])
+    known_keys = {
+        "potencia_nominal_kva",
+        "relacion_tension_kv",
+        "vsc_porcentaje",
+        "grupo_conexion",
+        "corriente_nominal_a",
+        "icw_ka",
+        "frecuencia_hz",
+        "calibre_in_a",
+        "cable_seccion",
+        "longitud_estimada_m",
+        "tension_nominal_v",
+        "categoria_tarifaria",
+        "trafo_asociado_kva",
+        "corriente_barra_a",
+        "proteccion_in_a",
+    }
+    if "corriente_nominal_A" in mp and "corriente_nominal_a" not in mp:
+        mp["corriente_nominal_a"] = mp.pop("corriente_nominal_A")
+    if "icw_kA" in mp and "icw_ka" not in mp:
+        mp["icw_ka"] = mp.pop("icw_kA")
+    if "calibre_in_A" in mp and "calibre_in_a" not in mp:
+        mp["calibre_in_a"] = mp.pop("calibre_in_A")
+
+    kwargs = {k: v for k, v in mp.items() if k in known_keys}
+    adicionales = {k: v for k, v in mp.items() if k not in known_keys}
+    return MetadatosPlaca(**kwargs, datos_adicionales=adicionales if adicionales else None)
+
+
+def _parsear_nodo_unifilar(n: dict, planta_id: str) -> NodoUnifilar:
+    tipo_raw = str(n.get("tipo", "CARGA")).upper()
+    if tipo_raw in TipoNodoUnifilar.__members__:
+        tipo = TipoNodoUnifilar[tipo_raw]
+    else:
+        structlog.get_logger(__name__).warning(
+            "unifilar_tipo_no_reconocido",
+            planta_id=planta_id,
+            nodo_id=n.get("id"),
+            tipo_raw=tipo_raw,
+            fallback="carga",
+        )
+        tipo = TipoNodoUnifilar.CARGA
+
+    return NodoUnifilar(
+        id=str(n["id"]),
+        planta_id=planta_id,
+        nombre=str(n["nombre"]),
+        tipo=tipo,
+        tension_nominal_v=float(n.get("tension_nominal_v", 380.0)),
+        parent_id=n.get("padre_id") or n.get("parent_id"),
+        device_id=n.get("dispositivo_id") or n.get("device_id"),
+        capacidad_nominal_kva=float(n["capacidad_nominal_kva"]) if n.get("capacidad_nominal_kva") is not None else None,
+        potencia_nominal_kw=float(n["potencia_nominal_kw"]) if n.get("potencia_nominal_kw") is not None else None,
+        uso_significativo=bool(n.get("uso_significativo", False)),
+        categoria_uso=n.get("categoria_uso"),
+        variable_relevante=n.get("variable_relevante"),
+        orden=int(n.get("orden", 0)),
+        categoria_tarifaria=n.get("categoria_tarifaria"),
+        penalizacion_reactiva_aplica=(
+            bool(n["penalizacion_reactiva_aplica"]) if n.get("penalizacion_reactiva_aplica") is not None else None
+        ),
+        fuente_dato=n.get("fuente_dato"),
+        notas_metrologicas=n.get("notas_metrologicas"),
+        coordenadas=_parsear_coordenadas(n),
+        metadatos_placa=_parsear_metadatos_placa(n),
+        interruptor_cabecera=_parsear_interruptor(n),
+        es_pasante=bool(n.get("es_pasante", False)),
+    )
 
 
 class YamlOrganizacionesRepository(RepositorioOrganizacionesPort):
@@ -92,50 +196,7 @@ class YamlOrganizacionesRepository(RepositorioOrganizacionesPort):
         for raw in self._cargar_organizaciones_raw():
             for p in raw.get("plantas", []):
                 if str(p.get("id")) == str(planta_id):
-                    nodos = []
-                    for n in p.get("nodos_unifilar", []):
-                        tipo_raw = str(n.get("tipo", "CARGA")).upper()
-                        if tipo_raw in TipoNodoUnifilar.__members__:
-                            tipo = TipoNodoUnifilar[tipo_raw]
-                        else:
-                            structlog.get_logger(__name__).warning(
-                                "unifilar_tipo_no_reconocido",
-                                planta_id=planta_id,
-                                nodo_id=n.get("id"),
-                                tipo_raw=tipo_raw,
-                                fallback="carga",
-                            )
-                            tipo = TipoNodoUnifilar.CARGA
-                        nodos.append(
-                            NodoUnifilar(
-                                id=str(n["id"]),
-                                planta_id=planta_id,
-                                nombre=str(n["nombre"]),
-                                tipo=tipo,
-                                tension_nominal_v=float(n.get("tension_nominal_v", 380.0)),
-                                parent_id=n.get("padre_id") or n.get("parent_id"),
-                                device_id=n.get("dispositivo_id") or n.get("device_id"),
-                                capacidad_nominal_kva=float(n["capacidad_nominal_kva"])
-                                if n.get("capacidad_nominal_kva") is not None
-                                else None,
-                                potencia_nominal_kw=float(n["potencia_nominal_kw"])
-                                if n.get("potencia_nominal_kw") is not None
-                                else None,
-                                uso_significativo=bool(n.get("uso_significativo", False)),
-                                categoria_uso=n.get("categoria_uso"),
-                                variable_relevante=n.get("variable_relevante"),
-                                categoria_tarifaria=n.get("categoria_tarifaria"),
-                                penalizacion_reactiva_aplica=(
-                                    bool(n["penalizacion_reactiva_aplica"])
-                                    if n.get("penalizacion_reactiva_aplica") is not None
-                                    else None
-                                ),
-                                fuente_dato=n.get("fuente_dato"),
-                                notas_metrologicas=n.get("notas_metrologicas"),
-                            )
-                        )
-
-                    return nodos
+                    return [_parsear_nodo_unifilar(n, planta_id) for n in p.get("nodos_unifilar", [])]
         return []
 
     def obtener_lineas_base_planta(self, planta_id: str) -> list[dict]:
