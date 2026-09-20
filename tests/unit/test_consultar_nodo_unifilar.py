@@ -104,3 +104,14 @@ def test_historico_consulta_los_medidores_frontera(use_case):
     llamados = [c.args[0] for c in use_case.consultar_telemetria.listar_instantaneas.call_args_list]
     assert llamados == [DEV_1, DEV_2]
     assert puntos == []
+
+
+def test_compensacion_historica_incluida_en_nodo_mt_o_total_planta(use_case):
+    resumen_mt = use_case.resumen(PLANTA_ID, "mt", organizacion_id=ORG_ID)
+    assert resumen_mt.compensacion_historica is not None
+    assert resumen_mt.compensacion_historica.periodo_dias == 7
+
+
+def test_compensacion_historica_es_none_en_nodo_bt_individual(use_case):
+    resumen_trafo = use_case.resumen(PLANTA_ID, "trafo-1", organizacion_id=ORG_ID)
+    assert resumen_trafo.compensacion_historica is None

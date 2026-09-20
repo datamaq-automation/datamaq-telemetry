@@ -181,6 +181,23 @@ class PlantaAreasEstadisticasResponseDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class BancoRecomendadoDTO(BaseModel):
+    tipo: Literal["banco", "qc"] = "banco"
+    potencia_kvar: float
+    tension_instalacion_v: float
+    justificacion: str
+
+
+class CompensacionHistoricaDTO(BaseModel):
+    periodo_dias: int
+    fecha_calculo: FechaHoraUTC
+    potencia_reactiva_promedio_kvar: float | None = None
+    potencia_reactiva_max_kvar: float | None = None
+    potencia_reactiva_min_kvar: float | None = None
+    factor_potencia_promedio: float | None = None
+    banco_recomendado: BancoRecomendadoDTO | None = None
+
+
 class ResumenNodoUnifilarDTO(BaseModel):
     planta_id: str
     nodo_id: str
@@ -194,6 +211,7 @@ class ResumenNodoUnifilarDTO(BaseModel):
     energia_agregada: list[EnergiaAgregadaDTO] = Field(default_factory=list)
     registrado_en: FechaHoraUTC | None = None
     agregado_por_fase: AgregadoPorFaseDTO | None = None
+    compensacion_historica: CompensacionHistoricaDTO | None = None
 
 
 class PuntoPotenciaNodoUnifilarDTO(BaseModel):

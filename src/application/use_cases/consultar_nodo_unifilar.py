@@ -1,7 +1,11 @@
 """src/application/use_cases/consultar_nodo_unifilar.py."""
 
+from datetime import datetime, timezone
+
 from src.application.dtos.planta_estructura_dto import (
     AgregadoPorFaseDTO,
+    BancoRecomendadoDTO,
+    CompensacionHistoricaDTO,
     FaseAgregadaDTO,
     PuntoPotenciaNodoUnifilarDTO,
     ResumenNodoUnifilarDTO,
@@ -14,6 +18,7 @@ from src.domain.telemetria.exceptions import PlantaNoEncontradaError
 from src.domain.telemetria.ports import RepositorioOrganizacionesPort, RepositorioTelemetriaPort
 from src.domain.telemetria.servicios.agregador_dispositivos import AgregadoPorFase
 from src.domain.telemetria.servicios.arbol_unifilar import ArbolUnifilarService
+from src.domain.telemetria.value_objects import TipoNodoUnifilar
 
 
 def _mapear_agregado_por_fase(ag: AgregadoPorFase | None) -> AgregadoPorFaseDTO | None:
@@ -66,7 +71,7 @@ class ConsultarNodoUnifilarUseCase:
     def _resolver_planta(self, planta_id: str, organizacion_id: str | None) -> Planta:
         planta = self.repo_organizaciones.obtener_planta_por_id(planta_id)
         if planta is None or (organizacion_id is not None and planta.organizacion_id != organizacion_id):
-            raise PlantaNoEncontradaError(f"Planta con id '{planta_id}' no encontrada.")
+            raise PlantaNoEncontradaError(f"Planta {planta_id} no encontrada")
         return planta
 
     def _resolver_nodo(
@@ -75,6 +80,65 @@ class ConsultarNodoUnifilarUseCase:
         planta = self._resolver_planta(planta_id, organizacion_id)
         arbol = ArbolUnifilarService(self.repo_organizaciones.obtener_nodos_unifilar(planta.id))
         return arbol.obtener(nodo_id), arbol.medidores_frontera(nodo_id)
+
+    def _calcular_compensacion_historica(
+        self, nodo: NodoUnifilar, dispositivos_ids: list[str], periodo_dias: int = 7
+    ) -> CompensacionHistoricaDTO | None:
+        es_acometida_mt = nodo.tipo == TipoNodoUnifilar.ACOMETIDA and nodo.tension_nominal_v >= 1000.0
+        es_total_planta = nodo.device_id is None and nodo.parent_id is None
+
+        if not (es_acometida_mt or es_total_planta):
+            return None
+
+        puntos = calcular_historico(
+            dispositivos_ids=dispositivos_ids,
+            consultar_telemetria=self.consultar_telemetria,
+            granularidad="5m",
+            horas=periodo_dias * 24,
+        )
+
+        q_kvar_vals = [
+            p.potencia_reactiva_total_var / 1000.0 for p in puntos if p.potencia_reactiva_total_var is not None
+        ]
+        fp_vals = [p.factor_desplazamiento_total for p in puntos if p.factor_desplazamiento_total is not None]
+
+        if not q_kvar_vals:
+            return CompensacionHistoricaDTO(
+                periodo_dias=periodo_dias,
+                fecha_calculo=datetime.now(timezone.utc),
+                potencia_reactiva_promedio_kvar=None,
+                potencia_reactiva_max_kvar=None,
+                potencia_reactiva_min_kvar=None,
+                factor_potencia_promedio=None,
+                banco_recomendado=None,
+            )
+
+        q_prom = sum(q_kvar_vals) / len(q_kvar_vals)
+        q_max = max(q_kvar_vals)
+        q_min = min(q_kvar_vals)
+        fp_prom = (sum(fp_vals) / len(fp_vals)) if fp_vals else None
+
+        banco: BancoRecomendadoDTO | None = None
+        if q_prom > 0:
+            qc_sugerida = round(q_prom * 0.5, 2)
+            if qc_sugerida > 0:
+                tension_v = nodo.tension_nominal_v if nodo.tension_nominal_v >= 1000.0 else 13200.0
+                banco = BancoRecomendadoDTO(
+                    tipo="banco",
+                    potencia_kvar=qc_sugerida,
+                    tension_instalacion_v=tension_v,
+                    justificacion=f"Proporciona compensación estable para Q_prom={q_prom:.2f} kVAR con margen de seguridad",
+                )
+
+        return CompensacionHistoricaDTO(
+            periodo_dias=periodo_dias,
+            fecha_calculo=datetime.now(timezone.utc),
+            potencia_reactiva_promedio_kvar=round(q_prom, 2),
+            potencia_reactiva_max_kvar=round(q_max, 2),
+            potencia_reactiva_min_kvar=round(q_min, 2),
+            factor_potencia_promedio=round(fp_prom, 3) if fp_prom is not None else None,
+            banco_recomendado=banco,
+        )
 
     def resumen(
         self,
@@ -98,6 +162,8 @@ class ConsultarNodoUnifilarUseCase:
             relacion_tension_kv,
         )
 
+        compensacion_hist = self._calcular_compensacion_historica(nodo, dispositivos_ids, periodo_dias=7)
+
         return ResumenNodoUnifilarDTO(
             planta_id=planta_id,
             nodo_id=nodo.id,
@@ -114,6 +180,7 @@ class ConsultarNodoUnifilarUseCase:
                 EnergiaAgregadaDTO(periodo=e.periodo, energia_activa_neta_kwh=e.energia_activa_neta_kwh)
                 for e in energia_sumada
             ],
+            compensacion_historica=compensacion_hist,
         )
 
     def historico(
