@@ -4,7 +4,7 @@ import math
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 
-from src.domain.telemetria.entities import EnergiaAgregada, LecturaInstantanea
+from src.domain.telemetria.entities import EnergiaAgregada, LecturaInstantanea, MedicionFase
 
 
 @dataclass(frozen=True)
@@ -30,6 +30,36 @@ class PotenciaSumada:
     potencia_aparente_total_va: float | None = None
     factor_desplazamiento_total: float | None = None
     registrado_en: datetime | None = None
+    agregado_por_fase: "AgregadoPorFase | None" = None
+
+
+@dataclass(frozen=True)
+class FaseAgregada:
+    """Magnitudes eléctricas agregadas para una única fase (R, S o T).
+
+    - ``voltage_V``: promedio de tensiones (V no se suman — representan el estado de la red).
+    - ``current_A``: suma de corrientes (Kirchhoff).
+    - ``net_active_power_W`` / ``net_reactive_power_VAR``: suma directa.
+    - ``net_apparent_power_VA`` / ``power_factor``: recompuestos desde P y Q agregados.
+    - ``desbalance_tension_pct``: calculado sobre las tensiones promedio de las 3 fases.
+    """
+
+    voltage_V: float | None
+    current_A: float | None
+    net_active_power_W: float | None
+    net_reactive_power_VAR: float | None
+    net_apparent_power_VA: float | None
+    power_factor: float | None
+    desbalance_tension_pct: float | None
+
+
+@dataclass(frozen=True)
+class AgregadoPorFase:
+    """Contenedor de las tres fases agregadas de un nodo."""
+
+    fase_r: FaseAgregada
+    fase_s: FaseAgregada
+    fase_t: FaseAgregada
 
 
 @dataclass(frozen=True)
@@ -195,3 +225,109 @@ class AgregadorDispositivosService:
                 )
             )
         return resultado
+
+
+def _calcular_desbalance_tension(v_prom: dict[str, float | None]) -> float | None:
+    tensiones_disponibles = [v for v in v_prom.values() if v is not None]
+    if len(tensiones_disponibles) == 3:
+        v_max = max(tensiones_disponibles)
+        v_min = min(tensiones_disponibles)
+        v_media = sum(tensiones_disponibles) / 3
+        return round((v_max - v_min) / v_media * 100, 2) if v_media > 0 else None
+    return None
+
+
+def _acumular_medicion_fase(
+    fase: "MedicionFase",
+    clave: str,
+    sum_v: dict[str, float],
+    cnt_v: dict[str, int],
+    sum_i: dict[str, float],
+    sum_p: dict[str, float],
+    sum_q: dict[str, float | None],
+    q_completa: dict[str, bool],
+) -> None:
+    if fase.tension is not None:
+        sum_v[clave] += fase.tension.voltios
+        cnt_v[clave] += 1
+    if fase.corriente is not None:
+        sum_i[clave] += fase.corriente.amperios
+    if fase.potencia_activa is not None:
+        sum_p[clave] += fase.potencia_activa.vatios
+    if fase.potencia_reactiva is not None and q_completa[clave]:
+        sum_q[clave] = (sum_q[clave] or 0.0) + fase.potencia_reactiva.var
+    elif fase.potencia_activa is not None and fase.potencia_reactiva is None:
+        q_completa[clave] = False
+
+
+def _acumular_lecturas_fase(
+    lecturas_por_dispositivo: dict[str, "LecturaInstantanea | None"],
+) -> tuple[
+    dict[str, float], dict[str, int], dict[str, float], dict[str, float], dict[str, float | None], dict[str, bool], bool
+]:
+    sum_v: dict[str, float] = {"r": 0.0, "s": 0.0, "t": 0.0}
+    cnt_v: dict[str, int] = {"r": 0, "s": 0, "t": 0}
+    sum_i: dict[str, float] = {"r": 0.0, "s": 0.0, "t": 0.0}
+    sum_p: dict[str, float] = {"r": 0.0, "s": 0.0, "t": 0.0}
+    sum_q: dict[str, float | None] = {"r": 0.0, "s": 0.0, "t": 0.0}
+    q_completa: dict[str, bool] = {"r": True, "s": True, "t": True}
+    hubo_dato = False
+
+    fase_map = [
+        ("r", lambda lect: lect.fase_r),
+        ("s", lambda lect: lect.fase_s),
+        ("t", lambda lect: lect.fase_t),
+    ]
+
+    for lectura in lecturas_por_dispositivo.values():
+        if lectura is None or lectura.potencia_activa_total is None:
+            continue
+        hubo_dato = True
+        for clave, getter in fase_map:
+            _acumular_medicion_fase(getter(lectura), clave, sum_v, cnt_v, sum_i, sum_p, sum_q, q_completa)
+
+    return sum_v, cnt_v, sum_i, sum_p, sum_q, q_completa, hubo_dato
+
+    @staticmethod
+    def sumar_fases(
+        lecturas_por_dispositivo: dict[str, "LecturaInstantanea | None"],
+        relacion_transformacion: float = 1.0,
+    ) -> "AgregadoPorFase | None":
+        """Agrega magnitudes eléctricas por fase (R, S, T) de múltiples dispositivos.
+
+        Para nodos BT usar ``relacion_transformacion=1.0`` (default).
+        Para nodos MT pasar ``a = V_primario_kV / V_secundario_kV`` obtenido de
+        ``MetadatosPlaca.relacion_tension_kv`` (ej: "15/0.4" → 37.5).
+
+        Bajo la hipótesis de transformador ideal:
+        - V_fase_MT = V_fase_BT x a
+        - I_fase_MT = I_fase_BT / a
+        - P, Q, S, FP: invariantes (conservación de energía).
+        """
+        sum_v, cnt_v, sum_i, sum_p, sum_q, q_completa, hubo_dato = _acumular_lecturas_fase(lecturas_por_dispositivo)
+        if not hubo_dato:
+            return None
+
+        v_prom = {
+            k: round((sum_v[k] / cnt_v[k]) * relacion_transformacion, 1) if cnt_v[k] > 0 else None
+            for k in ("r", "s", "t")
+        }
+        i_sum = {k: round(sum_i[k] / relacion_transformacion, 2) if sum_i[k] > 0 else None for k in ("r", "s", "t")}
+        desbalance = _calcular_desbalance_tension(v_prom)
+
+        def _fase(k: str) -> FaseAgregada:
+            p = round(sum_p[k], 2) if sum_p[k] != 0.0 else None
+            q_val = sum_q[k]
+            q = round(q_val, 2) if q_completa[k] and q_val is not None else None
+            s, fp = _recomponer_s_y_cos_fi(p, q)
+            return FaseAgregada(
+                voltage_V=v_prom[k],
+                current_A=i_sum[k],
+                net_active_power_W=p,
+                net_reactive_power_VAR=q,
+                net_apparent_power_VA=s,
+                power_factor=fp,
+                desbalance_tension_pct=desbalance,
+            )
+
+        return AgregadoPorFase(fase_r=_fase("r"), fase_s=_fase("s"), fase_t=_fase("t"))

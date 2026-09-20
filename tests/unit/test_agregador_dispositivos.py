@@ -224,3 +224,93 @@ class TestAgregadorDispositivosService:
 
         assert resultado.registrado_en is None
         assert resultado.potencia_activa_total_w is None
+
+    # ------------------------------------------------------------------
+    # sumar_fases
+    # ------------------------------------------------------------------
+
+    def _lectura_completa(
+        self,
+        dispositivo_id: str,
+        v_r: float,
+        v_s: float,
+        v_t: float,
+        i_r: float,
+        i_s: float,
+        i_t: float,
+        p_r: float,
+        p_s: float,
+        p_t: float,
+    ) -> LecturaInstantanea:
+        from src.domain.telemetria.value_objects import Corriente, Tension
+
+        return LecturaInstantanea(
+            id=None,
+            dispositivo_id=dispositivo_id,
+            registrado_en=datetime(2026, 9, 1, tzinfo=timezone.utc),
+            fase_r=MedicionFase(tension=Tension(v_r), corriente=Corriente(i_r), potencia_activa=PotenciaActiva(p_r)),
+            fase_s=MedicionFase(tension=Tension(v_s), corriente=Corriente(i_s), potencia_activa=PotenciaActiva(p_s)),
+            fase_t=MedicionFase(tension=Tension(v_t), corriente=Corriente(i_t), potencia_activa=PotenciaActiva(p_t)),
+            potencia_activa_total=PotenciaActiva(p_r + p_s + p_t),
+            potencia_reactiva_total=None,
+        )
+
+    def test_sumar_fases_suma_potencias_promedia_tension_y_suma_corriente(self):
+        lect1 = self._lectura_completa("d1", 230.0, 231.0, 229.0, 10.0, 10.0, 10.0, 2300.0, 2310.0, 2290.0)
+        lect2 = self._lectura_completa("d2", 232.0, 233.0, 231.0, 12.0, 12.0, 12.0, 2784.0, 2796.0, 2772.0)
+        resultado = AgregadorDispositivosService.sumar_fases({"d1": lect1, "d2": lect2})
+
+        assert resultado is not None
+        # Tensión: promedio de los 2 dispositivos
+        assert resultado.fase_r.voltage_V == round((230.0 + 232.0) / 2, 1)  # 231.0
+        assert resultado.fase_s.voltage_V == round((231.0 + 233.0) / 2, 1)  # 232.0
+        assert resultado.fase_t.voltage_V == round((229.0 + 231.0) / 2, 1)  # 230.0
+        # Corriente: suma
+        assert resultado.fase_r.current_A == round(10.0 + 12.0, 2)  # 22.0
+        # Potencia activa: suma
+        assert resultado.fase_r.net_active_power_W == round(2300.0 + 2784.0, 2)  # 5084.0
+        # Desbalance de tensión: (232.0 - 230.0) / 231.0 * 100 ≈ 0.87%
+        assert resultado.fase_r.desbalance_tension_pct is not None
+
+    def test_sumar_fases_excluye_fase_null_de_dispositivo_monofasico(self):
+        """Un dispositivo monofásico reporta solo fase_r; sus fase_s y fase_t están en None."""
+        from src.domain.telemetria.value_objects import Corriente, Tension
+
+        trifasico = self._lectura_completa("tri", 230.0, 231.0, 229.0, 10.0, 10.0, 10.0, 2300.0, 2310.0, 2290.0)
+        monofasico = LecturaInstantanea(
+            id=None,
+            dispositivo_id="mono",
+            registrado_en=datetime(2026, 9, 1, tzinfo=timezone.utc),
+            fase_r=MedicionFase(
+                tension=Tension(228.0), corriente=Corriente(8.0), potencia_activa=PotenciaActiva(1824.0)
+            ),
+            fase_s=MedicionFase(),  # null — monofásico no reporta S
+            fase_t=MedicionFase(),  # null — monofásico no reporta T
+            potencia_activa_total=PotenciaActiva(1824.0),
+            potencia_reactiva_total=None,
+        )
+        resultado = AgregadorDispositivosService.sumar_fases({"tri": trifasico, "mono": monofasico})
+
+        assert resultado is not None
+        # fase_r: promedio de 2 dispositivos (230 + 228) / 2
+        assert resultado.fase_r.voltage_V == round((230.0 + 228.0) / 2, 1)
+        # fase_s: solo el trifásico (monofásico tenía None)
+        assert resultado.fase_s.voltage_V == 231.0
+        assert resultado.fase_t.voltage_V == 229.0
+
+    def test_sumar_fases_devuelve_none_si_todos_sin_dato(self):
+        resultado = AgregadorDispositivosService.sumar_fases({"d1": None, "d2": None})
+        assert resultado is None
+
+    def test_sumar_fases_aplica_relacion_transformacion_mt(self):
+        """Con relacion de transformacion 15/0.4 = 37.5: V x 37.5, I/37.5, P invariante."""
+        lect = self._lectura_completa("d1", 230.0, 231.0, 229.0, 34.8, 34.8, 34.8, 5000.0, 5000.0, 5000.0)
+        resultado = AgregadorDispositivosService.sumar_fases({"d1": lect}, relacion_transformacion=37.5)
+
+        assert resultado is not None
+        # Tension MT: 230.0 x 37.5 = 8625.0 V
+        assert resultado.fase_r.voltage_V == round(230.0 * 37.5, 1)
+        # Corriente MT: 34.8 / 37.5 ≈ 0.928 A
+        assert resultado.fase_r.current_A == round(34.8 / 37.5, 2)
+        # Potencia activa: invariante
+        assert resultado.fase_r.net_active_power_W == 5000.0
