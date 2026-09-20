@@ -17,6 +17,20 @@ from src.domain.telemetria.servicios.agregador_dispositivos import (
 )
 
 
+def _parsear_relacion_transformacion(relacion_tension_kv: str | None) -> float:
+    """Parsea "15/0.4" → 37.5. Retorna 1.0 si no se puede parsear (nodo BT)."""
+    if not relacion_tension_kv:
+        return 1.0
+    try:
+        partes = relacion_tension_kv.split("/")
+        if len(partes) != 2:
+            return 1.0
+        primario, secundario = float(partes[0]), float(partes[1])
+        return primario / secundario if secundario > 0 else 1.0
+    except ValueError:
+        return 1.0
+
+
 def calcular_resumen(
     dispositivos_ids: list[str],
     repo_telemetria: RepositorioTelemetriaPort,
@@ -24,12 +38,24 @@ def calcular_resumen(
     granularidad: str,
     zona: str,
     dias: int | None,
+    relacion_tension_kv: str | None = None,
 ) -> tuple[PotenciaSumada, list[EnergiaAgregada]]:
     lecturas_por_dispositivo = {
         dispositivo_id: repo_telemetria.obtener_ultima_instantanea(dispositivo_id)
         for dispositivo_id in dispositivos_ids
     }
+    relacion = _parsear_relacion_transformacion(relacion_tension_kv)
     potencia_sumada = AgregadorDispositivosService.sumar_ultimas_lecturas(lecturas_por_dispositivo)
+    agregado_por_fase = AgregadorDispositivosService.sumar_fases(lecturas_por_dispositivo, relacion)
+    potencia_sumada = PotenciaSumada(
+        potencia_activa_total_w=potencia_sumada.potencia_activa_total_w,
+        dispositivos_sin_dato=potencia_sumada.dispositivos_sin_dato,
+        potencia_reactiva_total_var=potencia_sumada.potencia_reactiva_total_var,
+        potencia_aparente_total_va=potencia_sumada.potencia_aparente_total_va,
+        factor_desplazamiento_total=potencia_sumada.factor_desplazamiento_total,
+        registrado_en=potencia_sumada.registrado_en,
+        agregado_por_fase=agregado_por_fase,
+    )
 
     agregados_por_dispositivo: dict[str, list[EnergiaAgregada]] = {}
     for dispositivo_id in dispositivos_ids:

@@ -1,6 +1,8 @@
 """src/application/use_cases/consultar_nodo_unifilar.py."""
 
 from src.application.dtos.planta_estructura_dto import (
+    AgregadoPorFaseDTO,
+    FaseAgregadaDTO,
     PuntoPotenciaNodoUnifilarDTO,
     ResumenNodoUnifilarDTO,
 )
@@ -10,7 +12,42 @@ from src.application.use_cases.consultar_telemetria import ConsultarTelemetriaUs
 from src.domain.telemetria.entities import NodoUnifilar, Planta
 from src.domain.telemetria.exceptions import PlantaNoEncontradaError
 from src.domain.telemetria.ports import RepositorioOrganizacionesPort, RepositorioTelemetriaPort
+from src.domain.telemetria.servicios.agregador_dispositivos import AgregadoPorFase
 from src.domain.telemetria.servicios.arbol_unifilar import ArbolUnifilarService
+
+
+def _mapear_agregado_por_fase(ag: AgregadoPorFase | None) -> AgregadoPorFaseDTO | None:
+    if ag is None:
+        return None
+    return AgregadoPorFaseDTO(
+        fase_r=FaseAgregadaDTO(
+            voltage_V=ag.fase_r.voltage_V,
+            current_A=ag.fase_r.current_A,
+            net_active_power_W=ag.fase_r.net_active_power_W,
+            net_reactive_power_VAR=ag.fase_r.net_reactive_power_VAR,
+            net_apparent_power_VA=ag.fase_r.net_apparent_power_VA,
+            power_factor=ag.fase_r.power_factor,
+            desbalance_tension_pct=ag.fase_r.desbalance_tension_pct,
+        ),
+        fase_s=FaseAgregadaDTO(
+            voltage_V=ag.fase_s.voltage_V,
+            current_A=ag.fase_s.current_A,
+            net_active_power_W=ag.fase_s.net_active_power_W,
+            net_reactive_power_VAR=ag.fase_s.net_reactive_power_VAR,
+            net_apparent_power_VA=ag.fase_s.net_apparent_power_VA,
+            power_factor=ag.fase_s.power_factor,
+            desbalance_tension_pct=ag.fase_s.desbalance_tension_pct,
+        ),
+        fase_t=FaseAgregadaDTO(
+            voltage_V=ag.fase_t.voltage_V,
+            current_A=ag.fase_t.current_A,
+            net_active_power_W=ag.fase_t.net_active_power_W,
+            net_reactive_power_VAR=ag.fase_t.net_reactive_power_VAR,
+            net_apparent_power_VA=ag.fase_t.net_apparent_power_VA,
+            power_factor=ag.fase_t.power_factor,
+            desbalance_tension_pct=ag.fase_t.desbalance_tension_pct,
+        ),
+    )
 
 
 class ConsultarNodoUnifilarUseCase:
@@ -49,9 +86,16 @@ class ConsultarNodoUnifilarUseCase:
         dias: int | None = None,
     ) -> ResumenNodoUnifilarDTO:
         nodo, dispositivos_ids = self._resolver_nodo(planta_id, nodo_id, organizacion_id)
+        relacion_tension_kv = nodo.metadatos_placa.relacion_tension_kv if nodo.metadatos_placa else None
 
         potencia_sumada, energia_sumada = calcular_resumen(
-            dispositivos_ids, self.repo_telemetria, self.consultar_telemetria, granularidad, zona, dias
+            dispositivos_ids,
+            self.repo_telemetria,
+            self.consultar_telemetria,
+            granularidad,
+            zona,
+            dias,
+            relacion_tension_kv,
         )
 
         return ResumenNodoUnifilarDTO(
@@ -65,6 +109,7 @@ class ConsultarNodoUnifilarUseCase:
             factor_desplazamiento_total=potencia_sumada.factor_desplazamiento_total,
             dispositivos_sin_dato=potencia_sumada.dispositivos_sin_dato,
             registrado_en=potencia_sumada.registrado_en,
+            agregado_por_fase=_mapear_agregado_por_fase(potencia_sumada.agregado_por_fase),
             energia_agregada=[
                 EnergiaAgregadaDTO(periodo=e.periodo, energia_activa_neta_kwh=e.energia_activa_neta_kwh)
                 for e in energia_sumada

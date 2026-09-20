@@ -72,6 +72,24 @@ class MetadatosPlacaDTO(BaseModel):
         return data
 
 
+class FaseAgregadaDTO(BaseModel):
+    """Magnitudes eléctricas agregadas para una única fase del nodo."""
+
+    voltage_V: float | None = None
+    current_A: float | None = None
+    net_active_power_W: float | None = None
+    net_reactive_power_VAR: float | None = None
+    net_apparent_power_VA: float | None = None
+    power_factor: float | None = None
+    desbalance_tension_pct: float | None = None
+
+
+class AgregadoPorFaseDTO(BaseModel):
+    fase_r: FaseAgregadaDTO
+    fase_s: FaseAgregadaDTO
+    fase_t: FaseAgregadaDTO
+
+
 class NodoUnifilarDTO(BaseModel):
     id: str
     parent_id: str | None = None
@@ -175,6 +193,7 @@ class ResumenNodoUnifilarDTO(BaseModel):
     dispositivos_sin_dato: list[str] = Field(default_factory=list)
     energia_agregada: list[EnergiaAgregadaDTO] = Field(default_factory=list)
     registrado_en: FechaHoraUTC | None = None
+    agregado_por_fase: AgregadoPorFaseDTO | None = None
 
 
 class PuntoPotenciaNodoUnifilarDTO(BaseModel):
