@@ -64,6 +64,7 @@ class ConsultarNodoUnifilarUseCase:
             potencia_aparente_total_va=potencia_sumada.potencia_aparente_total_va,
             factor_desplazamiento_total=potencia_sumada.factor_desplazamiento_total,
             dispositivos_sin_dato=potencia_sumada.dispositivos_sin_dato,
+            registrado_en=potencia_sumada.registrado_en,
             energia_agregada=[
                 EnergiaAgregadaDTO(periodo=e.periodo, energia_activa_neta_kwh=e.energia_activa_neta_kwh)
                 for e in energia_sumada

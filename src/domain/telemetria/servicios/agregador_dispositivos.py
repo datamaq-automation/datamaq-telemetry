@@ -29,6 +29,7 @@ class PotenciaSumada:
     potencia_reactiva_total_var: float | None = None
     potencia_aparente_total_va: float | None = None
     factor_desplazamiento_total: float | None = None
+    registrado_en: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -81,12 +82,14 @@ class AgregadorDispositivosService:
         hubo_dato = False
         q_completa = True
         sin_dato: list[str] = []
+        timestamps: list[datetime] = []
         for dispositivo_id, lectura in lecturas_por_dispositivo.items():
             if lectura is None or lectura.potencia_activa_total is None:
                 sin_dato.append(dispositivo_id)
                 continue
             total_p += lectura.potencia_activa_total.vatios
             hubo_dato = True
+            timestamps.append(lectura.registrado_en)
             if lectura.potencia_reactiva_total is None:
                 q_completa = False
             else:
@@ -101,6 +104,7 @@ class AgregadorDispositivosService:
             potencia_reactiva_total_var=q,
             potencia_aparente_total_va=s,
             factor_desplazamiento_total=fp,
+            registrado_en=max(timestamps) if timestamps else None,
         )
 
     @staticmethod

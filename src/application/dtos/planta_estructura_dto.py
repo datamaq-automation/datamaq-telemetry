@@ -1,8 +1,8 @@
 """src/application/dtos/planta_estructura_dto.py."""
 
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from src.application.dtos.telemetria_dto import EnergiaAgregadaDTO
 from src.application.dtos.tipos import FechaHoraUTC
@@ -14,6 +14,64 @@ NivelTensionLiteral = Literal["MT", "BT"]
 UMBRAL_MEDIA_TENSION_V = 1000.0
 
 
+class CoordenadasNodoUnifilarDTO(BaseModel):
+    x: float
+    y: float
+    ancho: float | None = None
+    orientacion: Literal["horizontal", "vertical"] | None = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class InterruptorCabeceraDTO(BaseModel):
+    tag: str
+    tipo: str | None = None
+    in_a: float | None = None
+    icu_ka: float | None = None
+    estado: str = "cerrado"
+    model_config = ConfigDict(from_attributes=True, extra="allow")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalizar_aliases(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if "in_A" in data and "in_a" not in data:
+                data["in_a"] = data["in_A"]
+            if "icu_kA" in data and "icu_ka" not in data:
+                data["icu_ka"] = data["icu_kA"]
+        return data
+
+
+class MetadatosPlacaDTO(BaseModel):
+    potencia_nominal_kva: float | None = None
+    relacion_tension_kv: str | None = None
+    vsc_porcentaje: float | None = None
+    grupo_conexion: str | None = None
+    corriente_nominal_a: float | None = None
+    icw_ka: float | None = None
+    frecuencia_hz: float | None = 50.0
+    calibre_in_a: float | None = None
+    cable_seccion: str | None = None
+    longitud_estimada_m: float | None = None
+    tension_nominal_v: float | None = None
+    categoria_tarifaria: str | None = None
+    trafo_asociado_kva: float | None = None
+    corriente_barra_a: float | None = None
+    proteccion_in_a: float | None = None
+    model_config = ConfigDict(from_attributes=True, extra="allow")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalizar_aliases(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if "corriente_nominal_A" in data and "corriente_nominal_a" not in data:
+                data["corriente_nominal_a"] = data["corriente_nominal_A"]
+            if "icw_kA" in data and "icw_ka" not in data:
+                data["icw_ka"] = data["icw_kA"]
+            if "calibre_in_A" in data and "calibre_in_a" not in data:
+                data["calibre_in_a"] = data["calibre_in_A"]
+        return data
+
+
 class NodoUnifilarDTO(BaseModel):
     id: str
     parent_id: str | None = None
@@ -21,6 +79,7 @@ class NodoUnifilarDTO(BaseModel):
     tipo: TipoNodoUnifilarLiteral
     device_id: str | None = None
     es_virtual: bool = False
+    es_pasante: bool = False
     # R-03: nombre de la máquina asociada 1:1 al medidor (`machines.device_id` UNIQUE), si existe.
     nombre_maquina: str | None = None
     tension_nominal_V: float
@@ -34,7 +93,10 @@ class NodoUnifilarDTO(BaseModel):
     orden: int = 0
     fuente_dato: str | None = None
     notas_metrologicas: str | None = None
-    model_config = ConfigDict(from_attributes=True)
+    coordenadas: CoordenadasNodoUnifilarDTO | None = None
+    metadatos_placa: MetadatosPlacaDTO | None = None
+    interruptor_cabecera: InterruptorCabeceraDTO | None = None
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
 class UnifilarPlantaDTO(BaseModel):
@@ -112,6 +174,7 @@ class ResumenNodoUnifilarDTO(BaseModel):
     factor_desplazamiento_total: float | None = None
     dispositivos_sin_dato: list[str] = Field(default_factory=list)
     energia_agregada: list[EnergiaAgregadaDTO] = Field(default_factory=list)
+    registrado_en: FechaHoraUTC | None = None
 
 
 class PuntoPotenciaNodoUnifilarDTO(BaseModel):

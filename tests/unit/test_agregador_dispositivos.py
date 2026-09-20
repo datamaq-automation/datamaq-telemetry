@@ -185,3 +185,42 @@ class TestAgregadorDispositivosService:
         assert punto.dispositivos_sin_dato == []
         # Potencia aparente S = sqrt(800000^2 + 250000^2) ≈ 838152.73 VA
         assert punto.potencia_aparente_total_va == 838152.73
+
+    def test_registrado_en_es_el_timestamp_mas_reciente_entre_dispositivos_con_dato(self):
+        ts_antiguo = datetime(2026, 9, 1, 10, 0, 0, tzinfo=timezone.utc)
+        ts_reciente = datetime(2026, 9, 1, 10, 5, 0, tzinfo=timezone.utc)
+        lecturas: dict[str, LecturaInstantanea | None] = {
+            "dev-01": LecturaInstantanea(
+                id=None,
+                dispositivo_id="dev-01",
+                registrado_en=ts_antiguo,
+                fase_r=MedicionFase(),
+                fase_s=MedicionFase(),
+                fase_t=MedicionFase(),
+                potencia_activa_total=PotenciaActiva(1000.0),
+                potencia_reactiva_total=None,
+            ),
+            "dev-02": LecturaInstantanea(
+                id=None,
+                dispositivo_id="dev-02",
+                registrado_en=ts_reciente,
+                fase_r=MedicionFase(),
+                fase_s=MedicionFase(),
+                fase_t=MedicionFase(),
+                potencia_activa_total=PotenciaActiva(500.0),
+                potencia_reactiva_total=None,
+            ),
+        }
+        resultado = AgregadorDispositivosService.sumar_ultimas_lecturas(lecturas)
+
+        assert resultado.registrado_en == ts_reciente
+
+    def test_registrado_en_es_none_cuando_todos_los_dispositivos_sin_dato(self):
+        lecturas: dict[str, LecturaInstantanea | None] = {
+            "dev-01": None,
+            "dev-02": None,
+        }
+        resultado = AgregadorDispositivosService.sumar_ultimas_lecturas(lecturas)
+
+        assert resultado.registrado_en is None
+        assert resultado.potencia_activa_total_w is None
