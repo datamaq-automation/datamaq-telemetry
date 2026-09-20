@@ -226,6 +226,50 @@ class AgregadorDispositivosService:
             )
         return resultado
 
+    @staticmethod
+    def sumar_fases(
+        lecturas_por_dispositivo: dict[str, "LecturaInstantanea | None"],
+        relacion_transformacion: float = 1.0,
+    ) -> "AgregadoPorFase | None":
+        """Agrega magnitudes eléctricas por fase (R, S, T) de múltiples dispositivos.
+
+        Para nodos BT usar ``relacion_transformacion=1.0`` (default).
+        Para nodos MT pasar ``a = V_primario_kV / V_secundario_kV`` obtenido de
+        ``MetadatosPlaca.relacion_tension_kv`` (ej: "15/0.4" → 37.5).
+
+        Bajo la hipótesis de transformador ideal:
+        - V_fase_MT = V_fase_BT x a
+        - I_fase_MT = I_fase_BT / a
+        - P, Q, S, FP: invariantes (conservación de energía).
+        """
+        sum_v, cnt_v, sum_i, sum_p, sum_q, q_completa, hubo_dato = _acumular_lecturas_fase(lecturas_por_dispositivo)
+        if not hubo_dato:
+            return None
+
+        v_prom = {
+            k: round((sum_v[k] / cnt_v[k]) * relacion_transformacion, 1) if cnt_v[k] > 0 else None
+            for k in ("r", "s", "t")
+        }
+        i_sum = {k: round(sum_i[k] / relacion_transformacion, 2) if sum_i[k] > 0 else None for k in ("r", "s", "t")}
+        desbalance = _calcular_desbalance_tension(v_prom)
+
+        def _fase(k: str) -> FaseAgregada:
+            p = round(sum_p[k], 2) if sum_p[k] != 0.0 else None
+            q_val = sum_q[k]
+            q = round(q_val, 2) if q_completa[k] and q_val is not None else None
+            s, fp = _recomponer_s_y_cos_fi(p, q)
+            return FaseAgregada(
+                voltage_V=v_prom[k],
+                current_A=i_sum[k],
+                net_active_power_W=p,
+                net_reactive_power_VAR=q,
+                net_apparent_power_VA=s,
+                power_factor=fp,
+                desbalance_tension_pct=desbalance,
+            )
+
+        return AgregadoPorFase(fase_r=_fase("r"), fase_s=_fase("s"), fase_t=_fase("t"))
+
 
 def _calcular_desbalance_tension(v_prom: dict[str, float | None]) -> float | None:
     tensiones_disponibles = [v for v in v_prom.values() if v is not None]
@@ -287,47 +331,3 @@ def _acumular_lecturas_fase(
             _acumular_medicion_fase(getter(lectura), clave, sum_v, cnt_v, sum_i, sum_p, sum_q, q_completa)
 
     return sum_v, cnt_v, sum_i, sum_p, sum_q, q_completa, hubo_dato
-
-    @staticmethod
-    def sumar_fases(
-        lecturas_por_dispositivo: dict[str, "LecturaInstantanea | None"],
-        relacion_transformacion: float = 1.0,
-    ) -> "AgregadoPorFase | None":
-        """Agrega magnitudes eléctricas por fase (R, S, T) de múltiples dispositivos.
-
-        Para nodos BT usar ``relacion_transformacion=1.0`` (default).
-        Para nodos MT pasar ``a = V_primario_kV / V_secundario_kV`` obtenido de
-        ``MetadatosPlaca.relacion_tension_kv`` (ej: "15/0.4" → 37.5).
-
-        Bajo la hipótesis de transformador ideal:
-        - V_fase_MT = V_fase_BT x a
-        - I_fase_MT = I_fase_BT / a
-        - P, Q, S, FP: invariantes (conservación de energía).
-        """
-        sum_v, cnt_v, sum_i, sum_p, sum_q, q_completa, hubo_dato = _acumular_lecturas_fase(lecturas_por_dispositivo)
-        if not hubo_dato:
-            return None
-
-        v_prom = {
-            k: round((sum_v[k] / cnt_v[k]) * relacion_transformacion, 1) if cnt_v[k] > 0 else None
-            for k in ("r", "s", "t")
-        }
-        i_sum = {k: round(sum_i[k] / relacion_transformacion, 2) if sum_i[k] > 0 else None for k in ("r", "s", "t")}
-        desbalance = _calcular_desbalance_tension(v_prom)
-
-        def _fase(k: str) -> FaseAgregada:
-            p = round(sum_p[k], 2) if sum_p[k] != 0.0 else None
-            q_val = sum_q[k]
-            q = round(q_val, 2) if q_completa[k] and q_val is not None else None
-            s, fp = _recomponer_s_y_cos_fi(p, q)
-            return FaseAgregada(
-                voltage_V=v_prom[k],
-                current_A=i_sum[k],
-                net_active_power_W=p,
-                net_reactive_power_VAR=q,
-                net_apparent_power_VA=s,
-                power_factor=fp,
-                desbalance_tension_pct=desbalance,
-            )
-
-        return AgregadoPorFase(fase_r=_fase("r"), fase_s=_fase("s"), fase_t=_fase("t"))
