@@ -22,10 +22,11 @@ router = APIRouter(prefix="/api/v1/analitica", tags=["Analítica SSOT de Planta"
     "/banco-capacitores/planta",
     response_model=AnaliticaBancoCapacitoresPlantaDTO,
     status_code=status.HTTP_200_OK,
-    summary="Obtener analítica SSOT de banco de capacitores sugerido a 7 días",
+    summary="Obtener analítica SSOT de banco de capacitores (histórico real 30 días)",
 )
 def obtener_banco_capacitores_planta(
     planta_id: str = Query(..., description="ID de la planta industrial"),
+    periodo_dias: int = Query(default=30, description="Ventana de análisis en días (rango 7-60, ISO 50001: mínimo 30)"),
     user_claims: Annotated[dict[str, Any] | None, Depends(get_usuario_actual)] = None,
     use_case: Annotated[
         ConsultarAnaliticaPlantaUseCase | None, Depends(get_consultar_analitica_planta_use_case)
@@ -35,7 +36,7 @@ def obtener_banco_capacitores_planta(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Use case no inyectado")
 
     try:
-        return use_case.obtener_banco_capacitores(planta_id=planta_id)
+        return use_case.obtener_banco_capacitores(planta_id=planta_id, periodo_dias=periodo_dias)
     except Exception as err:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

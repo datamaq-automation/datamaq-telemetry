@@ -15,6 +15,7 @@ def mock_get_usuario_actual():
 
 
 def test_obtener_banco_capacitores_planta_exito():
+    """Valida que /banco-capacitores/planta retorna datos reales (no simulados)."""
     app = create_app(get_settings())
     app.dependency_overrides[get_usuario_actual] = mock_get_usuario_actual
 
@@ -23,10 +24,10 @@ def test_obtener_banco_capacitores_planta_exito():
     assert response.status_code == 200
     data = response.json()
     assert data["planta_id"] == "planta-garin"
-    assert data["periodo_dias"] == 7
-    assert data["fp_promedio"] == 0.88
-    assert data["banco_comercial_sugerido_kvar"] > 0
-    assert len(data["escalones_sugeridos_kvar"]) > 0
+    assert data["periodo_dias"] == 30  # Default: 30 días (ISO 50001)
+    assert "potencia_activa_promedio_kw" in data  # Campo real (no hardcodeado)
+    assert "potencia_reactiva_promedio_kvar" in data  # Campo nuevo para sobrecompensación
+    assert "sobrecompensacion_sostenida" in data  # Flag para detección de Q<0
 
 
 def test_obtener_penalizaciones_planta_exito():

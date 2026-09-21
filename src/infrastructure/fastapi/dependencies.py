@@ -219,12 +219,16 @@ def get_procesar_pregunta_asistente_use_case(
     )
 
 
-def get_consultar_analitica_planta_use_case() -> Any:
+def get_consultar_analitica_planta_use_case(
+    db: Annotated[Session, Depends(get_db_session)],
+) -> Any:
     from src.application.use_cases.consultar_analitica_planta import (
         ConsultarAnaliticaPlantaUseCase,
     )
 
-    return ConsultarAnaliticaPlantaUseCase()
+    # Reutilizar la misma sesión de telemetría
+    consultar_telemetria = get_telemetria_use_case(db)
+    return ConsultarAnaliticaPlantaUseCase(consultar_telemetria=consultar_telemetria)
 
 
 def get_procesar_chat_copilot_use_case() -> Any:
