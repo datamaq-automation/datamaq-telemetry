@@ -49,17 +49,24 @@ class DimensionadorCompensacionService:
         potencia_activa_kw: float | None,
         fp_actual: float | None,
         fp_objetivo: float = 0.96,
+        q_reactiva_kvar: float | None = None,
     ) -> float | None:
         """Calcula la potencia reactiva capacitiva requerida Qc (kVAr) para elevar el FP al objetivo.
 
         Fórmula:
             Qc = P_activa * (tan(arccos(FP_actual)) - tan(arccos(FP_objetivo)))
             donde tan(arccos(fp)) = sqrt(1 - fp^2) / fp
+
+        Si q_reactiva_kvar es pasado y es <= 0 (capacitivo/sobrecompensado), retorna 0.0
+        indicando que no se requiere compensación adicional.
         """
         if potencia_activa_kw is None or fp_actual is None:
             return None
         if potencia_activa_kw <= 0.0 or fp_actual <= 0.0 or fp_actual > 1.0 or fp_objetivo <= 0.0 or fp_objetivo > 1.0:
             return None
+
+        if q_reactiva_kvar is not None and q_reactiva_kvar <= 0.0:
+            return 0.0
 
         # Si el factor de potencia actual ya alcanza o supera el objetivo, no se requiere compensación
         if fp_actual >= fp_objetivo:

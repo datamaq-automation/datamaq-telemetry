@@ -196,6 +196,7 @@ class CompensacionHistoricaDTO(BaseModel):
     potencia_reactiva_min_kvar: float | None = None
     factor_potencia_promedio: float | None = None
     banco_recomendado: BancoRecomendadoDTO | None = None
+    sobrecompensacion_sostenida: bool = False
 
 
 class ResumenNodoUnifilarDTO(BaseModel):

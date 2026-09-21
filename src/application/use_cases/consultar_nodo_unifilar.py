@@ -13,6 +13,7 @@ from src.application.dtos.planta_estructura_dto import (
 from src.application.dtos.telemetria_dto import EnergiaAgregadaDTO
 from src.application.use_cases.agregacion_dispositivos import calcular_historico, calcular_resumen
 from src.application.use_cases.consultar_telemetria import ConsultarTelemetriaUseCase
+from src.domain.telemetria.analizador_reactiva import DimensionadorCompensacionService
 from src.domain.telemetria.entities import NodoUnifilar, Planta
 from src.domain.telemetria.exceptions import PlantaNoEncontradaError
 from src.domain.telemetria.ports import RepositorioOrganizacionesPort, RepositorioTelemetriaPort
@@ -101,6 +102,7 @@ class ConsultarNodoUnifilarUseCase:
             p.potencia_reactiva_total_var / 1000.0 for p in puntos if p.potencia_reactiva_total_var is not None
         ]
         fp_vals = [p.factor_desplazamiento_total for p in puntos if p.factor_desplazamiento_total is not None]
+        p_kw_vals = [p.potencia_activa_total_w / 1000.0 for p in puntos if p.potencia_activa_total_w is not None]
 
         if not q_kvar_vals:
             return CompensacionHistoricaDTO(
@@ -111,24 +113,34 @@ class ConsultarNodoUnifilarUseCase:
                 potencia_reactiva_min_kvar=None,
                 factor_potencia_promedio=None,
                 banco_recomendado=None,
+                sobrecompensacion_sostenida=False,
             )
 
         q_prom = sum(q_kvar_vals) / len(q_kvar_vals)
         q_max = max(q_kvar_vals)
         q_min = min(q_kvar_vals)
         fp_prom = (sum(fp_vals) / len(fp_vals)) if fp_vals else None
+        p_prom_kw = (sum(p_kw_vals) / len(p_kw_vals)) if p_kw_vals else None
+
+        sobrecompensacion_sostenida = q_max <= 0.0
 
         banco: BancoRecomendadoDTO | None = None
-        if q_prom > 0:
-            qc_sugerida = round(q_prom * 0.5, 2)
-            if qc_sugerida > 0:
-                tension_v = nodo.tension_nominal_v if nodo.tension_nominal_v >= 1000.0 else 13200.0
-                banco = BancoRecomendadoDTO(
-                    tipo="banco",
-                    potencia_kvar=qc_sugerida,
-                    tension_instalacion_v=tension_v,
-                    justificacion=f"Proporciona compensación estable para Q_prom={q_prom:.2f} kVAR con margen de seguridad",
-                )
+        if p_prom_kw is not None and fp_prom is not None:
+            qc_calc = DimensionadorCompensacionService.calcular_potencia_compensacion(
+                potencia_activa_kw=p_prom_kw,
+                fp_actual=fp_prom,
+                q_reactiva_kvar=q_prom,
+            )
+            if qc_calc is not None and qc_calc > 0.0:
+                qc_sugerida = DimensionadorCompensacionService.sugerir_banco_comercial(qc_calc)
+                if qc_sugerida is not None:
+                    tension_v = nodo.tension_nominal_v if nodo.tension_nominal_v >= 1000.0 else 13200.0
+                    banco = BancoRecomendadoDTO(
+                        tipo="banco",
+                        potencia_kvar=qc_sugerida,
+                        tension_instalacion_v=tension_v,
+                        justificacion=f"Compensación recomendada: Q_prom={q_prom:.2f} kVAr, FP_prom={fp_prom:.3f}",
+                    )
 
         return CompensacionHistoricaDTO(
             periodo_dias=periodo_dias,
@@ -138,6 +150,7 @@ class ConsultarNodoUnifilarUseCase:
             potencia_reactiva_min_kvar=round(q_min, 2),
             factor_potencia_promedio=round(fp_prom, 3) if fp_prom is not None else None,
             banco_recomendado=banco,
+            sobrecompensacion_sostenida=sobrecompensacion_sostenida,
         )
 
     def resumen(

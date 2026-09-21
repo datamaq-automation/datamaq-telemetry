@@ -17,6 +17,14 @@ from src.domain.telemetria.value_objects import (
 )
 
 
+def _obtener_q_reactiva(lectura: LecturaInstantanea) -> float | None:
+    """Extrae Q de lectura, con fallback a suma de fases."""
+    if lectura.potencia_reactiva_total is not None:
+        return lectura.potencia_reactiva_total.var
+    q_vals = [f.potencia_reactiva.var for f in (lectura.fase_r, lectura.fase_s, lectura.fase_t) if f.potencia_reactiva]
+    return sum(q_vals) if q_vals else None
+
+
 class AnalizadorMetrologicoService:
     """Servicio de dominio puro para validar balances y analítica metrológica de red."""
 
@@ -200,7 +208,9 @@ class AnalizadorMetrologicoService:
         return None
 
     @classmethod
-    def _obtener_potencia_y_fp(cls, lectura: LecturaInstantanea) -> tuple[float | None, float | None, float | None]:
+    def _obtener_potencia_y_fp(
+        cls, lectura: LecturaInstantanea
+    ) -> tuple[float | None, float | None, float | None, float | None]:
         p_activa_w: float | None = None
         if lectura.potencia_activa_total is not None:
             p_activa_w = lectura.potencia_activa_total.vatios
@@ -221,7 +231,9 @@ class AnalizadorMetrologicoService:
             ]
             fp_val = (sum(fp_vals) / len(fp_vals)) if fp_vals else None
 
-        return p_activa_w, p_activa_kw, fp_val
+        q_var = _obtener_q_reactiva(lectura)
+
+        return p_activa_w, p_activa_kw, fp_val, q_var
 
     @classmethod
     def _evaluar_compensacion_reactiva(
@@ -231,13 +243,15 @@ class AnalizadorMetrologicoService:
         fp_val: float | None,
         fp_objetivo: float,
         potencia_minima_w: float,
+        q_val: float | None = None,
     ) -> tuple[bool, float | None, float | None, float | None, float | None]:
         supera_minimo = p_activa_w is not None and p_activa_w >= potencia_minima_w
         if not (supera_minimo and p_activa_kw is not None and fp_val is not None and fp_val > 0.0):
             return False, None, None, None, 0.0
 
+        q_kvar = (q_val / 1000.0) if q_val is not None else None
         qc_calc = DimensionadorCompensacionService.calcular_potencia_compensacion(
-            p_activa_kw, fp_val, fp_objetivo=fp_objetivo
+            p_activa_kw, fp_val, fp_objetivo=fp_objetivo, q_reactiva_kvar=q_kvar
         )
         if qc_calc is not None and qc_calc > 0.0:
             requiere_comp = True
@@ -264,7 +278,7 @@ class AnalizadorMetrologicoService:
         diagnostico_instalacion: object | None = None,
     ) -> AnaliticaCalidadEnergia:
         """Calcula el bloque analítico completo de calidad de energía y compensación de reactiva."""
-        p_activa_w, p_activa_kw, fp_val = cls._obtener_potencia_y_fp(lectura)
+        p_activa_w, p_activa_kw, fp_val, q_var = cls._obtener_potencia_y_fp(lectura)
         motivo_abstencion = cls._evaluar_abstencion_enre(dispositivo)
 
         diag = diagnostico_instalacion or getattr(lectura, "diagnostico_instalacion", None)
@@ -284,7 +298,7 @@ class AnalizadorMetrologicoService:
             requiere_comp, qc_kvar, banco_sug, penalizacion_ars, recargo_pct = False, None, None, None, 0.0
         else:
             requiere_comp, qc_kvar, banco_sug, penalizacion_ars, recargo_pct = cls._evaluar_compensacion_reactiva(
-                p_activa_w, p_activa_kw, fp_val, fp_objetivo, potencia_minima_w
+                p_activa_w, p_activa_kw, fp_val, fp_objetivo, potencia_minima_w, q_var
             )
 
         vr = lectura.fase_r.tension.voltios if lectura.fase_r.tension else None

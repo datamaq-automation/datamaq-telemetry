@@ -115,3 +115,13 @@ def test_compensacion_historica_incluida_en_nodo_mt_o_total_planta(use_case):
 def test_compensacion_historica_es_none_en_nodo_bt_individual(use_case):
     resumen_trafo = use_case.resumen(PLANTA_ID, "trafo-1", organizacion_id=ORG_ID)
     assert resumen_trafo.compensacion_historica is None
+
+
+def test_nodo_agregado_potencia_activa_unidades_w(use_case):
+    use_case.repo_telemetria.obtener_ultima_instantanea.side_effect = lambda dev_id: {
+        DEV_1: _lectura(DEV_1, 1120.0),
+        DEV_2: _lectura(DEV_2, 8030.0),
+    }.get(dev_id)
+
+    resumen = use_case.resumen(PLANTA_ID, "mt", organizacion_id=ORG_ID)
+    assert resumen.potencia_activa_total_w == 9150.0

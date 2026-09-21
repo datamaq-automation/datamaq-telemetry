@@ -745,6 +745,24 @@ def test_dimensionador_calculo_potencia_compensacion():
     assert DimensionadorCompensacionService.calcular_potencia_compensacion(100.0, 1.2) is None
 
 
+def test_dimensionador_calculo_potencia_compensacion_con_q_reactiva_capacitiva():
+    """Si Q es capacitivo (<=0), no se recomienda más compensación."""
+    # Q capacitivo: no recomendar banco aunque FP sea bajo
+    assert DimensionadorCompensacionService.calcular_potencia_compensacion(100.0, 0.80, q_reactiva_kvar=-40.0) == 0.0
+    assert DimensionadorCompensacionService.calcular_potencia_compensacion(100.0, 0.85, q_reactiva_kvar=-50.0) == 0.0
+
+    # Q=0 (límite): también retorna 0.0
+    assert DimensionadorCompensacionService.calcular_potencia_compensacion(100.0, 0.80, q_reactiva_kvar=0.0) == 0.0
+
+    # Q inductivo (>0): comportamiento sin cambios, sigue calculando Qc
+    qc_inductivo = DimensionadorCompensacionService.calcular_potencia_compensacion(100.0, 0.80, q_reactiva_kvar=40.0)
+    assert qc_inductivo == 45.83
+
+    # Sin pasar Q: comportamiento sin cambios (compatibilidad hacia atrás)
+    qc_sin_q = DimensionadorCompensacionService.calcular_potencia_compensacion(100.0, 0.80)
+    assert qc_sin_q == 45.83
+
+
 def test_dimensionador_sugerencia_banco_comercial():
     # Qc = 45.83 -> Banco sugerido comercial más cercano = 50.0 kVAr
     assert DimensionadorCompensacionService.sugerir_banco_comercial(45.83) == 50.0

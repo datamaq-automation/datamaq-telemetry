@@ -18,16 +18,29 @@ from src.domain.telemetria.servicios.agregador_dispositivos import (
 
 
 def _parsear_relacion_transformacion(relacion_tension_kv: str | None) -> float:
-    """Parsea "15/0.4" → 37.5. Retorna 1.0 si no se puede parsear (nodo BT)."""
+    """Parsea "15/0.4" → 37.5, tolera "13.2 kV / 0.4 kV" → 33.0.
+    Retorna 1.0 si no se puede parsear (nodo BT)."""
+    import re
+
     if not relacion_tension_kv:
         return 1.0
     try:
         partes = relacion_tension_kv.split("/")
         if len(partes) != 2:
             return 1.0
-        primario, secundario = float(partes[0]), float(partes[1])
+
+        primario_str = partes[0].strip()
+        secundario_str = partes[1].strip()
+
+        match_prim = re.match(r"[\d.]+", primario_str)
+        match_sec = re.match(r"[\d.]+", secundario_str)
+        if not match_prim or not match_sec:
+            return 1.0
+
+        primario = float(match_prim.group())
+        secundario = float(match_sec.group())
         return primario / secundario if secundario > 0 else 1.0
-    except ValueError:
+    except (ValueError, AttributeError):
         return 1.0
 
 
