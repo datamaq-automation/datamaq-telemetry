@@ -1,7 +1,9 @@
 # Spec: Dimensionador de Bancos de Capacitores — Período Histórico 30 Días
 
 **Bloque Backend (`datamaq-telemetry`)**  
-**Origen:** [`../specs/dimensionador-30d.md`](../specs/dimensionador-30d.md)
+**Origen:** [`../specs/dimensionador-30d.md`](../specs/dimensionador-30d.md)  
+**Estado:** Secciones 2–3 implementadas (commits cfac816, a94a33f). Secciones 4–5 (tests completos, documentación) pendientes.  
+**Traspasada a hija:** sí (sesión actual implementó lo esencial) · **Bloque cerrado:** no
 
 ---
 
