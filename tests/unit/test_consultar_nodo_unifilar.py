@@ -109,7 +109,7 @@ def test_historico_consulta_los_medidores_frontera(use_case):
 def test_compensacion_historica_incluida_en_nodo_mt_o_total_planta(use_case):
     resumen_mt = use_case.resumen(PLANTA_ID, "mt", organizacion_id=ORG_ID)
     assert resumen_mt.compensacion_historica is not None
-    assert resumen_mt.compensacion_historica.periodo_dias == 7
+    assert resumen_mt.compensacion_historica.periodo_dias == 30  # Default: 30 días (ISO 50001)
 
 
 def test_compensacion_historica_es_none_en_nodo_bt_individual(use_case):

@@ -175,7 +175,11 @@ class ConsultarNodoUnifilarUseCase:
             relacion_tension_kv,
         )
 
-        compensacion_hist = self._calcular_compensacion_historica(nodo, dispositivos_ids, periodo_dias=7)
+        # Usar dias del parámetro si se proporciona, sino default de 30 (ISO 50001)
+        periodo_dias_compensacion = dias if dias is not None else 30
+        compensacion_hist = self._calcular_compensacion_historica(
+            nodo, dispositivos_ids, periodo_dias=periodo_dias_compensacion
+        )
 
         return ResumenNodoUnifilarDTO(
             planta_id=planta_id,
