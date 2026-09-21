@@ -51,6 +51,7 @@ class ConsultarAnaliticaPlantaUseCase:
         self, planta_id: str, dispositivos_ids: list[str] | None = None, periodo_dias: int = 30
     ) -> AnaliticaBancoCapacitoresPlantaDTO:
         """Calcula recomendación de banco de capacitores basado en histórico real."""
+        periodo_dias_orig = periodo_dias
         periodo_dias = max(7, min(60, periodo_dias))  # Validar rango [7, 60]
         dispositivos_ids = dispositivos_ids or []  # Usar lista vacía si None
 
@@ -76,6 +77,8 @@ class ConsultarAnaliticaPlantaUseCase:
                 banco_comercial_sugerido_kvar=None,
                 escalones_sugeridos_kvar=[],
                 sobrecompensacion_sostenida=False,
+                razon_no_recomendacion=None,
+                pendiente_30_dias=(periodo_dias_orig < 30),
                 fecha_calculo=datetime.now(timezone.utc),
             )
 
@@ -86,6 +89,13 @@ class ConsultarAnaliticaPlantaUseCase:
         fp_objetivo = 0.96
 
         qc_calc, banco_sugerido, escalones = self._calcular_banco_sugerido(p_prom, fp_prom, q_prom, fp_objetivo)
+
+        # Validar FP > 0.95: sin penalización ENRE, no hay justificación para compensación.
+        razon_no_recomendacion = None
+        if fp_prom is not None and fp_prom > 0.95:
+            banco_sugerido = None
+            escalones = []
+            razon_no_recomendacion = "Factor de potencia superior a 0.95 (sin penalización ENRE)"
 
         return AnaliticaBancoCapacitoresPlantaDTO(
             planta_id=planta_id,
@@ -99,6 +109,8 @@ class ConsultarAnaliticaPlantaUseCase:
             banco_comercial_sugerido_kvar=round(banco_sugerido, 2) if banco_sugerido else None,
             escalones_sugeridos_kvar=escalones,
             sobrecompensacion_sostenida=q_max <= 0.0,
+            razon_no_recomendacion=razon_no_recomendacion,
+            pendiente_30_dias=(periodo_dias_orig < 30),
             fecha_calculo=datetime.now(timezone.utc),
         )
 

@@ -1,6 +1,11 @@
 # tests/unit/test_analitica_planta.py
+from datetime import datetime, timezone
+from unittest.mock import MagicMock, patch
+
 from fastapi.testclient import TestClient
 
+from src.application.use_cases.consultar_analitica_planta import ConsultarAnaliticaPlantaUseCase
+from src.domain.telemetria.servicios.agregador_dispositivos import PuntoPotencia
 from src.infrastructure.fastapi.dependencies import get_usuario_actual
 from src.infrastructure.fastapi.server import create_app
 from src.infrastructure.settings.config import get_settings
@@ -43,3 +48,55 @@ def test_obtener_penalizaciones_planta_exito():
     assert data["horas_bajo_fp"] == 14.5
     assert data["penalizacion_estimada_ars"] > 0
     assert data["moneda"] == "ARS"
+
+
+def _crear_punto_potencia_fake(
+    fp: float = 0.996, potencia_w: float = 258600.0, q_var: float = 24000.0
+) -> PuntoPotencia:
+    """Crea punto de potencia ficticio con FP y reactiva controlables."""
+    return PuntoPotencia(
+        momento=datetime(2026, 9, 21, 12, 0, tzinfo=timezone.utc),
+        potencia_activa_total_w=potencia_w,
+        potencia_reactiva_total_var=q_var,
+        potencia_aparente_total_va=(potencia_w**2 + q_var**2) ** 0.5,
+        factor_desplazamiento_total=fp,
+        dispositivos_sin_dato=[],
+    )
+
+
+def test_dimensionador_fp_alto_sin_recomendacion():
+    """Valida que con FP > 0.95, NO se recomienda banco, aunque Q > 0."""
+    mock_consultar = MagicMock()
+
+    # Simular histórico con FP=0.996 (excelente) y Q>0 (inductiva)
+    puntos = [_crear_punto_potencia_fake(fp=0.996, potencia_w=258600.0, q_var=24000.0) for _ in range(10)]
+
+    with patch("src.application.use_cases.consultar_analitica_planta.calcular_historico", return_value=puntos):
+        use_case = ConsultarAnaliticaPlantaUseCase(consultar_telemetria=mock_consultar)
+        resultado = use_case.obtener_banco_capacitores(planta_id="planta-upp", periodo_dias=30)
+
+    # Validaciones: FP alto → sin recomendación
+    assert resultado.fp_promedio == 0.996
+    assert resultado.potencia_reactiva_promedio_kvar > 0  # Q positiva (inductiva)
+    assert resultado.banco_comercial_sugerido_kvar is None  # No se recomienda
+    assert resultado.escalones_sugeridos_kvar == []
+    assert resultado.razon_no_recomendacion is not None
+    assert "0.95" in resultado.razon_no_recomendacion  # Menciona el umbral
+    assert resultado.sobrecompensacion_sostenida is False  # Q>0, así que no está sobrecompensada
+
+
+def test_dimensionador_fp_bajo_con_recomendacion():
+    """Valida que con FP < 0.95 y Q > 0, SÍ se recomienda banco."""
+    mock_consultar = MagicMock()
+
+    # Simular histórico con FP=0.88 (bajo) y Q>0 (inductiva)
+    puntos = [_crear_punto_potencia_fake(fp=0.88, potencia_w=120000.0, q_var=100000.0) for _ in range(10)]
+
+    with patch("src.application.use_cases.consultar_analitica_planta.calcular_historico", return_value=puntos):
+        use_case = ConsultarAnaliticaPlantaUseCase(consultar_telemetria=mock_consultar)
+        resultado = use_case.obtener_banco_capacitores(planta_id="planta-test", periodo_dias=30)
+
+    # Validaciones: FP bajo → sí se recomienda
+    assert resultado.fp_promedio == 0.88
+    assert resultado.banco_comercial_sugerido_kvar is not None  # Se recomienda
+    assert resultado.razon_no_recomendacion is None  # Sin restricciones

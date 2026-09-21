@@ -28,6 +28,13 @@ class AnaliticaBancoCapacitoresPlantaDTO(BaseModel):
     sobrecompensacion_sostenida: bool = Field(
         default=False, description="True si Q_max <= 0 (planta en régimen capacitivo durante todo el período)"
     )
+    razon_no_recomendacion: str | None = Field(
+        default=None,
+        description="Razón por la que no se recomienda banco (ej. 'FP superior a 0.95', 'Período insuficiente')",
+    )
+    pendiente_30_dias: bool = Field(
+        default=False, description="True si período < 30 días (en evaluación, falta histórico)"
+    )
     fecha_calculo: datetime = Field(..., description="Fecha y hora ISO del cálculo")
 
 
