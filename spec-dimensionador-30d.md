@@ -125,22 +125,22 @@ def test_obtener_banco_capacitores_consulta_real():
     # Action: obtener_banco_capacitores(planta_id, periodo_dias=30)
     # Assert: potencia_activa_promedio_kw ≈ 100, no 120 (hardcodeado anterior)
 
-def test_obtener_banco_capacitores_sobrecompensado():
-    """Si Q_max <= 0, retorna sobrecompensacion_sostenida=True, banco_sugerido=None."""
-    # Setup: planta con Q siempre negativo (Q_max=-10)
-    # Assert: sobrecompensacion_sostenida=True, banco_sugerido=None
+    def test_obtener_banco_capacitores_sobrecompensado():
+        """Si Q_max <= 0, retorna sobrecompensacion_sostenida=True, banco_sugerido=None."""
+        # Setup: planta con Q siempre negativo (Q_max=-10)
+        # Assert: sobrecompensacion_sostenida=True, banco_sugerido=None
 
-def test_obtener_banco_capacitores_periodo_dias_variable():
-    """periodo_dias parámetro se respeta en la consulta."""
-    # Setup: planta con histórico de 60 días
-    # Action: obtener_banco_capacitores(planta_id, periodo_dias=7) vs periodo_dias=30
-    # Assert: P, Q, FP difieran según la ventana (7 días vs 30 días)
+    def test_obtener_banco_capacitores_periodo_dias_variable():
+        """periodo_dias parámetro se respeta en la consulta."""
+        # Setup: planta con histórico de 60 días
+        # Action: obtener_banco_capacitores(planta_id, periodo_dias=7) vs periodo_dias=30
+        # Assert: P, Q, FP difieran según la ventana (7 días vs 30 días)
 
-def test_obtener_banco_capacitores_sin_datos():
-    """Si sin histórico, retorna DTOs con Nones."""
-    # Setup: planta sin puntos de telemetría en período
-    # Action: obtener_banco_capacitores(planta_id, periodo_dias=30)
-    # Assert: potencia_activa_promedio_kw=None, banco_sugerido=None
+    def test_obtener_banco_capacitores_sin_datos():
+        """Si sin histórico, retorna DTOs con Nones."""
+        # Setup: planta sin puntos de telemetría en período
+        # Action: obtener_banco_capacitores(planta_id, periodo_dias=30)
+        # Assert: potencia_activa_promedio_kw=None, banco_sugerido=None
 ```
 
 ### Integración (`test_consultar_analitica_planta.py`)
@@ -151,6 +151,7 @@ def test_endpoint_banco_capacitores_planta_retorna_reales():
     # Setup: POST telemetría fixture para planta de test
     # Action: GET /banco-capacitores/planta?planta_id=test-planta&periodo_dias=30
     # Assert: response.potencia_activa_promedio_kw no es 120 (hardcodeado anterior)
+
 
 def test_endpoint_nodo_unifilar_expone_periodo_dias():
     """GET /nodo/unifilar/{nodo_id}?periodo_dias=30 acepta query param."""
