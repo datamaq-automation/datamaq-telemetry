@@ -219,6 +219,49 @@ def test_resumen_nodo_mt_con_placa_coherente_usa_la_relacion_de_placa(use_case):
     assert resumen.agregado_por_fase.fase_r.voltage_V == round(220.0 * 33.0, 1)
 
 
+def test_resumen_nodo_mt_expone_compuestas_y_las_marca_como_canonicas(use_case):
+    """En MT la red es de 3 conductores y el primario va en triángulo (Dyn11): la
+    magnitud accesible es la compuesta, no la fase-neutro. El resumen debe exponer
+    V_RS/V_ST/V_TR a la escala del nodo y decir que son ésas las que se muestran."""
+    acometida = _nodo("mt", TipoNodoUnifilar.ACOMETIDA)
+    acometida.tension_nominal_v = 13200.0
+    use_case.repo_organizaciones.obtener_nodos_unifilar.return_value = [
+        acometida,
+        _nodo("tgbt-1", TipoNodoUnifilar.TGBT, parent_id="mt", device_id=DEV_1),
+    ]
+    use_case.repo_telemetria.obtener_ultima_instantanea.side_effect = lambda dev_id: _lectura_con_fases(dev_id, 224.8)
+
+    resumen = use_case.resumen(PLANTA_ID, "mt", organizacion_id=ORG_ID)
+
+    assert resumen.magnitud_tension_canonica == "LINEA"
+    assert resumen.agregado_por_fase is not None
+    # 224.8 V de fase en BT → x34.74 → 7808.8 V de fase en MT → x√3 → ~13.5 kV compuestos,
+    # o sea la nominal de 13.2 kV con la misma desviación que traía la medición.
+    nominal_ll = resumen.tension_nominal_V or 0.0
+    for compuesta in (
+        resumen.agregado_por_fase.tension_linea_rs_V,
+        resumen.agregado_por_fase.tension_linea_st_V,
+        resumen.agregado_por_fase.tension_linea_tr_V,
+    ):
+        assert compuesta is not None
+        assert abs(compuesta - nominal_ll) / nominal_ll <= 0.10
+
+
+def test_resumen_nodo_bt_marca_la_fase_neutro_como_canonica(use_case):
+    """En BT la distribución es estrella con neutro: la fase-neutro sí se mide en
+    bornes, así que sigue siendo la magnitud a mostrar (las compuestas van igual)."""
+    nodo_bt = _nodo("tgbt", TipoNodoUnifilar.TGBT, device_id=DEV_1)
+    use_case.repo_organizaciones.obtener_nodos_unifilar.return_value = [nodo_bt]
+    use_case.repo_telemetria.obtener_ultima_instantanea.side_effect = lambda dev_id: _lectura_con_fases(dev_id, 219.4)
+
+    resumen = use_case.resumen(PLANTA_ID, "tgbt", organizacion_id=ORG_ID)
+
+    assert resumen.magnitud_tension_canonica == "FASE"
+    assert resumen.agregado_por_fase is not None
+    assert resumen.agregado_por_fase.fase_r.voltage_V == 219.4
+    assert resumen.agregado_por_fase.tension_linea_rs_V == pytest.approx(380.0, abs=0.1)
+
+
 def test_resumen_no_escala_nodo_bt_aunque_declare_relacion_tension_kv(use_case):
     """Reproduce el caso Durax end-to-end: un nodo BT con relacion_tension_kv de
     placa no debe alterar el agregado_por_fase (sin escalado, factor 1.0)."""

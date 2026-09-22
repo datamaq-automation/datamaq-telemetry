@@ -12,6 +12,9 @@ from src.domain.telemetria.servicios.clasificador_nivel_tension import (
 from src.domain.telemetria.servicios.clasificador_nivel_tension import (
     NivelTension as NivelTensionLiteral,
 )
+from src.domain.telemetria.servicios.tensiones_de_linea import (
+    MagnitudTension as MagnitudTensionLiteral,
+)
 
 TipoNodoUnifilarLiteral = Literal["acometida", "transformador", "tgbt", "seccional", "carga"]
 
@@ -90,6 +93,13 @@ class AgregadoPorFaseDTO(BaseModel):
     fase_r: FaseAgregadaDTO
     fase_s: FaseAgregadaDTO
     fase_t: FaseAgregadaDTO
+    tension_linea_rs_V: float | None = Field(
+        default=None,
+        description="Tensión compuesta V_RS (entre fases R y S), derivada de las "
+        "fase-neutro suponiendo 120° exactos, en la escala del nodo.",
+    )
+    tension_linea_st_V: float | None = Field(default=None, description="Tensión compuesta V_ST.")
+    tension_linea_tr_V: float | None = Field(default=None, description="Tensión compuesta V_TR.")
 
 
 class NodoUnifilarDTO(BaseModel):
@@ -230,7 +240,16 @@ class ResumenNodoUnifilarDTO(BaseModel):
         default=None,
         description="Tensión nominal fase-neutro (V_LN): referencia para "
         "agregado_por_fase.fase_r/s/t.voltage_V. None si no se pudo determinar la "
-        "cantidad de fases del nodo.",
+        "cantidad de fases del nodo. En un nodo MT es una referencia a un neutro "
+        "virtual (red de 3 conductores, primario en triángulo), no una magnitud "
+        "medible en bornes: ver `magnitud_tension_canonica`.",
+    )
+    magnitud_tension_canonica: MagnitudTensionLiteral | None = Field(
+        default=None,
+        description="Qué tensión del agregado es la físicamente accesible en este nodo. "
+        "'FASE' en BT (estrella con neutro distribuido): usar fase_r/s/t.voltage_V contra "
+        "tension_nominal_fase_V. 'LINEA' en MT (3 conductores, primario en triángulo): usar "
+        "tension_linea_rs/st/tr_V contra tension_nominal_V.",
     )
 
 

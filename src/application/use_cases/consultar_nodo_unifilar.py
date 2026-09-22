@@ -26,6 +26,7 @@ from src.domain.telemetria.servicios.clasificador_nivel_tension import (
     tension_nominal_de_fase_v,
 )
 from src.domain.telemetria.servicios.relacion_transformacion import derivar_relacion_transformacion
+from src.domain.telemetria.servicios.tensiones_de_linea import magnitud_tension_canonica
 from src.domain.telemetria.value_objects import TipoNodoUnifilar
 
 _log = structlog.get_logger(__name__)
@@ -62,6 +63,9 @@ def _mapear_agregado_por_fase(ag: AgregadoPorFase | None) -> AgregadoPorFaseDTO 
             power_factor=ag.fase_t.power_factor,
             desbalance_tension_pct=ag.fase_t.desbalance_tension_pct,
         ),
+        tension_linea_rs_V=ag.tension_linea_rs_V,
+        tension_linea_st_V=ag.tension_linea_st_V,
+        tension_linea_tr_V=ag.tension_linea_tr_V,
     )
 
 
@@ -179,6 +183,7 @@ class ConsultarNodoUnifilarUseCase:
     ) -> ResumenNodoUnifilarDTO:
         nodo, nodos_frontera = self._resolver_nodo(planta_id, nodo_id, organizacion_id)
         dispositivos_ids = [n.device_id for n in nodos_frontera if n.device_id]
+        nivel = clasificar_nivel_tension(nodo.tension_nominal_v)
 
         relacion = derivar_relacion_transformacion(nodo, nodos_frontera)
         if relacion.advertencia is not None:
@@ -211,9 +216,10 @@ class ConsultarNodoUnifilarUseCase:
             planta_id=planta_id,
             nodo_id=nodo.id,
             es_virtual=nodo.device_id is None,
-            nivel_tension=clasificar_nivel_tension(nodo.tension_nominal_v),
+            nivel_tension=nivel,
             tension_nominal_V=nodo.tension_nominal_v,
             tension_nominal_fase_V=tension_nominal_de_fase_v(nodo.tension_nominal_v),
+            magnitud_tension_canonica=magnitud_tension_canonica(nivel),
             dispositivos_ids=dispositivos_ids,
             potencia_activa_total_w=potencia_sumada.potencia_activa_total_w,
             potencia_reactiva_total_var=potencia_sumada.potencia_reactiva_total_var,

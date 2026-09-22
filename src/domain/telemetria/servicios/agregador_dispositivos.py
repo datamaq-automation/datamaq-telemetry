@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timezone
 
 from src.domain.telemetria.entities import EnergiaAgregada, LecturaInstantanea, MedicionFase
+from src.domain.telemetria.servicios.tensiones_de_linea import tensiones_de_linea
 
 
 @dataclass(frozen=True)
@@ -55,11 +56,20 @@ class FaseAgregada:
 
 @dataclass(frozen=True)
 class AgregadoPorFase:
-    """Contenedor de las tres fases agregadas de un nodo."""
+    """Contenedor de las tres fases agregadas de un nodo.
+
+    Las tensiones compuestas van acá y no dentro de ``FaseAgregada`` porque una
+    tensión de línea pertenece a un *par* de fases, no a una fase: no existe "la
+    compuesta de R". Se derivan de las fase-neutro ya escaladas a la escala del
+    nodo, así que quedan en esa misma escala.
+    """
 
     fase_r: FaseAgregada
     fase_s: FaseAgregada
     fase_t: FaseAgregada
+    tension_linea_rs_V: float | None = None
+    tension_linea_st_V: float | None = None
+    tension_linea_tr_V: float | None = None
 
 
 @dataclass(frozen=True)
@@ -268,7 +278,15 @@ class AgregadorDispositivosService:
                 desbalance_tension_pct=desbalance,
             )
 
-        return AgregadoPorFase(fase_r=_fase("r"), fase_s=_fase("s"), fase_t=_fase("t"))
+        v_rs, v_st, v_tr = tensiones_de_linea(v_prom["r"], v_prom["s"], v_prom["t"])
+        return AgregadoPorFase(
+            fase_r=_fase("r"),
+            fase_s=_fase("s"),
+            fase_t=_fase("t"),
+            tension_linea_rs_V=v_rs,
+            tension_linea_st_V=v_st,
+            tension_linea_tr_V=v_tr,
+        )
 
 
 def _calcular_desbalance_tension(v_prom: dict[str, float | None]) -> float | None:
