@@ -6,13 +6,16 @@ from unittest.mock import MagicMock
 import pytest
 
 from src.application.dtos.telemetria_dto import EnergiaAgregadaDTO
-from src.application.use_cases.consultar_nodo_unifilar import (
-    ConsultarNodoUnifilarUseCase,
-    _relacion_tension_kv_si_mt,
-)
+from src.application.use_cases.consultar_nodo_unifilar import ConsultarNodoUnifilarUseCase
 from src.domain.telemetria.entities import LecturaInstantanea, MedicionFase, NodoUnifilar, Planta
 from src.domain.telemetria.exceptions import NodoUnifilarNoEncontradoError, PlantaNoEncontradaError
-from src.domain.telemetria.value_objects import MetadatosPlaca, PotenciaActiva, TipoNodoUnifilar
+from src.domain.telemetria.value_objects import (
+    Corriente,
+    MetadatosPlaca,
+    PotenciaActiva,
+    Tension,
+    TipoNodoUnifilar,
+)
 
 PLANTA_ID = "planta-durax"
 ORG_ID = "org-durax"
@@ -150,31 +153,70 @@ def test_resumen_nodo_mt_expone_nivel_y_nominales(use_case):
     assert round(resumen.tension_nominal_fase_V or 0, 0) == 7621.0
 
 
-# --- _relacion_tension_kv_si_mt: sólo escala cuando el NODO CONSULTADO es MT ---
+# --- Escala del agregado por fase: invariante nivel_tension ↔ voltajes agregados ---
+# Las ramas de decisión del factor se prueban en tests/unit/test_relacion_transformacion.py;
+# acá se verifica el resultado observable en el DTO del resumen.
 
 
-def test_relacion_tension_kv_se_usa_cuando_el_nodo_es_mt():
-    """Caso UPP: la acometida se declara en MT y trae su propia relación de placa
-    para escalar hacia arriba las lecturas BT de los medidores frontera."""
-    nodo = _nodo("acometida-upp", TipoNodoUnifilar.ACOMETIDA)
-    nodo.tension_nominal_v = 13200.0
-    nodo.metadatos_placa = MetadatosPlaca(relacion_tension_kv="13.2/0.4")
-    assert _relacion_tension_kv_si_mt(nodo) == "13.2/0.4"
+def _lectura_con_fases(dispositivo_id: str, v_ln: float) -> LecturaInstantanea:
+    return LecturaInstantanea(
+        id=None,
+        dispositivo_id=dispositivo_id,
+        registrado_en=datetime(2026, 9, 22, tzinfo=timezone.utc),
+        fase_r=MedicionFase(tension=Tension(v_ln), corriente=Corriente(100.0), potencia_activa=PotenciaActiva(1000.0)),
+        fase_s=MedicionFase(tension=Tension(v_ln), corriente=Corriente(100.0), potencia_activa=PotenciaActiva(1000.0)),
+        fase_t=MedicionFase(tension=Tension(v_ln), corriente=Corriente(100.0), potencia_activa=PotenciaActiva(1000.0)),
+        potencia_activa_total=PotenciaActiva(3000.0),
+    )
 
 
-def test_relacion_tension_kv_se_ignora_cuando_el_nodo_es_bt():
-    """Caso Durax: el transformador declara su propia relación de placa (nameplate)
-    pero se mide en su propia barra BT ('misma barra de BT' en notas_metrologicas);
-    no debe escalar el agregado de ESE nodo."""
-    nodo = _nodo("trafo-durax", TipoNodoUnifilar.TRANSFORMADOR)
-    nodo.tension_nominal_v = 380.0
-    nodo.metadatos_placa = MetadatosPlaca(relacion_tension_kv="13.2/0.4")
-    assert _relacion_tension_kv_si_mt(nodo) is None
+def test_resumen_nodo_mt_sin_placa_escala_el_agregado_al_nivel_del_nodo(use_case):
+    """Reproduce `nodo-durax-acometida-mt`: acometida de 13.2 kV que NO declara
+    `relacion_tension_kv`, con dos medidores frontera en la barra de 380 V.
+
+    Antes de derivar la relación del árbol, el resumen devolvía nivel_tension="MT"
+    junto a fases de ~225 V (anomalía ANOMALIA_ESCALA_DATOS vista en el frontend).
+    """
+    acometida = _nodo("mt", TipoNodoUnifilar.ACOMETIDA)
+    acometida.tension_nominal_v = 13200.0
+    use_case.repo_organizaciones.obtener_nodos_unifilar.return_value = [
+        acometida,
+        _nodo("tgbt-1", TipoNodoUnifilar.TGBT, parent_id="mt", device_id=DEV_1),
+        _nodo("tgbt-2", TipoNodoUnifilar.TGBT, parent_id="mt", device_id=DEV_2),
+    ]
+    use_case.repo_telemetria.obtener_ultima_instantanea.side_effect = lambda dev_id: _lectura_con_fases(dev_id, 224.8)
+
+    resumen = use_case.resumen(PLANTA_ID, "mt", organizacion_id=ORG_ID)
+
+    assert resumen.nivel_tension == "MT"
+    assert resumen.agregado_por_fase is not None
+    nominal_fase = resumen.tension_nominal_fase_V or 0.0
+    for fase in (
+        resumen.agregado_por_fase.fase_r,
+        resumen.agregado_por_fase.fase_s,
+        resumen.agregado_por_fase.fase_t,
+    ):
+        assert fase.voltage_V is not None
+        assert abs(fase.voltage_V - nominal_fase) / nominal_fase <= 0.10
 
 
-def test_relacion_tension_kv_sin_metadatos_placa_es_none():
-    nodo = _nodo("bt-sin-placa", TipoNodoUnifilar.TGBT)
-    assert _relacion_tension_kv_si_mt(nodo) is None
+def test_resumen_nodo_mt_con_placa_coherente_usa_la_relacion_de_placa(use_case):
+    """Caso UPP: la acometida MT declara "13.2/0.4" (relación de transformación de
+    placa, a=33). Es coherente con el cociente del árbol (34.74) y tiene prioridad
+    por ser el turns ratio real del equipo."""
+    acometida = _nodo("mt", TipoNodoUnifilar.ACOMETIDA)
+    acometida.tension_nominal_v = 13200.0
+    acometida.metadatos_placa = MetadatosPlaca(relacion_tension_kv="13.2/0.4")
+    use_case.repo_organizaciones.obtener_nodos_unifilar.return_value = [
+        acometida,
+        _nodo("tgbt-1", TipoNodoUnifilar.TGBT, parent_id="mt", device_id=DEV_1),
+    ]
+    use_case.repo_telemetria.obtener_ultima_instantanea.side_effect = lambda dev_id: _lectura_con_fases(dev_id, 220.0)
+
+    resumen = use_case.resumen(PLANTA_ID, "mt", organizacion_id=ORG_ID)
+
+    assert resumen.agregado_por_fase is not None
+    assert resumen.agregado_por_fase.fase_r.voltage_V == round(220.0 * 33.0, 1)
 
 
 def test_resumen_no_escala_nodo_bt_aunque_declare_relacion_tension_kv(use_case):

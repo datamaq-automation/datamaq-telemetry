@@ -2,6 +2,8 @@
 
 from datetime import datetime, timezone
 
+import structlog
+
 from src.application.dtos.planta_estructura_dto import (
     AgregadoPorFaseDTO,
     BancoRecomendadoDTO,
@@ -23,19 +25,10 @@ from src.domain.telemetria.servicios.clasificador_nivel_tension import (
     clasificar_nivel_tension,
     tension_nominal_de_fase_v,
 )
+from src.domain.telemetria.servicios.relacion_transformacion import derivar_relacion_transformacion
 from src.domain.telemetria.value_objects import TipoNodoUnifilar
 
-
-def _relacion_tension_kv_si_mt(nodo: NodoUnifilar) -> str | None:
-    """`relacion_tension_kv` sólo escala el agregado cuando el nodo CONSULTADO se
-    declara a sí mismo en MT (ej. una acometida que agrega medidores BT hacia
-    arriba, como en la planta UPP). Si el nodo dice ser BT, ese dato de placa es
-    informativo del equipo (nameplate), no una instrucción de escalar ESTE nodo:
-    un transformador puede declarar su propia relación de placa mientras se mide
-    en su propia barra BT (caso observado en la planta Durax)."""
-    if nodo.metadatos_placa is None or clasificar_nivel_tension(nodo.tension_nominal_v) != "MT":
-        return None
-    return nodo.metadatos_placa.relacion_tension_kv
+_log = structlog.get_logger(__name__)
 
 
 def _mapear_agregado_por_fase(ag: AgregadoPorFase | None) -> AgregadoPorFaseDTO | None:
@@ -93,10 +86,16 @@ class ConsultarNodoUnifilarUseCase:
 
     def _resolver_nodo(
         self, planta_id: str, nodo_id: str, organizacion_id: str | None
-    ) -> tuple[NodoUnifilar, list[str]]:
+    ) -> tuple[NodoUnifilar, list[NodoUnifilar]]:
+        """Devuelve el nodo consultado y los nodos de su frontera de medición.
+
+        Los nodos frontera (no sólo sus `device_id`) hacen falta para derivar la
+        relación de transformación: es su tensión nominal la que fija la escala
+        desde la que se proyecta el agregado.
+        """
         planta = self._resolver_planta(planta_id, organizacion_id)
         arbol = ArbolUnifilarService(self.repo_organizaciones.obtener_nodos_unifilar(planta.id))
-        return arbol.obtener(nodo_id), arbol.medidores_frontera(nodo_id)
+        return arbol.obtener(nodo_id), arbol.nodos_medidores_frontera(nodo_id)
 
     def _calcular_compensacion_historica(
         self, nodo: NodoUnifilar, dispositivos_ids: list[str], periodo_dias: int = 7
@@ -178,8 +177,19 @@ class ConsultarNodoUnifilarUseCase:
         zona: str = "America/Argentina/Buenos_Aires",
         dias: int | None = None,
     ) -> ResumenNodoUnifilarDTO:
-        nodo, dispositivos_ids = self._resolver_nodo(planta_id, nodo_id, organizacion_id)
-        relacion_tension_kv = _relacion_tension_kv_si_mt(nodo)
+        nodo, nodos_frontera = self._resolver_nodo(planta_id, nodo_id, organizacion_id)
+        dispositivos_ids = [n.device_id for n in nodos_frontera if n.device_id]
+
+        relacion = derivar_relacion_transformacion(nodo, nodos_frontera)
+        if relacion.advertencia is not None:
+            _log.warning(
+                "unifilar_relacion_transformacion_degradada",
+                planta_id=planta_id,
+                nodo_id=nodo.id,
+                origen=relacion.origen,
+                factor=relacion.factor,
+                motivo=relacion.advertencia,
+            )
 
         potencia_sumada, energia_sumada = calcular_resumen(
             dispositivos_ids,
@@ -188,7 +198,7 @@ class ConsultarNodoUnifilarUseCase:
             granularidad,
             zona,
             dias,
-            relacion_tension_kv,
+            relacion.factor,
         )
 
         # Usar dias del parámetro si se proporciona, sino default de 30 (ISO 50001)
@@ -227,7 +237,8 @@ class ConsultarNodoUnifilarUseCase:
         granularidad: str = "5m",
         horas: int = 24,
     ) -> list[PuntoPotenciaNodoUnifilarDTO]:
-        _, dispositivos_ids = self._resolver_nodo(planta_id, nodo_id, organizacion_id)
+        _, nodos_frontera = self._resolver_nodo(planta_id, nodo_id, organizacion_id)
+        dispositivos_ids = [n.device_id for n in nodos_frontera if n.device_id]
 
         puntos = calcular_historico(dispositivos_ids, self.consultar_telemetria, granularidad, horas)
         return [

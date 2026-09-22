@@ -17,33 +17,6 @@ from src.domain.telemetria.servicios.agregador_dispositivos import (
 )
 
 
-def _parsear_relacion_transformacion(relacion_tension_kv: str | None) -> float:
-    """Parsea "15/0.4" → 37.5, tolera "13.2 kV / 0.4 kV" → 33.0.
-    Retorna 1.0 si no se puede parsear (nodo BT)."""
-    import re
-
-    if not relacion_tension_kv:
-        return 1.0
-    try:
-        partes = relacion_tension_kv.split("/")
-        if len(partes) != 2:
-            return 1.0
-
-        primario_str = partes[0].strip()
-        secundario_str = partes[1].strip()
-
-        match_prim = re.match(r"[\d.]+", primario_str)
-        match_sec = re.match(r"[\d.]+", secundario_str)
-        if not match_prim or not match_sec:
-            return 1.0
-
-        primario = float(match_prim.group())
-        secundario = float(match_sec.group())
-        return primario / secundario if secundario > 0 else 1.0
-    except (ValueError, AttributeError):
-        return 1.0
-
-
 def calcular_resumen(
     dispositivos_ids: list[str],
     repo_telemetria: RepositorioTelemetriaPort,
@@ -51,15 +24,16 @@ def calcular_resumen(
     granularidad: str,
     zona: str,
     dias: int | None,
-    relacion_tension_kv: str | None = None,
+    relacion_transformacion: float = 1.0,
 ) -> tuple[PotenciaSumada, list[EnergiaAgregada]]:
+    """``relacion_transformacion`` lo decide ``derivar_relacion_transformacion``
+    a partir del nodo y su frontera; acá ya llega resuelto como escalar."""
     lecturas_por_dispositivo = {
         dispositivo_id: repo_telemetria.obtener_ultima_instantanea(dispositivo_id)
         for dispositivo_id in dispositivos_ids
     }
-    relacion = _parsear_relacion_transformacion(relacion_tension_kv)
     potencia_sumada = AgregadorDispositivosService.sumar_ultimas_lecturas(lecturas_por_dispositivo)
-    agregado_por_fase = AgregadorDispositivosService.sumar_fases(lecturas_por_dispositivo, relacion)
+    agregado_por_fase = AgregadorDispositivosService.sumar_fases(lecturas_por_dispositivo, relacion_transformacion)
     potencia_sumada = PotenciaSumada(
         potencia_activa_total_w=potencia_sumada.potencia_activa_total_w,
         dispositivos_sin_dato=potencia_sumada.dispositivos_sin_dato,
