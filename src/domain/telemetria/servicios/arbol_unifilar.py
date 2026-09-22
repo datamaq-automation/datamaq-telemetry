@@ -63,14 +63,14 @@ class ArbolUnifilarService:
     def hijos_de(self, nodo_id: str) -> list[NodoUnifilar]:
         return list(self._hijos.get(nodo_id, []))
 
-    def medidores_frontera(self, nodo_id: str) -> list[str]:
-        """Device ids de los medidores más cercanos aguas abajo, uno por rama.
+    def nodos_medidores_frontera(self, nodo_id: str) -> list[NodoUnifilar]:
+        """Nodos medidos más cercanos aguas abajo, uno por rama.
 
         Se corta en el primer nodo medido de cada rama porque ese medidor ya integra
         todo lo que cuelga de él; seguir bajando duplicaría submediciones anidadas.
         """
         raiz = self.obtener(nodo_id)
-        resultado: list[str] = []
+        resultado: list[NodoUnifilar] = []
         visitados: set[str] = set()
         pendientes = [raiz]
         while pendientes:
@@ -79,10 +79,14 @@ class ArbolUnifilarService:
                 continue
             visitados.add(nodo.id)
             if nodo.device_id:
-                resultado.append(nodo.device_id)
+                resultado.append(nodo)
                 continue
             pendientes.extend(self.hijos_de(nodo.id))
         return resultado
+
+    def medidores_frontera(self, nodo_id: str) -> list[str]:
+        """Device ids de los nodos devueltos por ``nodos_medidores_frontera``."""
+        return [nodo.device_id for nodo in self.nodos_medidores_frontera(nodo_id) if nodo.device_id]
 
     def es_nodo_pasante(self, nodo_id: str) -> bool:
         """Determina si un nodo es puramente pasante (tramo continuo sin ramificaciones ni medidor propio)."""
