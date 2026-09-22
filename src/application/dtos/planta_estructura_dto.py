@@ -6,12 +6,14 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from src.application.dtos.telemetria_dto import EnergiaAgregadaDTO
 from src.application.dtos.tipos import FechaHoraUTC
+from src.domain.telemetria.servicios.clasificador_nivel_tension import (
+    UMBRAL_MEDIA_TENSION_V as UMBRAL_MEDIA_TENSION_V,
+)
+from src.domain.telemetria.servicios.clasificador_nivel_tension import (
+    NivelTension as NivelTensionLiteral,
+)
 
 TipoNodoUnifilarLiteral = Literal["acometida", "transformador", "tgbt", "seccional", "carga"]
-NivelTensionLiteral = Literal["MT", "BT"]
-
-# Umbral de clasificación MT/BT (IEC 60038): >1000 V AC es Media Tensión.
-UMBRAL_MEDIA_TENSION_V = 1000.0
 
 
 class CoordenadasNodoUnifilarDTO(BaseModel):
@@ -213,6 +215,23 @@ class ResumenNodoUnifilarDTO(BaseModel):
     registrado_en: FechaHoraUTC | None = None
     agregado_por_fase: AgregadoPorFaseDTO | None = None
     compensacion_historica: CompensacionHistoricaDTO | None = None
+    nivel_tension: NivelTensionLiteral | None = Field(
+        default=None,
+        description="Nivel de tensión al que está referido `agregado_por_fase` (IEC 60038). "
+        "En nodos MT virtuales, el agregado ya viene escalado por la relación de "
+        "transformación del nodo (V_MT = V_BT x a); este campo aclara esa escala.",
+    )
+    tension_nominal_V: float | None = Field(
+        default=None,
+        description="Tensión nominal entre fases (V_LL) del nodo, en la misma escala que "
+        "`agregado_por_fase` (declarada en data/organizaciones.yml).",
+    )
+    tension_nominal_fase_V: float | None = Field(
+        default=None,
+        description="Tensión nominal fase-neutro (V_LN): referencia para "
+        "agregado_por_fase.fase_r/s/t.voltage_V. None si no se pudo determinar la "
+        "cantidad de fases del nodo.",
+    )
 
 
 class PuntoPotenciaNodoUnifilarDTO(BaseModel):
