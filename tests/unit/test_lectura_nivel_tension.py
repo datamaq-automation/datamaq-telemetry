@@ -33,6 +33,7 @@ def test_sin_dispositivo_los_tres_campos_quedan_none():
     assert dto.nivel_tension is None
     assert dto.tension_nominal_V is None
     assert dto.tension_nominal_fase_V is None
+    assert dto.magnitud_tension_canonica is None
 
 
 def test_dispositivo_sin_tension_nominal_resuelta_queda_none():
@@ -40,6 +41,7 @@ def test_dispositivo_sin_tension_nominal_resuelta_queda_none():
     assert dto.nivel_tension is None
     assert dto.tension_nominal_V is None
     assert dto.tension_nominal_fase_V is None
+    assert dto.magnitud_tension_canonica is None
 
 
 def test_dispositivo_monofasico_bt_nominal_ya_es_fase_neutro():
@@ -48,6 +50,7 @@ def test_dispositivo_monofasico_bt_nominal_ya_es_fase_neutro():
     assert dto.nivel_tension == "BT"
     assert dto.tension_nominal_V == 220.0
     assert dto.tension_nominal_fase_V == 220.0
+    assert dto.magnitud_tension_canonica == "FASE"
 
 
 def test_dispositivo_trifasico_bt_deriva_nominal_fase_neutro():
@@ -56,6 +59,7 @@ def test_dispositivo_trifasico_bt_deriva_nominal_fase_neutro():
     assert dto.nivel_tension == "BT"
     assert dto.tension_nominal_V == 380.0
     assert round(dto.tension_nominal_fase_V or 0, 1) == 219.4
+    assert dto.magnitud_tension_canonica == "FASE"
 
 
 def test_dispositivo_en_nodo_mt_clasifica_mt():
@@ -64,6 +68,7 @@ def test_dispositivo_en_nodo_mt_clasifica_mt():
     assert dto.nivel_tension == "MT"
     assert dto.tension_nominal_V == 13200.0
     assert round(dto.tension_nominal_fase_V or 0, 0) == 7621.0
+    assert dto.magnitud_tension_canonica == "LINEA"
 
 
 def test_dispositivo_mock_no_explota_y_queda_none():
@@ -73,6 +78,7 @@ def test_dispositivo_mock_no_explota_y_queda_none():
     assert dto.nivel_tension is None
     assert dto.tension_nominal_V is None
     assert dto.tension_nominal_fase_V is None
+    assert dto.magnitud_tension_canonica is None
 
 
 def test_rehidratacion_de_dict_viejo_sin_los_campos_nuevos_usa_defaults():
@@ -83,9 +89,15 @@ def test_rehidratacion_de_dict_viejo_sin_los_campos_nuevos_usa_defaults():
 
     dto_original = TelemetriaMapper.instantanea_to_dto(_lectura())
     dict_viejo = dto_original.model_dump(mode="json")
-    del dict_viejo["nivel_tension"], dict_viejo["tension_nominal_V"], dict_viejo["tension_nominal_fase_V"]
+    del (
+        dict_viejo["nivel_tension"],
+        dict_viejo["tension_nominal_V"],
+        dict_viejo["tension_nominal_fase_V"],
+        dict_viejo["magnitud_tension_canonica"],
+    )
 
     dto = LecturaInstantaneaDTO.model_validate(dict_viejo)
     assert dto.nivel_tension is None
     assert dto.tension_nominal_V is None
     assert dto.tension_nominal_fase_V is None
+    assert dto.magnitud_tension_canonica is None

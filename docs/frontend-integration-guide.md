@@ -178,6 +178,10 @@ export interface LecturaInstantaneaDTO {
   tension_neutro_estimada_V: number | null;
   thd_v_promedio_pct: number | null;
   thd_i_total_pct: number | null;
+  nivel_tension: 'BT' | 'MT' | null;
+  tension_nominal_V: number | null;
+  tension_nominal_fase_V: number | null;
+  magnitud_tension_canonica: 'FASE' | 'LINEA' | null;
   analitica?: AnaliticaCalidadEnergiaDTO | null;
 }
 
@@ -202,6 +206,10 @@ export interface TelemetriaLatestResponseDTO {
     "corriente_neutro_estimada_A": 3.12,
     "voltage_linea_V": 382.04,
     "tension_neutro_estimada_V": 1.25,
+    "nivel_tension": "BT",
+    "tension_nominal_V": 380.0,
+    "tension_nominal_fase_V": 219.4,
+    "magnitud_tension_canonica": "FASE",
     "analitica": {
       "requiere_compensacion": true,
       "potencia_reactiva_a_compensar_kvar": 40.48,

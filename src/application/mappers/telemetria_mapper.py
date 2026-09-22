@@ -30,6 +30,7 @@ from src.domain.telemetria.servicios.clasificador_nivel_tension import (
     clasificar_nivel_tension,
     tension_nominal_de_fase_v,
 )
+from src.domain.telemetria.servicios.tensiones_de_linea import magnitud_tension_canonica
 from src.domain.telemetria.value_objects import AnaliticaCalidadEnergia
 
 
@@ -144,6 +145,7 @@ class TelemetriaMapper:
         p_tot = lectura.potencia_activa_total.vatios if lectura.potencia_activa_total else None
         q_tot = lectura.potencia_reactiva_total.var if lectura.potencia_reactiva_total else None
         nivel_tension, tension_nominal_v, tension_nominal_fase_v = _referencia_tension_de(dispositivo)
+        magnitud = magnitud_tension_canonica(nivel_tension) if nivel_tension else None
 
         return LecturaInstantaneaDTO(
             id=lectura.id,
@@ -170,6 +172,7 @@ class TelemetriaMapper:
             nivel_tension=nivel_tension,
             tension_nominal_V=tension_nominal_v,
             tension_nominal_fase_V=tension_nominal_fase_v,
+            magnitud_tension_canonica=magnitud,
         )
 
     @staticmethod

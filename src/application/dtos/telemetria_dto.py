@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from src.application.dtos.tipos import FechaHoraUTC
 from src.domain.telemetria.servicios.clasificador_nivel_tension import NivelTension
+from src.domain.telemetria.servicios.tensiones_de_linea import MagnitudTension
 from src.domain.telemetria.value_objects import (
     EstadoFactorPotencia,
     EstadoMetrologicoLectura,
@@ -90,6 +91,12 @@ class LecturaInstantaneaDTO(BaseModel):
         description="Tensión nominal fase-neutro (V_LN): referencia para escalar los gauges de "
         "fase_r/fase_s/fase_t.voltage_V. Monofásico (una sola fase con TI): igual a "
         "tension_nominal_V. Polifásico: tension_nominal_V / √3.",
+    )
+    magnitud_tension_canonica: MagnitudTension | None = Field(
+        default=None,
+        description="Magnitud canónica de tensión según IEC 60038: 'FASE' en BT (estrella), "
+        "'LINEA' en MT (triángulo). Permite al frontend discriminar V_LN vs. V_L en "
+        "etiquetas y escala de los gauges de tensión.",
     )
     model_config = ConfigDict(from_attributes=True)
 
