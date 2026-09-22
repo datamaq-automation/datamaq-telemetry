@@ -26,6 +26,18 @@ from src.domain.telemetria.servicios.clasificador_nivel_tension import (
 from src.domain.telemetria.value_objects import TipoNodoUnifilar
 
 
+def _relacion_tension_kv_si_mt(nodo: NodoUnifilar) -> str | None:
+    """`relacion_tension_kv` sólo escala el agregado cuando el nodo CONSULTADO se
+    declara a sí mismo en MT (ej. una acometida que agrega medidores BT hacia
+    arriba, como en la planta UPP). Si el nodo dice ser BT, ese dato de placa es
+    informativo del equipo (nameplate), no una instrucción de escalar ESTE nodo:
+    un transformador puede declarar su propia relación de placa mientras se mide
+    en su propia barra BT (caso observado en la planta Durax)."""
+    if nodo.metadatos_placa is None or clasificar_nivel_tension(nodo.tension_nominal_v) != "MT":
+        return None
+    return nodo.metadatos_placa.relacion_tension_kv
+
+
 def _mapear_agregado_por_fase(ag: AgregadoPorFase | None) -> AgregadoPorFaseDTO | None:
     if ag is None:
         return None
@@ -167,7 +179,7 @@ class ConsultarNodoUnifilarUseCase:
         dias: int | None = None,
     ) -> ResumenNodoUnifilarDTO:
         nodo, dispositivos_ids = self._resolver_nodo(planta_id, nodo_id, organizacion_id)
-        relacion_tension_kv = nodo.metadatos_placa.relacion_tension_kv if nodo.metadatos_placa else None
+        relacion_tension_kv = _relacion_tension_kv_si_mt(nodo)
 
         potencia_sumada, energia_sumada = calcular_resumen(
             dispositivos_ids,

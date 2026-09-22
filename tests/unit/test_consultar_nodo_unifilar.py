@@ -6,10 +6,13 @@ from unittest.mock import MagicMock
 import pytest
 
 from src.application.dtos.telemetria_dto import EnergiaAgregadaDTO
-from src.application.use_cases.consultar_nodo_unifilar import ConsultarNodoUnifilarUseCase
+from src.application.use_cases.consultar_nodo_unifilar import (
+    ConsultarNodoUnifilarUseCase,
+    _relacion_tension_kv_si_mt,
+)
 from src.domain.telemetria.entities import LecturaInstantanea, MedicionFase, NodoUnifilar, Planta
 from src.domain.telemetria.exceptions import NodoUnifilarNoEncontradoError, PlantaNoEncontradaError
-from src.domain.telemetria.value_objects import PotenciaActiva, TipoNodoUnifilar
+from src.domain.telemetria.value_objects import MetadatosPlaca, PotenciaActiva, TipoNodoUnifilar
 
 PLANTA_ID = "planta-durax"
 ORG_ID = "org-durax"
@@ -145,3 +148,47 @@ def test_resumen_nodo_mt_expone_nivel_y_nominales(use_case):
     assert resumen.nivel_tension == "MT"
     assert resumen.tension_nominal_V == 13200.0
     assert round(resumen.tension_nominal_fase_V or 0, 0) == 7621.0
+
+
+# --- _relacion_tension_kv_si_mt: sólo escala cuando el NODO CONSULTADO es MT ---
+
+
+def test_relacion_tension_kv_se_usa_cuando_el_nodo_es_mt():
+    """Caso UPP: la acometida se declara en MT y trae su propia relación de placa
+    para escalar hacia arriba las lecturas BT de los medidores frontera."""
+    nodo = _nodo("acometida-upp", TipoNodoUnifilar.ACOMETIDA)
+    nodo.tension_nominal_v = 13200.0
+    nodo.metadatos_placa = MetadatosPlaca(relacion_tension_kv="13.2/0.4")
+    assert _relacion_tension_kv_si_mt(nodo) == "13.2/0.4"
+
+
+def test_relacion_tension_kv_se_ignora_cuando_el_nodo_es_bt():
+    """Caso Durax: el transformador declara su propia relación de placa (nameplate)
+    pero se mide en su propia barra BT ('misma barra de BT' en notas_metrologicas);
+    no debe escalar el agregado de ESE nodo."""
+    nodo = _nodo("trafo-durax", TipoNodoUnifilar.TRANSFORMADOR)
+    nodo.tension_nominal_v = 380.0
+    nodo.metadatos_placa = MetadatosPlaca(relacion_tension_kv="13.2/0.4")
+    assert _relacion_tension_kv_si_mt(nodo) is None
+
+
+def test_relacion_tension_kv_sin_metadatos_placa_es_none():
+    nodo = _nodo("bt-sin-placa", TipoNodoUnifilar.TGBT)
+    assert _relacion_tension_kv_si_mt(nodo) is None
+
+
+def test_resumen_no_escala_nodo_bt_aunque_declare_relacion_tension_kv(use_case):
+    """Reproduce el caso Durax end-to-end: un nodo BT con relacion_tension_kv de
+    placa no debe alterar el agregado_por_fase (sin escalado, factor 1.0)."""
+    nodo_bt_con_placa = _nodo("trafo-durax", TipoNodoUnifilar.TRANSFORMADOR, device_id=DEV_1)
+    nodo_bt_con_placa.tension_nominal_v = 380.0
+    nodo_bt_con_placa.metadatos_placa = MetadatosPlaca(relacion_tension_kv="13.2/0.4")
+    use_case.repo_organizaciones.obtener_nodos_unifilar.return_value = [nodo_bt_con_placa]
+    use_case.repo_telemetria.obtener_ultima_instantanea.side_effect = lambda dev_id: {
+        DEV_1: _lectura(DEV_1, 1000.0),
+    }.get(dev_id)
+
+    resumen = use_case.resumen(PLANTA_ID, "trafo-durax", organizacion_id=ORG_ID)
+
+    assert resumen.nivel_tension == "BT"
+    assert resumen.potencia_activa_total_w == 1000.0
