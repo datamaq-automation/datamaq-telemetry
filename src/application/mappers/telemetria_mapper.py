@@ -24,6 +24,12 @@ from src.domain.telemetria.services import (
     AnalizadorCalidadEnergiaService,
     DiagnosticoFasorialRed,
 )
+from src.domain.telemetria.servicios.clasificador_nivel_tension import (
+    NivelTension,
+    cantidad_de_fases,
+    clasificar_nivel_tension,
+    tension_nominal_de_fase_v,
+)
 from src.domain.telemetria.value_objects import AnaliticaCalidadEnergia
 
 
@@ -33,6 +39,26 @@ def _calcular_phi_grados(p: float | None, q: float | None) -> float | None:
     if p == 0.0 and q == 0.0:
         return 0.0
     return round(-math.degrees(math.atan2(q, p)), 1)
+
+
+def _referencia_tension_de(dispositivo: object | None) -> tuple[NivelTension | None, float | None, float | None]:
+    """Deriva (nivel, nominal V_LL, nominal V_LN) del nodo que mide `dispositivo`.
+
+    `dispositivo` es `object | None` por contrato de capas; el `isinstance` protege
+    contra mocks de test y contra un dispositivo sin ese dato resuelto (huérfano
+    del unifilar), devolviendo (None, None, None) en ambos casos.
+    """
+    nominal_v = getattr(dispositivo, "tension_nominal_v", None)
+    if not isinstance(nominal_v, (int, float)) or isinstance(nominal_v, bool):
+        return None, None, None
+    fases_con_ti = getattr(dispositivo, "fases_con_ti", None)
+    fases = cantidad_de_fases(fases_con_ti) if isinstance(fases_con_ti, str) else None
+    nominal_v = float(nominal_v)
+    return (
+        clasificar_nivel_tension(nominal_v),
+        nominal_v,
+        tension_nominal_de_fase_v(nominal_v, fases),
+    )
 
 
 class TelemetriaMapper:
@@ -117,6 +143,7 @@ class TelemetriaMapper:
 
         p_tot = lectura.potencia_activa_total.vatios if lectura.potencia_activa_total else None
         q_tot = lectura.potencia_reactiva_total.var if lectura.potencia_reactiva_total else None
+        nivel_tension, tension_nominal_v, tension_nominal_fase_v = _referencia_tension_de(dispositivo)
 
         return LecturaInstantaneaDTO(
             id=lectura.id,
@@ -140,6 +167,9 @@ class TelemetriaMapper:
             thd_i_total_pct=lectura.thd_i_total_porcentaje,
             analitica=TelemetriaMapper.analitica_to_dto(analitica),
             diagnostico_instalacion=diag_inst_dto,
+            nivel_tension=nivel_tension,
+            tension_nominal_V=tension_nominal_v,
+            tension_nominal_fase_V=tension_nominal_fase_v,
         )
 
     @staticmethod

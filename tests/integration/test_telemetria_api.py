@@ -80,6 +80,9 @@ def test_get_latest_telemetry_end_to_end_con_thd():
             potencia_activa_total_W=6722.8,
             thd_v_promedio_pct=1.85,
             thd_i_total_pct=3.42,
+            nivel_tension="BT",
+            tension_nominal_V=380.0,
+            tension_nominal_fase_V=219.4,
         ),
         energia=None,
     )
@@ -100,6 +103,9 @@ def test_get_latest_telemetry_end_to_end_con_thd():
     assert data["device_id"] == "dev-test-1"
     assert data["instantanea"]["thd_v_promedio_pct"] == 1.85
     assert data["instantanea"]["thd_i_total_pct"] == 3.42
+    assert data["instantanea"]["nivel_tension"] == "BT"
+    assert data["instantanea"]["tension_nominal_V"] == 380.0
+    assert data["instantanea"]["tension_nominal_fase_V"] == 219.4
 
 
 def test_get_instantaneous_history_end_to_end():

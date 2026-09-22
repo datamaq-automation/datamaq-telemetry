@@ -3,9 +3,10 @@
 from datetime import date
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from src.application.dtos.tipos import FechaHoraUTC
+from src.domain.telemetria.servicios.clasificador_nivel_tension import NivelTension
 from src.domain.telemetria.value_objects import (
     EstadoFactorPotencia,
     EstadoMetrologicoLectura,
@@ -74,6 +75,22 @@ class LecturaInstantaneaDTO(BaseModel):
     thd_i_total_pct: float | None = None
     analitica: AnaliticaCalidadEnergiaDTO | None = None
     diagnostico_instalacion: DiagnosticoInstalacionDTO | None = None
+    nivel_tension: NivelTension | None = Field(
+        default=None,
+        description="Nivel de tensión del punto de medición según IEC 60038 (>1000 V = MT). "
+        "None si el medidor no está asociado a un nodo del unifilar.",
+    )
+    tension_nominal_V: float | None = Field(
+        default=None,
+        description="Tensión nominal entre fases (V_LL) del nodo del unifilar que mide este "
+        "dispositivo, declarada en data/organizaciones.yml.",
+    )
+    tension_nominal_fase_V: float | None = Field(
+        default=None,
+        description="Tensión nominal fase-neutro (V_LN): referencia para escalar los gauges de "
+        "fase_r/fase_s/fase_t.voltage_V. Monofásico (una sola fase con TI): igual a "
+        "tension_nominal_V. Polifásico: tension_nominal_V / √3.",
+    )
     model_config = ConfigDict(from_attributes=True)
 
 
