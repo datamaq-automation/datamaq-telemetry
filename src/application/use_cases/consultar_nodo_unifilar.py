@@ -19,6 +19,10 @@ from src.domain.telemetria.exceptions import PlantaNoEncontradaError
 from src.domain.telemetria.ports import RepositorioOrganizacionesPort, RepositorioTelemetriaPort
 from src.domain.telemetria.servicios.agregador_dispositivos import AgregadoPorFase
 from src.domain.telemetria.servicios.arbol_unifilar import ArbolUnifilarService
+from src.domain.telemetria.servicios.clasificador_nivel_tension import (
+    clasificar_nivel_tension,
+    tension_nominal_de_fase_v,
+)
 from src.domain.telemetria.value_objects import TipoNodoUnifilar
 
 
@@ -185,6 +189,9 @@ class ConsultarNodoUnifilarUseCase:
             planta_id=planta_id,
             nodo_id=nodo.id,
             es_virtual=nodo.device_id is None,
+            nivel_tension=clasificar_nivel_tension(nodo.tension_nominal_v),
+            tension_nominal_V=nodo.tension_nominal_v,
+            tension_nominal_fase_V=tension_nominal_de_fase_v(nodo.tension_nominal_v),
             dispositivos_ids=dispositivos_ids,
             potencia_activa_total_w=potencia_sumada.potencia_activa_total_w,
             potencia_reactiva_total_var=potencia_sumada.potencia_reactiva_total_var,

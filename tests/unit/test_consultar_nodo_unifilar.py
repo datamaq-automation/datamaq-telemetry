@@ -125,3 +125,23 @@ def test_nodo_agregado_potencia_activa_unidades_w(use_case):
 
     resumen = use_case.resumen(PLANTA_ID, "mt", organizacion_id=ORG_ID)
     assert resumen.potencia_activa_total_w == 9150.0
+
+
+def test_resumen_nodo_bt_expone_nivel_y_nominales(use_case):
+    resumen = use_case.resumen(PLANTA_ID, "trafo-1", organizacion_id=ORG_ID)
+
+    assert resumen.nivel_tension == "BT"
+    assert resumen.tension_nominal_V == 380.0
+    assert round(resumen.tension_nominal_fase_V or 0, 1) == 219.4
+
+
+def test_resumen_nodo_mt_expone_nivel_y_nominales(use_case):
+    nodo_mt = _nodo("mt-13200", TipoNodoUnifilar.ACOMETIDA)
+    nodo_mt.tension_nominal_v = 13200.0
+    use_case.repo_organizaciones.obtener_nodos_unifilar.return_value = [nodo_mt]
+
+    resumen = use_case.resumen(PLANTA_ID, "mt-13200", organizacion_id=ORG_ID)
+
+    assert resumen.nivel_tension == "MT"
+    assert resumen.tension_nominal_V == 13200.0
+    assert round(resumen.tension_nominal_fase_V or 0, 0) == 7621.0
