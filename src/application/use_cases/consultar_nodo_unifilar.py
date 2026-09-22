@@ -183,6 +183,17 @@ class ConsultarNodoUnifilarUseCase:
     ) -> ResumenNodoUnifilarDTO:
         nodo, nodos_frontera = self._resolver_nodo(planta_id, nodo_id, organizacion_id)
         dispositivos_ids = [n.device_id for n in nodos_frontera if n.device_id]
+
+        _log.info(
+            "nodo_unifilar_frontera_resuelta",
+            planta_id=planta_id,
+            nodo_id=nodo_id,
+            nodos_frontera_count=len(nodos_frontera),
+            dispositivos_ids=dispositivos_ids,
+            dispositivos_unicos=len(set(dispositivos_ids)),
+            hay_duplicados=len(dispositivos_ids) != len(set(dispositivos_ids)),
+        )
+
         nivel = clasificar_nivel_tension(nodo.tension_nominal_v)
 
         relacion = derivar_relacion_transformacion(nodo, nodos_frontera)
@@ -245,6 +256,16 @@ class ConsultarNodoUnifilarUseCase:
     ) -> list[PuntoPotenciaNodoUnifilarDTO]:
         _, nodos_frontera = self._resolver_nodo(planta_id, nodo_id, organizacion_id)
         dispositivos_ids = [n.device_id for n in nodos_frontera if n.device_id]
+
+        _log.info(
+            "nodo_unifilar_frontera_resuelta",
+            planta_id=planta_id,
+            nodo_id=nodo_id,
+            nodos_frontera_count=len(nodos_frontera),
+            dispositivos_ids=dispositivos_ids,
+            dispositivos_unicos=len(set(dispositivos_ids)),
+            hay_duplicados=len(dispositivos_ids) != len(set(dispositivos_ids)),
+        )
 
         puntos = calcular_historico(dispositivos_ids, self.consultar_telemetria, granularidad, horas)
         return [

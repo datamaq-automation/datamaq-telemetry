@@ -4,8 +4,12 @@ import math
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 
+import structlog
+
 from src.domain.telemetria.entities import EnergiaAgregada, LecturaInstantanea, MedicionFase
 from src.domain.telemetria.servicios.tensiones_de_linea import tensiones_de_linea
+
+_log = structlog.get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -186,6 +190,14 @@ class AgregadorDispositivosService:
         Cada lectura es ``(momento, potencia_activa_w)`` o ``(momento, potencia_activa_w,
         potencia_reactiva_var)``.
         """
+        total_puntos = sum(len(lecturas) for lecturas in lecturas_por_dispositivo.values())
+        _log.debug(
+            "agregador_sumar_potencia_inicio",
+            dispositivos_count=len(lecturas_por_dispositivo),
+            puntos_totales=total_puntos,
+            intervalo_segundos=intervalo_segundos,
+        )
+
         totales_p_por_bucket: dict[int, float] = {}
         totales_q_por_bucket: dict[int, float] = {}
         hubo_dato_por_bucket: dict[int, bool] = {}

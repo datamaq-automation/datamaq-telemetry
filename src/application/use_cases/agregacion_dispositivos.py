@@ -7,6 +7,8 @@ diferencia entre ambos consumidores es de dónde sacan esa lista de ids
 el cálculo de suma en sí vive en ``AgregadorDispositivosService``.
 """
 
+import structlog
+
 from src.application.use_cases.consultar_telemetria import ConsultarTelemetriaUseCase
 from src.domain.telemetria.entities import EnergiaAgregada
 from src.domain.telemetria.ports import RepositorioTelemetriaPort
@@ -15,6 +17,8 @@ from src.domain.telemetria.servicios.agregador_dispositivos import (
     PotenciaSumada,
     PuntoPotencia,
 )
+
+_log = structlog.get_logger(__name__)
 
 
 def calcular_resumen(
@@ -28,6 +32,13 @@ def calcular_resumen(
 ) -> tuple[PotenciaSumada, list[EnergiaAgregada]]:
     """``relacion_transformacion`` lo decide ``derivar_relacion_transformacion``
     a partir del nodo y su frontera; acá ya llega resuelto como escalar."""
+    _log.debug(
+        "agregador_resumen_inicio",
+        dispositivos_count=len(dispositivos_ids),
+        dispositivos_ids=dispositivos_ids,
+        relacion_transformacion=relacion_transformacion,
+    )
+
     lecturas_por_dispositivo = {
         dispositivo_id: repo_telemetria.obtener_ultima_instantanea(dispositivo_id)
         for dispositivo_id in dispositivos_ids
@@ -60,6 +71,14 @@ def calcular_historico(
     granularidad: str,
     horas: int,
 ) -> list[PuntoPotencia]:
+    _log.debug(
+        "agregador_historico_inicio",
+        dispositivos_count=len(dispositivos_ids),
+        dispositivos_ids=dispositivos_ids,
+        granularidad=granularidad,
+        horas=horas,
+    )
+
     intervalo_segundos = ConsultarTelemetriaUseCase._resolver_intervalo_segundos(granularidad, horas)
     if intervalo_segundos <= 0:
         intervalo_segundos = 300
