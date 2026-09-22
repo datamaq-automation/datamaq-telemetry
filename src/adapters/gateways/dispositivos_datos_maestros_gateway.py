@@ -28,9 +28,9 @@ class DispositivosConDatosMaestrosGateway(RepositorioDispositivosPort):
             dispositivo, self._org.obtener_instalacion_medidor(dispositivo.id)
         )
         if resuelto.planta_id:
-            resuelto = DatosMaestrosMedidorService.aplicar_contrato(
-                resuelto, self._org.obtener_nodos_unifilar(resuelto.planta_id)
-            )
+            nodos = self._org.obtener_nodos_unifilar(resuelto.planta_id)
+            resuelto = DatosMaestrosMedidorService.aplicar_contrato(resuelto, nodos)
+            resuelto = DatosMaestrosMedidorService.aplicar_tension_nominal(resuelto, nodos)
         return resuelto
 
     def obtener_por_id(self, dispositivo_id: str) -> Dispositivo | None:

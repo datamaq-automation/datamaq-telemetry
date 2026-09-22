@@ -89,6 +89,28 @@ def test_medidor_fuera_del_unifilar_no_hereda():
     assert DatosMaestrosMedidorService.aplicar_contrato(dev, ARBOL).categoria_tarifaria == "T2"
 
 
+def test_nodo_medido_por_devuelve_el_nodo_con_ese_device_id():
+    nodo = DatosMaestrosMedidorService.nodo_medido_por("dev-1", ARBOL)
+    assert nodo is not None and nodo.id == "tgbt"
+    assert DatosMaestrosMedidorService.nodo_medido_por("dev-otro", ARBOL) is None
+
+
+def test_aplicar_tension_nominal_hereda_del_nodo_medido_no_de_la_acometida():
+    # La acometida ("mt") declara 380.0 en este fixture (todos los nodos comparten
+    # tension_nominal_v=380.0 por defecto en `_nodo`); lo que importa es que la
+    # tensión venga del nodo con el device_id, no de subir hasta la acometida.
+    dev = _dev(tension_nominal_v=None)
+    res = DatosMaestrosMedidorService.aplicar_tension_nominal(dev, ARBOL)
+    assert res.tension_nominal_v == 380.0
+
+
+def test_aplicar_tension_nominal_dispositivo_fuera_del_yaml_queda_none():
+    dev = _dev(id="dev-otro", tension_nominal_v=None)
+    res = DatosMaestrosMedidorService.aplicar_tension_nominal(dev, ARBOL)
+    assert res.tension_nominal_v is None
+    assert DatosMaestrosMedidorService.aplicar_tension_nominal(dev, []).tension_nominal_v is None
+
+
 def test_campos_gobernados_y_rechazo_de_escritura():
     inst = InstalacionMedidor(dispositivo_id="dev-1", tag_ubicacion="TGBT-01")
     gobernados = DatosMaestrosMedidorService.campos_gobernados_por_yaml("dev-1", inst, ARBOL)
@@ -124,6 +146,16 @@ def test_gateway_resuelve_en_todas_las_lecturas():
         assert res.fases_con_ti == "S,T" and res.categoria_tarifaria == "T3-MT"
     assert len(gw.listar()) == 1
     assert gw.obtener_por_id("nadie") is None or base.obtener_por_id.return_value is dev
+
+
+def test_gateway_resuelve_tension_nominal_del_nodo_medido():
+    base = MagicMock()
+    dev = _dev()
+    base.obtener_por_id.return_value = dev
+    gw = DispositivosConDatosMaestrosGateway(base, _org_repo(nodos=ARBOL))
+    res = gw.obtener_por_id("dev-1")
+    assert res is not None
+    assert res.tension_nominal_v == 380.0
 
 
 def test_gateway_sin_yaml_es_transparente():

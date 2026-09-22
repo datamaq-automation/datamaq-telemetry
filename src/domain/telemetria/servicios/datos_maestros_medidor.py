@@ -36,12 +36,17 @@ class DatosMaestrosMedidorService:
         return replace(dispositivo, **cambios) if cambios else dispositivo
 
     @staticmethod
-    def acometida_de(dispositivo_id: str, nodos: list[NodoUnifilar]) -> NodoUnifilar | None:
+    def nodo_medido_por(dispositivo_id: str, nodos: list[NodoUnifilar]) -> NodoUnifilar | None:
+        """Devuelve el nodo del unifilar cuyo `device_id` es el del dispositivo dado."""
+        return next((n for n in nodos if n.device_id == dispositivo_id), None)
+
+    @classmethod
+    def acometida_de(cls, dispositivo_id: str, nodos: list[NodoUnifilar]) -> NodoUnifilar | None:
         """Sube por el unifilar desde el nodo medido por `dispositivo_id` hasta la acometida."""
         if not nodos:
             return None
         arbol = ArbolUnifilarService(nodos)
-        actual = next((n for n in nodos if n.device_id == dispositivo_id), None)
+        actual = cls.nodo_medido_por(dispositivo_id, nodos)
         visitados: set[str] = set()
         while actual is not None and actual.id not in visitados:
             visitados.add(actual.id)
@@ -66,6 +71,15 @@ class DatosMaestrosMedidorService:
         if acometida.penalizacion_reactiva_aplica is not None:
             cambios["penalizacion_reactiva_aplica"] = acometida.penalizacion_reactiva_aplica
         return replace(dispositivo, **cambios) if cambios else dispositivo
+
+    @classmethod
+    def aplicar_tension_nominal(cls, dispositivo: Dispositivo, nodos: list[NodoUnifilar]) -> Dispositivo:
+        """Hereda `tension_nominal_v` del nodo que este dispositivo mide (no de la acometida:
+        la acometida industrial puede estar en MT y el equipo medir en el TGBT en BT)."""
+        nodo = cls.nodo_medido_por(dispositivo.id, nodos)
+        if nodo is None:
+            return dispositivo
+        return replace(dispositivo, tension_nominal_v=nodo.tension_nominal_v)
 
     @classmethod
     def campos_gobernados_por_yaml(

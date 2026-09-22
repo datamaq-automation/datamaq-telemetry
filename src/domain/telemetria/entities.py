@@ -220,6 +220,9 @@ class Dispositivo:
     tarifa: str | None = None
     categoria_tarifaria: str | None = "T2"
     penalizacion_reactiva_aplica: bool = True
+    # Derivada del nodo del unifilar que este medidor mide (data/organizaciones.yml).
+    # No se persiste en MySQL: la resuelve DatosMaestrosMedidorService en cada lectura.
+    tension_nominal_v: float | None = None
     creado_en: datetime = field(default_factory=ahora_utc)
     actualizado_en: datetime = field(default_factory=ahora_utc)
 
