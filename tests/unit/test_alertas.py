@@ -155,3 +155,41 @@ def test_resolver_alerta_inexistente_lanza_error():
 
     with pytest.raises(AlertaNoEncontradaError):
         use_case.resolver_alerta(999)
+
+
+def test_resolver_alerta_con_publicador_y_repo_dispositivos():
+    """Verifica que se publique la alerta resuelta con device_uid si repo_dispositivos está disponible."""
+    from unittest.mock import MagicMock
+
+    repo_telem = MockTelemetriaRepo()
+    publicador_mock = MagicMock()
+    repo_dispositivos_mock = MagicMock()
+
+    # Mock un dispositivo que devuelve un device_uid
+    dispositivo_mock = MagicMock()
+    dispositivo_mock.device_uid.valor = "ECC9FFB45488"
+    repo_dispositivos_mock.obtener_por_id.return_value = dispositivo_mock
+
+    use_case = GestionarAlertasUseCase(repo_telem, publicador=publicador_mock, repo_dispositivos=repo_dispositivos_mock)
+
+    ahora = datetime.now(timezone.utc)
+    alerta = AlertaDispositivo(
+        id=20,
+        dispositivo_id="dev-1",
+        tipo_alerta="BAJA_TENSION",
+        severidad=SeveridadAlerta.WARNING,
+        mensaje="Tensión baja",
+        esta_resuelta=False,
+        disparada_en=ahora - timedelta(minutes=5),
+    )
+    repo_telem.guardar_alerta(alerta)
+
+    # Resolver la alerta
+    resuelta_dto = use_case.resolver_alerta(20, observaciones="Regulado OK")
+
+    # Verificar que se publicó con el device_uid
+    assert resuelta_dto.id == 20
+    assert resuelta_dto.esta_resuelta is True
+    publicador_mock.publicar_telemetria_en_vivo.assert_called_once()
+    call_args = publicador_mock.publicar_telemetria_en_vivo.call_args
+    assert "m/wifi/ECC9FFB45488/alertas" in str(call_args)
