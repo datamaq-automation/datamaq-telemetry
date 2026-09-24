@@ -140,15 +140,21 @@ def test_endpoint_facturas_distribuidora_gitops(client):
     assert resp.status_code == 200
     data = resp.json()
     assert isinstance(data, list)
-    assert len(data) >= 1
-    factura = data[0]
-    assert factura["plantaId"] == PLANTA_DURAX_ID
-    assert factura["periodo"] == "2026-08"
-    assert factura["distribuidora"] == "EDELAP"
-    assert factura["tarifa"] == "T5M12"
-    assert factura["energiaFacturadaKwh"] == pytest.approx(315810.0)
-    assert factura["potenciaExcedidaPuntaKw"] == pytest.approx(249.0)
-    assert factura["potenciaExcedidaFueraPuntaKw"] == pytest.approx(232.0)
+    # UPP-como-Durax: EdeLAP factura potencia y CAMMESA factura energía en dos documentos
+    # separados del mismo período (ver data/facturas_distribuidora.yml).
+    assert len(data) >= 2
+    del_periodo = [f for f in data if f["periodo"] == "2026-08" and f["plantaId"] == PLANTA_DURAX_ID]
+    assert {f["tipoDato"] for f in del_periodo} == {"potencia", "energia"}
+
+    potencia = next(f for f in del_periodo if f["tipoDato"] == "potencia")
+    assert potencia["proveedor"] == "EDELAP"
+    assert potencia["tarifa"] == "T5M12"
+    assert potencia["potenciaExcedidaPuntaKw"] == pytest.approx(249.0)
+    assert potencia["potenciaExcedidaFueraPuntaKw"] == pytest.approx(232.0)
+
+    energia = next(f for f in del_periodo if f["tipoDato"] == "energia")
+    assert energia["proveedor"] == "CAMMESA"
+    assert energia["energiaFacturadaKwh"] == pytest.approx(315810.0)
 
 
 def test_endpoint_facturas_distribuidora_planta_inexistente_404(client):

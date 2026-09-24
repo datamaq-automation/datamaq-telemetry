@@ -14,20 +14,17 @@ def _factura(**overrides) -> FacturaDistribuidora:
         id="f1",
         planta_id=PLANTA_ID,
         periodo="2026-08",
-        distribuidora="EDELAP",
+        proveedor="EDELAP",
+        tipo_dato="potencia",
         numero_factura="1",
+        importe_total_ars=100.0,
         tarifa="T5M12",
         dias_facturados=30,
-        energia_activa_punta_kwh=100.0,
-        energia_activa_resto_kwh=100.0,
-        energia_activa_valle_kwh=100.0,
         potencia_contratada_punta_kw=100.0,
         potencia_contratada_fuera_punta_kw=100.0,
         potencia_adquirida_punta_kw=100.0,
         potencia_adquirida_fuera_punta_kw=100.0,
         importe_potencia_ars=100.0,
-        importe_energia_ars=100.0,
-        importe_total_ars=100.0,
     )
     base.update(overrides)
     return FacturaDistribuidora(**base)
@@ -47,9 +44,27 @@ def test_facturas_validas_no_reporta_invalidas():
 
 
 def test_periodo_duplicado_en_la_misma_planta_es_invalido():
-    repo = _repo([_factura(id="f1", periodo="2026-08"), _factura(id="f2", periodo="2026-08")])
+    repo = _repo(
+        [
+            _factura(id="f1", periodo="2026-08", tipo_dato="potencia"),
+            _factura(id="f2", periodo="2026-08", tipo_dato="potencia"),
+        ]
+    )
     resultado = verificar_facturas_plantas(repo)
     assert resultado["invalidas"] == 1
+
+
+def test_mismo_periodo_con_distinto_tipo_dato_no_es_duplicado():
+    """UPP: EdeLAP factura potencia y CAMMESA factura energía del mismo período — no es
+    un duplicado, son dos documentos distintos."""
+    repo = _repo(
+        [
+            _factura(id="f1", periodo="2026-08", tipo_dato="potencia"),
+            _factura(id="f2", periodo="2026-08", tipo_dato="energia"),
+        ]
+    )
+    resultado = verificar_facturas_plantas(repo)
+    assert resultado["invalidas"] == 0
 
 
 def test_formato_de_periodo_invalido():

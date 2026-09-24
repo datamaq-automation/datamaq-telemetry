@@ -14,25 +14,35 @@ from src.domain.telemetria.entities import Planta
 PLANTA_ID = "planta-x"
 
 
-def _factura(periodo: str, energia_punta: float) -> FacturaDistribuidora:
+def _factura_energia(periodo: str, energia_punta: float) -> FacturaDistribuidora:
     return FacturaDistribuidora(
-        id=f"{PLANTA_ID}-{periodo}",
+        id=f"{PLANTA_ID}-{periodo}-energia",
         planta_id=PLANTA_ID,
         periodo=periodo,
-        distribuidora="EDELAP",
+        proveedor="CAMMESA",
+        tipo_dato="energia",
         numero_factura="1",
-        tarifa="T5M12",
-        dias_facturados=30,
+        importe_total_ars=0.0,
         energia_activa_punta_kwh=energia_punta,
         energia_activa_resto_kwh=0.0,
         energia_activa_valle_kwh=0.0,
-        potencia_contratada_punta_kw=100.0,
-        potencia_contratada_fuera_punta_kw=100.0,
-        potencia_adquirida_punta_kw=100.0,
-        potencia_adquirida_fuera_punta_kw=100.0,
-        importe_potencia_ars=0.0,
         importe_energia_ars=0.0,
+    )
+
+
+def _factura_potencia(periodo: str) -> FacturaDistribuidora:
+    """Documento de potencia (otro proveedor, ej. EdeLAP) — el fallback no debe usarlo."""
+    return FacturaDistribuidora(
+        id=f"{PLANTA_ID}-{periodo}-potencia",
+        planta_id=PLANTA_ID,
+        periodo=periodo,
+        proveedor="EDELAP",
+        tipo_dato="potencia",
+        numero_factura="1",
         importe_total_ars=0.0,
+        potencia_contratada_punta_kw=100.0,
+        potencia_adquirida_punta_kw=100.0,
+        importe_potencia_ars=0.0,
     )
 
 
@@ -45,7 +55,18 @@ def _repo(facturas: list[FacturaDistribuidora]) -> MagicMock:
 
 
 def test_sin_energia_padre_explicita_usa_la_factura_mas_reciente():
-    repo = _repo([_factura("2026-08", 1000.0)])
+    repo = _repo([_factura_energia("2026-08", 1000.0)])
+    use_case = ConsultarBalanceEnergiaUseCase(repo_organizaciones=repo)
+
+    resultado = use_case.ejecutar(planta_id=PLANTA_ID, energias_hijos_kwh=[900.0])
+
+    assert resultado.energia_padre_kwh == 1000.0
+
+
+def test_sin_energia_padre_explicita_ignora_documentos_de_potencia():
+    """UPP: EdeLAP (potencia) y CAMMESA (energía) conviven en el histórico — el fallback debe
+    tomar solo el de energía, no el primero de la lista sin filtrar."""
+    repo = _repo([_factura_potencia("2026-08"), _factura_energia("2026-08", 1000.0)])
     use_case = ConsultarBalanceEnergiaUseCase(repo_organizaciones=repo)
 
     resultado = use_case.ejecutar(planta_id=PLANTA_ID, energias_hijos_kwh=[900.0])
@@ -63,7 +84,7 @@ def test_sin_energia_padre_explicita_y_sin_facturas_usa_cero():
 
 
 def test_energia_padre_explicita_tiene_prioridad_sobre_la_factura():
-    repo = _repo([_factura("2026-08", 1000.0)])
+    repo = _repo([_factura_energia("2026-08", 1000.0)])
     use_case = ConsultarBalanceEnergiaUseCase(repo_organizaciones=repo)
 
     resultado = use_case.ejecutar(planta_id=PLANTA_ID, energia_padre_kwh=500.0, energias_hijos_kwh=[400.0])
