@@ -1,6 +1,7 @@
 # src/infrastructure/yaml/repositories/organizaciones_repository.py
 import structlog
 
+from src.domain.sge.entities import FacturaDistribuidora
 from src.domain.telemetria.entities import (
     DispositivoLayout,
     InstalacionMedidor,
@@ -18,9 +19,35 @@ from src.domain.telemetria.value_objects import (
     PosicionLayout,
     TipoNodoUnifilar,
 )
-from src.infrastructure.yaml.loaders import cargar_organizaciones_completas
+from src.infrastructure.yaml.loaders import cargar_facturas_distribuidora, cargar_organizaciones_completas
 
 logger = structlog.get_logger(__name__)
+
+
+def _parsear_factura(f: dict) -> FacturaDistribuidora:
+    planta_id = str(f["planta_id"])
+    periodo = str(f["periodo"])
+    return FacturaDistribuidora(
+        id=str(f.get("id") or f"{planta_id}-{periodo}"),
+        planta_id=planta_id,
+        periodo=periodo,
+        distribuidora=str(f.get("distribuidora", "")),
+        numero_factura=str(f.get("numero_factura", "")),
+        tarifa=str(f.get("tarifa", "")),
+        dias_facturados=int(f.get("dias_facturados", 0)),
+        energia_activa_punta_kwh=float(f.get("energia_activa_punta_kwh", 0.0)),
+        energia_activa_resto_kwh=float(f.get("energia_activa_resto_kwh", 0.0)),
+        energia_activa_valle_kwh=float(f.get("energia_activa_valle_kwh", 0.0)),
+        potencia_contratada_punta_kw=float(f.get("potencia_contratada_punta_kw", 0.0)),
+        potencia_contratada_fuera_punta_kw=float(f.get("potencia_contratada_fuera_punta_kw", 0.0)),
+        potencia_adquirida_punta_kw=float(f.get("potencia_adquirida_punta_kw", 0.0)),
+        potencia_adquirida_fuera_punta_kw=float(f.get("potencia_adquirida_fuera_punta_kw", 0.0)),
+        importe_potencia_ars=float(f.get("importe_potencia_ars", 0.0)),
+        importe_energia_ars=float(f.get("importe_energia_ars", 0.0)),
+        importe_total_ars=float(f.get("importe_total_ars", 0.0)),
+        fuente_archivo=f.get("fuente_archivo"),
+        cargada_en=f.get("cargada_en"),
+    )
 
 
 def _parsear_coordenadas(n: dict) -> CoordenadasNodoUnifilar | None:
@@ -284,3 +311,11 @@ class YamlOrganizacionesRepository(RepositorioOrganizacionesPort):
                             orden_fases=m.get("orden_fases"),
                         )
         return None
+
+    def obtener_facturas_planta(self, planta_id: str) -> list[FacturaDistribuidora]:
+        facturas = [
+            _parsear_factura(f)
+            for f in cargar_facturas_distribuidora(self.data_dir)
+            if str(f.get("planta_id")) == str(planta_id)
+        ]
+        return sorted(facturas, key=lambda f: f.periodo, reverse=True)

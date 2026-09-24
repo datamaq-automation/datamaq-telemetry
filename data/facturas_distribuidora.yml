@@ -1,0 +1,26 @@
+# data/facturas_distribuidora.yml — Histórico de facturas de la distribuidora por planta.
+# Una entrada por planta por período (decisión: decisions/2026-09-24_factura-distribuidora-yaml.md
+# en el repo padre). Se agrega por commit revisado con scripts/importar_factura_distribuidora.py,
+# nunca por API (RepositorioOrganizacionesPort es solo lectura).
+#
+# Campos discriminados Punta / Fuera de Punta porque así factura la distribuidora en Media
+# Tensión (confirmado con una factura real EDELAP tarifa T5M12, ver specs/factura-distribuidora.md).
+facturas:
+  - planta_id: "c64fd625-0037-4caa-b68a-800e8e0ee548"
+    periodo: "2026-08"
+    distribuidora: "EDELAP"
+    numero_factura: "0020-01988580"
+    tarifa: "T5M12"
+    dias_facturados: 30
+    energia_activa_punta_kwh: 68310.0
+    energia_activa_resto_kwh: 187506.0
+    energia_activa_valle_kwh: 59994.0
+    potencia_contratada_punta_kw: 800.0
+    potencia_contratada_fuera_punta_kw: 850.0
+    potencia_adquirida_punta_kw: 1049.0
+    potencia_adquirida_fuera_punta_kw: 1082.0
+    importe_potencia_ars: 7664856.62
+    importe_energia_ars: 638572.35
+    importe_total_ars: 21031736.78
+    fuente_archivo: "factura-durax-2026-08.pdf"
+    cargada_en: "2026-09-24"

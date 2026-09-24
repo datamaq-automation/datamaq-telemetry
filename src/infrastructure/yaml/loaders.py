@@ -182,3 +182,14 @@ def cargar_organizaciones_completas(data_dir: str) -> list[dict]:
     cargadas_por_id = cargar_organizaciones_modulares(data_dir)
     cargar_organizaciones_planas(data_dir, cargadas_por_id)
     return list(cargadas_por_id.values())
+
+
+def cargar_facturas_distribuidora(data_dir: str) -> list[dict]:
+    """Carga el histórico de facturas de la distribuidora (`{data_dir}/facturas_distribuidora.yml`).
+
+    Archivo único, sin merge modular/plano: no hay necesidad, es un solo documento por repo.
+    """
+    contenido = cargar_yaml_seguro(os.path.join(data_dir, "facturas_distribuidora.yml"))
+    if isinstance(contenido, dict) and isinstance(contenido.get("facturas"), list):
+        return [x for x in contenido["facturas"] if isinstance(x, dict)]
+    return []
