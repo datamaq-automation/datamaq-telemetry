@@ -25,16 +25,18 @@ def _magnitudes_negativas(f: FacturaDistribuidora) -> list[str]:
         "importe_energia_ars": f.importe_energia_ars,
         "importe_total_ars": f.importe_total_ars,
     }
-    return [nombre for nombre, valor in campos.items() if valor < 0.0]
+    return [nombre for nombre, valor in campos.items() if valor is not None and valor < 0.0]
 
 
 def verificar_facturas_plantas(yaml_repo: YamlOrganizacionesRepository | None = None) -> dict[str, int]:
     """Valida el histórico de facturas (`data/facturas_distribuidora.yml`) de cada planta.
 
     Distinta invariante que `verificador_unifilar.py` (árbol de nodos): acá es una lista
-    plana histórica, así que se valida período único por planta, formato `YYYY-MM` y
-    magnitudes no negativas. Advierte, no bloquea: igual criterio que el resto de los
-    validadores de integridad YAML.
+    plana histórica, así que se valida la unicidad de (período, tipo_dato) por planta —no
+    "período único", porque potencia y energía pueden venir de proveedores distintos en dos
+    documentos separados del mismo período (ver `FacturaDistribuidora` en `domain/sge/entities.py`)—,
+    formato `YYYY-MM` y magnitudes no negativas. Advierte, no bloquea: igual criterio que el
+    resto de los validadores de integridad YAML.
     """
     if yaml_repo is None:
         yaml_repo = YamlOrganizacionesRepository()
@@ -43,14 +45,15 @@ def verificar_facturas_plantas(yaml_repo: YamlOrganizacionesRepository | None = 
     invalidas = 0
     for planta in plantas:
         facturas = yaml_repo.obtener_facturas_planta(planta.id)
-        periodos_vistos: set[str] = set()
+        documentos_vistos: set[tuple[str, str]] = set()
         for factura in facturas:
             errores: list[str] = []
             if not _PATRON_PERIODO.match(factura.periodo):
                 errores.append(f"período '{factura.periodo}' no tiene formato YYYY-MM")
-            if factura.periodo in periodos_vistos:
-                errores.append(f"período '{factura.periodo}' duplicado en la planta")
-            periodos_vistos.add(factura.periodo)
+            clave_documento = (factura.periodo, factura.tipo_dato)
+            if clave_documento in documentos_vistos:
+                errores.append(f"período '{factura.periodo}' tipo '{factura.tipo_dato}' duplicado en la planta")
+            documentos_vistos.add(clave_documento)
             negativas = _magnitudes_negativas(factura)
             if negativas:
                 errores.append(f"magnitudes negativas: {', '.join(negativas)}")

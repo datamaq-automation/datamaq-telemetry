@@ -24,27 +24,36 @@ from src.infrastructure.yaml.loaders import cargar_facturas_distribuidora, carga
 logger = structlog.get_logger(__name__)
 
 
+def _float_opt(f: dict, clave: str) -> float | None:
+    valor = f.get(clave)
+    return float(valor) if valor is not None else None
+
+
 def _parsear_factura(f: dict) -> FacturaDistribuidora:
     planta_id = str(f["planta_id"])
     periodo = str(f["periodo"])
+    # Sin `tipo_dato` declarado (YAML legacy previo a la distinción potencia/energía),
+    # se asume "potencia": era el único tipo de dato que existía antes de este cambio.
+    tipo_dato = str(f.get("tipo_dato") or "potencia")
     return FacturaDistribuidora(
-        id=str(f.get("id") or f"{planta_id}-{periodo}"),
+        id=str(f.get("id") or f"{planta_id}-{periodo}-{tipo_dato}"),
         planta_id=planta_id,
         periodo=periodo,
-        distribuidora=str(f.get("distribuidora", "")),
+        proveedor=str(f.get("proveedor") or f.get("distribuidora", "")),
+        tipo_dato=tipo_dato,  # type: ignore[arg-type]
         numero_factura=str(f.get("numero_factura", "")),
-        tarifa=str(f.get("tarifa", "")),
-        dias_facturados=int(f.get("dias_facturados", 0)),
-        energia_activa_punta_kwh=float(f.get("energia_activa_punta_kwh", 0.0)),
-        energia_activa_resto_kwh=float(f.get("energia_activa_resto_kwh", 0.0)),
-        energia_activa_valle_kwh=float(f.get("energia_activa_valle_kwh", 0.0)),
-        potencia_contratada_punta_kw=float(f.get("potencia_contratada_punta_kw", 0.0)),
-        potencia_contratada_fuera_punta_kw=float(f.get("potencia_contratada_fuera_punta_kw", 0.0)),
-        potencia_adquirida_punta_kw=float(f.get("potencia_adquirida_punta_kw", 0.0)),
-        potencia_adquirida_fuera_punta_kw=float(f.get("potencia_adquirida_fuera_punta_kw", 0.0)),
-        importe_potencia_ars=float(f.get("importe_potencia_ars", 0.0)),
-        importe_energia_ars=float(f.get("importe_energia_ars", 0.0)),
         importe_total_ars=float(f.get("importe_total_ars", 0.0)),
+        tarifa=f.get("tarifa"),
+        dias_facturados=int(f["dias_facturados"]) if f.get("dias_facturados") is not None else None,
+        energia_activa_punta_kwh=_float_opt(f, "energia_activa_punta_kwh"),
+        energia_activa_resto_kwh=_float_opt(f, "energia_activa_resto_kwh"),
+        energia_activa_valle_kwh=_float_opt(f, "energia_activa_valle_kwh"),
+        potencia_contratada_punta_kw=_float_opt(f, "potencia_contratada_punta_kw"),
+        potencia_contratada_fuera_punta_kw=_float_opt(f, "potencia_contratada_fuera_punta_kw"),
+        potencia_adquirida_punta_kw=_float_opt(f, "potencia_adquirida_punta_kw"),
+        potencia_adquirida_fuera_punta_kw=_float_opt(f, "potencia_adquirida_fuera_punta_kw"),
+        importe_potencia_ars=_float_opt(f, "importe_potencia_ars"),
+        importe_energia_ars=_float_opt(f, "importe_energia_ars"),
         fuente_archivo=f.get("fuente_archivo"),
         cargada_en=f.get("cargada_en"),
     )

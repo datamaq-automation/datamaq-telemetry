@@ -56,52 +56,76 @@ class RegistroCapacitacionSge:
     comentarios: str | None = None
 
 
+TipoDatoFactura = Literal["potencia", "energia"]
+
+
 @dataclass(frozen=True)
 class FacturaDistribuidora:
-    """Factura mensual de la distribuidora, una por planta por período (histórico, no se pisa).
+    """Un documento de facturación de la distribuidora: potencia O energía, no ambas.
 
     Evidencia documental para ISO 50001 §6.3 (balance de energía) y §9.1 (EnPI de potencia
     y energía facturada). Se carga por commit al YAML (`data/facturas_distribuidora.yml`),
     nunca por API: ver `decisions/2026-09-24_factura-distribuidora-yaml.md`.
 
+    Potencia y energía pueden venir facturadas por proveedores DISTINTOS en la misma planta:
+    confirmado por el dueño que UPP recibe la potencia de EdeLAP y la energía de CAMMESA en dos
+    PDFs separados del mismo período (ver `specs/factura-distribuidora.md` §1, nota 2026-09-24).
+    Por eso cada instancia es un documento (`tipo_dato`), no "el período completo" — dos
+    instancias con el mismo `planta_id` y `periodo` pero distinto `tipo_dato` representan el
+    mismo mes facturado por dos proveedores. Un registro `tipo_dato="potencia"` tiene poblados
+    los campos de potencia (los de energía quedan en `None`) y viceversa.
+
     Potencia y su valor van discriminados Punta / Fuera de Punta porque así factura la
     distribuidora en tarifas de Media Tensión (confirmado con una factura real EDELAP,
-    tarifa T5M12, ver `specs/factura-distribuidora.md` §2.1): un único campo "potencia
-    contratada" perdería esa distinción tarifaria.
+    tarifa T5M12): un único campo "potencia contratada" perdería esa distinción tarifaria.
     """
 
     id: str
     planta_id: str
     periodo: str
-    distribuidora: str
+    proveedor: str
+    tipo_dato: TipoDatoFactura
     numero_factura: str
-    tarifa: str
-    dias_facturados: int
-    energia_activa_punta_kwh: float
-    energia_activa_resto_kwh: float
-    energia_activa_valle_kwh: float
-    potencia_contratada_punta_kw: float
-    potencia_contratada_fuera_punta_kw: float
-    potencia_adquirida_punta_kw: float
-    potencia_adquirida_fuera_punta_kw: float
-    importe_potencia_ars: float
-    importe_energia_ars: float
     importe_total_ars: float
+    tarifa: str | None = None
+    dias_facturados: int | None = None
+    energia_activa_punta_kwh: float | None = None
+    energia_activa_resto_kwh: float | None = None
+    energia_activa_valle_kwh: float | None = None
+    potencia_contratada_punta_kw: float | None = None
+    potencia_contratada_fuera_punta_kw: float | None = None
+    potencia_adquirida_punta_kw: float | None = None
+    potencia_adquirida_fuera_punta_kw: float | None = None
+    importe_potencia_ars: float | None = None
+    importe_energia_ars: float | None = None
     fuente_archivo: str | None = None
     cargada_en: str | None = None
 
     @property
-    def energia_facturada_kwh(self) -> float:
+    def energia_facturada_kwh(self) -> float | None:
+        if (
+            self.energia_activa_punta_kwh is None
+            or self.energia_activa_resto_kwh is None
+            or self.energia_activa_valle_kwh is None
+        ):
+            return None
         return self.energia_activa_punta_kwh + self.energia_activa_resto_kwh + self.energia_activa_valle_kwh
 
     @property
-    def potencia_excedida_punta_kw(self) -> float:
+    def potencia_excedida_punta_kw(self) -> float | None:
+        if self.potencia_adquirida_punta_kw is None or self.potencia_contratada_punta_kw is None:
+            return None
         return max(0.0, self.potencia_adquirida_punta_kw - self.potencia_contratada_punta_kw)
 
     @property
-    def potencia_excedida_fuera_punta_kw(self) -> float:
+    def potencia_excedida_fuera_punta_kw(self) -> float | None:
+        if self.potencia_adquirida_fuera_punta_kw is None or self.potencia_contratada_fuera_punta_kw is None:
+            return None
         return max(0.0, self.potencia_adquirida_fuera_punta_kw - self.potencia_contratada_fuera_punta_kw)
 
     @property
-    def valor_energia_ars_kwh_promedio(self) -> float:
-        return self.importe_energia_ars / self.energia_facturada_kwh if self.energia_facturada_kwh else 0.0
+    def valor_energia_ars_kwh_promedio(self) -> float | None:
+        energia = self.energia_facturada_kwh
+        if energia is None or self.importe_energia_ars is None or energia == 0:
+            return None
+        return self.importe_energia_ars / energia
