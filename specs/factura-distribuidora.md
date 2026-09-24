@@ -313,9 +313,7 @@ class FacturaDistribuidoraResponseDTO(BaseModel):
     potencia_excedida_fuera_punta_kw: float = Field(
         validation_alias="potenciaExcedidaFueraPuntaKw", serialization_alias="potenciaExcedidaFueraPuntaKw"
     )
-    importe_potencia_ars: float = Field(
-        validation_alias="importePotenciaArs", serialization_alias="importePotenciaArs"
-    )
+    importe_potencia_ars: float = Field(validation_alias="importePotenciaArs", serialization_alias="importePotenciaArs")
     importe_energia_ars: float = Field(validation_alias="importeEnergiaArs", serialization_alias="importeEnergiaArs")
     importe_total_ars: float = Field(validation_alias="importeTotalArs", serialization_alias="importeTotalArs")
     valor_energia_ars_kwh_promedio: float = Field(
