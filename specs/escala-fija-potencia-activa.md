@@ -90,6 +90,18 @@ para fijar el eje Y del frontend, en el header `X-Potencia-Referencia-W`.
   Logs de producción (2026-09-24, 6 h): un solo proceso uvicorn y los nodos consultados tienen como
   máximo 2 medidores. Para medirlo, cada cálculo (solo al vencer la caché) registra
   `potencia_referencia_calculada` con `duracion_ms`, `muestras` y `referencia_w`.
+  **Medido en producción (2026-09-24, plan free, 7 d a 1 h):** medidor 1119–1340 ms (168 muestras),
+  nodo UPP de 2 medidores 915 ms; con caché, el histórico responde en 360–710 ms. El costo es leer
+  y agregar las ~2000 lecturas crudas (≈ 0,6 ms c/u): con 30 d PRO serían ≈ 5 s por medidor.
+  Se vio además un doble cálculo al cargar el dashboard (gráfico e histograma en paralelo): se
+  resolvió con un lock por clave en `CacheTTL` (un solo cálculo; el segundo pedido espera).
+- **Pendiente antes de tener medidores PRO con 30 d de datos: agregación en SQL.** Trampas
+  verificadas para que dé la misma serie: (1) `_calcular_totales_potencia` cae a la suma de
+  fases si ningún punto del bucket tiene `total_active_power` (un `AVG` daría `NULL`);
+  (2) `recorded_at` es naive UTC y `UNIX_TIMESTAMP` usa la zona de la sesión MySQL (los buckets
+  se correrían); (3) el buffer en vivo no está en la tabla (despreciable en 30 d, pero la serie
+  deja de ser idéntica a la del gráfico). Hay un precedente liviano:
+  `SqlAlchemyTelemetriaRepository.listar_potencias_para_histograma`.
 
 ## 2. Dominio & Puertos
 

@@ -257,3 +257,41 @@ def test_registra_duracion_y_muestras_del_calculo():
     assert evento["muestras"] == 400
     assert evento["referencia_w"] == pytest.approx(100.0)
     assert evento["duracion_ms"] >= 0
+
+
+def test_cache_ttl_pedidos_simultaneos_calculan_una_sola_vez():
+    """El dashboard pide gráfico e histograma en paralelo: el segundo espera al primero."""
+    import threading
+
+    cache = CacheTTL(60)
+    empezo = threading.Event()
+    liberar = threading.Event()
+    llamadas = []
+
+    def calcular_lento() -> float:
+        llamadas.append(1)
+        empezo.set()
+        liberar.wait(5)
+        return 7.0
+
+    resultados: list[float | None] = []
+    hilos = [threading.Thread(target=lambda: resultados.append(cache.obtener("k", calcular_lento))) for _ in range(3)]
+    hilos[0].start()
+    empezo.wait(5)
+    for hilo in hilos[1:]:
+        hilo.start()
+    liberar.set()
+    for hilo in hilos:
+        hilo.join(5)
+
+    assert len(llamadas) == 1
+    assert resultados == [7.0, 7.0, 7.0]
+
+
+def test_cache_ttl_si_el_calculo_falla_el_siguiente_reintenta():
+    cache = CacheTTL(60)
+
+    with pytest.raises(RuntimeError):
+        cache.obtener("k", MagicMock(side_effect=RuntimeError("db caída")))
+
+    assert cache.obtener("k", lambda: 3.0) == 3.0

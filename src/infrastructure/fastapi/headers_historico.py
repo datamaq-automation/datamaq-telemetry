@@ -32,29 +32,48 @@ def formatear_potencia_referencia(valor: float) -> str:
 class CacheTTL:
     """Caché en memoria por proceso con expiración. Guarda también ``None`` (sin datos
     suficientes) para no recalcular 30 días en cada pedido de un medidor recién instalado.
-    El cálculo corre fuera del lock: dos pedidos simultáneos pueden calcular dos veces."""
+
+    Un solo cálculo por clave a la vez: el dashboard pide gráfico e histograma en paralelo al
+    mismo endpoint, y sin esto los dos calculaban (visto en producción, ~1,2 s cada uno). El
+    segundo pedido espera al primero y usa su resultado; claves distintas no se bloquean."""
 
     def __init__(self, ttl_segundos: float, reloj: Callable[[], float] = time.monotonic):
         self._ttl = ttl_segundos
         self._reloj = reloj
         self._valores: dict[Hashable, tuple[float, float | None]] = {}
+        self._en_curso: dict[Hashable, threading.Lock] = {}
         self._lock = threading.Lock()
 
+    def _vigente(self, clave: Hashable) -> tuple[bool, float | None]:
+        entrada = self._valores.get(clave)
+        if entrada is not None and entrada[0] > self._reloj():
+            return True, entrada[1]
+        return False, None
+
     def obtener(self, clave: Hashable, calcular: Callable[[], float | None]) -> float | None:
-        ahora = self._reloj()
         with self._lock:
-            entrada = self._valores.get(clave)
-            if entrada is not None and entrada[0] > ahora:
-                return entrada[1]
-        valor = calcular()
-        with self._lock:
-            self._valores = {c: e for c, e in self._valores.items() if e[0] > ahora}
-            self._valores[clave] = (ahora + self._ttl, valor)
-        return valor
+            hay, valor = self._vigente(clave)
+            if hay:
+                return valor
+            lock_clave = self._en_curso.setdefault(clave, threading.Lock())
+        with lock_clave:
+            with self._lock:
+                # Otro pedido pudo haberlo calculado mientras esperábamos.
+                hay, valor = self._vigente(clave)
+                if hay:
+                    return valor
+            valor = calcular()
+            with self._lock:
+                ahora = self._reloj()
+                self._valores = {c: e for c, e in self._valores.items() if e[0] > ahora}
+                self._valores[clave] = (ahora + self._ttl, valor)
+                self._en_curso.pop(clave, None)
+            return valor
 
     def limpiar(self) -> None:
         with self._lock:
             self._valores.clear()
+            self._en_curso.clear()
 
 
 _log = structlog.get_logger(__name__)
