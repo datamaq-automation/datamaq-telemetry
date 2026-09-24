@@ -8,6 +8,7 @@ el cálculo de suma en sí vive en ``AgregadorDispositivosService``.
 """
 
 import math
+import time
 from datetime import datetime, timedelta, timezone
 
 import structlog
@@ -131,6 +132,7 @@ def calcular_potencia_referencia(
     ``None`` si no hay datos suficientes (``MINIMO_HORAS_CON_DATOS``)."""
     if not dispositivos_ids:
         return None
+    inicio = time.perf_counter()
     datos_desde = calcular_datos_desde(dispositivos_ids, consultar_telemetria)
     puntos = calcular_historico(
         dispositivos_ids, consultar_telemetria, GRANULARIDAD_REFERENCIA, VENTANA_REFERENCIA_HORAS
@@ -140,4 +142,13 @@ def calcular_potencia_referencia(
         for p in puntos
         if p.potencia_activa_total_w is not None and (datos_desde is None or p.momento >= datos_desde)
     ]
-    return potencia_referencia(muestras)
+    referencia = potencia_referencia(muestras)
+    # Solo corre al vencer la caché (15 min): mide el costo real del cálculo en producción.
+    _log.info(
+        "potencia_referencia_calculada",
+        dispositivos_count=len(dispositivos_ids),
+        muestras=len(muestras),
+        referencia_w=referencia,
+        duracion_ms=round((time.perf_counter() - inicio) * 1000),
+    )
+    return referencia

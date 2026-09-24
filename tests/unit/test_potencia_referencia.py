@@ -242,3 +242,18 @@ def test_nodo_sin_acceso_no_consulta_la_referencia():
 
     assert response.status_code == 404
     use_case.potencia_referencia.assert_not_called()
+
+
+def test_registra_duracion_y_muestras_del_calculo():
+    from structlog.testing import capture_logs
+
+    consultar = _consultar({"a": _lecturas([100.0] * 400)})
+
+    with capture_logs() as logs:
+        calcular_potencia_referencia(["a"], consultar)
+
+    evento = next(e for e in logs if e["event"] == "potencia_referencia_calculada")
+    assert evento["dispositivos_count"] == 1
+    assert evento["muestras"] == 400
+    assert evento["referencia_w"] == pytest.approx(100.0)
+    assert evento["duracion_ms"] >= 0

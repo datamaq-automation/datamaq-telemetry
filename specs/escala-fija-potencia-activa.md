@@ -87,6 +87,9 @@ para fijar el eje Y del frontend, en el header `X-Potencia-Referencia-W`.
 
 - Con nodos de muchos medidores el primer pedido tras vencer la caché puede pasar de 2 s. Si se
   nota, pasar a un cálculo en SQL por buckets o precalcular en segundo plano; hoy no se justifica.
+  Logs de producción (2026-09-24, 6 h): un solo proceso uvicorn y los nodos consultados tienen como
+  máximo 2 medidores. Para medirlo, cada cálculo (solo al vencer la caché) registra
+  `potencia_referencia_calculada` con `duracion_ms`, `muestras` y `referencia_w`.
 
 ## 2. Dominio & Puertos
 
