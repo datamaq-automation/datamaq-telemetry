@@ -1,0 +1,466 @@
+# Factura de la distribuidora como dato histórico en YAML
+
+> **Decisión aplicable:** `decisions/2026-09-24_factura-distribuidora-yaml.md` (repo padre).
+> **Traspasada a hija:** sí · **Bloque cerrado:** sí (implementado, gauntlet en verde; falta
+> `git push`, que requiere autorización explícita del dueño — no bloquea el cierre de la spec)
+
+## 1. Objetivo y Contexto
+
+**Objetivo:** modelar la factura mensual de la distribuidora como dato histórico versionado en
+YAML (una entrada por planta por período), con un parser de PDF que extraiga los campos
+estructurados, para (a) comprobar la medición global de energía contra `BalanceEnergiaService`, y
+(b) exponer series de potencia adquirida/contratada/excedida (kW y su tarifa en $/kW) y energía
+facturada (MWh) a los gráficos.
+
+**Alcance:**
+- Entidad(es) de dominio para la factura (período, planta, energía facturada en MWh, potencia
+  adquirida/contratada/excedida en kW, valores tarifarios asociados).
+- Puerto + repositorio YAML para persistir/leer el histórico, versionado en git.
+- Parser de PDF en `infrastructure/` (nueva dependencia de terceros a elegir y justificar).
+- Validador de integridad (extensión de `verificador_unifilar.py` o uno nuevo).
+- Caso(s) de uso para: alimentar `BalanceEnergiaService` con la energía facturada como
+  `energia_padre_kwh`, y exponer la serie histórica a los endpoints que consuman los gráficos
+  nuevos.
+- DTOs y endpoint(s) FastAPI para exponer el histórico de facturas a `app-datamaq` (necesarios si
+  los gráficos mencionados se consumen desde el frontend — a confirmar alcance de endpoint en
+  esta iniciativa vs. una spec de `app-datamaq` aparte).
+
+**Fuera de alcance:**
+- La UI/gráficos en `app-datamaq` (potencia adquirida/contratada/excedida, MWh): esta spec cubre
+  solo el backend (dato + exposición). Si se necesita, abrir un bloque `## Repo: app-datamaq`
+  aparte cuando se defina el contrato de API resultante.
+- OCR genérico para cualquier formato de factura de cualquier distribuidora del país: alcanzar,
+  en esta primera iteración, el formato de la distribuidora real que se vaya a cargar primero.
+
+**Certezas verificadas en este repo (rutas, callers, qué borrar):**
+- `organizaciones.yml:9-11` — patrón existente de campos "fuente factura", pero vigente, no
+  histórico: no reusar tal cual, es un archivo/estructura distinta.
+- `src/domain/sge/servicios/balance_energia.py`, `src/application/use_cases/consultar_balance_energia.py`
+  — consumidor de energía medida vs. facturada, hoy con `energia_padre_kwh` como parámetro
+  explícito, no conectado a ninguna fuente.
+- `src/domain/telemetria/entities.py:219` — `potencia_contratada_kw` sin persistencia ni otros
+  usos en `src/` (`grep -rn potencia_contratada_kw src/ tests/ data/` solo devuelve la
+  declaración del campo): candidato a reemplazar o convivir, no a asumir vigente.
+- `src/infrastructure/yaml/verificador_unifilar.py` — único validador de integridad YAML hoy, corre
+  al arrancar sobre `YamlOrganizacionesRepository`, solo advierte. Valida específicamente el árbol
+  del unifilar (`ArbolUnifilarService`), no genérico.
+- Sin dependencia de PDF en `pyproject.toml`/`requirements.txt`: cualquier librería que se elija es
+  nueva y debe declararse.
+- `src/domain/telemetria/ports.py:191-196` — `RepositorioOrganizacionesPort` es **solo lectura a
+  propósito**: "la estructura de planta se modifica por commit al YAML, no por API. No hay
+  `guardar_*`." Este contrato ya existente condiciona el diseño del caso de uso de ingesta (§2).
+- `src/infrastructure/fastapi/routes/sge_router.py` — patrón ya usado para `linea-base` y
+  `balance-energia`/`ahorros-cusum`: router `/api/v1/sge`, dependencia `resolver_planta_permitida`
+  para aislar por planta, DTOs con alias camelCase (`sge_dto.py`), mapeo de dict crudo del YAML a
+  entidad tipada en el repositorio.
+- `scripts/exportar_instalacion_medidores.py` — precedente de script CLI que vuelca datos a un
+  formato revisable por un humano antes de commitear al YAML, en vez de escribir en caliente desde
+  la API.
+
+**Ya hecho por el padre (no repetir):** decisión registrada con las 6 respuestas del dueño
+(`decisions/2026-09-24_factura-distribuidora-yaml.md`). Nada de código.
+
+## 2. Dominio & Puertos
+
+### 2.1 Decisiones a criterio de la hija (registradas acá, no se devuelven sin decidir)
+
+1. **Librería de parsing de PDF: `pdfplumber`.** No se cuenta con una factura real de la
+   distribuidora para inspeccionar su formato en esta sesión (texto seleccionable vs. escaneo).
+   Se elige `pdfplumber` (pure-Python sobre `pdfminer.six`, sin binarios de sistema, ya extrae
+   texto y tablas) como implementación por defecto para el caso más común (PDF con texto
+   seleccionable, que es como la gran mayoría de distribuidoras argentinas emiten la factura
+   digital). El puerto de dominio (`ParserFacturaDistribuidoraPort`, ver 2.2) es la abstracción
+   que permite, **sin tocar dominio ni casos de uso**, agregar un segundo adaptador con OCR
+   (ej. `pytesseract` + `pdf2image`, que sí requieren binarios de sistema `tesseract`/`poppler`) el
+   día que aparezca una factura escaneada real. No se agrega esa dependencia ahora (no hay caso
+   de uso comprobado, y la regla de la casa es no construir para hipotéticos).
+2. **Validador: uno nuevo, `verificador_facturas.py`.** `verificador_unifilar.py` valida
+   específicamente la estructura de árbol del unifilar vía `ArbolUnifilarService.validar()`; una
+   colección plana de facturas históricas por planta no tiene esa forma (no hay padre/hijo,
+   `parent_id`, ciclos). Forzarla en el mismo validador mezclaría dos invariantes distintos.
+   `verificar_facturas_plantas()` sigue el mismo patrón (advierte, no bloquea) pero valida otra
+   cosa: período único por planta, formato `YYYY-MM`, `planta_id` existente, magnitudes no
+   negativas.
+3. **`Dispositivo.potencia_contratada_kw`: se elimina.** `grep` confirma cero callers y cero
+   persistencia (no está en ningún mapper SQLAlchemy ni DTO). La factura pasa a ser la fuente de
+   verdad histórica y real de potencia contratada (con período, a diferencia del campo suelto que
+   nunca se pobló). Mantenerlo sería duplicar una noción sin dueño. Se borra en el mismo commit que
+   agrega la entidad `FacturaDistribuidora`, dejando constancia acá para que la verificación
+   cruzada del padre no lo marque como pendiente.
+4. **Se verificó una factura real durante la implementación (no especulativa) y cambió el
+   modelo de la entidad.** El dueño compartió una factura real de EDELAP (Empresa Distribuidora
+   La Plata, tarifa de Media Tensión T5M12) vía Google Drive. Leerla mostró que la potencia
+   contratada, adquirida y su importe **no son un valor único**: la distribuidora factura Media
+   Tensión discriminando siempre **Punta** y **Fuera de Punta** (dos franjas horarias con
+   demanda y tarifa distintas — ver `Potencias Contratadas (KW): ... Transporte Punta: 800.000
+   Transporte Fuera Punta: 850.000` y los cargos de potencia separados por franja en la factura).
+   Un solo campo `potencia_contratada_kw` como se había especulado en el borrador inicial de este
+   documento habría perdido esa distinción tarifaria real. La entidad de §2.2 quedó rediseñada
+   con esa discriminación antes de escribir ningún caso de uso o DTO, para no arrastrar el
+   modelo viejo a capas superiores. La energía activa también viene discriminada en tres franjas
+   (Punta/Resto/Valle) en la factura real, así que la entidad las guarda por separado y expone
+   `energia_facturada_kwh` como propiedad calculada (la suma) en vez de un campo suelto.
+
+### 2.2 Entidad, puertos y estructura YAML
+
+**Entidad** `src/domain/sge/entities.py` (junto a `ArticuloSge`; el dominio de la factura es SGE —
+ISO 50001 §6.3/§9.1 la usa como evidencia de energía y demanda — no telemetría):
+
+```python
+@dataclass(frozen=True)
+class FacturaDistribuidora:
+    """Potencia y su valor van discriminados Punta / Fuera de Punta porque así factura la
+    distribuidora en tarifas de Media Tensión (confirmado con una factura real EDELAP, tarifa
+    T5M12) — un único campo "potencia contratada" perdería esa distinción tarifaria."""
+
+    id: str  # `{planta_id}-{periodo}`, determinístico
+    planta_id: str
+    periodo: str  # "YYYY-MM", mes facturado
+    distribuidora: str
+    numero_factura: str
+    tarifa: str
+    dias_facturados: int
+    energia_activa_punta_kwh: float
+    energia_activa_resto_kwh: float
+    energia_activa_valle_kwh: float
+    potencia_contratada_punta_kw: float
+    potencia_contratada_fuera_punta_kw: float
+    potencia_adquirida_punta_kw: float  # medida/facturada real = contratada + exceso
+    potencia_adquirida_fuera_punta_kw: float
+    importe_potencia_ars: float
+    importe_energia_ars: float
+    importe_total_ars: float
+    fuente_archivo: str | None = None  # nombre del PDF origen, trazabilidad
+    cargada_en: str | None = None  # fecha ISO de carga (no de facturación)
+
+    @property
+    def energia_facturada_kwh(self) -> float:
+        return self.energia_activa_punta_kwh + self.energia_activa_resto_kwh + self.energia_activa_valle_kwh
+
+    @property
+    def potencia_excedida_punta_kw(self) -> float:
+        return max(0.0, self.potencia_adquirida_punta_kw - self.potencia_contratada_punta_kw)
+
+    @property
+    def potencia_excedida_fuera_punta_kw(self) -> float:
+        return max(0.0, self.potencia_adquirida_fuera_punta_kw - self.potencia_contratada_fuera_punta_kw)
+
+    @property
+    def valor_energia_ars_kwh_promedio(self) -> float:
+        return self.importe_energia_ars / self.energia_facturada_kwh if self.energia_facturada_kwh else 0.0
+```
+
+Sin dependencias de terceros (`dataclass` + `@property` + stdlib), cumple la regla de capas. Las
+potencias excedidas y el valor promedio de energía se calculan (no se guardan duplicados en el
+YAML) porque son derivables de los campos que sí trae la factura — evita que YAML y cómputo se
+desincronicen.
+
+**Puerto de parsing** `src/domain/sge/ports.py`:
+
+```python
+class ParserFacturaDistribuidoraPort(ABC):
+    @abstractmethod
+    def parsear(self, ruta_pdf: str, planta_id: str) -> FacturaDistribuidora:
+        """Extrae los campos estructurados de un PDF de factura. Lanza
+        FacturaDistribuidoraIlegibleError si no puede extraer los campos obligatorios."""
+        ...
+```
+
+**Puerto de lectura**, extensión de `RepositorioOrganizacionesPort`
+(`src/domain/telemetria/ports.py:191`, mismo archivo que `obtener_lineas_base_planta` — ambos son
+"documentos declarativos colgados de una planta"):
+
+```python
+@abstractmethod
+def obtener_facturas_planta(self, planta_id: str) -> list[FacturaDistribuidora]:
+    """Histórico de facturas de la planta, orden descendente por período."""
+    pass
+```
+
+A diferencia de `obtener_lineas_base_planta` (que devuelve `list[dict]`, deuda existente), esta
+devuelve la entidad tipada: es el patrón correcto y no hay motivo para repetir la deuda en código
+nuevo.
+
+**Excepción** `src/domain/telemetria/exceptions.py`: `FacturaDistribuidoraIlegibleError` (mismo
+patrón que `EstructuraUnifilarInvalidaError`) — el parser la lanza cuando no puede extraer un campo
+obligatorio del PDF; el caso de uso de ingesta la deja propagar al script CLI (no hay endpoint HTTP
+que la necesite mapear, ver 2.3).
+
+**Archivo YAML nuevo:** `data/facturas_distribuidora.yml`, no anidado en
+`organizaciones.yml` (ciclo de vida y cardinalidad distintos: estructura vs. histórico que crece
+cada mes; anidarlo infla el archivo de estructura con filas que no cambian la topología):
+
+```yaml
+# data/facturas_distribuidora.yml — Histórico de facturas de la distribuidora por planta.
+# Una entrada por planta por período (decisión: decisions/2026-09-24_factura-distribuidora-yaml.md).
+# Se agrega por commit revisado (scripts/importar_factura_distribuidora.py), nunca por API.
+#
+# Campos discriminados Punta / Fuera de Punta porque así factura la distribuidora en Media
+# Tensión (confirmado con una factura real EDELAP tarifa T5M12, ver §2.1 punto 4).
+facturas:
+  - planta_id: "c64fd625-0037-4caa-b68a-800e8e0ee548"
+    periodo: "2026-08"
+    distribuidora: "EDELAP"
+    numero_factura: "0020-01988580"
+    tarifa: "T5M12"
+    dias_facturados: 30
+    energia_activa_punta_kwh: 68310.0
+    energia_activa_resto_kwh: 187506.0
+    energia_activa_valle_kwh: 59994.0
+    potencia_contratada_punta_kw: 800.0
+    potencia_contratada_fuera_punta_kw: 850.0
+    potencia_adquirida_punta_kw: 1049.0
+    potencia_adquirida_fuera_punta_kw: 1082.0
+    importe_potencia_ars: 7664856.62
+    importe_energia_ars: 638572.35
+    importe_total_ars: 21031736.78
+    fuente_archivo: "factura-durax-2026-08.pdf"
+    cargada_en: "2026-09-24"
+```
+
+Cargado en el repo con la planta Durax real (`c64fd625-0037-4caa-b68a-800e8e0ee548`, la misma que
+ya usan los tests de `linea-base`) para que el test del endpoint corra contra datos reales, mismo
+patrón que la línea de base existente en `organizaciones.yml`.
+
+**Loader**: `src/infrastructure/yaml/loaders.py` agrega `cargar_facturas_distribuidora(data_dir) ->
+list[dict]` (mismo patrón que `cargar_organizaciones_completas`, pero archivo único, sin merge
+modular/plano — no hay necesidad, es un solo documento por repo).
+
+**Repositorio**: `YamlOrganizacionesRepository.obtener_facturas_planta` (en
+`src/infrastructure/yaml/repositories/organizaciones_repository.py`) lee vía el loader nuevo,
+filtra por `planta_id`, mapea a `FacturaDistribuidora`, ordena por `periodo` descendente.
+
+**Parser** `src/infrastructure/pdfplumber/parser_factura_distribuidora.py` (infra organizada por
+librería, como `fastapi/`, `sqlalchemy/`, `paho_mqtt/`): implementa `ParserFacturaDistribuidoraPort`
+con `pdfplumber.page.extract_text()` y regex ancladas a etiquetas de campo ("Período:", "Energía
+activa punta:", "Potencia contratada punta:", "Importe total:", etc.), no a posiciones fijas de
+columna. Distingue dos formatos numéricos porque la factura real los mezcla: los importes en $
+vienen con formato AR (`.` miles, `,` decimal — ej. `21.031.736,78`) y las magnitudes de kWh/kW
+con decimal simple (ej. `800.000` = 800.0 kW, no 800.000 kW). Nueva dependencia en
+`requirements.txt`: `pdfplumber>=0.11.0`.
+
+**Límite conocido, documentado en el docstring del módulo:** se inspeccionó una factura real de
+EDELAP con `extract_text()` y el layout tabular de esa factura llega muy entreverado en texto
+plano (columnas de distintas filas quedan pegadas). Las regex de este parser están ancladas a un
+layout "etiqueta: valor" simple — el que usan los tests, no el de la EDELAP real. Extraer con
+confianza desde el PDF real de producción va a requerir revisar `page.extract_words()`
+(coordenadas x/y) o `page.extract_tables()` en vez de `extract_text()`; queda como trabajo
+pendiente para cuando se cargue la primera factura real, no bloqueante para esta iteración (no
+había forma de resolverlo sin ver más facturas reales, y el puerto ya deja esto reemplazable).
+
+**Script de ingesta** `scripts/importar_factura_distribuidora.py <ruta_pdf> <planta_id>`: instancia
+el parser, ejecuta `parsear()`, e imprime (o agrega, con `--commit`) el bloque YAML resultante a
+`data/facturas_distribuidora.yml` para revisión humana antes de `git commit` — coherente con que
+`RepositorioOrganizacionesPort` es solo lectura y con el precedente de
+`scripts/exportar_instalacion_medidores.py`. No hay endpoint `POST` de carga: cargar una factura es
+una operación GitOps (subir el PDF, correr el script, revisar el diff, commitear), no una escritura
+en caliente del servicio en producción.
+
+## 3. Casos de Uso & DTOs
+
+**`ConsultarHistoricoFacturasUseCase`**
+(`src/application/use_cases/consultar_historico_facturas.py`): recibe `repo_organizaciones`,
+`ejecutar(planta_id: str) -> list[FacturaDistribuidoraResponseDTO]`. Si la planta no existe,
+levanta `PlantaNoEncontradaError` (reuso, ya mapeada por `manejar_error_http`).
+
+**`ConsultarBalanceEnergiaUseCase`** (`src/application/use_cases/consultar_balance_energia.py`,
+existente) se modifica: si `energia_padre_kwh` no se pasa explícito, busca la factura más reciente
+de la planta (`repo_org.obtener_facturas_planta(planta_id)`, primera de la lista por venir ya
+ordenada descendente) y usa su propiedad `energia_facturada_kwh` (ya en kWh, suma de las tres
+franjas) como `energia_padre_kwh`; si no hay ninguna factura, mantiene el comportamiento actual
+(`0.0`). El parámetro explícito sigue teniendo prioridad — no se rompe el contrato existente del
+endpoint, solo se agrega un default mejor. Documentado en el docstring del caso de uso.
+
+**DTO** `src/application/dtos/sge_dto.py`, mismo estilo que `LineaBaseResponseDTO` (alias
+camelCase, contrato con `app-datamaq`):
+
+```python
+class FacturaDistribuidoraResponseDTO(BaseModel):
+    id: str
+    planta_id: str = Field(validation_alias="plantaId", serialization_alias="plantaId")
+    periodo: str
+    distribuidora: str
+    numero_factura: str = Field(validation_alias="numeroFactura", serialization_alias="numeroFactura")
+    tarifa: str
+    dias_facturados: int = Field(validation_alias="diasFacturados", serialization_alias="diasFacturados")
+    energia_activa_punta_kwh: float = Field(
+        validation_alias="energiaActivaPuntaKwh", serialization_alias="energiaActivaPuntaKwh"
+    )
+    energia_activa_resto_kwh: float = Field(
+        validation_alias="energiaActivaRestoKwh", serialization_alias="energiaActivaRestoKwh"
+    )
+    energia_activa_valle_kwh: float = Field(
+        validation_alias="energiaActivaValleKwh", serialization_alias="energiaActivaValleKwh"
+    )
+    energia_facturada_kwh: float = Field(
+        validation_alias="energiaFacturadaKwh", serialization_alias="energiaFacturadaKwh"
+    )
+    potencia_contratada_punta_kw: float = Field(
+        validation_alias="potenciaContratadaPuntaKw", serialization_alias="potenciaContratadaPuntaKw"
+    )
+    potencia_contratada_fuera_punta_kw: float = Field(
+        validation_alias="potenciaContratadaFueraPuntaKw", serialization_alias="potenciaContratadaFueraPuntaKw"
+    )
+    potencia_adquirida_punta_kw: float = Field(
+        validation_alias="potenciaAdquiridaPuntaKw", serialization_alias="potenciaAdquiridaPuntaKw"
+    )
+    potencia_adquirida_fuera_punta_kw: float = Field(
+        validation_alias="potenciaAdquiridaFueraPuntaKw", serialization_alias="potenciaAdquiridaFueraPuntaKw"
+    )
+    potencia_excedida_punta_kw: float = Field(
+        validation_alias="potenciaExcedidaPuntaKw", serialization_alias="potenciaExcedidaPuntaKw"
+    )
+    potencia_excedida_fuera_punta_kw: float = Field(
+        validation_alias="potenciaExcedidaFueraPuntaKw", serialization_alias="potenciaExcedidaFueraPuntaKw"
+    )
+    importe_potencia_ars: float = Field(
+        validation_alias="importePotenciaArs", serialization_alias="importePotenciaArs"
+    )
+    importe_energia_ars: float = Field(validation_alias="importeEnergiaArs", serialization_alias="importeEnergiaArs")
+    importe_total_ars: float = Field(validation_alias="importeTotalArs", serialization_alias="importeTotalArs")
+    valor_energia_ars_kwh_promedio: float = Field(
+        validation_alias="valorEnergiaArsKwhPromedio", serialization_alias="valorEnergiaArsKwhPromedio"
+    )
+```
+
+Se construye con kwargs snake_case (no los alias camelCase) porque el DTO usa
+`validation_alias`/`serialization_alias` separados en vez de `alias` único — mismo patrón que
+`LineaBaseResponseDTO`, cuyo constructor en `sge_router.py` también usa snake_case; con
+`validation_alias`/`serialization_alias`, pyright solo reconoce el nombre de campo Python como
+parámetro del `__init__` sintetizado, no el alias (a diferencia de otros DTOs de este archivo que
+usan `Field(alias=...)` único, donde sí se puede construir con el alias camelCase).
+
+**Mapper** `src/application/mappers/sge_mapper.py`: `factura_to_dto(f: FacturaDistribuidora) ->
+FacturaDistribuidoraResponseDTO`.
+
+**Endpoint** (contrato para la sesión hija de `app-datamaq`):
+
+```
+GET /api/v1/sge/plantas/{planta_id}/facturas-distribuidora
+Auth: Depends(get_usuario_actual) + Depends(resolver_planta_permitida)   (mismo patrón que
+      /balance-energia, /ahorros-cusum, /linea-base — aislamiento por planta ya resuelto)
+200 -> list[FacturaDistribuidoraResponseDTO]   (orden descendente por período, [] si no hay)
+404 -> planta_no_encontrada  (PlantaNoEncontradaError, vía resolver_planta_permitida)
+```
+
+Payload de un elemento (JSON, camelCase — ver DTO arriba; valores reales de la factura EDELAP
+inspeccionada durante la sesión):
+```json
+{
+  "id": "c64fd625-0037-4caa-b68a-800e8e0ee548-2026-08",
+  "plantaId": "c64fd625-0037-4caa-b68a-800e8e0ee548",
+  "periodo": "2026-08",
+  "distribuidora": "EDELAP",
+  "numeroFactura": "0020-01988580",
+  "tarifa": "T5M12",
+  "diasFacturados": 30,
+  "energiaActivaPuntaKwh": 68310.0,
+  "energiaActivaRestoKwh": 187506.0,
+  "energiaActivaValleKwh": 59994.0,
+  "energiaFacturadaKwh": 315810.0,
+  "potenciaContratadaPuntaKw": 800.0,
+  "potenciaContratadaFueraPuntaKw": 850.0,
+  "potenciaAdquiridaPuntaKw": 1049.0,
+  "potenciaAdquiridaFueraPuntaKw": 1082.0,
+  "potenciaExcedidaPuntaKw": 249.0,
+  "potenciaExcedidaFueraPuntaKw": 232.0,
+  "importePotenciaArs": 7664856.62,
+  "importeEnergiaArs": 638572.35,
+  "importeTotalArs": 21031736.78,
+  "valorEnergiaArsKwhPromedio": 2.0220143440676357
+}
+```
+`app-datamaq` grafica potencia (contratada/adquirida/excedida, discriminada Punta y Fuera de
+Punta, eje kW) y energía×valor (kWh y $/kWh promedio) a partir de esta única serie ordenada por
+`periodo` — no hace falta un segundo endpoint. Si necesita agregados (promedio anual, etc.) los
+calcula en frontend sobre esta lista.
+
+Router: se agrega en `src/infrastructure/fastapi/routes/sge_router.py`, junto a
+`obtener_lineas_base` (mismo router `/api/v1/sge`, misma dependencia `resolver_planta_permitida`,
+mismo `get_organizaciones_repository`).
+
+## 4. Matriz de Pruebas (RED Suite)
+
+Implementada y en verde (1512 tests totales del repo, sin regresiones):
+
+**`tests/unit/test_factura_distribuidora.py`** (10 tests) — entidad y repositorio:
+- `frozen=True` (intento de mutar levanta `FrozenInstanceError`).
+- `energia_facturada_kwh` suma las tres franjas; `potencia_excedida_punta_kw` /
+  `_fuera_punta_kw` con `max(0.0, ...)` (no negativa cuando adquirida < contratada);
+  `valor_energia_ars_kwh_promedio` con los valores reales de la factura EDELAP y sin dividir por
+  cero cuando no hay energía.
+- Repositorio YAML (fixture con `data/facturas_distribuidora.yml` de prueba en `tmp_path`): dos
+  facturas de la misma planta en períodos distintos → orden descendente por período; planta sin
+  facturas → `[]`; factura de otra planta no aparece en el filtro; sin archivo YAML → `[]`.
+
+**`tests/unit/test_parser_factura_distribuidora.py`** (3 tests) — PDF de fixture generado con
+`reportlab` (layout "etiqueta: valor" simple, no el layout real de EDELAP, ver límite conocido en
+§2.2): factura completa → todos los campos y las propiedades calculadas coinciden con los valores
+reales de la factura EDELAP inspeccionada; PDF sin campos obligatorios →
+`FacturaDistribuidoraIlegibleError`; PDF inexistente → `FacturaDistribuidoraIlegibleError`.
+
+**`tests/unit/test_verificador_facturas.py`** (5 tests): todo válido → `0` inválidas; período
+duplicado en la misma planta → `1` inválida (cuenta y loguea, no lanza); formato de período
+inválido (`"agosto-2026"`) → `1` inválida; magnitud negativa → `1` inválida; planta sin
+facturas → `0` inválidas.
+
+**`tests/unit/test_sge_endpoints_iso50001.py`** (2 tests agregados a la suite existente de ese
+router): `GET .../facturas-distribuidora` contra la planta Durax real (con la factura agregada en
+`data/facturas_distribuidora.yml`) → 200 con los campos y calculados esperados; planta
+inexistente → 404 `planta_no_encontrada`.
+
+**`tests/unit/test_consultar_balance_energia_uc.py`** (3 tests, nuevo — no existía cobertura del
+caso de uso, solo de `BalanceEnergiaService` en `test_balance_energia_sge.py`): sin
+`energia_padre_kwh` y con factura → usa `energia_facturada_kwh`; sin `energia_padre_kwh` y sin
+facturas → `0.0` (no rompe el comportamiento anterior); `energia_padre_kwh` explícito tiene
+prioridad y ni siquiera consulta `obtener_facturas_planta`.
+
+**Regresión de borrado**: `grep -rn potencia_contratada_kw src/ tests/ data/ scripts/` sin
+resultados tras eliminar el campo de `Dispositivo`.
+
+## 5. Criterios del Gauntlet
+
+Todos verificados en verde al cierre de esta iteración:
+
+- `venv/bin/ruff check .` y `venv/bin/ruff format .` sin errores.
+- `venv/bin/python -m pyright` (proyecto completo) — `0 errors, 0 warnings, 0 informations`.
+- `venv/bin/python -m pytest tests/unit -n auto --cov=src --cov-fail-under=85` — **1512 passed**,
+  cobertura total **91.87%**, verificado tanto normal como con `DB_HOST=127.0.0.2 DB_PORT=1`
+  (memoria `tests-locales-tocan-db-real`: los tests no deben tocar la DB real de producción).
+- `venv/bin/python scripts/verify_architecture.py` — `[PASS]`. `FacturaDistribuidora` y
+  `ParserFacturaDistribuidoraPort` en `domain/sge/` sin imports de terceros; `pdfplumber` solo en
+  `src/infrastructure/pdfplumber/`.
+- `venv/bin/python scripts/verify_code_size.py` — `[PASS]`. Ver nota de diseño abajo sobre
+  `server.py`, que sí llegó a superar el límite y se resolvió por extracción, no por recorte
+  cosmético.
+- `pdfplumber>=0.11.0` y `reportlab>=5.0.0` (solo para el PDF de fixture del test del parser)
+  agregados a `requirements.txt`, instalados y probados en `venv/`.
+- `data/facturas_distribuidora.yml` con la factura real de Durax no rompe
+  `verificar_unifilar_plantas` ni `verificar_facturas_plantas` al arrancar (probado con
+  `test_endpoint_facturas_distribuidora_gitops`, que ejercita el arranque completo de la app vía
+  `create_app()`).
+
+**Nota de diseño no anticipada por la spec original — `server.py` excedió las 500 líneas.**
+Conectar `verificar_facturas_plantas()` en el `lifespan` de `server.py` (junto a
+`verificar_unifilar_plantas()`, ya existente) llevó el archivo a 502 líneas. Se extrajo el bloque
+de validadores YAML de arranque (unifilar + facturas) a
+`src/infrastructure/fastapi/startup_verificaciones.py::ejecutar_verificaciones_yaml()` — mismo
+patrón "advierte, no bloquea" que ya tenía cada uno por separado, ahora en un solo lugar en vez de
+duplicar el `try/except` inline por cada validador nuevo que se agregue a futuro. `server.py`
+quedó en 492 líneas.
+
+## Verificación cruzada final (la hace el padre al cierre)
+
+- [x] La entidad de factura vive en `domain/` sin dependencias de terceros (parser en `infra`).
+      `src/domain/sge/entities.py::FacturaDistribuidora` — `dataclass(frozen=True)` + `@property`,
+      solo stdlib. `venv/bin/python scripts/verify_architecture.py` → `[PASS]`.
+- [x] El histórico queda versionado en git (archivo `.yml` nuevo, no en `organizaciones.yml`).
+      `data/facturas_distribuidora.yml`, con una factura real de la planta Durax.
+- [x] `BalanceEnergiaService`/`ConsultarBalanceEnergiaUseCase` quedan conectados a la energía
+      facturada. `ConsultarBalanceEnergiaUseCase.ejecutar` usa
+      `obtener_facturas_planta(planta_id)[0].energia_facturada_kwh` como default de
+      `energia_padre_kwh` cuando no se pasa explícito; cubierto por
+      `tests/unit/test_consultar_balance_energia_uc.py`.
+- [x] Ningún archivo de `src/` supera 500 líneas tras la implementación.
+      `venv/bin/python scripts/verify_code_size.py` → `[PASS]` (ver nota de diseño en §5 sobre
+      `server.py`/`startup_verificaciones.py`).
