@@ -342,12 +342,9 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("verificacion_consistencia_fallida", error=str(e))
 
-    try:
-        from src.infrastructure.yaml.verificador_unifilar import verificar_unifilar_plantas
+    from src.infrastructure.fastapi.startup_verificaciones import ejecutar_verificaciones_yaml
 
-        verificar_unifilar_plantas()
-    except Exception as e:
-        logger.warning("verificacion_unifilar_fallida", error=str(e))
+    ejecutar_verificaciones_yaml()
 
     # Hook up live WebSocket broadcasts
     global_event_broadcaster.suscribir(websocket_broadcast_callback)

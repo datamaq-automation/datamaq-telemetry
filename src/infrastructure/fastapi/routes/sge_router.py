@@ -15,6 +15,7 @@ from src.application.dtos.sge_dto import (
     AhorrosCusumResponseDTO,
     BalanceEnergiaResponseDTO,
     EstadoCompetenciasUsuarioDTO,
+    FacturaDistribuidoraResponseDTO,
     LineaBaseResponseDTO,
     RegistroCapacitacionResponseDTO,
     SgeDocArticleDTO,
@@ -35,6 +36,9 @@ from src.application.use_cases.consultar_competencias_usuario import (
 )
 from src.application.use_cases.consultar_documentacion_sge import (
     ConsultarDocumentacionSgeUseCase,
+)
+from src.application.use_cases.consultar_historico_facturas import (
+    ConsultarHistoricoFacturasUseCase,
 )
 from src.application.use_cases.registrar_acuse_capacitacion import (
     RegistrarAcuseCapacitacionUseCase,
@@ -127,6 +131,15 @@ def get_consultar_ahorros_use_case(
     ],
 ) -> ConsultarAhorrosCusumUseCase:
     return ConsultarAhorrosCusumUseCase(repo_organizaciones=repo_org)
+
+
+def get_consultar_historico_facturas_use_case(
+    repo_org: Annotated[
+        RepositorioOrganizacionesPort,
+        Depends(get_organizaciones_repository),
+    ],
+) -> ConsultarHistoricoFacturasUseCase:
+    return ConsultarHistoricoFacturasUseCase(repo_organizaciones=repo_org)
 
 
 router = APIRouter(
@@ -315,5 +328,28 @@ def obtener_lineas_base(
             )
             for lb in lbs
         ]
+    except Exception as exc:
+        manejar_error_http(exc)
+
+
+@router.get(
+    "/plantas/{planta_id}/facturas-distribuidora",
+    dependencies=[Depends(resolver_planta_permitida)],
+    response_model=list[FacturaDistribuidoraResponseDTO],
+    response_model_by_alias=True,
+    summary="Consultar el histórico de facturas de la distribuidora de la planta (ISO 50001 §6.3 / §9.1)",
+)
+def obtener_facturas_distribuidora(
+    planta_id: str,
+    use_case: Annotated[
+        ConsultarHistoricoFacturasUseCase,
+        Depends(get_consultar_historico_facturas_use_case),
+    ],
+    claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
+) -> list[FacturaDistribuidoraResponseDTO]:
+    """Retorna el histórico de facturas mensuales de la distribuidora (`data/facturas_distribuidora.yml`),
+    orden descendente por período."""
+    try:
+        return use_case.ejecutar(planta_id=planta_id)
     except Exception as exc:
         manejar_error_http(exc)
