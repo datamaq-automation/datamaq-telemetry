@@ -13,6 +13,7 @@ from src.domain.telemetria.value_objects import (
     Corriente,
     MetadatosPlaca,
     PotenciaActiva,
+    PotenciaReactiva,
     Tension,
     TipoNodoUnifilar,
 )
@@ -35,7 +36,7 @@ def _nodo(id_: str, tipo: TipoNodoUnifilar, parent_id: str | None = None, device
     )
 
 
-def _lectura(dispositivo_id: str, vatios: float) -> LecturaInstantanea:
+def _lectura(dispositivo_id: str, vatios: float, var: float | None = None) -> LecturaInstantanea:
     return LecturaInstantanea(
         id=None,
         dispositivo_id=dispositivo_id,
@@ -44,6 +45,7 @@ def _lectura(dispositivo_id: str, vatios: float) -> LecturaInstantanea:
         fase_s=MedicionFase(),
         fase_t=MedicionFase(),
         potencia_activa_total=PotenciaActiva(vatios),
+        potencia_reactiva_total=PotenciaReactiva(var) if var is not None else None,
     )
 
 
@@ -277,3 +279,48 @@ def test_resumen_no_escala_nodo_bt_aunque_declare_relacion_tension_kv(use_case):
 
     assert resumen.nivel_tension == "BT"
     assert resumen.potencia_activa_total_w == 1000.0
+
+
+def test_compensacion_historica_calcula_banco_recomendado_con_datos_reactivos(use_case):
+    """Cubre rama _calcular_compensacion_historica() cuando hay potencia reactiva:
+    verifica que se calcula Q promedio, factor de potencia y se sugiere banco.
+    Líneas 138-162 del use case."""
+    acometida_mt = _nodo("mt-13200v", TipoNodoUnifilar.ACOMETIDA)
+    acometida_mt.tension_nominal_v = 13200.0
+    use_case.repo_organizaciones.obtener_nodos_unifilar.return_value = [
+        acometida_mt,
+        _nodo("tgbt-1", TipoNodoUnifilar.TGBT, parent_id="mt-13200v", device_id=DEV_1),
+    ]
+
+    # Simular 3 lecturas instantáneas con P=100kW, Q=50kVAr (FP~0.89)
+    puntos_historico = [
+        (
+            datetime(2026, 9, 12, hour=i, tzinfo=timezone.utc),
+            100_000.0,  # P en W
+            50_000.0,  # Q en VAr
+        )
+        for i in range(3)
+    ]
+
+    use_case.consultar_telemetria.listar_instantaneas.return_value = [
+        type(
+            "PuntoPotencia",
+            (),
+            {"registrado_en": p[0], "potencia_activa_total_W": p[1], "potencia_reactiva_total_VAR": p[2]},
+        )()
+        for p in puntos_historico
+    ]
+
+    # Última lectura para el resumen
+    use_case.repo_telemetria.obtener_ultima_instantanea.return_value = _lectura(DEV_1, 100_000.0, var=50_000.0)
+
+    resumen = use_case.resumen(PLANTA_ID, "mt-13200v", organizacion_id=ORG_ID)
+
+    # Verificar que compensación se calculó con datos reactivos
+    assert resumen.compensacion_historica is not None
+    assert resumen.compensacion_historica.potencia_reactiva_promedio_kvar == 50.0
+    assert resumen.compensacion_historica.potencia_reactiva_max_kvar == 50.0
+    assert resumen.compensacion_historica.potencia_reactiva_min_kvar == 50.0
+    # FP debería estar alrededor de 0.89 (cos φ de P/S)
+    assert resumen.compensacion_historica.factor_potencia_promedio is not None
+    assert 0.85 < (resumen.compensacion_historica.factor_potencia_promedio or 0) < 0.95
