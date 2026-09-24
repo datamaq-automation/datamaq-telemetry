@@ -16,9 +16,9 @@ from src.infrastructure.settings.config import get_settings
 
 def mock_get_usuario_actual():
     return {
-        "user_id": "usr-test-123",
-        "organizacion_id": "org-garin",
         "sub": "usr-test-123",
+        "rol": "operador",
+        "org": "org-garin",
     }
 
 

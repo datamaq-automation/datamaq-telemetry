@@ -11,7 +11,8 @@ def test_generar_sin_api_key_devuelve_respuesta_simulada():
     resultado = "".join(adapter.generar("¿Cuál es el estado del medidor 1?", "contexto de prueba"))
 
     assert "Modo Simulación" in resultado
-    assert "medidor 1" in resultado
+    # Nunca devuelve el contexto crudo (datos de planta sin pasar por el modelo).
+    assert "contexto de prueba" not in resultado
 
 
 def test_generar_con_mock_key_devuelve_respuesta_simulada():

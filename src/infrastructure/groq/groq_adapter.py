@@ -20,12 +20,8 @@ class GroqRespuestaAdapter(GeneradorRespuestaPort):
         # Si no hay API Key configurada o se está en entorno de desarrollo/test,
         # devolver una respuesta sintética estructurada
         if not self._api_key or self._api_key == "mock-key":
-            yield (
-                "[Asistente DataMaq (Modo Simulación / Sin Groq Key)]\n\n"
-                f'Analizando tu consulta: *"{pregunta}"*\n\n'
-                "A partir de la información procesada de tu planta, se identificaron los siguientes puntos relevantes:\n"
-                f"{contexto[:500]}...\n"
-            )
+            # Nunca devolver el contexto: son datos de planta sin pasar por el modelo.
+            yield "[Asistente DataMaq (Modo Simulación / Sin Groq Key)] El servicio de inferencia no está configurado."
             return
 
         # En caso de contar con API Key real de Groq, realizar la llamada HTTP direct o mediante SDK (aislado)

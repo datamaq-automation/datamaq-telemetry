@@ -178,7 +178,9 @@ class RepositorioTelemetriaPort(ABC):
         limite: int = 100,
         desde: datetime | None = None,
         hasta: datetime | None = None,
+        organizacion_id: str | None = None,
     ) -> list[AlertaDispositivo]:
+        """Con `organizacion_id`, solo alertas de dispositivos de plantas de esa organización."""
         pass
 
     @abstractmethod

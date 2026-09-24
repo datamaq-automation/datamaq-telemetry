@@ -206,6 +206,7 @@ class MockTelemetriaRepo(RepositorioTelemetriaPort):
         limite: int = 100,
         desde: datetime | None = None,
         hasta: datetime | None = None,
+        organizacion_id: str | None = None,
     ) -> list[AlertaDispositivo]:
         q = list(self.alertas)
         if dispositivo_id:

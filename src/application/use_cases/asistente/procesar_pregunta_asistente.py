@@ -69,6 +69,18 @@ class ProcesarPreguntaAsistenteUseCase:
             f"PREGUNTA DEL USUARIO: {contexto.pregunta}"
         )
 
+    def _recopilar_datos(self, intencion: IntencionUsuario, organizacion_id: str) -> tuple[list[dict], list[dict]]:
+        """Alertas abiertas y medidores, siempre acotados a la organización del usuario."""
+        if intencion not in (IntencionUsuario.EXPLICAR_ALERTAS, IntencionUsuario.SALUD_DISPOSITIVOS):
+            return [], []
+        alertas: list[AlertaResponseDTO] = self._gestor_alertas.listar_alertas(
+            solo_abiertas=True, limite=20, organizacion_id=organizacion_id
+        )
+        dispositivos: list[DispositivoResponseDTO] = self._gestor_dispositivos.listar_dispositivos(
+            organizacion_id=organizacion_id
+        )
+        return [a.model_dump(mode="json") for a in alertas], [d.model_dump(mode="json") for d in dispositivos]
+
     def ejecutar(
         self,
         pregunta: str,
@@ -76,6 +88,10 @@ class ProcesarPreguntaAsistenteUseCase:
         usuario_id: str,
         conversacion_id: str | None = None,
     ) -> RespuestaAsistente:
+        # Sin organización los repositorios no filtran: nunca armar contexto de todas.
+        if not organizacion_id:
+            raise ValueError("El asistente requiere la organización del usuario.")
+
         # 1. Obtener o crear conversación multi-tenant
         if conversacion_id:
             conv = self._repo_conversaciones.obtener_conversacion(conversacion_id, organizacion_id)
@@ -89,19 +105,7 @@ class ProcesarPreguntaAsistenteUseCase:
         intencion_enum = self._intencion_mapeo.get(clasificacion.nombre, IntencionUsuario.DESCONOCIDO)
 
         # 3. Recopilar datos reales según la intención (Aislamiento Multi-tenant)
-        datos_alertas: list[dict] = []
-        datos_dispositivos: list[dict] = []
-
-        if intencion_enum in (IntencionUsuario.EXPLICAR_ALERTAS, IntencionUsuario.SALUD_DISPOSITIVOS):
-            # Listar alertas activas
-            alertas_dtos: list[AlertaResponseDTO] = self._gestor_alertas.listar_alertas(solo_abiertas=True, limite=20)
-            datos_alertas = [a.model_dump(mode="json") for a in alertas_dtos]
-
-            # Listar dispositivos de la organización
-            dispositivos_dtos: list[DispositivoResponseDTO] = self._gestor_dispositivos.listar_dispositivos(
-                organizacion_id=organizacion_id
-            )
-            datos_dispositivos = [d.model_dump(mode="json") for d in dispositivos_dtos]
+        datos_alertas, datos_dispositivos = self._recopilar_datos(intencion_enum, organizacion_id)
 
         # 4. Construir contexto y generar respuesta
         contexto = ContextoPreguntaAsistente(

@@ -88,7 +88,9 @@ def test_procesar_pregunta_asistente_aislamiento_y_sin_alucinaciones():
 
     # 3. Verificaciones de aislamiento y respuesta sintética
     assert resultado.intencion == "EXPLICAR_ALERTAS"
-    assert "CONECTIVIDAD_INESTABLE" in resultado.texto or "Trafo Usina" in resultado.texto
+    # El modo simulación no expone el contexto: ni alertas ni medidores en el texto.
+    assert "CONECTIVIDAD_INESTABLE" not in resultado.texto and "Trafo Usina" not in resultado.texto
+    gestor_alertas.listar_alertas.assert_called_once_with(solo_abiertas=True, limite=20, organizacion_id="org-durax")
 
     # Verificar que el gestor de dispositivos fue invocado con la organizacion_id correcta del usuario
     gestor_dispositivos.listar_dispositivos.assert_called_once_with(organizacion_id="org-durax")

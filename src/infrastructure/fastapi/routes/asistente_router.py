@@ -36,9 +36,13 @@ def preguntar(
     user_claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
     use_case: Annotated[ProcesarPreguntaAsistenteUseCase, Depends(get_procesar_pregunta_asistente_use_case)],
 ) -> PreguntaResponseDTO:
+    # El JWT emite la organización en la claim "org" (jwt_token_service). El asistente opera
+    # siempre sobre una sola organización, incluso para roles globales: sin ella, 404.
+    organizacion_id = str(user_claims.get("org") or "")
+    if not organizacion_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="asistente_no_disponible")
     try:
-        organizacion_id = str(user_claims.get("organizacion_id") or "")
-        user_id = str(user_claims.get("user_id") or user_claims.get("sub") or "")
+        user_id = str(user_claims.get("sub") or "")
         resultado = use_case.ejecutar(
             pregunta=dto.pregunta,
             organizacion_id=organizacion_id,

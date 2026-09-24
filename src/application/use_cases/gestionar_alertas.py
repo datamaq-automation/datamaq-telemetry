@@ -31,6 +31,7 @@ class GestionarAlertasUseCase:
         limite: int = 100,
         desde: datetime | None = None,
         hasta: datetime | None = None,
+        organizacion_id: str | None = None,
     ) -> list[AlertaResponseDTO]:
         alertas = self.repo_telemetria.listar_alertas(
             dispositivo_id=dispositivo_id,
@@ -39,6 +40,7 @@ class GestionarAlertasUseCase:
             limite=limite,
             desde=desde,
             hasta=hasta,
+            organizacion_id=organizacion_id,
         )
         return [AlertaMapper.to_dto(a) for a in alertas]
 

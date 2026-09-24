@@ -20,7 +20,9 @@ from src.domain.telemetria.value_objects import (
 )
 from src.infrastructure.sqlalchemy.models import (
     DeviceAlertModel,
+    DeviceModel,
     DeviceStatusLogModel,
+    FacilityModel,
     TelemetryEnergyModel,
     TelemetryInstantaneousModel,
 )
@@ -217,8 +219,15 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
         limite: int = 100,
         desde: datetime | None = None,
         hasta: datetime | None = None,
+        organizacion_id: str | None = None,
     ) -> list[AlertaDispositivo]:
         q = self.db.query(DeviceAlertModel)
+        if organizacion_id:
+            q = (
+                q.join(DeviceModel, DeviceAlertModel.device_id == DeviceModel.id)
+                .join(FacilityModel, DeviceModel.facility_id == FacilityModel.id)
+                .filter(FacilityModel.organization_id == organizacion_id)
+            )
         if dispositivo_id:
             q = q.filter(DeviceAlertModel.device_id == dispositivo_id)
         if solo_abiertas:

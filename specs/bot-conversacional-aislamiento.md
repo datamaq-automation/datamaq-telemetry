@@ -30,13 +30,18 @@ Certezas (verificadas en `6d857e5`):
 ## 2. Dominio & Puertos
 
 Entrega 1: sin cambios. Entrega 2: `GestionarAlertasUseCase.listar_alertas` recibe la organización;
-el filtro se resuelve en infraestructura (alerta → dispositivo → planta → organización del YAML).
+el filtro se resuelve en SQL (alerta → `devices` → `facilities.organization_id`), igual que
+`MySQLDispositivosRepository.listar`.
 
 ## 3. Caso de uso & DTOs
 
 - Entrega 1: `create_app` no registra los dos routers; los módulos siguen existiendo para la entrega 2.
-- Entrega 2: el router resuelve `organizacion_id` como `planta_ownership.py` (claims `rol`/`org`,
-  roles globales → `None`); rol no global sin `org` → 404 sin llamar al caso de uso.
+- Entrega 2: el router lee la claim `org` (como `planta_ownership.py`). Sin `org` → 404
+  `asistente_no_disponible` sin llamar al caso de uso, **también para roles globales**: el asistente
+  opera sobre una sola organización. Con `None` los repositorios no filtran y el prompt volvería a
+  mezclar datos de todos los clientes; además `RepositorioConversacionesAsistentePort` exige una
+  organización. (Más estricto que la sección 1, que solo exigía `org` a roles no globales.)
+  El caso de uso rechaza `organizacion_id` vacío (`ValueError`) como defensa en profundidad.
   `ProcesarPreguntaAsistenteUseCase` pasa la organización a dispositivos y alertas.
   `GroqRespuestaAdapter` sin clave responde un texto fijo sin datos del contexto.
 
