@@ -16,6 +16,7 @@ from src.application.dtos.telemetria_dto import (
     TelemetriaLatestResponseDTO,
 )
 from src.application.dtos.tipos import FechaHoraUTC
+from src.application.use_cases.agregacion_dispositivos import calcular_potencia_referencia
 from src.application.use_cases.consultar_telemetria import ConsultarTelemetriaUseCase
 from src.application.use_cases.exportar_telemetria import ExportarTelemetriaUseCase
 from src.application.use_cases.gestionar_alertas import GestionarAlertasUseCase
@@ -27,7 +28,11 @@ from src.infrastructure.fastapi.dependencies import (
 )
 from src.infrastructure.fastapi.device_ownership import verificar_propiedad_dispositivo
 from src.infrastructure.fastapi.error_handler import manejar_error_http
-from src.infrastructure.fastapi.headers_historico import HEADER_DATOS_DESDE, formatear_datos_desde
+from src.infrastructure.fastapi.headers_historico import (
+    HEADER_DATOS_DESDE,
+    formatear_datos_desde,
+    setear_potencia_referencia,
+)
 
 router = APIRouter(
     prefix="/api/v1/telemetria",
@@ -86,7 +91,9 @@ def get_instantaneous_history(
         None, description="Fin de la ventana ISO8601 UTC; la ventana es [hasta - hours, hasta]. Sin valor: ahora"
     ),
 ):
-    """El header `X-Datos-Desde` informa la fecha más antigua consultable (corte de retención)."""
+    """El header `X-Datos-Desde` informa la fecha más antigua consultable (corte de retención) y
+    `X-Potencia-Referencia-W` el P99 de potencia activa de los últimos 30 días (omitido sin datos
+    suficientes), independiente de `hours` y `hasta`."""
     try:
         fin_ventana = hasta or datetime.now(tz.utc)
         desde = fin_ventana - timedelta(hours=hours) if hours else None
@@ -99,6 +106,9 @@ def get_instantaneous_history(
             hasta=hasta,
         )
         response.headers[HEADER_DATOS_DESDE] = formatear_datos_desde(historico.datos_desde)
+        setear_potencia_referencia(
+            response, ("dispositivo", device_id), lambda: calcular_potencia_referencia([device_id], use_case)
+        )
         return historico.lecturas
     except Exception as e:
         manejar_error_http(e)

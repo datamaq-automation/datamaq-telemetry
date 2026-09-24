@@ -29,7 +29,7 @@ from src.infrastructure.fastapi.dependencies import (
     registrar_mqtt_listener,
 )
 from src.infrastructure.fastapi.error_handler import manejar_404
-from src.infrastructure.fastapi.headers_historico import HEADER_DATOS_DESDE
+from src.infrastructure.fastapi.headers_historico import HEADER_DATOS_DESDE, HEADER_POTENCIA_REFERENCIA
 from src.infrastructure.fastapi.middleware import RequestIdMiddleware
 from src.infrastructure.fastapi.routes.alertas_router import router as alertas_router
 from src.infrastructure.fastapi.routes.analitica_router import router as analitica_router
@@ -458,7 +458,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_credentials=not cors_abierto,
         allow_methods=["*"],
         allow_headers=["*"],
-        expose_headers=[HEADER_DATOS_DESDE],
+        expose_headers=[HEADER_DATOS_DESDE, HEADER_POTENCIA_REFERENCIA],
     )
 
     app.add_middleware(SecurityHeadersMiddleware, settings=settings)

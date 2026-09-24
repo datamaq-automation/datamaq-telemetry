@@ -20,6 +20,11 @@ from src.domain.telemetria.servicios.agregador_dispositivos import (
     PotenciaSumada,
     PuntoPotencia,
 )
+from src.domain.telemetria.servicios.potencia_referencia import (
+    GRANULARIDAD_REFERENCIA,
+    VENTANA_REFERENCIA_HORAS,
+    potencia_referencia,
+)
 
 _log = structlog.get_logger(__name__)
 
@@ -114,3 +119,25 @@ def calcular_historico(
         ]
 
     return AgregadorDispositivosService.sumar_potencia_en_el_tiempo(lecturas_por_dispositivo, intervalo_segundos)
+
+
+def calcular_potencia_referencia(
+    dispositivos_ids: list[str],
+    consultar_telemetria: ConsultarTelemetriaUseCase,
+) -> float | None:
+    """P99 de la potencia activa de la serie **sumada** de los dispositivos en los últimos 30 días,
+    acotada por el corte de retención (D1, D2). No se suman P99 individuales: los picos de cada
+    medidor no son simultáneos y esa suma sobreestima. Con un solo id es el P99 del medidor.
+    ``None`` si no hay datos suficientes (``MINIMO_HORAS_CON_DATOS``)."""
+    if not dispositivos_ids:
+        return None
+    datos_desde = calcular_datos_desde(dispositivos_ids, consultar_telemetria)
+    puntos = calcular_historico(
+        dispositivos_ids, consultar_telemetria, GRANULARIDAD_REFERENCIA, VENTANA_REFERENCIA_HORAS
+    )
+    muestras = [
+        (p.momento, p.potencia_activa_total_w)
+        for p in puntos
+        if p.potencia_activa_total_w is not None and (datos_desde is None or p.momento >= datos_desde)
+    ]
+    return potencia_referencia(muestras)

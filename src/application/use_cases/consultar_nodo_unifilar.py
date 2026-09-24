@@ -17,6 +17,7 @@ from src.application.dtos.telemetria_dto import EnergiaAgregadaDTO
 from src.application.use_cases.agregacion_dispositivos import (
     calcular_datos_desde,
     calcular_historico,
+    calcular_potencia_referencia,
     calcular_resumen,
 )
 from src.application.use_cases.consultar_telemetria import ConsultarTelemetriaUseCase
@@ -292,3 +293,10 @@ class ConsultarNodoUnifilarUseCase:
             ],
             datos_desde=datos_desde,
         )
+
+    def potencia_referencia(self, planta_id: str, nodo_id: str, organizacion_id: str | None = None) -> float | None:
+        """P99 de la serie sumada de los medidores frontera en los últimos 30 días (D1, D2);
+        independiente de la ventana consultada. ``None`` sin medidores o sin datos suficientes."""
+        _, nodos_frontera = self._resolver_nodo(planta_id, nodo_id, organizacion_id)
+        dispositivos_ids = [n.device_id for n in nodos_frontera if n.device_id]
+        return calcular_potencia_referencia(dispositivos_ids, self.consultar_telemetria)

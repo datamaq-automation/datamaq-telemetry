@@ -78,6 +78,7 @@ def _sample_layout_dto(planta_id: str = "planta-1") -> LayoutPlantaDTO:
 def _cliente(rol: str = "admin") -> tuple[TestClient, MagicMock]:
     app = create_app()
     mock_use_case = MagicMock()
+    mock_use_case.potencia_referencia.return_value = None
     app.dependency_overrides[get_planta_estructura_use_case] = lambda: mock_use_case
     app.dependency_overrides[get_consultar_nodo_unifilar_use_case] = lambda: mock_use_case
     app.dependency_overrides[get_usuario_actual] = lambda: {
@@ -405,7 +406,7 @@ def test_historico_nodo_unifilar_valida_rango_de_hours():
     assert client.get(f"{base}?hours=721").status_code == 422
 
 
-def test_cors_expone_header_datos_desde():
+def test_cors_expone_headers_del_historico():
     client, mock_use_case = _cliente()
     mock_use_case.historico.return_value = HistoricoNodoUnifilarDTO(puntos=[], datos_desde=None)
 
@@ -416,3 +417,4 @@ def test_cors_expone_header_datos_desde():
 
     expuestos = response.headers.get("access-control-expose-headers", "")
     assert "X-Datos-Desde" in expuestos
+    assert "X-Potencia-Referencia-W" in expuestos

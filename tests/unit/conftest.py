@@ -12,6 +12,7 @@ import pytest
 from src.application.use_cases.ingesta.procesador_alertas_ingesta import ProcesadorAlertasIngesta
 from src.application.use_cases.ingesta.resolvedor_dispositivo import ResolvedorDispositivoIngesta
 from src.application.use_cases.ingestar_telemetria import IngestarTelemetriaUseCase
+from src.infrastructure.fastapi.headers_historico import cache_potencia_referencia
 
 
 @pytest.fixture(autouse=True)
@@ -20,4 +21,5 @@ def _aislar_estado_de_clase_ingesta():
     ResolvedorDispositivoIngesta._ultimos_heartbeats.clear()
     IngestarTelemetriaUseCase._ultimas_persistencias.clear()
     ProcesadorAlertasIngesta._filtro_persistencia._estados.clear()
+    cache_potencia_referencia.limpiar()
     yield

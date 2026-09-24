@@ -22,7 +22,11 @@ from src.infrastructure.fastapi.dependencies import (
     get_usuario_actual,
 )
 from src.infrastructure.fastapi.error_handler import manejar_error_http
-from src.infrastructure.fastapi.headers_historico import HEADER_DATOS_DESDE, formatear_datos_desde
+from src.infrastructure.fastapi.headers_historico import (
+    HEADER_DATOS_DESDE,
+    formatear_datos_desde,
+    setear_potencia_referencia,
+)
 
 router = APIRouter(
     prefix="/api/v1",
@@ -99,12 +103,19 @@ def historico_nodo_unifilar(
     ),
 ):
     """El header `X-Datos-Desde` informa el corte de retención más reciente entre los medidores
-    frontera; se omite si el nodo no tiene medidores."""
+    frontera; se omite si el nodo no tiene medidores. `X-Potencia-Referencia-W` es el P99 de la
+    serie sumada en los últimos 30 días (omitido sin datos suficientes), independiente de la ventana."""
     try:
         org_id = _resolver_org_id(claims)
         historico = use_case.historico(planta_id, nodo_id, org_id, granularity, hours, hasta)
         if historico.datos_desde is not None:
             response.headers[HEADER_DATOS_DESDE] = formatear_datos_desde(historico.datos_desde)
+        # Después de `historico`: la caché se consulta solo si el nodo ya pasó el control de acceso.
+        setear_potencia_referencia(
+            response,
+            ("nodo", org_id, planta_id, nodo_id),
+            lambda: use_case.potencia_referencia(planta_id, nodo_id, org_id),
+        )
         return historico.puntos
     except Exception as e:
         manejar_error_http(e)
