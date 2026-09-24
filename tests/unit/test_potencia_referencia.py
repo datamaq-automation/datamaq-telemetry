@@ -247,14 +247,16 @@ def test_nodo_sin_acceso_no_consulta_la_referencia():
 
 
 def test_registra_duracion_y_muestras_del_calculo():
-    from structlog.testing import capture_logs
-
+    # Se parchea el logger del módulo: `capture_logs` no ve nada si otro test ya dejó el logger
+    # cacheado con otra configuración de structlog (falla según el reparto de pytest-xdist).
     consultar = _consultar({"a": _lecturas([100.0] * 400)})
 
-    with capture_logs() as logs:
+    with patch("src.application.use_cases.agregacion_dispositivos._log") as log:
         calcular_potencia_referencia(["a"], consultar)
 
-    evento = next(e for e in logs if e["event"] == "potencia_referencia_calculada")
+    log.info.assert_called_once()
+    assert log.info.call_args.args == ("potencia_referencia_calculada",)
+    evento = log.info.call_args.kwargs
     assert evento["dispositivos_count"] == 1
     assert evento["muestras"] == 400
     assert evento["referencia_w"] == pytest.approx(100.0)

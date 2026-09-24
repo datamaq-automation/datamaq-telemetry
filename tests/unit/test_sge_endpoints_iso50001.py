@@ -6,10 +6,13 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
+from src.application.use_cases.gestionar_acceso_plantas import GestionarAccesoPlantasUseCase
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
+from src.infrastructure.fastapi.auth_dependencies import get_acceso_plantas_use_case
 from src.infrastructure.fastapi.dependencies import get_usuarios_repository
 from src.infrastructure.fastapi.server import create_app
 from src.infrastructure.settings.config import get_settings
+from src.infrastructure.yaml.repositories.organizaciones_repository import YamlOrganizacionesRepository
 
 PLANTA_DURAX_ID = "c64fd625-0037-4caa-b68a-800e8e0ee548"
 ORG_DURAX_ID = "cf82b4be-0798-4beb-8978-2a27612d5761"
@@ -40,6 +43,12 @@ def client():
     mock_users_repo.buscar_por_id.return_value = mock_usuario
     mock_users_repo.obtener_por_id.return_value = mock_usuario
     app.dependency_overrides[get_usuarios_repository] = lambda: mock_users_repo
+    # Política de acceso real contra el YAML, sin asignaciones: no depende de MySQL.
+    repo_accesos = MagicMock()
+    repo_accesos.listar_por_usuario.return_value = []
+    app.dependency_overrides[get_acceso_plantas_use_case] = lambda: GestionarAccesoPlantasUseCase(
+        repo_accesos, YamlOrganizacionesRepository()
+    )
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
