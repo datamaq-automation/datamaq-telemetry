@@ -330,22 +330,40 @@ parser generaliza y no quedó hardcodeado a una sola factura.
 
 1. **[Resuelto] Parser real de EdeLAP (potencia).** Ver arriba — verificado contra 2 facturas
    reales de distinto período.
-2. **[Resuelto] Parser de CAMMESA (energía).** Ver arriba — verificado contra 1 factura real; solo
-   una muestra, así que sigue siendo más frágil que el de EdeLAP (nada que comparar entre
-   períodos). Si una segunda factura de CAMMESA rompe alguna regex, revisar primero si el layout
-   cambió entre períodos o si fue un supuesto mal generalizado de esta sesión.
-3. **[Sin fecha] Distribuidoras del resto de las plantas.** Eitec y Cristal Avellaneda (EDESUR),
-   Madygraf y Los Constituyentes (Edenor), El Gringo y Textiles Pigué (distribuidoras locales,
-   nombre todavía desconocido): relevar su formato real cuando esas plantas tengan medidores
-   instalados, para no descubrir un tercer/cuarto/quinto formato recién al cargarlos. Puede que
-   alguna facture potencia y energía en un solo documento (a diferencia de UPP) — el modelo con
-   discriminador `tipo_dato` ya soporta ambos casos sin cambios adicionales.
-4. **[Prioridad baja, a confirmar con `app-datamaq`] Exponer `cargadaEn`.** La sesión hija pidió
+2. **[Resuelto, con vuelta] Parser de CAMMESA (energía).** La primera versión (regex sobre
+   `extract_text()` lineal, ancladas a la única factura real vista en ese momento) **falló
+   directo** contra una segunda factura real de CAMMESA (cliente EITAR, período 2024-08, no UPP):
+   no extraía ni período ni energía. Causa: el texto lineal pega sin separador el valor de
+   "Energía Demandada" a un código de barras/referencia adyacente (`"0006849353,610 MWh"`), de
+   forma no reproducible con regex porque no hay ningún separador entre ambos tokens — no era un
+   problema de qué etiqueta usar, sino del mecanismo de extracción en sí. Se verificó con
+   `page.extract_words()` sobre los dos PDFs reales (UPP y EITAR, clientes y períodos distintos)
+   que el valor de energía SÍ es una palabra propia por coordenadas, separada del código, en la
+   misma posición relativa de la tabla — `ParserFacturaEnergiaCammesa` se reescribió para usar
+   `extract_words()` en vez de regex sobre texto lineal, y ahora da precisión exacta contra ambas
+   facturas reales (`tests/unit/test_parser_factura_distribuidora.py`,
+   `test_cammesa_factura_202408_confirma_layout_estable_entre_clientes`). Lección para el próximo
+   proveedor: no dar por buena una regex sobre texto lineal con una sola muestra — pedir una
+   segunda antes de darlo por cerrado, o partir directo de `extract_words()`.
+3. **[Sin fecha] EDESUR (Eitec/EITAR, Cristal Avellaneda).** Se inspeccionó una factura real de
+   EDESUR (EITAR S.A.I.C., tarifa T3 MT, LSP N° A 9904-02246147) — confirma un **tercer formato**
+   estructural, distinto de EdeLAP y de CAMMESA: un solo documento que factura todo junto (como
+   EdeLAP), pero la potencia **no** se discrimina Punta/Fuera de Punta a nivel de cargo (un solo
+   par Convenida/Adquirida — el DRP/DRFP que trae es solo un historial informativo de lecturas,
+   no un ítem facturado aparte), y la energía sí viene en tres franjas pero con otros nombres
+   ("Horas Restantes"/"Valle Nocturno"/"Horas Punta"). **Decisión del dueño (2026-09-24): no
+   implementar todavía** — EITAR no tiene medidor de datamaq instalado (lo va a tener "en breve"),
+   así que no hay consumidor real del dato hoy; implementar contra una sola muestra sin urgencia
+   real repetiría el mismo error que ya costó una vuelta con CAMMESA. Cuando EITAR o Cristal
+   Avellaneda tengan medidor, conseguir más de una factura real antes de diseñar el parser.
+4. **[Sin fecha] Edenor (Madygraf, Los Constituyentes), distribuidoras locales (El Gringo,
+   Textiles Pigué).** Sin ninguna muestra real todavía — mismo criterio que el punto 3.
+5. **[Prioridad baja, a confirmar con `app-datamaq`] Exponer `cargadaEn`.** La sesión hija pidió
    este campo (`FacturaDistribuidora.cargada_en` existe en el dominio pero no se serializa en
    `FacturaDistribuidoraResponseDTO`) para distinguir una resubida/corrección de un mismo período
    y tipo de dato. Agregar `cargadaEn` al DTO y al mapper si confirman que lo necesitan — cambio
    acotado, no rompe el contrato existente (es un campo nuevo, no un rename).
-5. **Sin decisión tomada:** si en algún momento se quiere que la UI suba el PDF directo (en vez
+6. **Sin decisión tomada:** si en algún momento se quiere que la UI suba el PDF directo (en vez
    del flujo GitOps por script + commit), hace falta una decisión nueva del dueño — hoy
    `RepositorioOrganizacionesPort` es solo lectura por diseño explícito y no hay endpoint `POST`.
 

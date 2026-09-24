@@ -133,6 +133,11 @@ class ParserFacturaPotenciaEdelap(ParserFacturaDistribuidoraPort):
         )
 
 
+_RE_MONEDA_AR = re.compile(r"^[\d.]+(?:,\d{1,2})?$")
+_RE_CANTIDAD_MWH = re.compile(r"^\d+,\d{3}$")
+_RE_NUMERO_FACTURA_CAMMESA = re.compile(r"^\d{4}-\d{8}$")
+
+
 class ParserFacturaEnergiaCammesa(ParserFacturaDistribuidoraPort):
     """Extrae los campos de ENERGÍA de una factura de CAMMESA (mercado eléctrico mayorista).
 
@@ -141,26 +146,70 @@ class ParserFacturaEnergiaCammesa(ParserFacturaDistribuidoraPort):
     `energia_activa_total_kwh`. Los cargos de potencia, transporte y adicionales del MEM que
     también trae esta factura no se modelan en esta iteración (ver `specs/factura-distribuidora.md`
     §"Pendientes"): solo se captura el total de energía y el importe total de la factura.
+
+    Nota de diseño (sesión 2026-09-24, tercera pasada): a diferencia de EdeLAP, acá SÍ hace falta
+    `page.extract_words()` (coordenadas) en vez de `extract_text()` lineal. Se detectó con una
+    segunda factura real de CAMMESA (cliente distinto, EITAR) que el texto plano pega sin
+    separador el valor de "Energía Demandada" a un código de barras/referencia adyacente
+    ("0006849353,610 MWh"), de forma no reproducible con regex sobre texto lineal porque no hay
+    ningún separador entre ambos tokens. Verificado con las dos facturas reales (UPP y EITAR,
+    clientes y períodos distintos): con `extract_words()` el valor de energía es SIEMPRE una
+    palabra propia, separada del código, en la misma posición relativa de la tabla
+    (columna "Cantidad", fila "Energía Demandada"; ver `specs/factura-distribuidora.md`).
     """
 
     def parsear(self, ruta_pdf: str, planta_id: str) -> FacturaDistribuidora:
-        texto = _extraer_texto(ruta_pdf)
+        try:
+            with pdfplumber.open(ruta_pdf) as pdf:
+                palabras = pdf.pages[0].extract_words()
+        except Exception as e:
+            raise FacturaDistribuidoraIlegibleError(f"No se pudo abrir o leer el PDF '{ruta_pdf}': {e}") from e
 
-        periodo_m = re.search(r"(\d{2})/(\d{2})/(\d{4})\s*al\s*\d{2}/\d{2}/\d{4}", texto)
-        energia_m = re.search(r"SUBTOTAL CARGOS DE POTENCIA\s*\n?\s*(\d+,\d+)", texto)
+        def _fila(top: float, tolerancia: float = 1.5) -> list[dict]:
+            return sorted((p for p in palabras if abs(p["top"] - top) <= tolerancia), key=lambda p: p["x0"])
 
-        if periodo_m is None or energia_m is None:
+        periodo_label = next((p for p in palabras if p["text"] == "Periodo"), None)
+        energia_label = next((p for p in palabras if p["text"] == "Demandada"), None)
+        subtotal_energia_label = next(
+            (p for p in palabras if p["text"] == "DEMANDADA" and any(q["text"] == "SUBTOTAL" for q in _fila(p["top"]))),
+            None,
+        )
+        total_label = next((p for p in palabras if p["text"] == "TOTAL"), None)
+
+        if periodo_label is None or energia_label is None or subtotal_energia_label is None:
             raise FacturaDistribuidoraIlegibleError(
-                f"No se pudieron extraer los campos obligatorios (período o energía demandada) "
+                f"No se pudieron ubicar las etiquetas obligatorias (Periodo, Energía Demandada) "
                 f"de '{ruta_pdf}' con el parser de CAMMESA."
             )
 
-        periodo = f"{periodo_m.group(3)}-{periodo_m.group(2)}"
-        energia_total_kwh = _numero_coma(energia_m.group(1)) * 1000
+        fechas = [p for p in _fila(periodo_label["top"]) if re.fullmatch(r"\d{2}/\d{2}/\d{4}", p["text"])]
+        cantidad_energia = next((p for p in _fila(energia_label["top"]) if _RE_CANTIDAD_MWH.match(p["text"])), None)
+        importe_energia = next(
+            (p for p in reversed(_fila(subtotal_energia_label["top"])) if _RE_MONEDA_AR.match(p["text"])), None
+        )
+        numero_factura = next((p for p in palabras if _RE_NUMERO_FACTURA_CAMMESA.match(p["text"])), None)
 
-        numero_factura = re.search(r"\b([A-Z]-\d{4}-\d{8})\b", texto)
-        importe_energia_m = re.search(r"SUBTOTAL ENERG[ÍI]A DEMANDADA\s*\n?\s*([\d.]+)", texto)
-        importe_total_m = re.search(r"LEY 24065 Art\.70-FNEE \$/MWh\s*\n?\s*([\d.]+,\d{2})", texto)
+        if fechas is None or len(fechas) < 2 or cantidad_energia is None or importe_energia is None:
+            raise FacturaDistribuidoraIlegibleError(
+                f"No se pudieron extraer los valores obligatorios (período o energía demandada) "
+                f"de '{ruta_pdf}' con el parser de CAMMESA."
+            )
+
+        _, mes, anio = fechas[-1]["text"].split("/")
+        periodo = f"{anio}-{mes}"
+        energia_total_kwh = _numero_coma(cantidad_energia["text"]) * 1000
+
+        importe_total = 0.0
+        if total_label is not None:
+            candidatos = [
+                p
+                for p in palabras
+                if p["top"] >= total_label["top"] - 1
+                and p["top"] <= total_label["top"] + 3
+                and _RE_MONEDA_AR.match(p["text"])
+            ]
+            if candidatos:
+                importe_total = _numero_ar(max(candidatos, key=lambda p: p["x0"])["text"])
 
         return FacturaDistribuidora(
             id=f"{planta_id}-{periodo}-energia",
@@ -168,9 +217,9 @@ class ParserFacturaEnergiaCammesa(ParserFacturaDistribuidoraPort):
             periodo=periodo,
             proveedor="CAMMESA",
             tipo_dato="energia",
-            numero_factura=numero_factura.group(1) if numero_factura else "",
-            importe_total_ars=_numero_ar(importe_total_m.group(1)) if importe_total_m else 0.0,
+            numero_factura=numero_factura["text"] if numero_factura else "",
+            importe_total_ars=importe_total,
             energia_activa_total_kwh=energia_total_kwh,
-            importe_energia_ars=_numero_ar(importe_energia_m.group(1)) if importe_energia_m else 0.0,
+            importe_energia_ars=_numero_ar(importe_energia["text"]),
             fuente_archivo=ruta_pdf.rsplit("/", 1)[-1],
         )

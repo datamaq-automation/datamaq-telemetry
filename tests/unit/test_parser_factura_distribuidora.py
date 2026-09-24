@@ -211,83 +211,59 @@ Resp. inscripto 30707619089 Contr. Exento
 02/01/2024
 1 1""".splitlines()
 
-# CAMMESA, UPP, período 01/01/2024 al 31/01/2024.
-LINEAS_CAMMESA_202401 = """3065537309401005774064812295481202402197 CAMMESA
-A
-0057-00299314
-89.038
-717,00
-19/02/2024
-CAMMESA
-N°
-Ruta 34 "S" Km. 3,5 (2121) PEREZ - Pcia. Santa Fé - Argentina Tel.: (54-341) 495-8300 / 8301 / 8351 / 8361
-Domicilio Comercial: Avda. E. Madero 942 - 1° Piso (C1106ACW) Buenos Aires - Argentina Tel.: (54-11) 4319-3700 - Fax:(54-11) 4315-4716
-FACTURA
-Código N° 1
-Fecha Emisión: Buenos Aires, C.U.I.T. N°: 30-65537309-4 IVA RESPONSABLE INSCRIPTO Impuesto a las Ganancias: EXENTO (Artículo 12 - Decreto 1192/92) Ingresos Brutos: EXCLUIDO (Art. 12 - Ley 15336) (Art. 15 - Decreto 1192/92) Caja Previsión: N°: 65.537.309 Inicio Actividades: 1-8-92
-Señor(es): Vencimiento:
-Periodo Facturado:
-Suministro:
-Código de pago electrónico:
-C.U.I.T.: IVA:
-Cantidad Descripción Precio Medio Importe
-Observaciones:
-(*) Lugar de cumplimiento de la obligación de pago:
-Ciudad Autónoma de Buenos Aires, en las cuentas de CAMMESA El pago se considerará efectuado, solo en la fecha en la cual los fondos se acrediten en las cuentas de CAMMESA.
-Camino 09 de Febrero de 2024
-11 de Marzo de 2024 COOPERATIVA UNIÓN PAPELERA PLATENSE LTDA. Camino Centenario S / N Y 514 S / N
-COOPRIIN
-Centenario S / N Y 514 S / N PAPELERA PLATENSE
-0006849353,610 MWh
-Venticuatro millones seiscientos ventisiete mil doscientos sesenta y ocho con 27/100
-74064812295481
-COOPERATIVA UNIÓN PAPELERA PLATENSE LTDA.
-01/01/2024 al 31/01/2024
-1901 - Ringuelet - BUENOS
-6849
-AIRES
-005700299314 30-70761908-9
-Responsable Inscripto
-Energía Demandada
-3.767,00 SUBTOTAL ENERGÍA DEMANDADA
-1.332.048 1,046 MW
-Cargos de Potencia
-1.838.923,52 SUBTOTAL CARGOS DE POTENCIA
-353,610
-POR VUESTRA ACTIVIDAD EN EL MERCADO ELECTRICO
-10.578 INTERESES POR MORA SUBTOTAL CARGOS POR TRANSPORTE
-3,00
-253.538,37
-ORIGINAL
-11/03/2024
-A-0057-00299314
-6849
-COOPRIIN
-PAPELERA PLATENSE
-Camino Centenario S / N Y 514 S / N
-1.923.514 CARGOS ADICIONALES DEL MEM
-14.777.790 0,475
-Cargo por Comercialización
-184.440,00 Cargo por Administración
-4,04 CARGOS POR APLICACIÓN RES.MEyM 281 E/17
-101.167 514.888
-SUBTOTAL ESTE DOCUMENTO SE EMITE POR CUENTA Y ORDEN DE LOS AGENTES DEL MERCADO ELECTRICO MAYORISTA. 5.062.236,21 562.470,69
-TOTAL
-Son Pesos:
-Banco: Cheque N°:
-CAE: VENCIMIENTO CAE: Vencimiento:
-N° Factura:
-Número de Suministro:
-1901 - Ringuelet - BUENOS AIRES
-IMPORTE $
-Banco:
-Cheque N°:
-Talón para el banco
-18.749.023,00 I.V.A. RESP. INSCRIPTO % I.V.A. PERCEPCION % LEY 24065 Art.70-FNEE $/MWh
-24.627.268,27
-8070100570029931406849240311024627268275
-27,00
-24.627.268,27""".splitlines()
+# CAMMESA: coordenadas (texto, x, top) verificadas con `page.extract_words()` contra dos facturas
+# reales (UPP período 2024-01 y EITAR período 2024-08, clientes distintos) — no una reconstrucción
+# de línea de texto: el parser de CAMMESA necesita palabras separadas por posición, no texto lineal
+# (ver docstring de ParserFacturaEnergiaCammesa). `top` es la distancia al borde superior de la
+# página, igual que pdfplumber; estos fixtures reproducen solo las etiquetas y valores que el
+# parser usa como ancla, en las mismas filas relativas que la factura real, no el documento
+# completo (evita commitear datos personales/impositivos reales de un cliente en el repo).
+PALABRAS_CAMMESA_UPP_202401 = [
+    ("0057-00299314", 430, 67),
+    ("Periodo", 100, 197),
+    ("01/01/2024", 250, 197),
+    ("31/01/2024", 400, 197),
+    ("353,610", 50, 285),
+    ("MWh", 150, 285),
+    ("Energía", 250, 285),
+    ("Demandada", 350, 285),
+    ("SUBTOTAL", 50, 296),
+    ("ENERGÍA", 200, 296),
+    ("DEMANDADA", 320, 296),
+    ("1.332.048", 480, 296),
+    ("TOTAL", 100, 550),
+    ("24.627.268,27", 350, 551),
+]
+
+# CAMMESA, EITAR (planta distinta, sin medidor de datamaq instalado aún), período 2024-08 — segunda
+# muestra real, usada para confirmar que el parser no quedó pegado al cliente/período de la primera.
+PALABRAS_CAMMESA_EITAR_202408 = [
+    ("0057-00008747", 430, 67),
+    ("Periodo", 100, 197),
+    ("01/08/2024", 250, 197),
+    ("31/08/2024", 400, 197),
+    ("41,760", 50, 285),
+    ("MWh", 150, 285),
+    ("Energía", 250, 285),
+    ("Demandada", 350, 285),
+    ("SUBTOTAL", 50, 296),
+    ("ENERGÍA", 200, 296),
+    ("DEMANDADA", 320, 296),
+    ("509.455", 480, 296),
+    ("TOTAL", 100, 550),
+    ("5.972.126,39", 350, 551),
+]
+
+
+def _generar_pdf_por_palabras(ruta: str, palabras: list[tuple[str, float, float]]) -> None:
+    """Dibuja cada palabra en su posición (x, top) — reproduce lo que ve `extract_words()` en una
+    factura real, a diferencia de `_generar_pdf` (una línea de texto = una línea del PDF)."""
+    alto_pagina = 800
+    c = canvas.Canvas(ruta, pagesize=(620, alto_pagina))
+    c.setFont("Helvetica", 9)
+    for texto, x, top in palabras:
+        c.drawString(x, alto_pagina - top, texto)
+    c.save()
 
 
 def _generar_pdf(ruta: str, lineas: list[str]) -> None:
@@ -365,7 +341,7 @@ def test_edelap_pdf_inexistente_lanza_ilegible(tmp_path):
 
 def test_cammesa_factura_202401_extrae_campos_reales(tmp_path):
     ruta_pdf = str(tmp_path / "cammesa_202401.pdf")
-    _generar_pdf(ruta_pdf, LINEAS_CAMMESA_202401)
+    _generar_pdf_por_palabras(ruta_pdf, PALABRAS_CAMMESA_UPP_202401)
 
     factura = ParserFacturaEnergiaCammesa().parsear(ruta_pdf, PLANTA_ID)
 
@@ -373,7 +349,7 @@ def test_cammesa_factura_202401_extrae_campos_reales(tmp_path):
     assert factura.periodo == "2024-01"
     assert factura.proveedor == "CAMMESA"
     assert factura.tipo_dato == "energia"
-    assert factura.numero_factura == "A-0057-00299314"
+    assert factura.numero_factura == "0057-00299314"
     assert factura.energia_activa_total_kwh == pytest.approx(353610.0)
     assert factura.energia_facturada_kwh == pytest.approx(353610.0)
     # No discrimina por franja horaria (a diferencia de EdeLAP): quedan en None.
@@ -382,6 +358,22 @@ def test_cammesa_factura_202401_extrae_campos_reales(tmp_path):
     assert factura.importe_energia_ars == pytest.approx(1332048.0)
     assert factura.importe_total_ars == pytest.approx(24627268.27)
     assert factura.fuente_archivo == "cammesa_202401.pdf"
+
+
+def test_cammesa_factura_202408_confirma_layout_estable_entre_clientes(tmp_path):
+    """Cliente distinto (EITAR, no UPP) y período distinto: confirma que el parser generaliza
+    y no quedó pegado a un solo ejemplar — bug real encontrado y corregido en esta sesión: la
+    versión anterior (regex sobre `extract_text()` lineal) fallaba directo contra esta factura."""
+    ruta_pdf = str(tmp_path / "cammesa_202408.pdf")
+    _generar_pdf_por_palabras(ruta_pdf, PALABRAS_CAMMESA_EITAR_202408)
+
+    factura = ParserFacturaEnergiaCammesa().parsear(ruta_pdf, PLANTA_ID)
+
+    assert factura.periodo == "2024-08"
+    assert factura.numero_factura == "0057-00008747"
+    assert factura.energia_activa_total_kwh == pytest.approx(41760.0)
+    assert factura.importe_energia_ars == pytest.approx(509455.0)
+    assert factura.importe_total_ars == pytest.approx(5972126.39)
 
 
 def test_cammesa_factura_sin_campos_obligatorios_lanza_ilegible(tmp_path):
