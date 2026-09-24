@@ -67,52 +67,50 @@ def _normalizar_distribuidora(nombre: str) -> str:
 
 
 class PdfplumberParserFacturaDistribuidora(ParserFacturaDistribuidoraPort):
-    """Extrae los campos estructurados de una factura de distribuidora en PDF con texto seleccionable."""
+    """Extrae los campos de POTENCIA de una factura de distribuidora en PDF con texto seleccionable.
+
+    Representa el documento de EdeLAP (potencia) del caso real UPP, no el de CAMMESA (energía):
+    ver Tarea 2 de `specs/factura-distribuidora.md` §"Pendientes". Por eso siempre produce
+    `tipo_dato="potencia"` con los campos de energía en `None` — un parser de energía (CAMMESA)
+    es un adaptador nuevo del mismo puerto, todavía sin escribir (no hay muestra real).
+    """
 
     def parsear(self, ruta_pdf: str, planta_id: str) -> FacturaDistribuidora:
         texto = self._extraer_texto(ruta_pdf)
 
         periodo = _buscar(r"Per[ií]odo:\s*(\d{4}-\d{2})", texto)
-        energia_punta = _buscar_numero_kw(r"Energ[ií]a activa punta:\s*([\d.,]+)\s*kWh", texto)
-        energia_resto = _buscar_numero_kw(r"Energ[ií]a activa resto:\s*([\d.,]+)\s*kWh", texto)
-        energia_valle = _buscar_numero_kw(r"Energ[ií]a activa valle:\s*([\d.,]+)\s*kWh", texto)
         potencia_contratada_punta = _buscar_numero_kw(r"Potencia contratada punta:\s*([\d.,]+)\s*kW", texto)
 
-        if periodo is None or energia_punta is None or potencia_contratada_punta is None:
+        if periodo is None or potencia_contratada_punta is None:
             raise FacturaDistribuidoraIlegibleError(
-                f"No se pudieron extraer los campos obligatorios (período, energía o potencia "
-                f"contratada) de '{ruta_pdf}'."
+                f"No se pudieron extraer los campos obligatorios (período o potencia contratada) de '{ruta_pdf}'."
             )
 
         distribuidora_raw = _buscar(r"Distribuidora:\s*([^\n]+)", texto) or ""
         numero_factura = _buscar(r"N[º°o]\s*de\s*Factura:\s*([\d-]+)", texto) or ""
-        tarifa = _buscar(r"Tarifa:\s*(\S+)", texto) or ""
+        tarifa = _buscar(r"Tarifa:\s*(\S+)", texto)
         dias_facturados = _buscar(r"D[ií]as facturados:\s*(\d+)", texto)
         potencia_contratada_fp = _buscar_numero_kw(r"Potencia contratada fuera punta:\s*([\d.,]+)\s*kW", texto)
         potencia_adquirida_p = _buscar_numero_kw(r"Potencia adquirida punta:\s*([\d.,]+)\s*kW", texto)
         potencia_adquirida_fp = _buscar_numero_kw(r"Potencia adquirida fuera punta:\s*([\d.,]+)\s*kW", texto)
         importe_potencia = _buscar_numero(r"Importe potencia:\s*\$?\s*([\d.,]+)", texto)
-        importe_energia = _buscar_numero(r"Importe energ[ií]a:\s*\$?\s*([\d.,]+)", texto)
         importe_total = _buscar_numero(r"Importe total:\s*\$?\s*([\d.,]+)", texto)
 
         return FacturaDistribuidora(
-            id=f"{planta_id}-{periodo}",
+            id=f"{planta_id}-{periodo}-potencia",
             planta_id=planta_id,
             periodo=periodo,
-            distribuidora=_normalizar_distribuidora(distribuidora_raw),
+            proveedor=_normalizar_distribuidora(distribuidora_raw),
+            tipo_dato="potencia",
             numero_factura=numero_factura,
+            importe_total_ars=importe_total or 0.0,
             tarifa=tarifa,
-            dias_facturados=int(dias_facturados) if dias_facturados else 0,
-            energia_activa_punta_kwh=energia_punta,
-            energia_activa_resto_kwh=energia_resto or 0.0,
-            energia_activa_valle_kwh=energia_valle or 0.0,
+            dias_facturados=int(dias_facturados) if dias_facturados else None,
             potencia_contratada_punta_kw=potencia_contratada_punta,
             potencia_contratada_fuera_punta_kw=potencia_contratada_fp or 0.0,
             potencia_adquirida_punta_kw=potencia_adquirida_p or potencia_contratada_punta,
             potencia_adquirida_fuera_punta_kw=potencia_adquirida_fp or (potencia_contratada_fp or 0.0),
             importe_potencia_ars=importe_potencia or 0.0,
-            importe_energia_ars=importe_energia or 0.0,
-            importe_total_ars=importe_total or 0.0,
             fuente_archivo=ruta_pdf.rsplit("/", 1)[-1],
         )
 

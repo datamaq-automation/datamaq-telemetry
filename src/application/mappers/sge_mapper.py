@@ -18,8 +18,10 @@ def factura_to_dto(f: FacturaDistribuidora) -> FacturaDistribuidoraResponseDTO:
         id=f.id,
         planta_id=f.planta_id,
         periodo=f.periodo,
-        distribuidora=f.distribuidora,
+        proveedor=f.proveedor,
+        tipo_dato=f.tipo_dato,
         numero_factura=f.numero_factura,
+        importe_total_ars=f.importe_total_ars,
         tarifa=f.tarifa,
         dias_facturados=f.dias_facturados,
         energia_activa_punta_kwh=f.energia_activa_punta_kwh,
@@ -34,7 +36,6 @@ def factura_to_dto(f: FacturaDistribuidora) -> FacturaDistribuidoraResponseDTO:
         potencia_excedida_fuera_punta_kw=f.potencia_excedida_fuera_punta_kw,
         importe_potencia_ars=f.importe_potencia_ars,
         importe_energia_ars=f.importe_energia_ars,
-        importe_total_ars=f.importe_total_ars,
         valor_energia_ars_kwh_promedio=f.valor_energia_ars_kwh_promedio,
     )
 

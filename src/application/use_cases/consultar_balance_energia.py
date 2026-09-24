@@ -38,14 +38,18 @@ class ConsultarBalanceEnergiaUseCase:
         padre_id = nodo_padre.id if nodo_padre else (nodo_id or "desconocido")
         padre_nombre = nodo_padre.nombre if nodo_padre else "TGBT Cabecera"
 
-        # Si se pasa energia_padre_kwh explícito, se usa directo. Si no, se busca la factura
-        # de la distribuidora más reciente de la planta (energía facturada real); sin
-        # facturas cargadas, cae al comportamiento anterior (0.0).
+        # Si se pasa energia_padre_kwh explícito, se usa directo. Si no, se busca el documento
+        # de energía (tipo_dato="energia") más reciente de la planta — puede venir de un
+        # proveedor distinto al de potencia (ej. UPP: CAMMESA factura energía, EdeLAP potencia,
+        # ver FacturaDistribuidora en domain/sge/entities.py). Sin facturas de energía cargadas,
+        # cae al comportamiento anterior (0.0).
         if energia_padre_kwh is not None:
             e_padre = float(energia_padre_kwh)
         else:
-            facturas = self._repo_org.obtener_facturas_planta(planta_id)
-            e_padre = facturas[0].energia_facturada_kwh if facturas else 0.0
+            facturas_energia = [
+                f for f in self._repo_org.obtener_facturas_planta(planta_id) if f.tipo_dato == "energia"
+            ]
+            e_padre = (facturas_energia[0].energia_facturada_kwh or 0.0) if facturas_energia else 0.0
         e_hijos = energias_hijos_kwh if energias_hijos_kwh is not None else []
 
         resultado = BalanceEnergiaService.evaluar_balance(

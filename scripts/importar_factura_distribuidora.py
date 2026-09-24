@@ -28,25 +28,37 @@ from src.infrastructure.pdfplumber.parser_factura_distribuidora import (  # noqa
 
 
 def _bloque_yaml(f) -> str:
-    return (
-        f'  - planta_id: "{f.planta_id}"\n'
-        f'    periodo: "{f.periodo}"\n'
-        f'    distribuidora: "{f.distribuidora}"\n'
-        f'    numero_factura: "{f.numero_factura}"\n'
-        f'    tarifa: "{f.tarifa}"\n'
-        f"    dias_facturados: {f.dias_facturados}\n"
-        f"    energia_activa_punta_kwh: {f.energia_activa_punta_kwh}\n"
-        f"    energia_activa_resto_kwh: {f.energia_activa_resto_kwh}\n"
-        f"    energia_activa_valle_kwh: {f.energia_activa_valle_kwh}\n"
-        f"    potencia_contratada_punta_kw: {f.potencia_contratada_punta_kw}\n"
-        f"    potencia_contratada_fuera_punta_kw: {f.potencia_contratada_fuera_punta_kw}\n"
-        f"    potencia_adquirida_punta_kw: {f.potencia_adquirida_punta_kw}\n"
-        f"    potencia_adquirida_fuera_punta_kw: {f.potencia_adquirida_fuera_punta_kw}\n"
-        f"    importe_potencia_ars: {f.importe_potencia_ars}\n"
-        f"    importe_energia_ars: {f.importe_energia_ars}\n"
-        f"    importe_total_ars: {f.importe_total_ars}\n"
-        f'    fuente_archivo: "{f.fuente_archivo}"\n'
-    )
+    """Emite solo los campos poblados del documento (potencia O energía, nunca ambos a la vez:
+    ver FacturaDistribuidora en domain/sge/entities.py)."""
+    campos_str = [
+        ("planta_id", f.planta_id),
+        ("periodo", f.periodo),
+        ("proveedor", f.proveedor),
+        ("tipo_dato", f.tipo_dato),
+        ("numero_factura", f.numero_factura),
+    ]
+    campos_num = [
+        ("importe_total_ars", f.importe_total_ars),
+        ("tarifa", f.tarifa),
+        ("dias_facturados", f.dias_facturados),
+        ("energia_activa_punta_kwh", f.energia_activa_punta_kwh),
+        ("energia_activa_resto_kwh", f.energia_activa_resto_kwh),
+        ("energia_activa_valle_kwh", f.energia_activa_valle_kwh),
+        ("potencia_contratada_punta_kw", f.potencia_contratada_punta_kw),
+        ("potencia_contratada_fuera_punta_kw", f.potencia_contratada_fuera_punta_kw),
+        ("potencia_adquirida_punta_kw", f.potencia_adquirida_punta_kw),
+        ("potencia_adquirida_fuera_punta_kw", f.potencia_adquirida_fuera_punta_kw),
+        ("importe_potencia_ars", f.importe_potencia_ars),
+        ("importe_energia_ars", f.importe_energia_ars),
+    ]
+    lineas = [
+        f'  - {nombre}: "{valor}"' if i == 0 else f'    {nombre}: "{valor}"'
+        for i, (nombre, valor) in enumerate(campos_str)
+    ]
+    lineas += [f"    {nombre}: {valor}" for nombre, valor in campos_num if valor is not None]
+    if f.fuente_archivo is not None:
+        lineas.append(f'    fuente_archivo: "{f.fuente_archivo}"')
+    return "\n".join(lineas) + "\n"
 
 
 def main() -> int:
