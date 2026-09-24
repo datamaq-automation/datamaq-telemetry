@@ -79,3 +79,7 @@ class PlanNoEncontradoError(DominioTelemetriaException):
 
 class OrganizacionNoEncontradaError(DominioTelemetriaException):
     """Lanzada al operar sobre una organización que no existe en el dato maestro (YAML)."""
+
+
+class FacturaDistribuidoraIlegibleError(DominioTelemetriaException):
+    """Lanzada cuando el parser de PDF no puede extraer un campo obligatorio de la factura."""

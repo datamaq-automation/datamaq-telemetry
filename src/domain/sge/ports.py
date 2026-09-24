@@ -2,7 +2,17 @@
 
 from abc import ABC, abstractmethod
 
-from src.domain.sge.entities import ArticuloSge, RegistroCapacitacionSge
+from src.domain.sge.entities import ArticuloSge, FacturaDistribuidora, RegistroCapacitacionSge
+
+
+class ParserFacturaDistribuidoraPort(ABC):
+    """Puerto para extraer los campos estructurados de una factura de distribuidora en PDF."""
+
+    @abstractmethod
+    def parsear(self, ruta_pdf: str, planta_id: str) -> FacturaDistribuidora:
+        """Extrae los campos de la factura. Lanza FacturaDistribuidoraIlegibleError si no puede
+        extraer alguno de los campos obligatorios (período, energía o potencia)."""
+        ...
 
 
 class RepositorioDocumentacionSgePort(ABC):

@@ -216,7 +216,6 @@ class Dispositivo:
     correccion_angular_fases: str = ""
     invertido: bool = False
     orden_fases: list[str] | None = None
-    potencia_contratada_kw: float | None = None
     tarifa: str | None = None
     categoria_tarifaria: str | None = "T2"
     penalizacion_reactiva_aplica: bool = True

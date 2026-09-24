@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from datetime import datetime
 
+from src.domain.sge.entities import FacturaDistribuidora
 from src.domain.telemetria.entities import (
     AcumuladoEnergia,
     AlertaDispositivo,
@@ -230,6 +231,10 @@ class RepositorioOrganizacionesPort(ABC):
 
     def obtener_lineas_base_planta(self, planta_id: str) -> list[dict]:
         """Líneas de base energéticas (EnB) declaradas para los nodos de una planta."""
+        return []
+
+    def obtener_facturas_planta(self, planta_id: str) -> list[FacturaDistribuidora]:
+        """Histórico de facturas de la distribuidora de la planta, orden descendente por período."""
         return []
 
 
