@@ -13,6 +13,7 @@ from src.infrastructure.sqlalchemy.database import get_db_session
 from src.infrastructure.sqlalchemy.mysql_repositories import (
     MySQLEventosDisponibilidadRepository,
     MySQLMaquinasRepository,
+    MySQLTelemetriaRepository,
 )
 from src.infrastructure.yaml.repositories.organizaciones_repository import (
     YamlOrganizacionesRepository,
@@ -100,6 +101,31 @@ def verificar_propiedad_maquina(
     organizacion_maquina = _organizacion_de_dispositivo(db, maquina.dispositivo_id)
     if not debe_recibir_evento(False, claims.get("org"), organizacion_maquina):
         raise HTTPException(status_code=404, detail="maquina_no_encontrada")
+
+
+def verificar_propiedad_alerta(
+    claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
+    db: Annotated[Session, Depends(get_db_session)],
+    alerta_id: int | None = None,
+) -> None:
+    """Rechaza con 404 si la alerta pedida no pertenece a la organización del usuario
+    autenticado (alerta -> dispositivo -> planta -> organización). Superadmin, invitado_global
+    y modo sin auth (AUTH_REQUIRED=False) pasan sin chequeo.
+    """
+    settings = get_settings()
+    if not settings.AUTH_REQUIRED or claims.get("rol") in ("superadmin", "invitado_global"):
+        return
+
+    if alerta_id is None:
+        return
+
+    alerta = MySQLTelemetriaRepository(db).obtener_alerta_por_id(alerta_id)
+    if alerta is None:
+        raise HTTPException(status_code=404, detail="alerta_no_encontrada")
+
+    organizacion_alerta = _organizacion_de_dispositivo(db, alerta.dispositivo_id)
+    if not debe_recibir_evento(False, claims.get("org"), organizacion_alerta):
+        raise HTTPException(status_code=404, detail="alerta_no_encontrada")
 
 
 def verificar_propiedad_evento_disponibilidad(

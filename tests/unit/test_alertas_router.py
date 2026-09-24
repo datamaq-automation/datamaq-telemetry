@@ -11,6 +11,7 @@ from src.infrastructure.fastapi.dependencies import (
     get_alertas_use_case,
     get_usuario_actual,
 )
+from src.infrastructure.fastapi.device_ownership import verificar_propiedad_alerta
 from src.infrastructure.fastapi.server import create_app
 
 AHORA = datetime(2026, 9, 12, 10, 0, 0, tzinfo=timezone.utc)
@@ -46,6 +47,8 @@ def _cliente(rol: str = "admin", autenticado: bool = True) -> tuple[TestClient, 
         "alertas": MagicMock(),
     }
     app.dependency_overrides[get_alertas_use_case] = lambda: mocks["alertas"]
+    # La propiedad de la alerta se prueba en test_aislamiento_alertas.py.
+    app.dependency_overrides[verificar_propiedad_alerta] = lambda: None
     if autenticado:
         app.dependency_overrides[get_usuario_actual] = lambda: {
             "sub": "user-test-1",
@@ -75,6 +78,7 @@ def test_listar_alertas_sin_filtros_retorna_lista():
         limite=100,
         desde=None,
         hasta=None,
+        organizacion_id="org-test-1",
     )
     data = response.json()
     assert len(data) == 1
@@ -109,6 +113,7 @@ def test_listar_alertas_filtro_device_id():
         limite=100,
         desde=None,
         hasta=None,
+        organizacion_id="org-test-1",
     )
     data = response.json()
     assert data[0]["dispositivo_id"] == "dev-xyz-999"
@@ -128,6 +133,7 @@ def test_listar_alertas_filtro_solo_abiertas_true():
         limite=100,
         desde=None,
         hasta=None,
+        organizacion_id="org-test-1",
     )
 
 
@@ -145,6 +151,7 @@ def test_listar_alertas_filtro_solo_abiertas_false():
         limite=100,
         desde=None,
         hasta=None,
+        organizacion_id="org-test-1",
     )
 
 
@@ -162,6 +169,7 @@ def test_listar_alertas_filtro_severidad():
         limite=100,
         desde=None,
         hasta=None,
+        organizacion_id="org-test-1",
     )
     assert response.json()[0]["severidad"] == "CRITICAL"
 
@@ -180,6 +188,7 @@ def test_listar_alertas_filtro_limit_personalizado():
         limite=50,
         desde=None,
         hasta=None,
+        organizacion_id="org-test-1",
     )
 
 
@@ -197,6 +206,7 @@ def test_listar_alertas_filtro_limit_maximo_permitido():
         limite=500,
         desde=None,
         hasta=None,
+        organizacion_id="org-test-1",
     )
 
 
@@ -223,6 +233,7 @@ def test_listar_alertas_filtro_fechas_desde_hasta():
         limite=100,
         desde=datetime(2026, 9, 1, 0, 0, 0, tzinfo=timezone.utc),
         hasta=datetime(2026, 9, 10, 23, 59, 59, tzinfo=timezone.utc),
+        organizacion_id="org-test-1",
     )
 
 
@@ -252,6 +263,7 @@ def test_listar_alertas_combinacion_todos_los_filtros():
         limite=25,
         desde=datetime(2026, 9, 5, 8, 0, 0, tzinfo=timezone.utc),
         hasta=datetime(2026, 9, 6, 18, 0, 0, tzinfo=timezone.utc),
+        organizacion_id="org-test-1",
     )
 
 
