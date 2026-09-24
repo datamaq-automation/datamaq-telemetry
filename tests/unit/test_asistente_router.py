@@ -9,6 +9,7 @@ from src.infrastructure.fastapi.dependencies import (
     get_procesar_pregunta_asistente_use_case,
     get_usuario_actual,
 )
+from src.infrastructure.fastapi.routes.asistente_router import router as asistente_router
 from src.infrastructure.fastapi.server import create_app
 from src.infrastructure.settings.config import get_settings
 
@@ -41,6 +42,8 @@ class _UseCaseFalso:
 
 def _cliente_con_use_case(use_case: ProcesarPreguntaAsistenteUseCase) -> TestClient:
     app = create_app(get_settings())
+    # Apagado en create_app (D1): se monta a mano para seguir probando el router.
+    app.include_router(asistente_router)
     app.dependency_overrides[get_usuario_actual] = mock_get_usuario_actual
     app.dependency_overrides[get_procesar_pregunta_asistente_use_case] = lambda: use_case
     return TestClient(app)

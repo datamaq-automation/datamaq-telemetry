@@ -2,6 +2,7 @@
 from fastapi.testclient import TestClient
 
 from src.infrastructure.fastapi.dependencies import get_usuario_actual
+from src.infrastructure.fastapi.routes.copilot_router import router as copilot_router
 from src.infrastructure.fastapi.server import create_app
 from src.infrastructure.settings.config import get_settings
 
@@ -16,6 +17,7 @@ def mock_get_usuario_actual():
 
 def test_copilot_chat_endpoint_exito():
     app = create_app(get_settings())
+    app.include_router(copilot_router)
     app.dependency_overrides[get_usuario_actual] = mock_get_usuario_actual
 
     client = TestClient(app)
