@@ -123,8 +123,8 @@ El esquema se gestiona con **Alembic** (fuente de verdad: `src/infrastructure/sq
 | | `GET /api/v1/dispositivos/{id}` | Obtener detalle de medidor por UUID o MAC |
 | | `PATCH /api/v1/dispositivos/{id}` | Actualizar configuración y metrología (fases_con_ti, tipo_instalacion) |
 | **Telemetría** | `GET /api/v1/telemetria/latest/{device_id}` | Última instantánea, acumulado de energía y bloque `analitica` precalculado |
-| | `GET /api/v1/telemetria/instantaneous/{device_id}` | Historial de V, I, P, Q, S, FP, VUR y analítica (`limit`, `hours`, `granularity`) |
-| | `GET /api/v1/telemetria/energy/{device_id}` | Historial de kWh y kVARh acumulados (`limit`, `hours`) |
+| | `GET /api/v1/telemetria/instantaneous/{device_id}` | Historial de V, I, P, Q, S, FP, VUR y analítica (`limit`, `hours`, `granularity`, `hasta`); headers `X-Datos-Desde` y `X-Potencia-Referencia-W` |
+| | `GET /api/v1/telemetria/energy/{device_id}` | Historial de kWh y kVARh (`limit`, `days`, `granularity`, `timezone`); header `X-Datos-Desde` |
 | **Alertas** | `GET /api/v1/alertas?device_id=...&solo_abiertas=true` | Consultar alarmas activas / historial |
 | | `PATCH /api/v1/alertas/{id}/resolver` | Marcar alerta como resuelta / atendida (`POST` también soportado) |
 | **Topología Unifilar & Layout** | `GET /api/v1/planta/unifilar?planta_id=...` | Obtener árbol de nodos unifilares de la planta |

@@ -242,7 +242,41 @@ export interface TelemetriaLatestResponseDTO {
 * **Query Parameters:**
   * `limit`: Entero (1 a 5000, default `500`).
   * `hours`: Entero (1 a 720, ej: `2`, `24`, `168`).
-  * `granularity`: Remuestreo inteligente (`auto`, `raw`, `1m`, `5m`, `15m`, `1h`).
+  * `granularity`: Remuestreo inteligente (`auto`, `raw`, `1m`, `5m`, `15m`, `1h`). Sin PRO el
+    intervalo mínimo es 3600 s: cualquier granularidad menor sale en buckets de 1 h.
+  * `hasta`: ISO 8601 UTC, opcional. La ventana es `[hasta - hours, hasta]`; sin valor, termina
+    ahora. Una ventana entera anterior al corte de retención devuelve `[]` (no es un error).
+* **Headers de respuesta** (el body sigue siendo la lista de lecturas; CORS los expone, se leen con
+  `response.headers['x-…']` porque axios normaliza a minúsculas):
+  * `X-Datos-Desde`: fecha más antigua consultable (corte de retención del plan), ISO 8601 UTC con
+    `Z`. Sirve para deshabilitar ◀ y para titular el período real.
+  * `X-Potencia-Referencia-W`: potencia de referencia para fijar el eje Y, en W con un decimal
+    (ej. `301913.3`). Es el **P99 de `potencia_activa_total_W` de los últimos 30 días** (acotado
+    por la retención), sobre la misma serie que dibuja el gráfico. **No depende de `hours` ni de
+    `hasta`**: es la misma para toda ventana, y eso es lo que mantiene fija la escala al navegar.
+    **Se omite** si hay menos de 24 horas con datos (medidor recién instalado) o si el cálculo
+    falla: en ese caso, escalar como antes, con el máximo visible. Regla sugerida (decisión D4 del
+    repo padre): techo = `redondearMaximoLimpio(max(referencia, máximo visible))`. El backend lo
+    cachea 15 min.
+
+### 4.4 Endpoint de Energía `GET /api/v1/telemetria/energy/{device_id}`
+* **Query Parameters:** `limit` (≤ 1000, solo `raw`), `days`, `granularity` (`raw`, `day`, `month`),
+  `timezone` (IANA, default `America/Argentina/Buenos_Aires`).
+* **Header de respuesta `X-Datos-Desde`:** igual que en §4.3. `days` se acota al corte de
+  retención **sin aviso en el body** (sin PRO, `days=30` devuelve 7 días): usar este header para
+  titular el período real en lugar de "últimos 30 días" fijo.
+
+### 4.5 Histórico de Nodo `GET /api/v1/plantas/{planta_id}/unifilar/nodos/{nodo_id}/resumen/historico`
+* **Query Parameters:** `hours` (1 a 720, default `24`), `granularity` (default `5m`), `hasta`
+  (igual que en §4.3).
+* **Body:** lista de `PuntoPotenciaNodoUnifilarDTO`, la suma por bucket de los medidores frontera
+  del nodo.
+* **Headers de respuesta:**
+  * `X-Datos-Desde`: el corte **más reciente** entre los medidores frontera (desde ahí están
+    todos). Los puntos anteriores no se devuelven. Se omite si el nodo no tiene medidores.
+  * `X-Potencia-Referencia-W`: P99 de la **serie sumada** en los últimos 30 días, no la suma de
+    los P99 de cada medidor (los picos no son simultáneos y esa suma sobreestima). Mismas reglas
+    de omisión y caché que en §4.3.
 
 ---
 
