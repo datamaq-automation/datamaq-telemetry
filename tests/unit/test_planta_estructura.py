@@ -28,6 +28,7 @@ from src.infrastructure.fastapi.dependencies import (
     get_usuario_actual,
     requiere_rol_escritura,
 )
+from src.infrastructure.fastapi.planta_ownership import resolver_planta_permitida
 from src.infrastructure.fastapi.server import create_app
 from src.infrastructure.settings.config import Settings
 
@@ -237,10 +238,14 @@ def test_gestionar_unifilar_use_case():
     assert len(res_guardado.nodos) == 3
     assert res_guardado.nodos[1].parent_id == "n1"
 
-    # 3. Consulta sin especificar planta_id (resuelve planta por defecto)
-    res_default = use_case.obtener_unifilar()
-    assert res_default.planta_id == "plant-1"
-    assert len(res_default.nodos) == 3
+    # 3. Sin planta_id el caso de uso no elige planta: la activa la resuelve la política de acceso
+    res_default = use_case.obtener_unifilar(organizacion_id="org-1")
+    assert res_default.planta_id == ""
+    assert res_default.nodos == []
+
+    # 4. Una planta de otra organización se trata como inexistente
+    with pytest.raises(PlantaNoEncontradaError):
+        use_case.obtener_unifilar("plant-1", organizacion_id="org-otra")
 
 
 def test_obtener_unifilar_con_nodo_virtual_marca_es_virtual():
@@ -369,6 +374,8 @@ def api_test_client():
     app.dependency_overrides[get_planta_estructura_use_case] = lambda: use_case
     app.dependency_overrides[get_usuario_actual] = lambda: {"username": "admin", "rol": "administrador"}
     app.dependency_overrides[requiere_rol_escritura] = lambda: {"username": "admin", "rol": "administrador"}
+    # Simula la política de acceso: la planta pedida, o "plant-test" como planta activa.
+    app.dependency_overrides[resolver_planta_permitida] = lambda planta_id=None: planta_id or "plant-test"
 
     return TestClient(app), repo
 

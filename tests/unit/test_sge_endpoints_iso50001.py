@@ -12,6 +12,7 @@ from src.infrastructure.fastapi.server import create_app
 from src.infrastructure.settings.config import get_settings
 
 PLANTA_DURAX_ID = "c64fd625-0037-4caa-b68a-800e8e0ee548"
+ORG_DURAX_ID = "cf82b4be-0798-4beb-8978-2a27612d5761"
 
 
 def _crear_token(rol: str, exp_minutos: int = 60) -> str:
@@ -23,6 +24,7 @@ def _crear_token(rol: str, exp_minutos: int = 60) -> str:
         usuario="test@datamaq.com.ar",
         rol=rol,
         expira_en=expira,
+        organizacion_id=ORG_DURAX_ID,
     )
 
 

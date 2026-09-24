@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from src.application.use_cases.consultar_analitica_planta import ConsultarAnaliticaPlantaUseCase
 from src.domain.telemetria.servicios.agregador_dispositivos import PuntoPotencia
 from src.infrastructure.fastapi.dependencies import get_usuario_actual
+from src.infrastructure.fastapi.planta_ownership import resolver_planta_permitida
 from src.infrastructure.fastapi.server import create_app
 from src.infrastructure.settings.config import get_settings
 
@@ -23,6 +24,7 @@ def test_obtener_banco_capacitores_planta_exito():
     """Valida que /banco-capacitores/planta retorna datos reales (no simulados)."""
     app = create_app(get_settings())
     app.dependency_overrides[get_usuario_actual] = mock_get_usuario_actual
+    app.dependency_overrides[resolver_planta_permitida] = lambda planta_id=None: planta_id
 
     client = TestClient(app)
     response = client.get("/api/v1/analitica/banco-capacitores/planta?planta_id=planta-garin")
@@ -38,6 +40,7 @@ def test_obtener_banco_capacitores_planta_exito():
 def test_obtener_penalizaciones_planta_exito():
     app = create_app(get_settings())
     app.dependency_overrides[get_usuario_actual] = mock_get_usuario_actual
+    app.dependency_overrides[resolver_planta_permitida] = lambda planta_id=None: planta_id
 
     client = TestClient(app)
     response = client.get("/api/v1/analitica/penalizaciones/planta?planta_id=planta-garin")

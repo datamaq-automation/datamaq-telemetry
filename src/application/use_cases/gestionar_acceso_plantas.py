@@ -40,6 +40,21 @@ class GestionarAccesoPlantasUseCase:
     def planta_activa(plantas: list[PlantaAccesoDTO]) -> str | None:
         return plantas[0].id if plantas else None
 
+    def resolver_planta_permitida(
+        self, usuario_id: str | None, rol: str, organizacion_id: str | None, planta_id: str | None
+    ) -> str | None:
+        """Planta efectiva de una consulta: la pedida si está permitida, o la activa si no se pidió.
+
+        Una planta ajena, no asignada o inexistente lanza el mismo error, para no revelar
+        a un usuario ajeno que el id existe.
+        """
+        permitidas = self.resolver(usuario_id, rol, organizacion_id)
+        if planta_id is None:
+            return self.planta_activa(permitidas)
+        if any(p.id == planta_id for p in permitidas):
+            return planta_id
+        raise PlantaNoEncontradaError(f"Planta con id '{planta_id}' no encontrada.")
+
     def listar_asignadas(self, usuario_id: str) -> list[PlantaAccesoDTO]:
         usuario = self._obtener_usuario(usuario_id)
         return self.resolver(usuario.id, usuario.rol, usuario.organizacion_id)

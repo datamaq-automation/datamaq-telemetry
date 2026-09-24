@@ -24,6 +24,7 @@ from src.infrastructure.fastapi.dependencies import (
 )
 from src.infrastructure.fastapi.device_ownership import verificar_propiedad_dispositivo
 from src.infrastructure.fastapi.headers_historico import CacheTTL
+from src.infrastructure.fastapi.planta_ownership import resolver_planta_permitida
 from src.infrastructure.fastapi.server import create_app
 
 AHORA = datetime.now(timezone.utc).replace(second=0, microsecond=0)
@@ -166,6 +167,7 @@ def _cliente_nodo() -> tuple[TestClient, MagicMock]:
     use_case = MagicMock()
     use_case.historico.return_value = HistoricoNodoUnifilarDTO(puntos=[], datos_desde=INICIO)
     app.dependency_overrides[get_consultar_nodo_unifilar_use_case] = lambda: use_case
+    app.dependency_overrides[resolver_planta_permitida] = lambda planta_id=None: planta_id
     app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "u1", "rol": "admin", "org": "org-1"}
     return TestClient(app), use_case
 

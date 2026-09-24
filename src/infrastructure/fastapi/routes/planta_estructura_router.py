@@ -27,6 +27,7 @@ from src.infrastructure.fastapi.headers_historico import (
     formatear_datos_desde,
     setear_potencia_referencia,
 )
+from src.infrastructure.fastapi.planta_ownership import resolver_planta_permitida
 
 router = APIRouter(
     prefix="/api/v1",
@@ -42,6 +43,10 @@ def _resolver_org_id(claims: dict) -> str | None:
     return claims.get("org")
 
 
+# Planta efectiva ya verificada contra la política de acceso (404 si no está permitida).
+PlantaPermitida = Annotated[str | None, Depends(resolver_planta_permitida)]
+
+
 # --- Diagrama Unifilar ---
 
 
@@ -49,7 +54,7 @@ def _resolver_org_id(claims: dict) -> str | None:
 def get_unifilar_default(
     use_case: Annotated[GestionarPlantaEstructuraUseCase, Depends(get_planta_estructura_use_case)],
     claims: Annotated[dict, Depends(get_usuario_actual)],
-    planta_id: str | None = None,
+    planta_id: PlantaPermitida,
 ):
     try:
         org_id = _resolver_org_id(claims)
@@ -58,18 +63,25 @@ def get_unifilar_default(
         manejar_error_http(e)
 
 
-@router.get("/plantas/{planta_id}/unifilar", response_model=UnifilarPlantaDTO)
+@router.get(
+    "/plantas/{planta_id}/unifilar", response_model=UnifilarPlantaDTO, dependencies=[Depends(resolver_planta_permitida)]
+)
 def get_unifilar_by_planta(
     planta_id: str,
     use_case: Annotated[GestionarPlantaEstructuraUseCase, Depends(get_planta_estructura_use_case)],
+    claims: Annotated[dict, Depends(get_usuario_actual)],
 ):
     try:
-        return use_case.obtener_unifilar(planta_id=planta_id)
+        return use_case.obtener_unifilar(planta_id=planta_id, organizacion_id=_resolver_org_id(claims))
     except Exception as e:
         manejar_error_http(e)
 
 
-@router.get("/plantas/{planta_id}/unifilar/nodos/{nodo_id}/resumen", response_model=ResumenNodoUnifilarDTO)
+@router.get(
+    "/plantas/{planta_id}/unifilar/nodos/{nodo_id}/resumen",
+    response_model=ResumenNodoUnifilarDTO,
+    dependencies=[Depends(resolver_planta_permitida)],
+)
 def resumen_nodo_unifilar(
     planta_id: str,
     nodo_id: str,
@@ -89,6 +101,7 @@ def resumen_nodo_unifilar(
 @router.get(
     "/plantas/{planta_id}/unifilar/nodos/{nodo_id}/resumen/historico",
     response_model=list[PuntoPotenciaNodoUnifilarDTO],
+    dependencies=[Depends(resolver_planta_permitida)],
 )
 def historico_nodo_unifilar(
     planta_id: str,
@@ -128,7 +141,7 @@ def historico_nodo_unifilar(
 def get_layout_default(
     use_case: Annotated[GestionarPlantaEstructuraUseCase, Depends(get_planta_estructura_use_case)],
     claims: Annotated[dict, Depends(get_usuario_actual)],
-    planta_id: str | None = None,
+    planta_id: PlantaPermitida,
 ):
     try:
         org_id = _resolver_org_id(claims)
@@ -137,13 +150,16 @@ def get_layout_default(
         manejar_error_http(e)
 
 
-@router.get("/plantas/{planta_id}/layout", response_model=LayoutPlantaDTO)
+@router.get(
+    "/plantas/{planta_id}/layout", response_model=LayoutPlantaDTO, dependencies=[Depends(resolver_planta_permitida)]
+)
 def get_layout_by_planta(
     planta_id: str,
     use_case: Annotated[GestionarPlantaEstructuraUseCase, Depends(get_planta_estructura_use_case)],
+    claims: Annotated[dict, Depends(get_usuario_actual)],
 ):
     try:
-        return use_case.obtener_layout(planta_id=planta_id)
+        return use_case.obtener_layout(planta_id=planta_id, organizacion_id=_resolver_org_id(claims))
     except Exception as e:
         manejar_error_http(e)
 
@@ -155,7 +171,7 @@ def get_layout_by_planta(
 def get_areas_estadisticas_default(
     use_case: Annotated[GestionarPlantaEstructuraUseCase, Depends(get_planta_estructura_use_case)],
     claims: Annotated[dict, Depends(get_usuario_actual)],
-    planta_id: str | None = None,
+    planta_id: PlantaPermitida,
 ):
     try:
         org_id = _resolver_org_id(claims)
@@ -164,12 +180,17 @@ def get_areas_estadisticas_default(
         manejar_error_http(e)
 
 
-@router.get("/plantas/{planta_id}/areas", response_model=PlantaAreasEstadisticasResponseDTO)
+@router.get(
+    "/plantas/{planta_id}/areas",
+    response_model=PlantaAreasEstadisticasResponseDTO,
+    dependencies=[Depends(resolver_planta_permitida)],
+)
 def get_areas_estadisticas_by_planta(
     planta_id: str,
     use_case: Annotated[GestionarPlantaEstructuraUseCase, Depends(get_planta_estructura_use_case)],
+    claims: Annotated[dict, Depends(get_usuario_actual)],
 ):
     try:
-        return use_case.obtener_areas_estadisticas(planta_id=planta_id)
+        return use_case.obtener_areas_estadisticas(planta_id=planta_id, organizacion_id=_resolver_org_id(claims))
     except Exception as e:
         manejar_error_http(e)

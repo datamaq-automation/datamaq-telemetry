@@ -46,6 +46,7 @@ from src.domain.sge.ports import (
 from src.domain.telemetria.ports import RepositorioOrganizacionesPort
 from src.infrastructure.fastapi.dependencies import get_usuario_actual
 from src.infrastructure.fastapi.error_handler import manejar_error_http
+from src.infrastructure.fastapi.planta_ownership import resolver_planta_permitida
 from src.infrastructure.yaml.repositories.organizaciones_repository import (
     YamlOrganizacionesRepository,
 )
@@ -217,6 +218,7 @@ def consultar_mis_competencias(
 
 @router.get(
     "/plantas/{planta_id}/balance-energia",
+    dependencies=[Depends(resolver_planta_permitida)],
     response_model=BalanceEnergiaResponseDTO,
     response_model_by_alias=True,
     summary="Consultar balance de energía en TGBT y pérdidas técnicas (ISO 50001 §6.3)",
@@ -248,6 +250,7 @@ def obtener_balance_energia(
 
 @router.get(
     "/plantas/{planta_id}/ahorros-cusum",
+    dependencies=[Depends(resolver_planta_permitida)],
     response_model=AhorrosCusumResponseDTO,
     response_model_by_alias=True,
     summary="Consultar ahorros acumulados y curva CUSUM frente a EnB congelada (ISO 50006 / ISO 50001 §9.1)",
@@ -279,6 +282,7 @@ def obtener_ahorros_cusum(
 
 @router.get(
     "/plantas/{planta_id}/linea-base",
+    dependencies=[Depends(resolver_planta_permitida)],
     response_model=list[LineaBaseResponseDTO],
     response_model_by_alias=True,
     summary="Consultar Líneas de Base Energética (EnB) congeladas en GitOps para la planta (ISO 50001 §6.5)",

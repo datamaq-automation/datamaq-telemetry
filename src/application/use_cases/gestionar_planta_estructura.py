@@ -28,16 +28,16 @@ class GestionarPlantaEstructuraUseCase:
         self.repo_maquinas = repo_maquinas
 
     def _resolver_planta(self, planta_id: str | None = None, organizacion_id: str | None = None) -> Planta | None:
-        if planta_id:
-            planta = self.repo_organizaciones.obtener_planta_por_id(planta_id)
-            if planta:
-                return planta
-            raise PlantaNoEncontradaError(f"Planta con id '{planta_id}' no encontrada.")
+        """Sin id no hay planta: la activa la decide la política de acceso, no este caso de uso.
 
-        plantas = self.repo_organizaciones.listar_plantas(organizacion_id)
-        if plantas:
-            return plantas[0]
-        return None
+        Con `organizacion_id`, una planta de otra organización se trata como inexistente.
+        """
+        if not planta_id:
+            return None
+        planta = self.repo_organizaciones.obtener_planta_por_id(planta_id)
+        if planta is None or (organizacion_id is not None and planta.organizacion_id != organizacion_id):
+            raise PlantaNoEncontradaError(f"Planta con id '{planta_id}' no encontrada.")
+        return planta
 
     def obtener_unifilar(self, planta_id: str | None = None, organizacion_id: str | None = None) -> UnifilarPlantaDTO:
         planta = self._resolver_planta(planta_id, organizacion_id)

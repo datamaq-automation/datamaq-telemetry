@@ -14,12 +14,14 @@ from src.infrastructure.fastapi.dependencies import (
     get_consultar_analitica_planta_use_case,
     get_usuario_actual,
 )
+from src.infrastructure.fastapi.planta_ownership import resolver_planta_permitida
 
 router = APIRouter(prefix="/api/v1/analitica", tags=["Analítica SSOT de Planta"])
 
 
 @router.get(
     "/banco-capacitores/planta",
+    dependencies=[Depends(resolver_planta_permitida)],
     response_model=AnaliticaBancoCapacitoresPlantaDTO,
     status_code=status.HTTP_200_OK,
     summary="Obtener analítica SSOT de banco de capacitores (histórico real 30 días)",
@@ -46,6 +48,7 @@ def obtener_banco_capacitores_planta(
 
 @router.get(
     "/penalizaciones/planta",
+    dependencies=[Depends(resolver_planta_permitida)],
     response_model=AnaliticaPenalizacionesPlantaDTO,
     status_code=status.HTTP_200_OK,
     summary="Obtener acumulado SSOT de penalizaciones por bajo FP a 7 días",

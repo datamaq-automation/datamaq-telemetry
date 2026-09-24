@@ -121,6 +121,34 @@ def test_use_case_resolver_mapea_a_dto_y_planta_activa_es_la_primera():
     assert GestionarAccesoPlantasUseCase.planta_activa([]) is None
 
 
+def test_planta_permitida_propia_se_devuelve_y_la_ajena_o_inexistente_no():
+    use_case = GestionarAccesoPlantasUseCase(RepoAccesosEnMemoria(), _repo_org())
+    assert use_case.resolver_planta_permitida("u-1", "operador", "org-a", "planta-pilar") == "planta-pilar"
+    for planta_id in ("planta-ajena", "planta-inexistente"):
+        with pytest.raises(PlantaNoEncontradaError):
+            use_case.resolver_planta_permitida("u-1", "operador", "org-a", planta_id)
+
+
+def test_planta_permitida_con_asignaciones_rechaza_la_no_asignada_de_su_org():
+    accesos = RepoAccesosEnMemoria([AccesoPlantaUsuario("u-1", "planta-pilar", puede_cambiar=False)])
+    use_case = GestionarAccesoPlantasUseCase(accesos, _repo_org())
+    with pytest.raises(PlantaNoEncontradaError):
+        use_case.resolver_planta_permitida("u-1", "operador", "org-a", "planta-garin")
+    # Sin id pedido: la activa es la asignada, igual que planta_activa_id de /auth/me.
+    assert use_case.resolver_planta_permitida("u-1", "operador", "org-a", None) == "planta-pilar"
+
+
+@pytest.mark.parametrize("rol", ["superadmin", "invitado_global"])
+def test_planta_permitida_roles_globales_acceden_a_cualquier_planta(rol):
+    use_case = GestionarAccesoPlantasUseCase(RepoAccesosEnMemoria(), _repo_org())
+    assert use_case.resolver_planta_permitida("u-1", rol, "org-a", "planta-ajena") == "planta-ajena"
+
+
+def test_planta_permitida_sin_organizacion_no_tiene_planta_activa():
+    use_case = GestionarAccesoPlantasUseCase(RepoAccesosEnMemoria(), _repo_org())
+    assert use_case.resolver_planta_permitida("u-1", "operador", None, None) is None
+
+
 def test_use_case_asignar_reemplaza_el_conjunto_y_deduplica():
     accesos = RepoAccesosEnMemoria([AccesoPlantaUsuario("u-1", "planta-garin", puede_cambiar=True)])
     use_case = GestionarAccesoPlantasUseCase(accesos, _repo_org(), RepoUsuariosEnMemoria([_usuario()]))

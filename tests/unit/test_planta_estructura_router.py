@@ -26,6 +26,7 @@ from src.infrastructure.fastapi.dependencies import (
     get_planta_estructura_use_case,
     get_usuario_actual,
 )
+from src.infrastructure.fastapi.planta_ownership import resolver_planta_permitida
 from src.infrastructure.fastapi.server import create_app
 
 
@@ -81,6 +82,8 @@ def _cliente(rol: str = "admin") -> tuple[TestClient, MagicMock]:
     mock_use_case.potencia_referencia.return_value = None
     app.dependency_overrides[get_planta_estructura_use_case] = lambda: mock_use_case
     app.dependency_overrides[get_consultar_nodo_unifilar_use_case] = lambda: mock_use_case
+    # El control de acceso por planta se prueba en test_aislamiento_planta_api.py.
+    app.dependency_overrides[resolver_planta_permitida] = lambda planta_id=None: planta_id
     app.dependency_overrides[get_usuario_actual] = lambda: {
         "sub": "u1",
         "rol": rol,
@@ -149,7 +152,7 @@ def test_get_unifilar_by_planta_exitoso():
     response = client.get("/api/v1/plantas/planta-42/unifilar")
 
     assert response.status_code == 200
-    mock_use_case.obtener_unifilar.assert_called_once_with(planta_id="planta-42")
+    mock_use_case.obtener_unifilar.assert_called_once_with(planta_id="planta-42", organizacion_id="org-1")
     assert response.json()["planta_id"] == "planta-42"
 
 
@@ -241,7 +244,7 @@ def test_get_layout_by_planta_exitoso():
     response = client.get("/api/v1/plantas/planta-88/layout")
 
     assert response.status_code == 200
-    mock_use_case.obtener_layout.assert_called_once_with(planta_id="planta-88")
+    mock_use_case.obtener_layout.assert_called_once_with(planta_id="planta-88", organizacion_id="org-1")
     assert response.json()["planta_id"] == "planta-88"
 
 
@@ -320,7 +323,7 @@ def test_get_areas_estadisticas_by_planta_exitoso():
     response = client.get("/api/v1/plantas/planta-durax/areas")
 
     assert response.status_code == 200
-    mock_use_case.obtener_areas_estadisticas.assert_called_once_with(planta_id="planta-durax")
+    mock_use_case.obtener_areas_estadisticas.assert_called_once_with(planta_id="planta-durax", organizacion_id="org-1")
     assert response.json()["planta_id"] == "planta-durax"
 
 
