@@ -183,8 +183,8 @@ class AgregadorDispositivosService:
         lecturas_por_dispositivo: dict[str, list[tuple]],
         intervalo_segundos: int,
     ) -> list[PuntoPotencia]:
-        """Bucketiza por tiempo (mismo cálculo de piso que AgregadorLecturasService) y suma
-        entre dispositivos. Tolera que cada dispositivo tenga sus propios timestamps: lo que
+        """Bucketiza por tiempo (mismo cálculo de piso que AgregadorLecturasService), promedia las
+        lecturas de cada dispositivo dentro del bucket y suma esos promedios entre dispositivos. Tolera que cada dispositivo tenga sus propios timestamps: lo que
         importa es a qué bucket cae cada lectura, no que coincidan exactamente entre sí.
 
         Cada lectura es ``(momento, potencia_activa_w)`` o ``(momento, potencia_activa_w,
@@ -198,8 +198,11 @@ class AgregadorDispositivosService:
             intervalo_segundos=intervalo_segundos,
         )
 
-        totales_p_por_bucket: dict[int, float] = {}
-        totales_q_por_bucket: dict[int, float] = {}
+        # Muestras por (bucket, dispositivo): varias lecturas de un mismo medidor en un bucket
+        # (p. ej. las crudas del buffer en vivo antepuestas al histórico ya agregado) son muestras
+        # de UNA potencia media. Se promedian por medidor y recién después se suma entre medidores.
+        muestras_p: dict[tuple[int, str], list[float]] = {}
+        muestras_q: dict[tuple[int, str], list[float]] = {}
         hubo_dato_por_bucket: dict[int, bool] = {}
         q_completa_por_bucket: dict[int, bool] = {}
         dispositivos_con_dato_por_bucket: dict[int, set[str]] = {}
@@ -215,14 +218,17 @@ class AgregadorDispositivosService:
                 if potencia_w is None:
                     hubo_dato_por_bucket.setdefault(bucket_ts, False)
                     continue
-                totales_p_por_bucket[bucket_ts] = totales_p_por_bucket.get(bucket_ts, 0.0) + potencia_w
+                muestras_p.setdefault((bucket_ts, dispositivo_id), []).append(potencia_w)
                 hubo_dato_por_bucket[bucket_ts] = True
                 dispositivos_con_dato_por_bucket.setdefault(bucket_ts, set()).add(dispositivo_id)
                 if reactiva_var is None:
                     q_completa_por_bucket[bucket_ts] = False
                 else:
                     q_completa_por_bucket.setdefault(bucket_ts, True)
-                    totales_q_por_bucket[bucket_ts] = totales_q_por_bucket.get(bucket_ts, 0.0) + reactiva_var
+                    muestras_q.setdefault((bucket_ts, dispositivo_id), []).append(reactiva_var)
+
+        totales_p_por_bucket = _sumar_promedios_por_bucket(muestras_p)
+        totales_q_por_bucket = _sumar_promedios_por_bucket(muestras_q)
 
         todos_los_dispositivos = set(lecturas_por_dispositivo.keys())
         resultado = []
@@ -299,6 +305,14 @@ class AgregadorDispositivosService:
             tension_linea_st_V=v_st,
             tension_linea_tr_V=v_tr,
         )
+
+
+def _sumar_promedios_por_bucket(muestras: dict[tuple[int, str], list[float]]) -> dict[int, float]:
+    """Promedia las muestras de cada (bucket, dispositivo) y suma esos promedios por bucket."""
+    totales: dict[int, float] = {}
+    for (bucket_ts, _), valores in muestras.items():
+        totales[bucket_ts] = totales.get(bucket_ts, 0.0) + sum(valores) / len(valores)
+    return totales
 
 
 def _calcular_desbalance_tension(v_prom: dict[str, float | None]) -> float | None:

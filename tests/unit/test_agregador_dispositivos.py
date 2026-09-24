@@ -186,6 +186,52 @@ class TestAgregadorDispositivosService:
         # Potencia aparente S = sqrt(800000^2 + 250000^2) ≈ 838152.73 VA
         assert punto.potencia_aparente_total_va == 838152.73
 
+    def test_sumar_potencia_en_el_tiempo_promedia_lecturas_del_mismo_dispositivo_en_un_bucket(self):
+        """Varias lecturas de un mismo medidor en un bucket (p. ej. las crudas del buffer en vivo que
+        ``listar_instantaneas`` antepone al histórico agregado) son muestras de UNA potencia media, no
+        cargas distintas: sumarlas multiplicaba el último bucket del nodo MT (pico de 72 a 92 MW)."""
+
+        base = datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc)
+        lecturas = {
+            "trafo-01": [
+                (base, 1000.0, 100.0),
+                (base.replace(second=10), 2000.0, 200.0),
+                (base.replace(second=20), 3000.0, 300.0),
+            ],
+        }
+
+        resultado = AgregadorDispositivosService.sumar_potencia_en_el_tiempo(lecturas, intervalo_segundos=300)
+
+        assert len(resultado) == 1
+        assert resultado[0].potencia_activa_total_w == 2000.0
+        assert resultado[0].potencia_reactiva_total_var == 200.0
+
+    def test_sumar_potencia_en_el_tiempo_suma_promedios_entre_dispositivos(self):
+
+        base = datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc)
+        lecturas = {
+            "trafo-01": [(base, 1000.0, 100.0), (base.replace(second=30), 3000.0, 300.0)],
+            "trafo-02": [(base.replace(second=40), 500.0, 50.0)],
+        }
+
+        resultado = AgregadorDispositivosService.sumar_potencia_en_el_tiempo(lecturas, intervalo_segundos=300)
+
+        assert len(resultado) == 1
+        assert resultado[0].potencia_activa_total_w == 2500.0
+        assert resultado[0].potencia_reactiva_total_var == 250.0
+        assert resultado[0].dispositivos_sin_dato == []
+
+    def test_sumar_potencia_en_el_tiempo_ignora_lecturas_none_al_promediar(self):
+
+        base = datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc)
+        lecturas = {
+            "trafo-01": [(base, 1000.0), (base.replace(second=10), None), (base.replace(second=20), 3000.0)],
+        }
+
+        resultado = AgregadorDispositivosService.sumar_potencia_en_el_tiempo(lecturas, intervalo_segundos=300)
+
+        assert resultado[0].potencia_activa_total_w == 2000.0
+
     def test_registrado_en_es_el_timestamp_mas_reciente_entre_dispositivos_con_dato(self):
         ts_antiguo = datetime(2026, 9, 1, 10, 0, 0, tzinfo=timezone.utc)
         ts_reciente = datetime(2026, 9, 1, 10, 5, 0, tzinfo=timezone.utc)
