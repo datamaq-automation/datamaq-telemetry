@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 from fastapi.testclient import TestClient
 
 from src.application.dtos.telemetria_dto import (
+    HistoricoInstantaneasDTO,
     LecturaInstantaneaDTO,
     MedicionFaseDTO,
     TelemetriaLatestResponseDTO,
@@ -124,7 +125,9 @@ def test_get_instantaneous_history_end_to_end():
     )
 
     mock_use_case = MagicMock()
-    mock_use_case.listar_instantaneas.return_value = [mock_item]
+    mock_use_case.historico_instantaneas.return_value = HistoricoInstantaneasDTO(
+        lecturas=[mock_item], datos_desde=ahora
+    )
 
     app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "user-test", "rol": "operador"}
     app.dependency_overrides[verificar_propiedad_dispositivo] = lambda: None
@@ -135,6 +138,7 @@ def test_get_instantaneous_history_end_to_end():
 
     assert response.status_code == 200
     assert "X-Request-ID" in response.headers
+    assert "X-Datos-Desde" in response.headers
     data = response.json()
     assert len(data) == 1
     assert data[0]["thd_v_promedio_pct"] == 1.50
@@ -144,7 +148,9 @@ def test_get_instantaneous_history_empty_result_returns_200_empty_list():
     app = create_app()
 
     mock_use_case = MagicMock()
-    mock_use_case.listar_instantaneas.return_value = []
+    mock_use_case.historico_instantaneas.return_value = HistoricoInstantaneasDTO(
+        lecturas=[], datos_desde=datetime(2026, 9, 1, tzinfo=timezone.utc)
+    )
 
     app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "user-test", "rol": "invitado"}
     app.dependency_overrides[verificar_propiedad_dispositivo] = lambda: None

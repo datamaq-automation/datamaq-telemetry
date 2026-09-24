@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query, Response
 
 from src.application.dtos.planta_estructura_dto import (
     LayoutPlantaDTO,
@@ -11,6 +11,7 @@ from src.application.dtos.planta_estructura_dto import (
     ResumenNodoUnifilarDTO,
     UnifilarPlantaDTO,
 )
+from src.application.dtos.tipos import FechaHoraUTC
 from src.application.use_cases.consultar_nodo_unifilar import ConsultarNodoUnifilarUseCase
 from src.application.use_cases.gestionar_planta_estructura import (
     GestionarPlantaEstructuraUseCase,
@@ -21,6 +22,7 @@ from src.infrastructure.fastapi.dependencies import (
     get_usuario_actual,
 )
 from src.infrastructure.fastapi.error_handler import manejar_error_http
+from src.infrastructure.fastapi.headers_historico import HEADER_DATOS_DESDE, formatear_datos_desde
 
 router = APIRouter(
     prefix="/api/v1",
@@ -89,12 +91,21 @@ def historico_nodo_unifilar(
     nodo_id: str,
     use_case: Annotated[ConsultarNodoUnifilarUseCase, Depends(get_consultar_nodo_unifilar_use_case)],
     claims: Annotated[dict, Depends(get_usuario_actual)],
-    hours: int = 24,
+    response: Response,
+    hours: int = Query(24, ge=1, le=720, description="Ancho de la ventana en horas"),
     granularity: str = "5m",
+    hasta: FechaHoraUTC | None = Query(
+        None, description="Fin de la ventana ISO8601 UTC; la ventana es [hasta - hours, hasta]. Sin valor: ahora"
+    ),
 ):
+    """El header `X-Datos-Desde` informa el corte de retención más reciente entre los medidores
+    frontera; se omite si el nodo no tiene medidores."""
     try:
         org_id = _resolver_org_id(claims)
-        return use_case.historico(planta_id, nodo_id, org_id, granularity, hours)
+        historico = use_case.historico(planta_id, nodo_id, org_id, granularity, hours, hasta)
+        if historico.datos_desde is not None:
+            response.headers[HEADER_DATOS_DESDE] = formatear_datos_desde(historico.datos_desde)
+        return historico.puntos
     except Exception as e:
         manejar_error_http(e)
 

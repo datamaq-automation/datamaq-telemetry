@@ -9,11 +9,16 @@ from src.application.dtos.planta_estructura_dto import (
     BancoRecomendadoDTO,
     CompensacionHistoricaDTO,
     FaseAgregadaDTO,
+    HistoricoNodoUnifilarDTO,
     PuntoPotenciaNodoUnifilarDTO,
     ResumenNodoUnifilarDTO,
 )
 from src.application.dtos.telemetria_dto import EnergiaAgregadaDTO
-from src.application.use_cases.agregacion_dispositivos import calcular_historico, calcular_resumen
+from src.application.use_cases.agregacion_dispositivos import (
+    calcular_datos_desde,
+    calcular_historico,
+    calcular_resumen,
+)
 from src.application.use_cases.consultar_telemetria import ConsultarTelemetriaUseCase
 from src.domain.telemetria.analizador_reactiva import DimensionadorCompensacionService
 from src.domain.telemetria.entities import NodoUnifilar, Planta
@@ -253,7 +258,8 @@ class ConsultarNodoUnifilarUseCase:
         organizacion_id: str | None = None,
         granularidad: str = "5m",
         horas: int = 24,
-    ) -> list[PuntoPotenciaNodoUnifilarDTO]:
+        hasta: datetime | None = None,
+    ) -> HistoricoNodoUnifilarDTO:
         _, nodos_frontera = self._resolver_nodo(planta_id, nodo_id, organizacion_id)
         dispositivos_ids = [n.device_id for n in nodos_frontera if n.device_id]
 
@@ -267,15 +273,22 @@ class ConsultarNodoUnifilarUseCase:
             hay_duplicados=len(dispositivos_ids) != len(set(dispositivos_ids)),
         )
 
-        puntos = calcular_historico(dispositivos_ids, self.consultar_telemetria, granularidad, horas)
-        return [
-            PuntoPotenciaNodoUnifilarDTO(
-                momento=p.momento,
-                potencia_activa_total_w=p.potencia_activa_total_w,
-                potencia_reactiva_total_var=p.potencia_reactiva_total_var,
-                potencia_aparente_total_va=p.potencia_aparente_total_va,
-                factor_desplazamiento_total=p.factor_desplazamiento_total,
-                dispositivos_sin_dato=p.dispositivos_sin_dato,
-            )
-            for p in puntos
-        ]
+        datos_desde = calcular_datos_desde(dispositivos_ids, self.consultar_telemetria)
+        puntos = calcular_historico(dispositivos_ids, self.consultar_telemetria, granularidad, horas, hasta)
+        if datos_desde is not None:
+            # Antes del corte más reciente falta al menos un medidor: la suma estaría incompleta.
+            puntos = [p for p in puntos if p.momento >= datos_desde]
+        return HistoricoNodoUnifilarDTO(
+            puntos=[
+                PuntoPotenciaNodoUnifilarDTO(
+                    momento=p.momento,
+                    potencia_activa_total_w=p.potencia_activa_total_w,
+                    potencia_reactiva_total_var=p.potencia_reactiva_total_var,
+                    potencia_aparente_total_va=p.potencia_aparente_total_va,
+                    factor_desplazamiento_total=p.factor_desplazamiento_total,
+                    dispositivos_sin_dato=p.dispositivos_sin_dato,
+                )
+                for p in puntos
+            ],
+            datos_desde=datos_desde,
+        )

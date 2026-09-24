@@ -7,6 +7,7 @@ from src.application.dtos.telemetria_dto import (
     AcumuladoEnergiaDTO,
     DiagnosticoFasesDispositivoDTO,
     EnergiaAgregadaDTO,
+    HistoricoInstantaneasDTO,
     LecturaInstantaneaDTO,
     TelemetriaLatestResponseDTO,
 )
@@ -32,6 +33,9 @@ from src.domain.telemetria.services import (
     PoliticaSuscripcionService,
 )
 from src.domain.telemetria.value_objects import GranularidadEnergia, MacAddress, ModoFreeTier
+
+# Throttle de persistencia de `IngestarTelemetriaUseCase` (granularidad_segundos por defecto).
+_THROTTLE_PERSISTENCIA_SEGUNDOS = 300
 
 
 class ConsultarTelemetriaUseCase:
@@ -150,6 +154,22 @@ class ConsultarTelemetriaUseCase:
             analitica=inst_dto.analitica if inst_dto else None,
         )
 
+    def datos_desde(self, id_o_uid: str) -> datetime:
+        """Fecha más antigua consultable del dispositivo (corte de retención de su plan)."""
+        return self._calcular_fecha_corte_retencion(self._resolver_dispositivo(id_o_uid))
+
+    def historico_instantaneas(
+        self,
+        id_o_uid: str,
+        limite: int = 100,
+        desde: datetime | None = None,
+        granularidad: str = "raw",
+        horas: int | None = None,
+        hasta: datetime | None = None,
+    ) -> HistoricoInstantaneasDTO:
+        lecturas = self.listar_instantaneas(id_o_uid, limite, desde, granularidad, horas, hasta)
+        return HistoricoInstantaneasDTO(lecturas=lecturas, datos_desde=self.datos_desde(id_o_uid))
+
     def listar_instantaneas(
         self,
         id_o_uid: str,
@@ -157,6 +177,7 @@ class ConsultarTelemetriaUseCase:
         desde: datetime | None = None,
         granularidad: str = "raw",
         horas: int | None = None,
+        hasta: datetime | None = None,
     ) -> list[LecturaInstantaneaDTO]:
         dev = self._resolver_dispositivo(id_o_uid)
         _, _, _, min_intervalo = self._obtener_contexto_suscripcion(dev)
@@ -165,18 +186,21 @@ class ConsultarTelemetriaUseCase:
             getattr(dev, "fases_con_ti", "R,S,T"),
         )
 
-        ahora = datetime.now(timezone.utc)
+        fin_ventana = hasta or datetime.now(timezone.utc)
         horas_efectivas = horas
         if horas_efectivas is None and desde is not None:
-            horas_efectivas = max(1, int((ahora - desde).total_seconds() / 3600.0))
+            horas_efectivas = max(1, int((fin_ventana - desde).total_seconds() / 3600.0))
 
         es_lttb = (granularidad or "").strip().lower() == "lttb"
         intervalo_pedido = self._resolver_intervalo_segundos(granularidad, horas_efectivas)
         intervalo_segundos = max(intervalo_pedido, min_intervalo)
         desde_efectivo = self._acotar_fecha_desde(dev, desde)
+        if hasta is not None and hasta < desde_efectivo:
+            # Ventana entera antes del corte de retención: vacía, no error (D3).
+            return []
 
         limite_db = max(limite * 10, 5000) if (intervalo_segundos > 0 or es_lttb) else limite
-        lecturas = self.repo_telemetria.listar_instantaneas(dev.id, limite_db, desde_efectivo)
+        lecturas = self.repo_telemetria.listar_instantaneas(dev.id, limite_db, desde_efectivo, hasta)
 
         if es_lttb:
             lecturas = AnalizadorCalidadEnergiaService.downsample_lttb(lecturas, target_points=limite)
@@ -188,10 +212,25 @@ class ConsultarTelemetriaUseCase:
             lecturas = lecturas[:limite]
 
         lecturas_dto = [TelemetriaMapper.instantanea_to_dto(item, dispositivo=dev) for item in lecturas]
-        return self._mezclar_buffer_en_vivo(dev.id, lecturas_dto, limite)
+        if not self._buffer_aplica(hasta, intervalo_segundos):
+            return lecturas_dto
+        return self._mezclar_buffer_en_vivo(dev.id, lecturas_dto, limite, hasta)
+
+    @staticmethod
+    def _buffer_aplica(hasta: datetime | None, intervalo_segundos: int) -> bool:
+        """D4: el buffer en vivo solo tiene lecturas aún no persistidas (throttle de 300 s), así
+        que solo aporta si la ventana termina en el presente o dentro del último intervalo."""
+        if hasta is None:
+            return True
+        margen = timedelta(seconds=max(intervalo_segundos, _THROTTLE_PERSISTENCIA_SEGUNDOS))
+        return hasta >= datetime.now(timezone.utc) - margen
 
     def _mezclar_buffer_en_vivo(
-        self, dispositivo_id: str, lecturas_dto: list[LecturaInstantaneaDTO], limite: int
+        self,
+        dispositivo_id: str,
+        lecturas_dto: list[LecturaInstantaneaDTO],
+        limite: int,
+        hasta: datetime | None = None,
     ) -> list[LecturaInstantaneaDTO]:
         """Antepone al histórico de BD las lecturas recibidas en vivo que todavía no bajaron
         a la base de datos (downsampling de persistencia), para que un F5 del navegador no
@@ -203,7 +242,11 @@ class ConsultarTelemetriaUseCase:
         candidatos = [
             LecturaInstantaneaDTO.model_validate(dato) for dato in self.buffer_en_vivo.obtener(dispositivo_id)
         ]
-        recientes = [dto for dto in candidatos if dto.registrado_en not in vistos]
+        recientes = [
+            dto
+            for dto in candidatos
+            if dto.registrado_en not in vistos and (hasta is None or dto.registrado_en <= hasta)
+        ]
         recientes.sort(key=lambda dto: dto.registrado_en, reverse=True)
         return (recientes + lecturas_dto)[:limite]
 

@@ -29,6 +29,7 @@ from src.infrastructure.fastapi.dependencies import (
     registrar_mqtt_listener,
 )
 from src.infrastructure.fastapi.error_handler import manejar_404
+from src.infrastructure.fastapi.headers_historico import HEADER_DATOS_DESDE
 from src.infrastructure.fastapi.middleware import RequestIdMiddleware
 from src.infrastructure.fastapi.routes.alertas_router import router as alertas_router
 from src.infrastructure.fastapi.routes.analitica_router import router as analitica_router
@@ -448,23 +449,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         openapi_url="/openapi.json" if settings.API_EXPOSE_DOCS else None,
     )
 
-    if (settings.CORS_ORIGINS or "").strip() == "*":
-        app.add_middleware(
-            CORSMiddleware,
-            allow_origins=["*"],
-            allow_credentials=False,
-            allow_methods=["*"],
-            allow_headers=["*"],
-        )
-    else:
-        origins = [o.strip() for o in (settings.CORS_ORIGINS or "").split(",") if o.strip()]
-        app.add_middleware(
-            CORSMiddleware,
-            allow_origins=origins,
-            allow_credentials=True,
-            allow_methods=["*"],
-            allow_headers=["*"],
-        )
+    # Con "*" no se permiten credenciales (la especificación CORS lo prohíbe).
+    cors_abierto = (settings.CORS_ORIGINS or "").strip() == "*"
+    origins = ["*"] if cors_abierto else [o.strip() for o in (settings.CORS_ORIGINS or "").split(",") if o.strip()]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_credentials=not cors_abierto,
+        allow_methods=["*"],
+        allow_headers=["*"],
+        expose_headers=[HEADER_DATOS_DESDE],
+    )
 
     app.add_middleware(SecurityHeadersMiddleware, settings=settings)
     app.add_middleware(RequestIdMiddleware)

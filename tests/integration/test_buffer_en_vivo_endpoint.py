@@ -87,7 +87,7 @@ class _RepoTelemetriaFakeSoloDb(RepositorioTelemetriaPort):
         return None
 
     def listar_instantaneas(
-        self, dispositivo_id: str, limite: int, desde: datetime | None = None
+        self, dispositivo_id: str, limite: int, desde: datetime | None = None, hasta: datetime | None = None
     ) -> list[LecturaInstantanea]:
         return [i for i in self._instantaneas if i.dispositivo_id == dispositivo_id][:limite]
 

@@ -70,6 +70,7 @@ def use_case():
         EnergiaAgregadaDTO(periodo=date(2026, 9, 12), energia_activa_neta_kwh={DEV_1: 10.0, DEV_2: 5.0}[dev_id])
     ]
     consultar_telemetria.listar_instantaneas.return_value = []
+    consultar_telemetria.datos_desde.return_value = datetime(2026, 8, 29, tzinfo=timezone.utc)
 
     return ConsultarNodoUnifilarUseCase(repo_org, repo_telemetria, consultar_telemetria)
 
@@ -107,11 +108,12 @@ def test_nodo_inexistente_es_404(use_case):
 
 
 def test_historico_consulta_los_medidores_frontera(use_case):
-    puntos = use_case.historico(PLANTA_ID, "mt", organizacion_id=ORG_ID, granularidad="5m", horas=1)
+    historico = use_case.historico(PLANTA_ID, "mt", organizacion_id=ORG_ID, granularidad="5m", horas=1)
 
     llamados = [c.args[0] for c in use_case.consultar_telemetria.listar_instantaneas.call_args_list]
     assert llamados == [DEV_1, DEV_2]
-    assert puntos == []
+    assert historico.puntos == []
+    assert historico.datos_desde == datetime(2026, 8, 29, tzinfo=timezone.utc)
 
 
 def test_compensacion_historica_incluida_en_nodo_mt_o_total_planta(use_case):

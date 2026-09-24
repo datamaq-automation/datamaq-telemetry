@@ -1,5 +1,6 @@
 """tests/unit/test_planta_estructura_router.py — Tests unitarios para el router de estructura de planta (unifilar y layout)."""
 
+from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient
@@ -7,9 +8,11 @@ from fastapi.testclient import TestClient
 from src.application.dtos.planta_estructura_dto import (
     CoordenadasZonaDTO,
     DispositivoLayoutDTO,
+    HistoricoNodoUnifilarDTO,
     LayoutPlantaDTO,
     NodoUnifilarDTO,
     PosicionLayoutDTO,
+    PuntoPotenciaNodoUnifilarDTO,
     ResumenNodoUnifilarDTO,
     UnifilarPlantaDTO,
     ZonaPlantaDTO,
@@ -366,10 +369,50 @@ def test_resumen_nodo_unifilar_no_encontrado():
 
 def test_historico_nodo_unifilar_exitoso():
     client, mock_use_case = _cliente()
-    mock_use_case.historico.return_value = []
+    mock_use_case.historico.return_value = HistoricoNodoUnifilarDTO(
+        puntos=[PuntoPotenciaNodoUnifilarDTO(momento=datetime(2026, 9, 10, 0, 0, tzinfo=timezone.utc))],
+        datos_desde=datetime(2026, 8, 27, 12, 0, tzinfo=timezone.utc),
+    )
 
     response = client.get("/api/v1/plantas/planta-1/unifilar/nodos/mt/resumen/historico?hours=6&granularity=15m")
 
     assert response.status_code == 200
-    mock_use_case.historico.assert_called_once_with("planta-1", "mt", "org-1", "15m", 6)
+    mock_use_case.historico.assert_called_once_with("planta-1", "mt", "org-1", "15m", 6, None)
+    assert [p["momento"] for p in response.json()] == ["2026-09-10T00:00:00Z"]
+    assert response.headers["X-Datos-Desde"] == "2026-08-27T12:00:00Z"
+
+
+def test_historico_nodo_unifilar_propaga_hasta():
+    client, mock_use_case = _cliente()
+    mock_use_case.historico.return_value = HistoricoNodoUnifilarDTO(puntos=[], datos_desde=None)
+
+    response = client.get(
+        "/api/v1/plantas/planta-1/unifilar/nodos/mt/resumen/historico?hours=8&hasta=2026-09-10T08:00:00Z"
+    )
+
+    assert response.status_code == 200
     assert response.json() == []
+    hasta = mock_use_case.historico.call_args.args[5]
+    assert hasta == datetime(2026, 9, 10, 8, 0, tzinfo=timezone.utc)
+    # Sin medidores frontera no hay retención que informar: el header se omite.
+    assert "X-Datos-Desde" not in response.headers
+
+
+def test_historico_nodo_unifilar_valida_rango_de_hours():
+    client, _ = _cliente()
+    base = "/api/v1/plantas/planta-1/unifilar/nodos/mt/resumen/historico"
+    assert client.get(f"{base}?hours=0").status_code == 422
+    assert client.get(f"{base}?hours=721").status_code == 422
+
+
+def test_cors_expone_header_datos_desde():
+    client, mock_use_case = _cliente()
+    mock_use_case.historico.return_value = HistoricoNodoUnifilarDTO(puntos=[], datos_desde=None)
+
+    response = client.get(
+        "/api/v1/plantas/planta-1/unifilar/nodos/mt/resumen/historico",
+        headers={"Origin": "http://localhost:5173"},
+    )
+
+    expuestos = response.headers.get("access-control-expose-headers", "")
+    assert "X-Datos-Desde" in expuestos

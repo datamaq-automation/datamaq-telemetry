@@ -132,6 +132,14 @@ class LogEstadoDispositivoDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class HistoricoInstantaneasDTO(BaseModel):
+    """Histórico de un dispositivo más su corte de retención (`datos_desde`): la fecha más
+    antigua consultable. El router publica `datos_desde` en el header `X-Datos-Desde`."""
+
+    lecturas: list[LecturaInstantaneaDTO]
+    datos_desde: FechaHoraUTC
+
+
 class TelemetriaLatestResponseDTO(BaseModel):
     device_id: str
     instantanea: LecturaInstantaneaDTO | None = None

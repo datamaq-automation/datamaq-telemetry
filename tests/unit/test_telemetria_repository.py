@@ -622,6 +622,22 @@ class TestListarInstantaneas:
         assert q_mock.filter.call_count == 2
         assert len(resultado) == 1
 
+    def test_listar_instantaneas_con_hasta_acota_por_arriba(self, repo: MySQLTelemetriaRepository, mock_db: MagicMock):
+        q_mock = MagicMock()
+        q_mock.filter.return_value = q_mock
+        q_mock.order_by.return_value = q_mock
+        q_mock.limit.return_value = q_mock
+        q_mock.all.return_value = []
+        mock_db.query.return_value = q_mock
+
+        desde = datetime(2026, 9, 12, 0, 0, 0, tzinfo=timezone.utc)
+        hasta = datetime(2026, 9, 12, 8, 0, 0, tzinfo=timezone.utc)
+        repo.listar_instantaneas(dispositivo_id=DEV_ID, limite=5, desde=desde, hasta=hasta)
+
+        assert q_mock.filter.call_count == 3
+        filtro_hasta = str(q_mock.filter.call_args_list[2].args[0])
+        assert "recorded_at <=" in filtro_hasta
+
 
 class TestIterarInstantaneas:
     """Tests para iterar_instantaneas (generador paginado por chunks)."""

@@ -7,6 +7,9 @@ diferencia entre ambos consumidores es de dónde sacan esa lista de ids
 el cálculo de suma en sí vive en ``AgregadorDispositivosService``.
 """
 
+import math
+from datetime import datetime, timedelta, timezone
+
 import structlog
 
 from src.application.use_cases.consultar_telemetria import ConsultarTelemetriaUseCase
@@ -65,11 +68,22 @@ def calcular_resumen(
     return potencia_sumada, energia_sumada
 
 
+def calcular_datos_desde(
+    dispositivos_ids: list[str],
+    consultar_telemetria: ConsultarTelemetriaUseCase,
+) -> datetime | None:
+    """Corte de retención más reciente entre los dispositivos: desde ahí están todos, así la suma
+    nunca queda incompleta sin aviso (D3). ``None`` si no hay dispositivos."""
+    cortes = [consultar_telemetria.datos_desde(dispositivo_id) for dispositivo_id in dispositivos_ids]
+    return max(cortes) if cortes else None
+
+
 def calcular_historico(
     dispositivos_ids: list[str],
     consultar_telemetria: ConsultarTelemetriaUseCase,
     granularidad: str,
     horas: int,
+    hasta: datetime | None = None,
 ) -> list[PuntoPotencia]:
     _log.debug(
         "agregador_historico_inicio",
@@ -77,16 +91,22 @@ def calcular_historico(
         dispositivos_ids=dispositivos_ids,
         granularidad=granularidad,
         horas=horas,
+        hasta=hasta.isoformat() if hasta else None,
     )
 
     intervalo_segundos = ConsultarTelemetriaUseCase._resolver_intervalo_segundos(granularidad, horas)
     if intervalo_segundos <= 0:
         intervalo_segundos = 300
 
+    # Un intervalo por bucket de la ventana (+1 por el bucket parcial del borde): con un tope fijo
+    # de 2000, una semana a 5 min (2016 buckets) perdía sus ~80 min más antiguos.
+    limite = max(2000, math.ceil(horas * 3600 / intervalo_segundos) + 1)
+    desde = (hasta or datetime.now(timezone.utc)) - timedelta(hours=horas)
+
     lecturas_por_dispositivo: dict[str, list[tuple]] = {}
     for dispositivo_id in dispositivos_ids:
         lecturas_dto = consultar_telemetria.listar_instantaneas(
-            dispositivo_id, limite=2000, granularidad=granularidad, horas=horas
+            dispositivo_id, limite=limite, desde=desde, granularidad=granularidad, horas=horas, hasta=hasta
         )
         lecturas_por_dispositivo[dispositivo_id] = [
             (lectura.registrado_en, lectura.potencia_activa_total_W, lectura.potencia_reactiva_total_VAR)

@@ -255,11 +255,13 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
         return self._energia_to_entity(m) if m else None
 
     def listar_instantaneas(
-        self, dispositivo_id: str, limite: int, desde: datetime | None = None
+        self, dispositivo_id: str, limite: int, desde: datetime | None = None, hasta: datetime | None = None
     ) -> list[LecturaInstantanea]:
         q = self.db.query(TelemetryInstantaneousModel).filter(TelemetryInstantaneousModel.device_id == dispositivo_id)
         if desde:
             q = q.filter(TelemetryInstantaneousModel.recorded_at >= desde)
+        if hasta:
+            q = q.filter(TelemetryInstantaneousModel.recorded_at <= hasta)
         items = q.order_by(desc(TelemetryInstantaneousModel.recorded_at)).limit(limite).all()
         return [self._instantanea_to_entity(m) for m in items]
 

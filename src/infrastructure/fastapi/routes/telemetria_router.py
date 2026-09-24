@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from datetime import timezone as tz
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from fastapi.responses import StreamingResponse
 
 from src.application.dtos.alerta_dto import AlertaResponseDTO
@@ -27,6 +27,7 @@ from src.infrastructure.fastapi.dependencies import (
 )
 from src.infrastructure.fastapi.device_ownership import verificar_propiedad_dispositivo
 from src.infrastructure.fastapi.error_handler import manejar_error_http
+from src.infrastructure.fastapi.headers_historico import HEADER_DATOS_DESDE, formatear_datos_desde
 
 router = APIRouter(
     prefix="/api/v1/telemetria",
@@ -73,6 +74,7 @@ def get_phase_diagnostic(
 )
 def get_instantaneous_history(
     device_id: str,
+    response: Response,
     use_case: Annotated[ConsultarTelemetriaUseCase, Depends(get_telemetria_use_case)],
     limit: int = Query(500, ge=1, le=5000, description="Límite máximo de registros a retornar"),
     hours: int | None = Query(None, ge=1, le=720, description="Últimas N horas"),
@@ -80,16 +82,24 @@ def get_instantaneous_history(
         "auto",
         description="Granularidad temporal: auto, raw, 1m, 5m, 15m, 1h, lttb (downsampling con preservación de picos)",
     ),
+    hasta: FechaHoraUTC | None = Query(
+        None, description="Fin de la ventana ISO8601 UTC; la ventana es [hasta - hours, hasta]. Sin valor: ahora"
+    ),
 ):
+    """El header `X-Datos-Desde` informa la fecha más antigua consultable (corte de retención)."""
     try:
-        desde = datetime.now(tz.utc) - timedelta(hours=hours) if hours else None
-        return use_case.listar_instantaneas(
+        fin_ventana = hasta or datetime.now(tz.utc)
+        desde = fin_ventana - timedelta(hours=hours) if hours else None
+        historico = use_case.historico_instantaneas(
             id_o_uid=device_id,
             limite=limit,
             desde=desde,
             granularidad=granularity,
             horas=hours,
+            hasta=hasta,
         )
+        response.headers[HEADER_DATOS_DESDE] = formatear_datos_desde(historico.datos_desde)
+        return historico.lecturas
     except Exception as e:
         manejar_error_http(e)
 

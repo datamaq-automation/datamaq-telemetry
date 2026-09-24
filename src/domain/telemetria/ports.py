@@ -104,6 +104,7 @@ class RepositorioTelemetriaPort(ABC):
         dispositivo_id: str,
         limite: int,
         desde: datetime | None = None,
+        hasta: datetime | None = None,
     ) -> list[LecturaInstantanea]:
         pass
 
@@ -115,10 +116,7 @@ class RepositorioTelemetriaPort(ABC):
         limite: int = 10000,
         chunk_size: int = 500,
     ) -> Iterator[LecturaInstantanea]:
-        items = self.listar_instantaneas(dispositivo_id, limite=limite, desde=desde)
-        if hasta:
-            items = [i for i in items if i.registrado_en <= hasta]
-        yield from items
+        yield from self.listar_instantaneas(dispositivo_id, limite=limite, desde=desde, hasta=hasta)
 
     @abstractmethod
     def listar_energias(

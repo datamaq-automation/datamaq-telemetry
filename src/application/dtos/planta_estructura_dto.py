@@ -260,3 +260,11 @@ class PuntoPotenciaNodoUnifilarDTO(BaseModel):
     potencia_aparente_total_va: float | None = None
     factor_desplazamiento_total: float | None = None
     dispositivos_sin_dato: list[str] = Field(default_factory=list)
+
+
+class HistoricoNodoUnifilarDTO(BaseModel):
+    """Puntos del nodo más `datos_desde`: el corte de retención más reciente entre sus medidores
+    frontera (desde ahí están todos). `None` si el nodo no tiene medidores frontera."""
+
+    puntos: list[PuntoPotenciaNodoUnifilarDTO]
+    datos_desde: FechaHoraUTC | None = None

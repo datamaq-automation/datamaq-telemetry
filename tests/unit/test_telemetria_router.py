@@ -13,6 +13,7 @@ from src.application.dtos.telemetria_dto import (
     DiagnosticoFaseDTO,
     DiagnosticoFasesDispositivoDTO,
     EnergiaAgregadaDTO,
+    HistoricoInstantaneasDTO,
     LecturaInstantaneaDTO,
     MedicionFaseDTO,
     TelemetriaLatestResponseDTO,
@@ -245,40 +246,70 @@ def test_get_phase_diagnostic_unexpected_error_returns_500():
 # ==============================================================================
 
 
+DATOS_DESDE = datetime(2026, 8, 29, 10, 0, 0, tzinfo=timezone.utc)
+
+
+def _historico(*lecturas: LecturaInstantaneaDTO) -> HistoricoInstantaneasDTO:
+    return HistoricoInstantaneasDTO(lecturas=list(lecturas), datos_desde=DATOS_DESDE)
+
+
 def test_get_instantaneous_history_default_params():
     client, mocks = _cliente()
-    mocks["telemetria"].listar_instantaneas.return_value = [_lectura_instantanea_dto()]
+    mocks["telemetria"].historico_instantaneas.return_value = _historico(_lectura_instantanea_dto())
 
     response = client.get(f"/api/v1/telemetria/instantaneous/{DEV_ID}")
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 1
     assert data[0]["dispositivo_id"] == DEV_ID
-    mocks["telemetria"].listar_instantaneas.assert_called_once_with(
+    assert response.headers["X-Datos-Desde"] == "2026-08-29T10:00:00Z"
+    mocks["telemetria"].historico_instantaneas.assert_called_once_with(
         id_o_uid=DEV_ID,
         limite=500,
         desde=None,
         granularidad="auto",
         horas=None,
+        hasta=None,
     )
 
 
 def test_get_instantaneous_history_custom_params():
     client, mocks = _cliente()
-    mocks["telemetria"].listar_instantaneas.return_value = [_lectura_instantanea_dto()]
+    mocks["telemetria"].historico_instantaneas.return_value = _historico(_lectura_instantanea_dto())
 
     antes = datetime.now(timezone.utc) - timedelta(hours=12)
     response = client.get(f"/api/v1/telemetria/instantaneous/{DEV_ID}?limit=250&hours=12&granularity=15m")
     despues = datetime.now(timezone.utc) - timedelta(hours=12)
 
     assert response.status_code == 200
-    mocks["telemetria"].listar_instantaneas.assert_called_once()
-    _, kwargs = mocks["telemetria"].listar_instantaneas.call_args
+    mocks["telemetria"].historico_instantaneas.assert_called_once()
+    _, kwargs = mocks["telemetria"].historico_instantaneas.call_args
     assert kwargs["id_o_uid"] == DEV_ID
     assert kwargs["limite"] == 250
     assert kwargs["granularidad"] == "15m"
     assert kwargs["horas"] == 12
+    assert kwargs["hasta"] is None
     assert antes <= kwargs["desde"] <= despues
+
+
+def test_get_instantaneous_history_con_hasta_desplaza_la_ventana():
+    client, mocks = _cliente()
+    mocks["telemetria"].historico_instantaneas.return_value = _historico()
+
+    response = client.get(f"/api/v1/telemetria/instantaneous/{DEV_ID}?hours=8&hasta=2026-09-10T08:00:00Z")
+
+    assert response.status_code == 200
+    assert response.json() == []
+    assert response.headers["X-Datos-Desde"] == "2026-08-29T10:00:00Z"
+    _, kwargs = mocks["telemetria"].historico_instantaneas.call_args
+    assert kwargs["hasta"] == datetime(2026, 9, 10, 8, 0, tzinfo=timezone.utc)
+    assert kwargs["desde"] == datetime(2026, 9, 10, 0, 0, tzinfo=timezone.utc)
+    assert kwargs["horas"] == 8
+
+
+def test_get_instantaneous_history_hasta_invalido_es_422():
+    client, _ = _cliente()
+    assert client.get(f"/api/v1/telemetria/instantaneous/{DEV_ID}?hasta=ayer").status_code == 422
 
 
 def test_get_instantaneous_history_validation_errors():
@@ -295,7 +326,7 @@ def test_get_instantaneous_history_validation_errors():
 
 def test_get_instantaneous_history_not_found_returns_404():
     client, mocks = _cliente()
-    mocks["telemetria"].listar_instantaneas.side_effect = DispositivoNoEncontradoError("Dispositivo inexistente")
+    mocks["telemetria"].historico_instantaneas.side_effect = DispositivoNoEncontradoError("Dispositivo inexistente")
 
     response = client.get(f"/api/v1/telemetria/instantaneous/{DEV_ID}")
     assert response.status_code == 404
@@ -304,7 +335,7 @@ def test_get_instantaneous_history_not_found_returns_404():
 
 def test_get_instantaneous_history_unexpected_error_returns_500():
     client, mocks = _cliente()
-    mocks["telemetria"].listar_instantaneas.side_effect = RuntimeError("Error inesperado en BD")
+    mocks["telemetria"].historico_instantaneas.side_effect = RuntimeError("Error inesperado en BD")
 
     response = client.get(f"/api/v1/telemetria/instantaneous/{DEV_ID}")
     assert response.status_code == 500

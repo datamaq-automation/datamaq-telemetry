@@ -245,11 +245,13 @@ class MockTelemetriaRepo(RepositorioTelemetriaPort):
         return a_utc >= b_utc
 
     def listar_instantaneas(
-        self, dispositivo_id: str, limite: int, desde: datetime | None = None
+        self, dispositivo_id: str, limite: int, desde: datetime | None = None, hasta: datetime | None = None
     ) -> list[LecturaInstantanea]:
         q = [i for i in self.instantaneas if i.dispositivo_id == dispositivo_id]
         if desde:
             q = [i for i in q if self._gte(i.registrado_en, desde)]
+        if hasta:
+            q = [i for i in q if self._gte(hasta, i.registrado_en)]
         return q[:limite]
 
     def listar_energias(
