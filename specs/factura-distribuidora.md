@@ -3,8 +3,9 @@
 > **Decisión aplicable:** `decisions/2026-09-24_factura-distribuidora-yaml.md` (repo padre).
 > **Traspasada a hija:** sí · **Bloque cerrado:** parcial — rediseñado e implementado tras
 > corregir un supuesto falso (ver nota 2026-09-24 abajo), gauntlet en verde, sin pushear.
-> Pendiente antes del cierre total: el parser real de EdeLAP, el parser de CAMMESA (sin muestra
-> real todavía), y confirmar con `app-datamaq` si hace falta exponer `cargadaEn` en el DTO — ver
+> Parsers reales de EdeLAP y CAMMESA resueltos (2026-09-24, segunda pasada, ver §2.2). Pendiente
+> antes del cierre total: confirmar con `app-datamaq` si hace falta exponer `cargadaEn` en el
+> DTO, y relevar EDESUR/Edenor/distribuidoras locales para el resto de las plantas — ver
 > "Pendientes" al final de §2.2.
 
 ## 1. Objetivo y Contexto
@@ -284,40 +285,55 @@ modular/plano — no hay necesidad, es un solo documento por repo).
 `src/infrastructure/yaml/repositories/organizaciones_repository.py`) lee vía el loader nuevo,
 filtra por `planta_id`, mapea a `FacturaDistribuidora`, ordena por `periodo` descendente.
 
-**Parser** `src/infrastructure/pdfplumber/parser_factura_distribuidora.py` (infra organizada por
-librería, como `fastapi/`, `sqlalchemy/`, `paho_mqtt/`): implementa `ParserFacturaDistribuidoraPort`
-con `pdfplumber.page.extract_text()` y regex ancladas a etiquetas de campo ("Período:", "Energía
-activa punta:", "Potencia contratada punta:", "Importe total:", etc.), no a posiciones fijas de
-columna. Distingue dos formatos numéricos porque la factura real los mezcla: los importes en $
-vienen con formato AR (`.` miles, `,` decimal — ej. `21.031.736,78`) y las magnitudes de kWh/kW
-con decimal simple (ej. `800.000` = 800.0 kW, no 800.000 kW). Nueva dependencia en
-`requirements.txt`: `pdfplumber>=0.11.0`.
+**Parsers** `src/infrastructure/pdfplumber/parser_factura_distribuidora.py` (infra organizada por
+librería, como `fastapi/`, `sqlalchemy/`, `paho_mqtt/`): dos implementaciones concretas de
+`ParserFacturaDistribuidoraPort`, una por proveedor, resueltas y verificadas contra **3 facturas
+reales** de UPP (dos de EdeLAP, períodos 2023-12 y 2024-11; una de CAMMESA, período 2024-01):
 
-**Límite conocido, documentado en el docstring del módulo:** se inspeccionó una factura real de
-EDELAP con `extract_text()` y el layout tabular de esa factura llega muy entreverado en texto
-plano (columnas de distintas filas quedan pegadas). Las regex de este parser están ancladas a un
-layout "etiqueta: valor" simple — el que usan los tests, no el de la EDELAP real. Extraer con
-confianza desde el PDF real de producción va a requerir revisar `page.extract_words()`
-(coordenadas x/y) o `page.extract_tables()` en vez de `extract_text()`; queda como trabajo
-pendiente para cuando se cargue la primera factura real, no bloqueante para esta iteración (no
-había forma de resolverlo sin ver más facturas reales, y el puerto ya deja esto reemplazable).
+- `ParserFacturaPotenciaEdelap`: produce `tipo_dato="potencia"`. Usa `pdfplumber.page.extract_text()`
+  con regex ancladas a etiquetas estables del layout real (confirmadas idénticas entre las dos
+  facturas EdeLAP: "Transporte Punta:", "Nº de factura:", "Tipo de tarifa:", "Días:", el patrón
+  `NNNkW *TASA$/kW` que aparece 4 veces en orden fijo — pico contratado, f.pico contratado, exceso
+  pico, exceso f.pico — y "Vencimientos Recargo 1º2º" para el importe total antes de recargo). No
+  usa `page.extract_words()`/coordenadas: con solo 2 muestras de EdeLAP no hay forma de validar con
+  confianza qué heurística de posición sería más estable que anclar a estas etiquetas, que además
+  se confirmaron literalmente iguales entre ambas facturas.
+- `ParserFacturaEnergiaCammesa`: produce `tipo_dato="energia"`. CAMMESA no discrimina por franja
+  horaria (a diferencia de EdeLAP): factura "Energía Demandada" como un total único, que se guarda
+  en `energia_activa_total_kwh` (campo nuevo en la entidad, ver abajo). Ancla a "SUBTOTAL CARGOS
+  DE POTENCIA" (el total de MWh aparece justo después, sin el prefijo de código de cliente pegado
+  que sí tiene en otras apariciones del mismo número en el texto), "SUBTOTAL ENERGÍA DEMANDADA" y
+  la cita legal fija "LEY 24065 Art.70-FNEE $/MWh" (identifica el importe total final sin
+  confundirlo con subtotales intermedios). **Recorte deliberado de alcance:** CAMMESA también
+  factura "Cargos de Potencia" (MW) propios del mercado mayorista, más cargos por transporte y
+  cargos adicionales del MEM (comercialización, administración) — ninguno de esos conceptos se
+  modela en esta iteración, solo `energia_activa_total_kwh`, `importe_energia_ars` (subtotal de la
+  energía demandada) e `importe_total_ars` (el total de la factura).
 
-### Pendientes (actualizado 2026-09-24, tras el rediseño a dos documentos)
+Ambos distinguen dos formatos numéricos porque la factura real los mezcla: los importes en $
+vienen con formato AR (`.` miles, `,` decimal — ej. `21.031.736,78`) y las magnitudes de kWh/kW de
+EdeLAP con decimal simple (ej. `800.000` = 800.0 kW). Nueva dependencia en `requirements.txt`:
+`pdfplumber>=0.11.0` (y `reportlab>=5.0.0`, solo para generar los PDFs de fixture del test).
 
-1. **[Prioridad alta] Parser real de EdeLAP (potencia).** `PdfplumberParserFacturaDistribuidora`
-   solo funciona contra el fixture de test (layout "etiqueta: valor"); no corrió nunca contra un
-   PDF de producción, y ahora produce siempre `tipo_dato="potencia"` (correcto: representa el
-   documento de EdeLAP). Antes de usar `scripts/importar_factura_distribuidora.py` con una
-   factura real hay que:
-   - Correr `page.extract_words()` (o `extract_tables()`) sobre la factura real ya vista en esta
-     sesión (Drive `fileId 1lErYCz3TaS-jF-s0XtX9CDuKZoGqTq1m`, EDELAP, tarifa T5M12, período
-     202411) y ajustar el parser para agrupar por posición en vez de confiar en el orden lineal
-     de `extract_text()`.
-   - Revalidar contra una segunda factura real de EdeLAP (idealmente de otro período, para
-     confirmar que el layout no varía mes a mes) antes de darlo por cerrado.
-2. **[Prioridad alta, sin muestra real] Parser de CAMMESA (energía).** No hay ningún adaptador
-   escrito — no hay forma de adivinar el formato sin ver al menos un PDF real de CAMMESA de UPP.
-   Bloqueado hasta conseguir uno.
+**Campo nuevo en la entidad:** `FacturaDistribuidora.energia_activa_total_kwh: float | None` —
+para proveedores que no discriminan por franja horaria. `energia_facturada_kwh` (property) usa
+este campo si está poblado, o la suma Punta+Resto+Valle si no, o `None` si no hay ningún dato.
+
+**Tests** `tests/unit/test_parser_factura_distribuidora.py`: fixtures generados con `reportlab`
+reproduciendo, línea por línea, el texto real extraído de las 3 facturas (mismo desorden de
+columnas que produce el PDF real, no un layout limpio inventado) — corren ambos parsers contra
+las 3 muestras y verifican los valores contra el PDF original a mano. Un test específico confirma
+que las dos facturas EdeLAP dan la misma potencia contratada (800/850 kW), como señal de que el
+parser generaliza y no quedó hardcodeado a una sola factura.
+
+### Pendientes (actualizado 2026-09-24, tras el rediseño a dos documentos y los parsers reales)
+
+1. **[Resuelto] Parser real de EdeLAP (potencia).** Ver arriba — verificado contra 2 facturas
+   reales de distinto período.
+2. **[Resuelto] Parser de CAMMESA (energía).** Ver arriba — verificado contra 1 factura real; solo
+   una muestra, así que sigue siendo más frágil que el de EdeLAP (nada que comparar entre
+   períodos). Si una segunda factura de CAMMESA rompe alguna regex, revisar primero si el layout
+   cambió entre períodos o si fue un supuesto mal generalizado de esta sesión.
 3. **[Sin fecha] Distribuidoras del resto de las plantas.** Eitec y Cristal Avellaneda (EDESUR),
    Madygraf y Los Constituyentes (Edenor), El Gringo y Textiles Pigué (distribuidoras locales,
    nombre todavía desconocido): relevar su formato real cuando esas plantas tengan medidores
@@ -333,9 +349,11 @@ había forma de resolverlo sin ver más facturas reales, y el puerto ya deja est
    del flujo GitOps por script + commit), hace falta una decisión nueva del dueño — hoy
    `RepositorioOrganizacionesPort` es solo lectura por diseño explícito y no hay endpoint `POST`.
 
-**Script de ingesta** `scripts/importar_factura_distribuidora.py <ruta_pdf> <planta_id>`: instancia
-el parser, ejecuta `parsear()`, e imprime (o agrega, con `--commit`) el bloque YAML resultante a
-`data/facturas_distribuidora.yml` para revisión humana antes de `git commit` — coherente con que
+**Script de ingesta** `scripts/importar_factura_distribuidora.py <ruta_pdf> <planta_id> --tipo
+potencia|energia`: instancia el parser correspondiente (`--tipo potencia` → EdeLAP, `--tipo
+energia` → CAMMESA), ejecuta `parsear()`, e imprime el bloque YAML resultante a stdout para
+revisión humana antes de pegarlo en `data/facturas_distribuidora.yml` y `git commit` — coherente
+con que
 `RepositorioOrganizacionesPort` es solo lectura y con el precedente de
 `scripts/exportar_instalacion_medidores.py`. No hay endpoint `POST` de carga: cargar una factura es
 una operación GitOps (subir el PDF, correr el script, revisar el diff, commitear), no una escritura
