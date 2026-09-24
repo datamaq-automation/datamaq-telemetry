@@ -1,12 +1,30 @@
 # Factura de la distribuidora como dato histórico en YAML
 
 > **Decisión aplicable:** `decisions/2026-09-24_factura-distribuidora-yaml.md` (repo padre).
-> **Traspasada a hija:** sí · **Bloque cerrado:** parcial — implementado, gauntlet en verde,
-> pusheado a `main` (`5d2c3a0`, 2026-09-24). Pendiente antes del cierre total: el parser real
-> de EDELAP (ver "Pendientes" al final de §2.2) y confirmar con `app-datamaq` si hace falta
-> exponer `cargadaEn` en el DTO (§3).
+> **Traspasada a hija:** sí · **Bloque cerrado:** parcial — rediseñado e implementado tras
+> corregir un supuesto falso (ver nota 2026-09-24 abajo), gauntlet en verde, sin pushear.
+> Pendiente antes del cierre total: el parser real de EdeLAP, el parser de CAMMESA (sin muestra
+> real todavía), y confirmar con `app-datamaq` si hace falta exponer `cargadaEn` en el DTO — ver
+> "Pendientes" al final de §2.2.
 
 ## 1. Objetivo y Contexto
+
+> **Nota 2026-09-24 (corrección de supuesto):** el diseño original de este bloque (secciones
+> abajo, ya corregidas) asumía **un solo PDF por planta por período**. Es falso: el dueño
+> confirmó que la planta UPP recibe la **potencia** facturada por **EdeLAP** y la **energía**
+> facturada por **CAMMESA** en dos PDFs separados del mismo período — no hay un documento único
+> que traiga ambas magnitudes. Otras plantas (Eitec, Cristal Avellaneda → EDESUR; Madygraf, Los
+> Constituyentes → Edenor; El Gringo, Textiles Pigué → distribuidoras locales todavía sin
+> identificar) tendrán su propio caso cuando se les instale el medidor — puede que un solo
+> proveedor facture todo, o que se repita el patrón de dos documentos.
+>
+> Decisión del dueño (vía `AskUserQuestion`, 2026-09-24): el histórico guarda **dos entradas
+> separadas por período** cuando hay dos proveedores — un único tipo `FacturaDistribuidora` con
+> un discriminador `tipo_dato: Literal["potencia", "energia"]` y un campo `proveedor`, no dos
+> clases de entidad ni una fusión de ambas en una fila. Alcance de esta iteración: **solo EdeLAP
+> (potencia) + CAMMESA (energía) para UPP**, la única planta con medidores instalados hoy; el
+> resto de las distribuidoras queda documentado como pendiente, sin parser todavía (ver
+> "Pendientes" en §2.2).
 
 **Objetivo:** modelar la factura mensual de la distribuidora como dato histórico versionado en
 YAML (una entrada por planta por período), con un parser de PDF que extraiga los campos
@@ -81,8 +99,9 @@ facturada (MWh) a los gráficos.
    colección plana de facturas históricas por planta no tiene esa forma (no hay padre/hijo,
    `parent_id`, ciclos). Forzarla en el mismo validador mezclaría dos invariantes distintos.
    `verificar_facturas_plantas()` sigue el mismo patrón (advierte, no bloquea) pero valida otra
-   cosa: período único por planta, formato `YYYY-MM`, `planta_id` existente, magnitudes no
-   negativas.
+   cosa: unicidad de `(período, tipo_dato)` por planta (no "período único" — dos documentos del
+   mismo período, uno de potencia y otro de energía, son válidos), formato `YYYY-MM`, `planta_id`
+   existente, magnitudes no negativas.
 3. **`Dispositivo.potencia_contratada_kw`: se elimina.** `grep` confirma cero callers y cero
    persistencia (no está en ningún mapper SQLAlchemy ni DTO). La factura pasa a ser la fuente de
    verdad histórica y real de potencia contratada (con período, a diferencia del campo suelto que
@@ -109,53 +128,71 @@ facturada (MWh) a los gráficos.
 ISO 50001 §6.3/§9.1 la usa como evidencia de energía y demanda — no telemetría):
 
 ```python
+TipoDatoFactura = Literal["potencia", "energia"]
+
+
 @dataclass(frozen=True)
 class FacturaDistribuidora:
-    """Potencia y su valor van discriminados Punta / Fuera de Punta porque así factura la
-    distribuidora en tarifas de Media Tensión (confirmado con una factura real EDELAP, tarifa
-    T5M12) — un único campo "potencia contratada" perdería esa distinción tarifaria."""
+    """UN documento de facturación — potencia O energía, no ambas (ver nota 2026-09-24 en §1).
 
-    id: str  # `{planta_id}-{periodo}`, determinístico
+    Potencia y energía pueden venir facturadas por proveedores DISTINTOS en la misma planta
+    (UPP: EdeLAP potencia, CAMMESA energía). Un registro `tipo_dato="potencia"` tiene poblados
+    los campos de potencia (los de energía quedan en None) y viceversa. Potencia y su valor van
+    discriminados Punta / Fuera de Punta porque así factura la distribuidora en tarifas de Media
+    Tensión (confirmado con una factura real EDELAP, tarifa T5M12)."""
+
+    id: str  # `{planta_id}-{periodo}-{tipo_dato}`, determinístico
     planta_id: str
     periodo: str  # "YYYY-MM", mes facturado
-    distribuidora: str
+    proveedor: str  # "EDELAP", "CAMMESA", ...
+    tipo_dato: TipoDatoFactura
     numero_factura: str
-    tarifa: str
-    dias_facturados: int
-    energia_activa_punta_kwh: float
-    energia_activa_resto_kwh: float
-    energia_activa_valle_kwh: float
-    potencia_contratada_punta_kw: float
-    potencia_contratada_fuera_punta_kw: float
-    potencia_adquirida_punta_kw: float  # medida/facturada real = contratada + exceso
-    potencia_adquirida_fuera_punta_kw: float
-    importe_potencia_ars: float
-    importe_energia_ars: float
     importe_total_ars: float
+    tarifa: str | None = None
+    dias_facturados: int | None = None
+    energia_activa_punta_kwh: float | None = None
+    energia_activa_resto_kwh: float | None = None
+    energia_activa_valle_kwh: float | None = None
+    potencia_contratada_punta_kw: float | None = None
+    potencia_contratada_fuera_punta_kw: float | None = None
+    potencia_adquirida_punta_kw: float | None = None  # medida/facturada real = contratada + exceso
+    potencia_adquirida_fuera_punta_kw: float | None = None
+    importe_potencia_ars: float | None = None
+    importe_energia_ars: float | None = None
     fuente_archivo: str | None = None  # nombre del PDF origen, trazabilidad
     cargada_en: str | None = None  # fecha ISO de carga (no de facturación)
 
     @property
-    def energia_facturada_kwh(self) -> float:
+    def energia_facturada_kwh(self) -> float | None:
+        if None in (self.energia_activa_punta_kwh, self.energia_activa_resto_kwh, self.energia_activa_valle_kwh):
+            return None
         return self.energia_activa_punta_kwh + self.energia_activa_resto_kwh + self.energia_activa_valle_kwh
 
     @property
-    def potencia_excedida_punta_kw(self) -> float:
+    def potencia_excedida_punta_kw(self) -> float | None:
+        if self.potencia_adquirida_punta_kw is None or self.potencia_contratada_punta_kw is None:
+            return None
         return max(0.0, self.potencia_adquirida_punta_kw - self.potencia_contratada_punta_kw)
 
     @property
-    def potencia_excedida_fuera_punta_kw(self) -> float:
-        return max(0.0, self.potencia_adquirida_fuera_punta_kw - self.potencia_contratada_fuera_punta_kw)
+    def potencia_excedida_fuera_punta_kw(self) -> float | None:
+        # análogo a potencia_excedida_punta_kw, con los campos "fuera punta"
+        ...
 
     @property
-    def valor_energia_ars_kwh_promedio(self) -> float:
-        return self.importe_energia_ars / self.energia_facturada_kwh if self.energia_facturada_kwh else 0.0
+    def valor_energia_ars_kwh_promedio(self) -> float | None:
+        energia = self.energia_facturada_kwh
+        if energia is None or self.importe_energia_ars is None or energia == 0:
+            return None
+        return self.importe_energia_ars / energia
 ```
 
 Sin dependencias de terceros (`dataclass` + `@property` + stdlib), cumple la regla de capas. Las
 potencias excedidas y el valor promedio de energía se calculan (no se guardan duplicados en el
 YAML) porque son derivables de los campos que sí trae la factura — evita que YAML y cómputo se
-desincronicen.
+desincronicen. Las properties devuelven `None` (no `0.0`) cuando falta el dato que necesitan, para
+no confundir "no hay energía en este documento porque es de potencia" con "la energía facturada
+fue cero".
 
 **Puerto de parsing** `src/domain/sge/ports.py`:
 
@@ -194,35 +231,50 @@ cada mes; anidarlo infla el archivo de estructura con filas que no cambian la to
 
 ```yaml
 # data/facturas_distribuidora.yml — Histórico de facturas de la distribuidora por planta.
-# Una entrada por planta por período (decisión: decisions/2026-09-24_factura-distribuidora-yaml.md).
-# Se agrega por commit revisado (scripts/importar_factura_distribuidora.py), nunca por API.
+# Uno o dos documentos por planta por período (decisión: decisions/2026-09-24_factura-distribuidora-yaml.md,
+# corregida el 2026-09-24 al confirmar que UPP recibe potencia y energía de proveedores
+# distintos). Se agrega por commit revisado (scripts/importar_factura_distribuidora.py), nunca
+# por API.
 #
-# Campos discriminados Punta / Fuera de Punta porque así factura la distribuidora en Media
-# Tensión (confirmado con una factura real EDELAP tarifa T5M12, ver §2.1 punto 4).
+# Cada fila es UN documento (tipo_dato: potencia | energia), no el período completo — ver §1.
+# Campos de potencia discriminados Punta / Fuera de Punta porque así factura la distribuidora
+# en Media Tensión (confirmado con una factura real EDELAP tarifa T5M12, ver §2.1 punto 4).
 facturas:
   - planta_id: "c64fd625-0037-4caa-b68a-800e8e0ee548"
     periodo: "2026-08"
-    distribuidora: "EDELAP"
+    proveedor: "EDELAP"
+    tipo_dato: "potencia"
     numero_factura: "0020-01988580"
+    importe_total_ars: 21031736.78
     tarifa: "T5M12"
     dias_facturados: 30
-    energia_activa_punta_kwh: 68310.0
-    energia_activa_resto_kwh: 187506.0
-    energia_activa_valle_kwh: 59994.0
     potencia_contratada_punta_kw: 800.0
     potencia_contratada_fuera_punta_kw: 850.0
     potencia_adquirida_punta_kw: 1049.0
     potencia_adquirida_fuera_punta_kw: 1082.0
     importe_potencia_ars: 7664856.62
+    fuente_archivo: "factura-durax-2026-08-edelap.pdf"
+    cargada_en: "2026-09-24"
+  - planta_id: "c64fd625-0037-4caa-b68a-800e8e0ee548"
+    periodo: "2026-08"
+    proveedor: "CAMMESA"
+    tipo_dato: "energia"
+    numero_factura: "CAM-2026-08-00312"
+    importe_total_ars: 638572.35
+    dias_facturados: 30
+    energia_activa_punta_kwh: 68310.0
+    energia_activa_resto_kwh: 187506.0
+    energia_activa_valle_kwh: 59994.0
     importe_energia_ars: 638572.35
-    importe_total_ars: 21031736.78
-    fuente_archivo: "factura-durax-2026-08.pdf"
+    fuente_archivo: "factura-durax-2026-08-cammesa.pdf"
     cargada_en: "2026-09-24"
 ```
 
 Cargado en el repo con la planta Durax real (`c64fd625-0037-4caa-b68a-800e8e0ee548`, la misma que
 ya usan los tests de `linea-base`) para que el test del endpoint corra contra datos reales, mismo
-patrón que la línea de base existente en `organizaciones.yml`.
+patrón que la línea de base existente en `organizaciones.yml`. `YamlOrganizacionesRepository`
+mapea un YAML legacy sin `tipo_dato` (previo a este cambio) como `"potencia"` por default, para no
+romper si queda algún archivo viejo sin migrar.
 
 **Loader**: `src/infrastructure/yaml/loaders.py` agrega `cargar_facturas_distribuidora(data_dir) ->
 list[dict]` (mismo patrón que `cargar_organizaciones_completas`, pero archivo único, sin merge
@@ -250,23 +302,34 @@ confianza desde el PDF real de producción va a requerir revisar `page.extract_w
 pendiente para cuando se cargue la primera factura real, no bloqueante para esta iteración (no
 había forma de resolverlo sin ver más facturas reales, y el puerto ya deja esto reemplazable).
 
-### Pendientes (post-push, 2026-09-24)
+### Pendientes (actualizado 2026-09-24, tras el rediseño a dos documentos)
 
-1. **[Prioridad alta] Parser real de EDELAP.** El parser hoy solo funciona contra el fixture de
-   test (layout "etiqueta: valor"); no corrió nunca contra un PDF de producción. Antes de usar
-   `scripts/importar_factura_distribuidora.py` con una factura real hay que:
+1. **[Prioridad alta] Parser real de EdeLAP (potencia).** `PdfplumberParserFacturaDistribuidora`
+   solo funciona contra el fixture de test (layout "etiqueta: valor"); no corrió nunca contra un
+   PDF de producción, y ahora produce siempre `tipo_dato="potencia"` (correcto: representa el
+   documento de EdeLAP). Antes de usar `scripts/importar_factura_distribuidora.py` con una
+   factura real hay que:
    - Correr `page.extract_words()` (o `extract_tables()`) sobre la factura real ya vista en esta
      sesión (Drive `fileId 1lErYCz3TaS-jF-s0XtX9CDuKZoGqTq1m`, EDELAP, tarifa T5M12, período
-     202411) y ajustar `PdfplumberParserFacturaDistribuidora` para agrupar por posición en vez de
-     confiar en el orden lineal de `extract_text()`.
-   - Revalidar contra una segunda factura real (idealmente de otro período, para confirmar que el
-     layout no varía mes a mes) antes de darlo por cerrado.
-2. **[Prioridad baja, a confirmar con `app-datamaq`] Exponer `cargadaEn`.** La sesión hija pidió
+     202411) y ajustar el parser para agrupar por posición en vez de confiar en el orden lineal
+     de `extract_text()`.
+   - Revalidar contra una segunda factura real de EdeLAP (idealmente de otro período, para
+     confirmar que el layout no varía mes a mes) antes de darlo por cerrado.
+2. **[Prioridad alta, sin muestra real] Parser de CAMMESA (energía).** No hay ningún adaptador
+   escrito — no hay forma de adivinar el formato sin ver al menos un PDF real de CAMMESA de UPP.
+   Bloqueado hasta conseguir uno.
+3. **[Sin fecha] Distribuidoras del resto de las plantas.** Eitec y Cristal Avellaneda (EDESUR),
+   Madygraf y Los Constituyentes (Edenor), El Gringo y Textiles Pigué (distribuidoras locales,
+   nombre todavía desconocido): relevar su formato real cuando esas plantas tengan medidores
+   instalados, para no descubrir un tercer/cuarto/quinto formato recién al cargarlos. Puede que
+   alguna facture potencia y energía en un solo documento (a diferencia de UPP) — el modelo con
+   discriminador `tipo_dato` ya soporta ambos casos sin cambios adicionales.
+4. **[Prioridad baja, a confirmar con `app-datamaq`] Exponer `cargadaEn`.** La sesión hija pidió
    este campo (`FacturaDistribuidora.cargada_en` existe en el dominio pero no se serializa en
-   `FacturaDistribuidoraResponseDTO`) para distinguir una resubida/corrección de un mismo período.
-   Agregar `cargadaEn` al DTO y al mapper si confirman que lo necesitan — cambio acotado, no
-   rompe el contrato existente (es un campo nuevo, no un rename).
-3. **Sin decisión tomada:** si en algún momento se quiere que la UI suba el PDF directo (en vez
+   `FacturaDistribuidoraResponseDTO`) para distinguir una resubida/corrección de un mismo período
+   y tipo de dato. Agregar `cargadaEn` al DTO y al mapper si confirman que lo necesitan — cambio
+   acotado, no rompe el contrato existente (es un campo nuevo, no un rename).
+5. **Sin decisión tomada:** si en algún momento se quiere que la UI suba el PDF directo (en vez
    del flujo GitOps por script + commit), hace falta una decisión nueva del dueño — hoy
    `RepositorioOrganizacionesPort` es solo lectura por diseño explícito y no hay endpoint `POST`.
 
@@ -298,49 +361,25 @@ camelCase, contrato con `app-datamaq`):
 
 ```python
 class FacturaDistribuidoraResponseDTO(BaseModel):
+    """Un documento (potencia O energía) — dos filas pueden compartir `periodo` con `tipoDato`
+    distinto cuando hay dos proveedores (ver FacturaDistribuidora en domain/sge)."""
+
     id: str
     planta_id: str = Field(validation_alias="plantaId", serialization_alias="plantaId")
     periodo: str
-    distribuidora: str
+    proveedor: str
+    tipo_dato: str = Field(validation_alias="tipoDato", serialization_alias="tipoDato")
     numero_factura: str = Field(validation_alias="numeroFactura", serialization_alias="numeroFactura")
-    tarifa: str
-    dias_facturados: int = Field(validation_alias="diasFacturados", serialization_alias="diasFacturados")
-    energia_activa_punta_kwh: float = Field(
-        validation_alias="energiaActivaPuntaKwh", serialization_alias="energiaActivaPuntaKwh"
-    )
-    energia_activa_resto_kwh: float = Field(
-        validation_alias="energiaActivaRestoKwh", serialization_alias="energiaActivaRestoKwh"
-    )
-    energia_activa_valle_kwh: float = Field(
-        validation_alias="energiaActivaValleKwh", serialization_alias="energiaActivaValleKwh"
-    )
-    energia_facturada_kwh: float = Field(
-        validation_alias="energiaFacturadaKwh", serialization_alias="energiaFacturadaKwh"
-    )
-    potencia_contratada_punta_kw: float = Field(
-        validation_alias="potenciaContratadaPuntaKw", serialization_alias="potenciaContratadaPuntaKw"
-    )
-    potencia_contratada_fuera_punta_kw: float = Field(
-        validation_alias="potenciaContratadaFueraPuntaKw", serialization_alias="potenciaContratadaFueraPuntaKw"
-    )
-    potencia_adquirida_punta_kw: float = Field(
-        validation_alias="potenciaAdquiridaPuntaKw", serialization_alias="potenciaAdquiridaPuntaKw"
-    )
-    potencia_adquirida_fuera_punta_kw: float = Field(
-        validation_alias="potenciaAdquiridaFueraPuntaKw", serialization_alias="potenciaAdquiridaFueraPuntaKw"
-    )
-    potencia_excedida_punta_kw: float = Field(
-        validation_alias="potenciaExcedidaPuntaKw", serialization_alias="potenciaExcedidaPuntaKw"
-    )
-    potencia_excedida_fuera_punta_kw: float = Field(
-        validation_alias="potenciaExcedidaFueraPuntaKw", serialization_alias="potenciaExcedidaFueraPuntaKw"
-    )
-    importe_potencia_ars: float = Field(validation_alias="importePotenciaArs", serialization_alias="importePotenciaArs")
-    importe_energia_ars: float = Field(validation_alias="importeEnergiaArs", serialization_alias="importeEnergiaArs")
     importe_total_ars: float = Field(validation_alias="importeTotalArs", serialization_alias="importeTotalArs")
-    valor_energia_ars_kwh_promedio: float = Field(
-        validation_alias="valorEnergiaArsKwhPromedio", serialization_alias="valorEnergiaArsKwhPromedio"
+    tarifa: str | None = None
+    dias_facturados: int | None = Field(
+        default=None, validation_alias="diasFacturados", serialization_alias="diasFacturados"
     )
+    # ... campos de energía y potencia, todos `| None`, mismos nombres/alias que la entidad
+    # (energiaActivaPuntaKwh, energiaFacturadaKwh, potenciaContratadaPuntaKw,
+    # potenciaExcedidaPuntaKw, importePotenciaArs, importeEnergiaArs,
+    # valorEnergiaArsKwhPromedio, ...) — ver src/application/dtos/sge_dto.py para el listado
+    # completo, no se repite acá para no desincronizar la spec del código.
 ```
 
 Se construye con kwargs snake_case (no los alias camelCase) porque el DTO usa
@@ -363,37 +402,62 @@ Auth: Depends(get_usuario_actual) + Depends(resolver_planta_permitida)   (mismo 
 404 -> planta_no_encontrada  (PlantaNoEncontradaError, vía resolver_planta_permitida)
 ```
 
-Payload de un elemento (JSON, camelCase — ver DTO arriba; valores reales de la factura EDELAP
-inspeccionada durante la sesión):
+Payload real (JSON, camelCase — ver DTO arriba): **dos elementos por período** cuando hay dos
+proveedores, cada uno con los campos del OTRO tipo en `null`. Valores reales de la factura de
+potencia EDELAP inspeccionada durante la sesión (los de CAMMESA/energía son de ejemplo, sin
+muestra real todavía — ver "Pendientes"):
 ```json
-{
-  "id": "c64fd625-0037-4caa-b68a-800e8e0ee548-2026-08",
-  "plantaId": "c64fd625-0037-4caa-b68a-800e8e0ee548",
-  "periodo": "2026-08",
-  "distribuidora": "EDELAP",
-  "numeroFactura": "0020-01988580",
-  "tarifa": "T5M12",
-  "diasFacturados": 30,
-  "energiaActivaPuntaKwh": 68310.0,
-  "energiaActivaRestoKwh": 187506.0,
-  "energiaActivaValleKwh": 59994.0,
-  "energiaFacturadaKwh": 315810.0,
-  "potenciaContratadaPuntaKw": 800.0,
-  "potenciaContratadaFueraPuntaKw": 850.0,
-  "potenciaAdquiridaPuntaKw": 1049.0,
-  "potenciaAdquiridaFueraPuntaKw": 1082.0,
-  "potenciaExcedidaPuntaKw": 249.0,
-  "potenciaExcedidaFueraPuntaKw": 232.0,
-  "importePotenciaArs": 7664856.62,
-  "importeEnergiaArs": 638572.35,
-  "importeTotalArs": 21031736.78,
-  "valorEnergiaArsKwhPromedio": 2.0220143440676357
-}
+[
+  {
+    "id": "c64fd625-0037-4caa-b68a-800e8e0ee548-2026-08-potencia",
+    "plantaId": "c64fd625-0037-4caa-b68a-800e8e0ee548",
+    "periodo": "2026-08",
+    "proveedor": "EDELAP",
+    "tipoDato": "potencia",
+    "numeroFactura": "0020-01988580",
+    "importeTotalArs": 21031736.78,
+    "tarifa": "T5M12",
+    "diasFacturados": 30,
+    "energiaActivaPuntaKwh": null,
+    "energiaFacturadaKwh": null,
+    "potenciaContratadaPuntaKw": 800.0,
+    "potenciaContratadaFueraPuntaKw": 850.0,
+    "potenciaAdquiridaPuntaKw": 1049.0,
+    "potenciaAdquiridaFueraPuntaKw": 1082.0,
+    "potenciaExcedidaPuntaKw": 249.0,
+    "potenciaExcedidaFueraPuntaKw": 232.0,
+    "importePotenciaArs": 7664856.62,
+    "importeEnergiaArs": null,
+    "valorEnergiaArsKwhPromedio": null
+  },
+  {
+    "id": "c64fd625-0037-4caa-b68a-800e8e0ee548-2026-08-energia",
+    "plantaId": "c64fd625-0037-4caa-b68a-800e8e0ee548",
+    "periodo": "2026-08",
+    "proveedor": "CAMMESA",
+    "tipoDato": "energia",
+    "numeroFactura": "CAM-2026-08-00312",
+    "importeTotalArs": 638572.35,
+    "tarifa": null,
+    "diasFacturados": 30,
+    "energiaActivaPuntaKwh": 68310.0,
+    "energiaActivaRestoKwh": 187506.0,
+    "energiaActivaValleKwh": 59994.0,
+    "energiaFacturadaKwh": 315810.0,
+    "potenciaContratadaPuntaKw": null,
+    "importePotenciaArs": null,
+    "importeEnergiaArs": 638572.35,
+    "valorEnergiaArsKwhPromedio": 2.0220143440676357
+  }
+]
 ```
 `app-datamaq` grafica potencia (contratada/adquirida/excedida, discriminada Punta y Fuera de
 Punta, eje kW) y energía×valor (kWh y $/kWh promedio) a partir de esta única serie ordenada por
-`periodo` — no hace falta un segundo endpoint. Si necesita agregados (promedio anual, etc.) los
-calcula en frontend sobre esta lista.
+`periodo` — no hace falta un segundo endpoint, pero **el frontend tiene que filtrar/agrupar por
+`tipoDato`** en vez de asumir una fila = un período con todos los campos (contrato anterior que ya
+no es real). Si necesita "el total del período" (`importeTotalArs` combinado), tiene que sumar las
+filas del mismo `periodo` — cada `importeTotalArs` es el total de ESE documento, no del mes
+completo.
 
 Router: se agrega en `src/infrastructure/fastapi/routes/sge_router.py`, junto a
 `obtener_lineas_base` (mismo router `/api/v1/sge`, misma dependencia `resolver_planta_permitida`,
@@ -401,51 +465,56 @@ mismo `get_organizaciones_repository`).
 
 ## 4. Matriz de Pruebas (RED Suite)
 
-Implementada y en verde (1512 tests totales del repo, sin regresiones):
+Implementada y en verde (1519 tests totales del repo, sin regresiones).
 
-**`tests/unit/test_factura_distribuidora.py`** (10 tests) — entidad y repositorio:
+**`tests/unit/test_factura_distribuidora.py`** (15 tests) — entidad y repositorio:
 - `frozen=True` (intento de mutar levanta `FrozenInstanceError`).
-- `energia_facturada_kwh` suma las tres franjas; `potencia_excedida_punta_kw` /
-  `_fuera_punta_kw` con `max(0.0, ...)` (no negativa cuando adquirida < contratada);
-  `valor_energia_ars_kwh_promedio` con los valores reales de la factura EDELAP y sin dividir por
-  cero cuando no hay energía.
-- Repositorio YAML (fixture con `data/facturas_distribuidora.yml` de prueba en `tmp_path`): dos
-  facturas de la misma planta en períodos distintos → orden descendente por período; planta sin
-  facturas → `[]`; factura de otra planta no aparece en el filtro; sin archivo YAML → `[]`.
+- `energia_facturada_kwh`, `potencia_excedida_*_kw` y `valor_energia_ars_kwh_promedio` con los
+  valores reales de la factura EDELAP; y cada una devuelve `None` (no `0.0`) cuando falta el dato
+  que necesita, incluido el caso de un documento real de un solo `tipo_dato` (solo potencia, con
+  todos los campos de energía en `None`).
+- Repositorio YAML (fixture con `data/facturas_distribuidora.yml` de prueba en `tmp_path`): orden
+  descendente por período con dos documentos del mismo período (potencia + energía, distinto
+  `tipo_dato`) conviviendo sin chocar; planta sin facturas → `[]`; factura de otra planta no
+  aparece en el filtro; sin archivo YAML → `[]`.
 
 **`tests/unit/test_parser_factura_distribuidora.py`** (3 tests) — PDF de fixture generado con
 `reportlab` (layout "etiqueta: valor" simple, no el layout real de EDELAP, ver límite conocido en
-§2.2): factura completa → todos los campos y las propiedades calculadas coinciden con los valores
-reales de la factura EDELAP inspeccionada; PDF sin campos obligatorios →
-`FacturaDistribuidoraIlegibleError`; PDF inexistente → `FacturaDistribuidoraIlegibleError`.
+§2.2 y Tarea 1 de "Pendientes"): factura completa → `tipo_dato="potencia"` fijo, campos de
+potencia con los valores reales de la factura EDELAP inspeccionada, campos de energía en `None`;
+PDF sin campos obligatorios → `FacturaDistribuidoraIlegibleError`; PDF inexistente → ídem.
 
-**`tests/unit/test_verificador_facturas.py`** (5 tests): todo válido → `0` inválidas; período
-duplicado en la misma planta → `1` inválida (cuenta y loguea, no lanza); formato de período
-inválido (`"agosto-2026"`) → `1` inválida; magnitud negativa → `1` inválida; planta sin
+**`tests/unit/test_verificador_facturas.py`** (6 tests): todo válido → `0` inválidas; `(período,
+tipo_dato)` duplicado en la misma planta → `1` inválida (cuenta y loguea, no lanza); **mismo
+período con distinto `tipo_dato` → válido, no es duplicado** (caso UPP: EdeLAP + CAMMESA); formato
+de período inválido (`"agosto-2026"`) → `1` inválida; magnitud negativa → `1` inválida; planta sin
 facturas → `0` inválidas.
 
 **`tests/unit/test_sge_endpoints_iso50001.py`** (2 tests agregados a la suite existente de ese
-router): `GET .../facturas-distribuidora` contra la planta Durax real (con la factura agregada en
-`data/facturas_distribuidora.yml`) → 200 con los campos y calculados esperados; planta
-inexistente → 404 `planta_no_encontrada`.
+router): `GET .../facturas-distribuidora` contra la planta Durax real (con las dos filas —
+potencia y energía— del mismo período agregadas en `data/facturas_distribuidora.yml`) → 200 con
+al menos 2 elementos, `tipoDato` de ambos tipos presentes, y los campos calculados esperados en
+cada uno; planta inexistente → 404 `planta_no_encontrada`.
 
-**`tests/unit/test_consultar_balance_energia_uc.py`** (3 tests, nuevo — no existía cobertura del
-caso de uso, solo de `BalanceEnergiaService` en `test_balance_energia_sge.py`): sin
-`energia_padre_kwh` y con factura → usa `energia_facturada_kwh`; sin `energia_padre_kwh` y sin
-facturas → `0.0` (no rompe el comportamiento anterior); `energia_padre_kwh` explícito tiene
-prioridad y ni siquiera consulta `obtener_facturas_planta`.
+**`tests/unit/test_consultar_balance_energia_uc.py`** (4 tests — no existía cobertura del caso de
+uso, solo de `BalanceEnergiaService` en `test_balance_energia_sge.py`): sin `energia_padre_kwh` y
+con factura de energía → usa `energia_facturada_kwh`; **sin `energia_padre_kwh` y con un
+documento de potencia en el histórico → lo ignora, no lo confunde con energía** (caso UPP: el
+primero de la lista puede ser el de EdeLAP); sin `energia_padre_kwh` y sin facturas → `0.0` (no
+rompe el comportamiento anterior); `energia_padre_kwh` explícito tiene prioridad y ni siquiera
+consulta `obtener_facturas_planta`.
 
 **Regresión de borrado**: `grep -rn potencia_contratada_kw src/ tests/ data/ scripts/` sin
 resultados tras eliminar el campo de `Dispositivo`.
 
 ## 5. Criterios del Gauntlet
 
-Todos verificados en verde al cierre de esta iteración:
+Todos verificados en verde tras el rediseño a dos documentos (2026-09-24):
 
 - `venv/bin/ruff check .` y `venv/bin/ruff format .` sin errores.
 - `venv/bin/python -m pyright` (proyecto completo) — `0 errors, 0 warnings, 0 informations`.
-- `venv/bin/python -m pytest tests/unit -n auto --cov=src --cov-fail-under=85` — **1512 passed**,
-  cobertura total **91.87%**, verificado tanto normal como con `DB_HOST=127.0.0.2 DB_PORT=1`
+- `venv/bin/python -m pytest tests/unit -n auto --cov=src --cov-fail-under=85` — **1519 passed**,
+  cobertura total **92%**, verificado tanto normal como con `DB_HOST=127.0.0.2 DB_PORT=1`
   (memoria `tests-locales-tocan-db-real`: los tests no deben tocar la DB real de producción).
 - `venv/bin/python scripts/verify_architecture.py` — `[PASS]`. `FacturaDistribuidora` y
   `ParserFacturaDistribuidoraPort` en `domain/sge/` sin imports de terceros; `pdfplumber` solo en
