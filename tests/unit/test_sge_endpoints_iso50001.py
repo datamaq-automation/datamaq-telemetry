@@ -129,3 +129,32 @@ def test_endpoint_lineas_base_gitops(client):
     assert enb["potenciaBaseKw"] == 15.0
     assert enb["autorizadoPor"] == "admin@durax.com.ar"
     assert enb["activa"] is True
+
+
+def test_endpoint_facturas_distribuidora_gitops(client):
+    token = _crear_token(rol="operador")
+    resp = client.get(
+        f"/api/v1/sge/plantas/{PLANTA_DURAX_ID}/facturas-distribuidora",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert isinstance(data, list)
+    assert len(data) >= 1
+    factura = data[0]
+    assert factura["plantaId"] == PLANTA_DURAX_ID
+    assert factura["periodo"] == "2026-08"
+    assert factura["distribuidora"] == "EDELAP"
+    assert factura["tarifa"] == "T5M12"
+    assert factura["energiaFacturadaKwh"] == pytest.approx(315810.0)
+    assert factura["potenciaExcedidaPuntaKw"] == pytest.approx(249.0)
+    assert factura["potenciaExcedidaFueraPuntaKw"] == pytest.approx(232.0)
+
+
+def test_endpoint_facturas_distribuidora_planta_inexistente_404(client):
+    token = _crear_token(rol="operador")
+    resp = client.get(
+        "/api/v1/sge/plantas/planta-que-no-existe/facturas-distribuidora",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 404
