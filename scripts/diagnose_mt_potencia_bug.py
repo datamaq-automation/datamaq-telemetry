@@ -11,20 +11,19 @@ Uso (desde datamaq-telemetry/):
   venv/bin/python -m scripts.diagnose_mt_potencia_bug --planta-id durax --nodo-id acometida-13200v
 """
 
-import sys
-from pathlib import Path
-
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
-
 import argparse
 import logging
+import sys
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
-from src.infrastructure.settings.config import get_settings
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
+from src.infrastructure.settings.config import get_settings  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 _log = logging.getLogger(__name__)
