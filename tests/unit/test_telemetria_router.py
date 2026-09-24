@@ -145,6 +145,7 @@ def _cliente(usuario: dict | None = None) -> tuple[TestClient, dict[str, MagicMo
         "alertas": MagicMock(),
         "exportar": MagicMock(),
     }
+    mocks["telemetria"].datos_desde.return_value = DATOS_DESDE
     app.dependency_overrides[get_telemetria_use_case] = lambda: mocks["telemetria"]
     app.dependency_overrides[get_alertas_use_case] = lambda: mocks["alertas"]
     app.dependency_overrides[get_exportar_telemetria_use_case] = lambda: mocks["exportar"]
@@ -356,6 +357,7 @@ def test_get_energy_history_raw_without_days():
     assert len(data) == 1
     assert data[0]["imported_active_energy_kwh"] == 1500.5
     mocks["telemetria"].listar_energias.assert_called_once_with(DEV_ID, 50, None)
+    assert response.headers["X-Datos-Desde"] == "2026-08-29T10:00:00Z"
 
 
 def test_get_energy_history_raw_with_days():
@@ -390,6 +392,9 @@ def test_get_energy_history_aggregated_day():
     assert data[0]["periodo"] == "2026-09-01"
     assert data[0]["energia_activa_neta_kwh"] == 10.5
     mocks["telemetria"].listar_energia_agregada.assert_called_once_with(DEV_ID, "day", "America/Argentina/Cordoba", 30)
+    # `days=30` se acota a la retención sin aviso en el body: el header informa el período real.
+    assert response.headers["X-Datos-Desde"] == "2026-08-29T10:00:00Z"
+    mocks["telemetria"].datos_desde.assert_called_once_with(DEV_ID)
 
 
 def test_get_energy_history_aggregated_month():

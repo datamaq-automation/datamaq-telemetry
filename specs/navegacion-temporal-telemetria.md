@@ -98,6 +98,15 @@ ventanas del pasado sin cambiar el comportamiento cuando no se envía.
   antes del corte se descarta aunque tenga datos parciales (conservador: la suma nunca queda
   incompleta sin aviso).
 
+### 1.3 Extensión (2026-09-24): `X-Datos-Desde` en energía
+
+- `GET /api/v1/telemetria/energy/{device_id}` también acota `days` por el corte de retención
+  (`_acotar_fecha_desde`) sin avisarlo en el body: el gráfico "Energía activa (últimos 30 días)"
+  mostraba 7 días en una suscripción sin PRO. Ahora manda `X-Datos-Desde` con el mismo contrato de
+  §1.2 (mismo corte, `ConsultarTelemetriaUseCase.datos_desde`), para las tres granularidades.
+  Aditivo: body sin cambios, CORS ya lo expone. Origen: análisis del histograma de consumo
+  (doc del padre, fila "se puede hacer ya").
+
 ## 2. Dominio & Puertos
 
 - `RepositorioTelemetriaPort.listar_instantaneas(dispositivo_id, limite, desde=None, hasta=None)`:

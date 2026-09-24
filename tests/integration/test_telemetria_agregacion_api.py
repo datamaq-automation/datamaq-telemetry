@@ -1,6 +1,6 @@
 """tests/integration/test_telemetria_agregacion_api.py — Pruebas de integración de la agregación de energía por periodo (granularity=day|month)."""
 
-from datetime import date
+from datetime import date, datetime, timezone
 from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient
@@ -22,6 +22,7 @@ def test_get_energy_aggregated_day_end_to_end():
         EnergiaAgregadaDTO(periodo=date(2026, 9, 1), energia_activa_neta_kwh=None),
         EnergiaAgregadaDTO(periodo=date(2026, 9, 2), energia_activa_neta_kwh=5.0),
     ]
+    mock_use_case.datos_desde.return_value = datetime(2026, 9, 1, tzinfo=timezone.utc)
 
     app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "user-test", "rol": "operador"}
     app.dependency_overrides[verificar_propiedad_dispositivo] = lambda: None
@@ -34,6 +35,7 @@ def test_get_energy_aggregated_day_end_to_end():
     )
 
     assert response.status_code == 200
+    assert response.headers["X-Datos-Desde"] == "2026-09-01T00:00:00Z"
     data = response.json()
     assert len(data) == 2
     assert data[0]["periodo"] == "2026-09-01"

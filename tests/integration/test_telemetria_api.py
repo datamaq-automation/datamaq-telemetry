@@ -180,6 +180,7 @@ def test_get_energy_history_end_to_end():
 
     mock_use_case = MagicMock()
     mock_use_case.listar_energias.return_value = [mock_energy]
+    mock_use_case.datos_desde.return_value = datetime(2026, 9, 17, tzinfo=timezone.utc)
 
     app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "user-test", "rol": "invitado"}
     app.dependency_overrides[verificar_propiedad_dispositivo] = lambda: None
@@ -189,6 +190,7 @@ def test_get_energy_history_end_to_end():
     response = client.get("/api/v1/telemetria/energy/725dfb4c-2610-4405-878a-d718b4f428a4?limit=100&days=7")
 
     assert response.status_code == 200
+    assert response.headers["X-Datos-Desde"] == "2026-09-17T00:00:00Z"
     assert "X-Request-ID" in response.headers
     data = response.json()
     assert len(data) == 1

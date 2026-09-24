@@ -121,17 +121,23 @@ def get_instantaneous_history(
 )
 def get_energy_history(
     device_id: str,
+    response: Response,
     use_case: Annotated[ConsultarTelemetriaUseCase, Depends(get_telemetria_use_case)],
     limit: int = Query(100, le=1000),
     days: int | None = Query(None, description="Últimos N días"),
     granularity: Literal["raw", "day", "month"] = Query("raw", description="Granularidad: raw, day, month"),
     timezone: str = Query("America/Argentina/Buenos_Aires", description="Zona horaria IANA"),
 ):
+    """El header `X-Datos-Desde` informa el corte de retención: `days` se acota a él sin aviso en
+    el body, así que el frontend lo necesita para titular el período real."""
     try:
         if granularity == "raw":
             desde = datetime.now(tz.utc) - timedelta(days=days) if days else None
-            return use_case.listar_energias(device_id, limit, desde)
-        return use_case.listar_energia_agregada(device_id, granularity, timezone, days)
+            energias = use_case.listar_energias(device_id, limit, desde)
+        else:
+            energias = use_case.listar_energia_agregada(device_id, granularity, timezone, days)
+        response.headers[HEADER_DATOS_DESDE] = formatear_datos_desde(use_case.datos_desde(device_id))
+        return energias
     except Exception as e:
         manejar_error_http(e)
 
