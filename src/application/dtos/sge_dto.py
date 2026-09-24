@@ -152,6 +152,9 @@ class FacturaDistribuidoraResponseDTO(BaseModel):
     energia_activa_valle_kwh: float | None = Field(
         default=None, validation_alias="energiaActivaValleKwh", serialization_alias="energiaActivaValleKwh"
     )
+    energia_activa_total_kwh: float | None = Field(
+        default=None, validation_alias="energiaActivaTotalKwh", serialization_alias="energiaActivaTotalKwh"
+    )
     energia_facturada_kwh: float | None = Field(
         default=None, validation_alias="energiaFacturadaKwh", serialization_alias="energiaFacturadaKwh"
     )

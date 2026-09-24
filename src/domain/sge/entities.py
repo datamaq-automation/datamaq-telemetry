@@ -92,6 +92,7 @@ class FacturaDistribuidora:
     energia_activa_punta_kwh: float | None = None
     energia_activa_resto_kwh: float | None = None
     energia_activa_valle_kwh: float | None = None
+    energia_activa_total_kwh: float | None = None
     potencia_contratada_punta_kw: float | None = None
     potencia_contratada_fuera_punta_kw: float | None = None
     potencia_adquirida_punta_kw: float | None = None
@@ -103,6 +104,10 @@ class FacturaDistribuidora:
 
     @property
     def energia_facturada_kwh(self) -> float | None:
+        """Total facturado del período: el explícito (proveedores que no discriminan por franja,
+        ej. CAMMESA) o la suma Punta+Resto+Valle (proveedores que sí, ej. EdeLAP)."""
+        if self.energia_activa_total_kwh is not None:
+            return self.energia_activa_total_kwh
         if (
             self.energia_activa_punta_kwh is None
             or self.energia_activa_resto_kwh is None

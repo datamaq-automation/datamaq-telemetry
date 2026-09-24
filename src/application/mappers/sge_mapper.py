@@ -27,6 +27,7 @@ def factura_to_dto(f: FacturaDistribuidora) -> FacturaDistribuidoraResponseDTO:
         energia_activa_punta_kwh=f.energia_activa_punta_kwh,
         energia_activa_resto_kwh=f.energia_activa_resto_kwh,
         energia_activa_valle_kwh=f.energia_activa_valle_kwh,
+        energia_activa_total_kwh=f.energia_activa_total_kwh,
         energia_facturada_kwh=f.energia_facturada_kwh,
         potencia_contratada_punta_kw=f.potencia_contratada_punta_kw,
         potencia_contratada_fuera_punta_kw=f.potencia_contratada_fuera_punta_kw,
