@@ -8,7 +8,10 @@ original antes de commitear (CONVENTIONS §3.6, dato físico declarativo sin fue
 no va al YAML).
 
 Uso:
-  venv/bin/python scripts/importar_factura_distribuidora.py <ruta_pdf> <planta_id>
+  venv/bin/python scripts/importar_factura_distribuidora.py <ruta_pdf> <planta_id> --tipo potencia|energia
+
+`--tipo potencia` usa el parser de EdeLAP, `--tipo energia` el de CAMMESA (únicos dos
+proveedores con parser real hoy, ver specs/factura-distribuidora.md §"Pendientes").
 """
 
 from __future__ import annotations
@@ -23,8 +26,14 @@ if str(ROOT_DIR) not in sys.path:
 
 from src.domain.telemetria.exceptions import FacturaDistribuidoraIlegibleError  # noqa: E402
 from src.infrastructure.pdfplumber.parser_factura_distribuidora import (  # noqa: E402
-    PdfplumberParserFacturaDistribuidora,
+    ParserFacturaEnergiaCammesa,
+    ParserFacturaPotenciaEdelap,
 )
+
+_PARSERS = {
+    "potencia": ParserFacturaPotenciaEdelap,
+    "energia": ParserFacturaEnergiaCammesa,
+}
 
 
 def _bloque_yaml(f) -> str:
@@ -42,6 +51,7 @@ def _bloque_yaml(f) -> str:
         ("tarifa", f.tarifa),
         ("dias_facturados", f.dias_facturados),
         ("energia_activa_punta_kwh", f.energia_activa_punta_kwh),
+        ("energia_activa_total_kwh", f.energia_activa_total_kwh),
         ("energia_activa_resto_kwh", f.energia_activa_resto_kwh),
         ("energia_activa_valle_kwh", f.energia_activa_valle_kwh),
         ("potencia_contratada_punta_kw", f.potencia_contratada_punta_kw),
@@ -65,10 +75,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("ruta_pdf", help="Ruta al PDF de la factura")
     parser.add_argument("planta_id", help="ID de la planta (data/organizaciones.yml)")
+    parser.add_argument("--tipo", choices=sorted(_PARSERS), required=True, help="potencia (EdeLAP) o energia (CAMMESA)")
     args = parser.parse_args()
 
     try:
-        factura = PdfplumberParserFacturaDistribuidora().parsear(args.ruta_pdf, args.planta_id)
+        factura = _PARSERS[args.tipo]().parsear(args.ruta_pdf, args.planta_id)
     except FacturaDistribuidoraIlegibleError as e:
         print(f"[ERROR] No se pudo parsear la factura: {e}", file=sys.stderr)
         return 1
