@@ -1,8 +1,10 @@
 # Factura de la distribuidora como dato histórico en YAML
 
 > **Decisión aplicable:** `decisions/2026-09-24_factura-distribuidora-yaml.md` (repo padre).
-> **Traspasada a hija:** sí · **Bloque cerrado:** sí (implementado, gauntlet en verde; falta
-> `git push`, que requiere autorización explícita del dueño — no bloquea el cierre de la spec)
+> **Traspasada a hija:** sí · **Bloque cerrado:** parcial — implementado, gauntlet en verde,
+> pusheado a `main` (`5d2c3a0`, 2026-09-24). Pendiente antes del cierre total: el parser real
+> de EDELAP (ver "Pendientes" al final de §2.2) y confirmar con `app-datamaq` si hace falta
+> exponer `cargadaEn` en el DTO (§3).
 
 ## 1. Objetivo y Contexto
 
@@ -247,6 +249,26 @@ confianza desde el PDF real de producción va a requerir revisar `page.extract_w
 (coordenadas x/y) o `page.extract_tables()` en vez de `extract_text()`; queda como trabajo
 pendiente para cuando se cargue la primera factura real, no bloqueante para esta iteración (no
 había forma de resolverlo sin ver más facturas reales, y el puerto ya deja esto reemplazable).
+
+### Pendientes (post-push, 2026-09-24)
+
+1. **[Prioridad alta] Parser real de EDELAP.** El parser hoy solo funciona contra el fixture de
+   test (layout "etiqueta: valor"); no corrió nunca contra un PDF de producción. Antes de usar
+   `scripts/importar_factura_distribuidora.py` con una factura real hay que:
+   - Correr `page.extract_words()` (o `extract_tables()`) sobre la factura real ya vista en esta
+     sesión (Drive `fileId 1lErYCz3TaS-jF-s0XtX9CDuKZoGqTq1m`, EDELAP, tarifa T5M12, período
+     202411) y ajustar `PdfplumberParserFacturaDistribuidora` para agrupar por posición en vez de
+     confiar en el orden lineal de `extract_text()`.
+   - Revalidar contra una segunda factura real (idealmente de otro período, para confirmar que el
+     layout no varía mes a mes) antes de darlo por cerrado.
+2. **[Prioridad baja, a confirmar con `app-datamaq`] Exponer `cargadaEn`.** La sesión hija pidió
+   este campo (`FacturaDistribuidora.cargada_en` existe en el dominio pero no se serializa en
+   `FacturaDistribuidoraResponseDTO`) para distinguir una resubida/corrección de un mismo período.
+   Agregar `cargadaEn` al DTO y al mapper si confirman que lo necesitan — cambio acotado, no
+   rompe el contrato existente (es un campo nuevo, no un rename).
+3. **Sin decisión tomada:** si en algún momento se quiere que la UI suba el PDF directo (en vez
+   del flujo GitOps por script + commit), hace falta una decisión nueva del dueño — hoy
+   `RepositorioOrganizacionesPort` es solo lectura por diseño explícito y no hay endpoint `POST`.
 
 **Script de ingesta** `scripts/importar_factura_distribuidora.py <ruta_pdf> <planta_id>`: instancia
 el parser, ejecuta `parsear()`, e imprime (o agrega, con `--commit`) el bloque YAML resultante a
