@@ -125,6 +125,57 @@ class AhorrosCusumResponseDTO(BaseModel):
     )
 
 
+class FacturaDistribuidoraResponseDTO(BaseModel):
+    id: str
+    planta_id: str = Field(validation_alias="plantaId", serialization_alias="plantaId")
+    periodo: str
+    distribuidora: str
+    numero_factura: str = Field(validation_alias="numeroFactura", serialization_alias="numeroFactura")
+    tarifa: str
+    dias_facturados: int = Field(validation_alias="diasFacturados", serialization_alias="diasFacturados")
+    energia_activa_punta_kwh: float = Field(
+        validation_alias="energiaActivaPuntaKwh", serialization_alias="energiaActivaPuntaKwh"
+    )
+    energia_activa_resto_kwh: float = Field(
+        validation_alias="energiaActivaRestoKwh", serialization_alias="energiaActivaRestoKwh"
+    )
+    energia_activa_valle_kwh: float = Field(
+        validation_alias="energiaActivaValleKwh", serialization_alias="energiaActivaValleKwh"
+    )
+    energia_facturada_kwh: float = Field(
+        validation_alias="energiaFacturadaKwh", serialization_alias="energiaFacturadaKwh"
+    )
+    potencia_contratada_punta_kw: float = Field(
+        validation_alias="potenciaContratadaPuntaKw", serialization_alias="potenciaContratadaPuntaKw"
+    )
+    potencia_contratada_fuera_punta_kw: float = Field(
+        validation_alias="potenciaContratadaFueraPuntaKw", serialization_alias="potenciaContratadaFueraPuntaKw"
+    )
+    potencia_adquirida_punta_kw: float = Field(
+        validation_alias="potenciaAdquiridaPuntaKw", serialization_alias="potenciaAdquiridaPuntaKw"
+    )
+    potencia_adquirida_fuera_punta_kw: float = Field(
+        validation_alias="potenciaAdquiridaFueraPuntaKw", serialization_alias="potenciaAdquiridaFueraPuntaKw"
+    )
+    potencia_excedida_punta_kw: float = Field(
+        validation_alias="potenciaExcedidaPuntaKw", serialization_alias="potenciaExcedidaPuntaKw"
+    )
+    potencia_excedida_fuera_punta_kw: float = Field(
+        validation_alias="potenciaExcedidaFueraPuntaKw", serialization_alias="potenciaExcedidaFueraPuntaKw"
+    )
+    importe_potencia_ars: float = Field(validation_alias="importePotenciaArs", serialization_alias="importePotenciaArs")
+    importe_energia_ars: float = Field(validation_alias="importeEnergiaArs", serialization_alias="importeEnergiaArs")
+    importe_total_ars: float = Field(validation_alias="importeTotalArs", serialization_alias="importeTotalArs")
+    valor_energia_ars_kwh_promedio: float = Field(
+        validation_alias="valorEnergiaArsKwhPromedio", serialization_alias="valorEnergiaArsKwhPromedio"
+    )
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+        serialize_by_alias=True,
+    )
+
+
 class LineaBaseResponseDTO(BaseModel):
     id: str
     nombre: str

@@ -38,8 +38,14 @@ class ConsultarBalanceEnergiaUseCase:
         padre_id = nodo_padre.id if nodo_padre else (nodo_id or "desconocido")
         padre_nombre = nodo_padre.nombre if nodo_padre else "TGBT Cabecera"
 
-        # Si se pasan valores explícitos, se usan directamente; si no, valores base
-        e_padre = float(energia_padre_kwh if energia_padre_kwh is not None else 0.0)
+        # Si se pasa energia_padre_kwh explícito, se usa directo. Si no, se busca la factura
+        # de la distribuidora más reciente de la planta (energía facturada real); sin
+        # facturas cargadas, cae al comportamiento anterior (0.0).
+        if energia_padre_kwh is not None:
+            e_padre = float(energia_padre_kwh)
+        else:
+            facturas = self._repo_org.obtener_facturas_planta(planta_id)
+            e_padre = facturas[0].energia_facturada_kwh if facturas else 0.0
         e_hijos = energias_hijos_kwh if energias_hijos_kwh is not None else []
 
         resultado = BalanceEnergiaService.evaluar_balance(

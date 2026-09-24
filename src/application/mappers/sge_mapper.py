@@ -2,13 +2,41 @@
 
 from src.application.dtos.sge_dto import (
     EstadoCompetenciasUsuarioDTO,
+    FacturaDistribuidoraResponseDTO,
     RegistroCapacitacionResponseDTO,
     SgeDocArticleDTO,
 )
 from src.application.use_cases.consultar_competencias_usuario import (
     EstadoCompetenciasUsuario,
 )
-from src.domain.sge.entities import ArticuloSge, RegistroCapacitacionSge
+from src.domain.sge.entities import ArticuloSge, FacturaDistribuidora, RegistroCapacitacionSge
+
+
+def factura_to_dto(f: FacturaDistribuidora) -> FacturaDistribuidoraResponseDTO:
+    """Convierte una entidad FacturaDistribuidora a FacturaDistribuidoraResponseDTO."""
+    return FacturaDistribuidoraResponseDTO(
+        id=f.id,
+        planta_id=f.planta_id,
+        periodo=f.periodo,
+        distribuidora=f.distribuidora,
+        numero_factura=f.numero_factura,
+        tarifa=f.tarifa,
+        dias_facturados=f.dias_facturados,
+        energia_activa_punta_kwh=f.energia_activa_punta_kwh,
+        energia_activa_resto_kwh=f.energia_activa_resto_kwh,
+        energia_activa_valle_kwh=f.energia_activa_valle_kwh,
+        energia_facturada_kwh=f.energia_facturada_kwh,
+        potencia_contratada_punta_kw=f.potencia_contratada_punta_kw,
+        potencia_contratada_fuera_punta_kw=f.potencia_contratada_fuera_punta_kw,
+        potencia_adquirida_punta_kw=f.potencia_adquirida_punta_kw,
+        potencia_adquirida_fuera_punta_kw=f.potencia_adquirida_fuera_punta_kw,
+        potencia_excedida_punta_kw=f.potencia_excedida_punta_kw,
+        potencia_excedida_fuera_punta_kw=f.potencia_excedida_fuera_punta_kw,
+        importe_potencia_ars=f.importe_potencia_ars,
+        importe_energia_ars=f.importe_energia_ars,
+        importe_total_ars=f.importe_total_ars,
+        valor_energia_ars_kwh_promedio=f.valor_energia_ars_kwh_promedio,
+    )
 
 
 def articulo_to_dto(articulo: ArticuloSge) -> SgeDocArticleDTO:
