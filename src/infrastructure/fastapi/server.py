@@ -465,7 +465,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_exception_handler(StarletteHTTPException, manejar_404)
 
     # Register Routers
-    # asistente y copilot quedan fuera hasta aislarlos por organización
+    # El asistente queda fuera hasta que el dueño decida reencenderlo
     # (decisions/2026-09-24_bot-conversacional-aislamiento.md del repo padre, D1).
     from src.infrastructure.fastapi.routes.produccion_router import (
         router as produccion_router,

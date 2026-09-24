@@ -231,14 +231,6 @@ def get_consultar_analitica_planta_use_case(
     return ConsultarAnaliticaPlantaUseCase(consultar_telemetria=consultar_telemetria)
 
 
-def get_procesar_chat_copilot_use_case() -> Any:
-    from src.application.use_cases.copilot.procesar_chat_copilot import (
-        ProcesarChatCopilotUseCase,
-    )
-
-    return ProcesarChatCopilotUseCase()
-
-
 def get_maquinas_use_case(
     db: Annotated[Session, Depends(get_db_session)],
 ) -> GestionarMaquinasUseCase:
