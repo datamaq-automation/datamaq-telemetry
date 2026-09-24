@@ -85,8 +85,21 @@ class ArbolUnifilarService:
         return resultado
 
     def medidores_frontera(self, nodo_id: str) -> list[str]:
-        """Device ids de los nodos devueltos por ``nodos_medidores_frontera``."""
-        return [nodo.device_id for nodo in self.nodos_medidores_frontera(nodo_id) if nodo.device_id]
+        """Device ids de los nodos devueltos por ``nodos_medidores_frontera``.
+
+        Garantiza que no hay duplicados de device_id, incluso si la estructura
+        tiene nodos diferentes con el mismo device_id (error de configuración).
+        Preserva el orden de aparición: mantiene el primero de cada device_id.
+        """
+        nodos = self.nodos_medidores_frontera(nodo_id)
+        # Usar dict para deduplicar por device_id manteniendo orden (Python 3.7+)
+        vistos: dict[str, bool] = {}
+        resultado = []
+        for nodo in nodos:
+            if nodo.device_id and nodo.device_id not in vistos:
+                vistos[nodo.device_id] = True
+                resultado.append(nodo.device_id)
+        return resultado
 
     def es_nodo_pasante(self, nodo_id: str) -> bool:
         """Determina si un nodo es puramente pasante (tramo continuo sin ramificaciones ni medidor propio)."""
