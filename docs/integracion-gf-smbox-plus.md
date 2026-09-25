@@ -50,53 +50,109 @@ Backend datamaq-telemetry (consume comandos de alivio)
 
 ### ❓ Incógnitas / Dudas
 
-| Duda | Impacto | Plan para resolver |
-|------|--------|-------------------|
-| ¿Es realmente Tuya o clone?** | Medio | Verificar Device ID después de configurar en Smart Life |
-| ¿Tiene local key accesible? | Alto | Script `discover_tuya_devices.py` lo buscará |
-| ¿Soporta protocolo MQTT nativo? | Bajo | Probablemente no, usaremos bridge |
-| ¿Necesita acceso a cloud Tuya? | Medio | Tuya permite modo "local only" con credenciales extraídas |
-| ¿Consumo de energía en reposo? | Bajo | Manual dice ≤0.8W |
-| ¿Relé? ¿Tiempos de switching? | Bajo | No especificado; lo mediremos en pruebas |
+| Duda | Impacto | Estado | Plan para resolver |
+|------|--------|--------|-------------------|
+| ¿Es realmente Tuya o clone? | Medio | ✅ Casi confirmado (Smart Life funciona nativamente) | Extraer Device ID + Local Key |
+| ¿Tiene local key accesible? | Alto | ❓ Desconocido | Script `extract_tuya_credentials.py` lo obtendrá desde API Tuya |
+| ¿Por qué Smart Life reporta IP pública? | Bajo | ✅ Normal (comunica con servidores Tuya en nube) | Esperado; la IP local será diferente (10.194.124.x) |
+| ¿Puerto UDP ocupado? | Medio | ❓ Requiere investigación | Identificar qué proceso usa puerto UDP; posible: otro servicio IoT |
+| ¿Responde a broadcasts locales? | Alto | ❓ No responde | Posibles causas: firewall router, aislamiento AP, VLANs |
+| ¿Soporta protocolo MQTT nativo? | Bajo | ❌ Probablemente no | Usaremos bridge Tuya→MQTT |
+| ¿Necesita acceso a cloud Tuya? | Medio | ✅ No (Tuya permite local) | Con Local Key podemos hablar directamente al dispositivo |
+| ¿Consumo de energía en reposo? | Bajo | ✅ Manual: ≤0.8W | Confirmado |
+| ¿Relé? ¿Tiempos de switching? | Bajo | ❓ No especificado | Mediremos en pruebas de integración |
+
+---
+
+## Decisiones arquitectónicas (post-investigación)
+
+### 1. Autenticación: Cloud API vs Local Protocol
+
+**Opciones:**
+- **A: Usar API Cloud Tuya** (simple, requiere internet)
+  - Ventajas: Simple, confiable, sin necesidad de extraer Local Key
+  - Desventajas: Depende de internet, posible latencia
+  
+- **B: Usar protocolo local Tuya** (directo, sin internet)
+  - Ventajas: Rápido, funciona sin internet, control total
+  - Desventajas: Requiere Local Key, setup más complejo
+
+**Decisión preliminar:** Opción B (Local) + fallback a Cloud
+- Razón: Alivio de carga es crítico → no queremos depender de internet
+- Estrategia: Intentar local primero; si falla, usar cloud
+
+### 2. Extracción de credenciales
+
+**Problema:** Smart Life no muestra Local Key en la app
+
+**Solución:** Usar `extract_tuya_credentials.py`
+- Requiere credenciales de cuenta Tuya/Smart Life
+- Las obtiene de la API oficial
+- Se guardan **LOCALMENTE** en `tuya_devices_credentials.json` (NO en git)
+
+**Seguridad:**
+- Archivo debe estar en `.gitignore`
+- Solo el usuario debe tener acceso (permisos 600)
+- Nunca compartir ni pushear
+
+### 3. Bridge MQTT
+
+**Decisión:** Python + tinytuya + paho-mqtt
+- Lightweight (vs Node.js)
+- Integración directa con backend datamaq-telemetry
+- Ya tienen Python en la stack
 
 ---
 
 ## Próximos pasos
 
-### Fase 1: Validación (HOY)
+### Fase 1: Extracción de credenciales (AHORA)
 
 ```bash
-# 1. Instalar descubridor
-pip install tinytuya
-
-# 2. Ejecutar descubrimiento
-python scripts/discover_tuya_devices.py
+cd /home/agustin/proyectos_software/datamaq-telemetry
+source venv/bin/activate
+python scripts/extract_tuya_credentials.py
 ```
 
-**Esperamos obtener:**
+**Entrada requerida:**
+- Email de cuenta Smart Life
+- Contraseña (solo local, NO se envía)
+
+**Salida esperada:**
 - Device ID del GF-SMBOX
-- IP local
-- Versión del protocolo Tuya
-- Local Key (si está disponible)
+- Local Key (para control sin internet)
+- Archivo: `tuya_devices_credentials.json` (mantener seguro, NO en git)
 
-### Fase 2: Bridge MQTT (próxima semana)
+### Fase 2: Bridge MQTT local (próxima semana)
 
-Implementar bridge Python que:
-- Se conecta al GF-SMBOX vía Tuya (usando Device ID + Local Key)
-- Publica estado en `m/wifi/gf-smbox-plus-01/state` (JSON)
-- Escucha comandos en `m/wifi/gf-smbox-plus-01/command`
-- Traduce entre Tuya ↔ MQTT
+Crear `scripts/bridge_tuya_mqtt.py`:
+- Lee `tuya_devices_credentials.json`
+- Se conecta directamente al GF-SMBOX vía protocolo Tuya (sin internet)
+- Publica estado en MQTT: `m/wifi/gf-smbox-plus-01/state`
+- Escucha comandos: `m/wifi/gf-smbox-plus-01/command`
+- Reconexión automática
+- Logs para debugging
 
 **Librerías:**
-- `paho-mqtt` (cliente MQTT)
-- `tinytuya` (cliente Tuya local)
+- `paho-mqtt` (cliente MQTT → broker central)
+- `tinytuya` (cliente Tuya local → dispositivo)
 
 ### Fase 3: Integración backend (posterior)
 
-- Crear endpoint de "solicitar alivio de carga"
-- Mapear plantas → GF-SMBOX-PLUS
-- Lógica de activación/desactivación
-- Auditoría de eventos
+- [ ] Crear modelo `AlivioDeCargas` (planta, dispositivo, duración, ejecutado_en)
+- [ ] API endpoint: `POST /api/v1/plantas/{id}/alivio`
+- [ ] Consumidor MQTT que publica comandos al bridge
+- [ ] Lógica: máximo 1 alivio simultáneo, límites por hora
+- [ ] Auditoría: loguear cada solicitud + resultado
+- [ ] WebSocket notifications para UI
+
+### Fase 4: Testing
+
+- [ ] Control local sin internet (critical)
+- [ ] Latencia comando → respuesta
+- [ ] Reconexión automática después de desconexión
+- [ ] Múltiples plantas con múltiples dispositivos
+- [ ] Casos edge (simultáneo, cancelación, timeout)
 
 ---
 
@@ -184,7 +240,7 @@ m/wifi/gf-smbox-plus-02/
 
 ## Hallazgos de ejecución
 
-### Ejecución 1: 2026-09-25 14:06 UTC
+### Ejecución 1: 2026-09-25 14:06 UTC (Dispositivo apagado)
 
 **Comando:** `python scripts/discover_tuya_devices.py`
 
@@ -195,22 +251,80 @@ Dispositivos con puerto 6668 abierto: 0
 Dispositivos Tuya vía broadcast: 0 (no encontrados)
 ```
 
-**Conclusión:**
-- El GF-SMBOX-PLUS **NO está actualmente en la red local**
-- Causas posibles:
-  1. Dispositivo apagado
-  2. No conectado a WiFi
-  3. Emparejamiento en Smart Life no completado
-  4. En modo AP (punto de acceso) esperando configuración
+**Conclusión:** Dispositivo no está en red (esperado - aún no conectado).
 
-**Acciones requeridas antes del próximo escaneo:**
-1. Completar instalación en Smart Life (hasta que aparezca "Conectado" en verde)
-2. Verificar que WiFi muestre "Conectado" en la app
-3. Dispositivo debe estar alimentado (luz LED)
-4. Esperar 30-60s después de encender antes de escanear
+---
+
+### Ejecución 2: 2026-09-25 14:xx UTC (Dispositivo conectado a WiFi "Maestros")
+
+**Estado del dispositivo en Smart Life:**
+- ✅ Conectado a WiFi: "Maestros"
+- ✅ Estado: Conectado
+- 📊 Fuerza de señal: -41 dBm (excelente)
+- 🔗 IP reportada por Smart Life: `186.18.144.215` (PÚBLICA/WAN)
+- 🖥️ MAC local: `cc:8c:bf:bf:6d:24`
+
+**Comando ejecutado:** `python scripts/discover_tuya_devices.py`
+
+**Resultado:**
+```
+Red local detectada: 10.194.124.0/24
+Dispositivos activos (puerto 6668): 0
+Descubrimiento Tuya: Error - Address already in use (puerto UDP ocupado)
+```
+
+**Hallazgos importantes:**
+1. El dispositivo **SÍ está conectado a WiFi** (confirmado por Smart Life)
+2. Smart Life reporta IP **pública** (186.18.144.215) no local - esto es normal, indica que se conectó a servidores Tuya en la nube
+3. El puerto UDP necesario está ocupado (probablemente por otro proceso) → necesita investigación
+4. Device no responde a broadcasts locales (posible: firewall, configuración VLAN, o aislamiento de AP)
+
+---
+
+## Consideraciones de seguridad
+
+### Almacenamiento de credenciales
+
+**Archivo:** `tuya_devices_credentials.json`
+```json
+{
+  "device_id_xxx": {
+    "name": "GF-SMBOX-PLUS",
+    "device_id": "...",
+    "local_key": "...",
+    "category": "switch"
+  }
+}
+```
+
+**Protección requerida:**
+```bash
+# Agregar a .gitignore
+echo "tuya_devices_credentials.json" >> .gitignore
+
+# Restringir permisos de archivo
+chmod 600 tuya_devices_credentials.json
+
+# Verificar que no esté trackeado
+git rm --cached tuya_devices_credentials.json 2>/dev/null || true
+```
+
+**¿Por qué necesitamos el Local Key?**
+- Tuya no lo muestra en la app
+- Es necesario para comunicación directa sin internet
+- Se obtiene de la API Cloud de Tuya (credenciales = acceso a todos los dispositivos de tu cuenta)
+- El script `extract_tuya_credentials.py` lo obtiene de forma segura
+
+**Alternativas consideradas:**
+1. ❌ Hardcoded en código → seguridad nula
+2. ❌ Variable de entorno → aún visible en logs
+3. ✅ Archivo JSON con permisos restrictivos → mejor
+4. ⏳ Vault/KMS en producción → futuro
 
 ---
 
 ## Log de cambios
 
-- **2026-09-25:** Investigación inicial, especificaciones, dudas documentadas; primer escaneo sin dispositivo (esperado)
+- **2026-09-25 14:00:** Investigación inicial, especificaciones, dudas documentadas
+- **2026-09-25 14:30:** Dispositivo conectado a WiFi; documentados hallazgos y decisiones arquitectónicas
+- **2026-09-25 14:45:** Creados scripts de extracción; planes de Fase 1-4 definidos
