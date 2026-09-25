@@ -69,6 +69,12 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
     echo "==> Actualizando datos maestros (repo independiente datamaq-data)..."
     if [ -d "data/.git" ]; then
         git -C data pull --ff-only
+        # El `git pull --ff-only` del código (arriba) puede haber borrado archivos de data/ del
+        # working tree si datamaq-telemetry todavía los trackeaba en el commit anterior (pasó una
+        # vez en la migración a repo independiente, 2026-09-25: el pull del padre eliminó los YAML
+        # físicamente y este `pull` del repo anidado, ya al día con el remoto, no los restauró).
+        # `checkout -- .` reconcilia el working tree con HEAD sin importar quién borró qué.
+        git -C data checkout -- .
     elif [ -d "data" ] && [ -n "$(ls -A data 2>/dev/null)" ]; then
         echo "ADVERTENCIA: data/ existe pero no es un repo git (¿migración no aplicada?). Se omite la actualización."
     else
