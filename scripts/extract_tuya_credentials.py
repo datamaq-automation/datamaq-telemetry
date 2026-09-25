@@ -1,20 +1,30 @@
 #!/usr/bin/env python3
 """Extrae Device ID y Local Key de una cuenta Smart Life / Tuya.
 
-Este script obtiene las credenciales de control local de tus dispositivos Tuya.
+Este script obtiene las credenciales de control local de tus dispositivos Tuya
+usando la API Cloud oficial de Tuya IoT Platform (https://iot.tuya.com).
 Las credenciales se guardan en archivo local y NO se envían a servidores externos.
+
+Requiere un proyecto Cloud en Tuya IoT Platform (Access ID + Access Secret) con
+la cuenta Smart Life vinculada vía "Link Tuya App Account" (QR). El login directo
+con usuario/contraseña de Smart Life está deprecado por Tuya (clientId inválido).
 
 Uso:
     python scripts/extract_tuya_credentials.py
 
+Variables de entorno (.env):
+    TUYA_API_REGION      Región del proyecto Cloud (default: sa)
+    TUYA_ACCESS_ID       Access ID / Client ID del proyecto Cloud
+    TUYA_ACCESS_SECRET   Access Secret del proyecto Cloud
+
 Requisitos:
-    pip install tinytuya
+    pip install tinytuya python-dotenv
 """
 
 import json
 import sys
-from pathlib import Path
 from getpass import getpass
+from pathlib import Path
 
 
 def main() -> None:
@@ -28,6 +38,10 @@ def main() -> None:
 
     import os
 
+    from dotenv import load_dotenv
+
+    load_dotenv()
+
     print("\n" + "=" * 70)
     print("🔐 Extractor de Credenciales Tuya / Smart Life")
     print("=" * 70)
@@ -37,40 +51,40 @@ def main() -> None:
     print("  • NUNCA compartas ese archivo con otros")
     print()
 
-    # Obtener credenciales de variables de entorno o input
-    email = os.getenv("TUYA_EMAIL") or os.getenv("SMARTLIFE_EMAIL")
-    password = os.getenv("TUYA_PASSWORD") or os.getenv("SMARTLIFE_PASSWORD")
+    # Credenciales del proyecto Cloud de Tuya IoT Platform (obligatorias)
+    region = os.getenv("TUYA_API_REGION", "sa")
+    access_id = os.getenv("TUYA_ACCESS_ID")
+    access_secret = os.getenv("TUYA_ACCESS_SECRET")
 
-    if not email:
-        print("📱 Ingresa tus credenciales de Smart Life:")
-        email = input("  Email: ").strip()
+    if not access_id:
+        access_id = input("  Access ID (Client ID) del proyecto Cloud: ").strip()
 
-    if not password:
-        password = getpass("  Contraseña: ")
+    if not access_secret:
+        access_secret = getpass("  Access Secret del proyecto Cloud: ")
 
-    if not email or not password:
-        print("❌ Email y contraseña requeridos")
+    if not access_id or not access_secret:
+        print("❌ Access ID y Access Secret requeridos")
+        print("   Crear un proyecto en https://iot.tuya.com y vincular la app")
+        print("   Smart Life vía 'Link Tuya App Account' (QR)")
         sys.exit(1)
 
     print("\n⏳ Conectando a Tuya Cloud...")
     print("   (Esto puede tomar 10-30 segundos)")
 
     try:
-        # Obtiene lista de dispositivos
-        email_or_phone = email
         tuya_api = tinytuya.Cloud(
-            apiRegion="sa",  # South America
-            apiKey="xxxxxxxxxxxxxxxx",  # Dummy, se ignora
-            apiSecret="xxxxxxxxxxxxxxxx",  # Dummy, se ignora
-            userName=email_or_phone,
-            password=password,
+            apiRegion=region,
+            apiKey=access_id,
+            apiSecret=access_secret,
         )
 
         # Intenta conectar
         devices = tuya_api.getdevices()
 
         if not devices:
-            print("❌ No se encontraron dispositivos o credenciales inválidas")
+            print("❌ No se encontraron dispositivos")
+            print("   Verifica que la cuenta Smart Life esté vinculada al proyecto")
+            print("   Cloud vía 'Link Tuya App Account'")
             sys.exit(1)
 
         print(f"\n✅ Encontrados {len(devices)} dispositivo(s):\n")
@@ -133,13 +147,13 @@ def main() -> None:
 
             # Busca el SMBOX específicamente
             smbox = None
-            for dev_id, info in credentials.items():
+            for info in credentials.values():
                 if "smbox" in info["name"].lower():
                     smbox = info
                     break
 
             if smbox:
-                print(f"\n🎯 GF-SMBOX-PLUS encontrado:")
+                print("\n🎯 GF-SMBOX-PLUS encontrado:")
                 print(f"   Device ID:  {smbox['device_id']}")
                 print(f"   Local Key:  {smbox['local_key']}")
         else:
@@ -149,9 +163,10 @@ def main() -> None:
     except Exception as e:
         print(f"❌ Error: {e}")
         print("\n💡 Posibles causas:")
-        print("   • Credenciales incorrectas")
+        print("   • Access ID / Access Secret incorrectos")
+        print("   • Cuenta Smart Life no vinculada al proyecto Cloud")
         print("   • Sin conexión a internet")
-        print("   • Región incorrecta (asumimos South America)")
+        print(f"   • Región incorrecta (usando: {region})")
         sys.exit(1)
 
 
