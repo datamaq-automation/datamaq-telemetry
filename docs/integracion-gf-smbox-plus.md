@@ -255,7 +255,7 @@ Dispositivos Tuya vía broadcast: 0 (no encontrados)
 
 ---
 
-### Ejecución 2: 2026-09-25 14:xx UTC (Dispositivo conectado a WiFi "Maestros")
+### Ejecución 2: 2026-09-25 14:45 UTC (Dispositivo conectado a WiFi "Maestros" - Problema encontrado)
 
 **Estado del dispositivo en Smart Life:**
 - ✅ Conectado a WiFi: "Maestros"
