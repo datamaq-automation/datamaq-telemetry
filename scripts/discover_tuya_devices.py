@@ -83,10 +83,11 @@ def main() -> None:
         import tinytuya  # type: ignore
 
         print("  ⏳ Esperando broadcasts de dispositivos Tuya...")
-        print("     (Puede tomar 5-15 segundos)")
-        devices = tinytuya.discover.discover()
+        print("     (Puede tomar 10-20 segundos)")
 
-        if devices:
+        devices = tinytuya.deviceScan(verbose=False)
+
+        if devices and len(devices) > 0:
             print(f"\n  ✅ Dispositivos Tuya encontrados:\n")
             for dev_id, info in sorted(devices.items()):
                 print(f"    📦 Dispositivo: {info.get('name', 'Desconocido')}")
@@ -96,11 +97,13 @@ def main() -> None:
                 print(f"       Puerto:     {info.get('port', 'N/A')}")
                 print()
         else:
-            print("  ⚠️  No se encontraron dispositivos Tuya.")
-            print("     Verifica que:")
-            print("     • El dispositivo esté encendido")
-            print("     • Esté conectado a la misma WiFi que esta laptop")
-            print("     • La app Smart Life haya completado el emparejamiento")
+            print("  ⚠️  No se encontraron dispositivos Tuya por broadcast.")
+            print("     Esto puede ocurrir si:")
+            print("     • El dispositivo NO está encendido")
+            print("     • NO está conectado a la misma WiFi que esta laptop")
+            print("     • La app Smart Life aún no terminó el emparejamiento")
+            print("     • Tu router NO permite UDP broadcasts entre subredes")
+            print("     • El GF-SMBOX no está basado en Tuya (fallback a manual)")
 
     except ImportError:
         print("  ⚠️  'tinytuya' no está instalado.")

@@ -2,6 +2,7 @@
 
 **Estado:** 🔍 Investigación inicial  
 **Fecha inicio:** 2026-09-25  
+**Última ejecución:** 2026-09-25 14:06 UTC (sin dispositivo en red)  
 **Propósito:** Control de alivio de carga (load shedding) para plantas  
 **Caso de uso:** Desconectar cargas automáticamente cuando la demanda lo requiera
 
@@ -181,6 +182,35 @@ m/wifi/gf-smbox-plus-02/
 
 ---
 
+## Hallazgos de ejecución
+
+### Ejecución 1: 2026-09-25 14:06 UTC
+
+**Comando:** `python scripts/discover_tuya_devices.py`
+
+**Resultado:**
+```
+Red local detectada: 10.194.124.0/24
+Dispositivos con puerto 6668 abierto: 0
+Dispositivos Tuya vía broadcast: 0 (no encontrados)
+```
+
+**Conclusión:**
+- El GF-SMBOX-PLUS **NO está actualmente en la red local**
+- Causas posibles:
+  1. Dispositivo apagado
+  2. No conectado a WiFi
+  3. Emparejamiento en Smart Life no completado
+  4. En modo AP (punto de acceso) esperando configuración
+
+**Acciones requeridas antes del próximo escaneo:**
+1. Completar instalación en Smart Life (hasta que aparezca "Conectado" en verde)
+2. Verificar que WiFi muestre "Conectado" en la app
+3. Dispositivo debe estar alimentado (luz LED)
+4. Esperar 30-60s después de encender antes de escanear
+
+---
+
 ## Log de cambios
 
-- **2026-09-25:** Investigación inicial, especificaciones, dudas documentadas
+- **2026-09-25:** Investigación inicial, especificaciones, dudas documentadas; primer escaneo sin dispositivo (esperado)
