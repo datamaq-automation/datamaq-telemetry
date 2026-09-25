@@ -26,6 +26,8 @@ def main() -> None:
         print("   Instala con: pip install tinytuya")
         sys.exit(1)
 
+    import os
+
     print("\n" + "=" * 70)
     print("🔐 Extractor de Credenciales Tuya / Smart Life")
     print("=" * 70)
@@ -35,16 +37,19 @@ def main() -> None:
     print("  • NUNCA compartas ese archivo con otros")
     print()
 
-    # Pedir credenciales
-    print("📱 Ingresa tus credenciales de Smart Life:")
-    email = input("  Email: ").strip()
-    if not email:
-        print("❌ Email requerido")
-        sys.exit(1)
+    # Obtener credenciales de variables de entorno o input
+    email = os.getenv("TUYA_EMAIL") or os.getenv("SMARTLIFE_EMAIL")
+    password = os.getenv("TUYA_PASSWORD") or os.getenv("SMARTLIFE_PASSWORD")
 
-    password = getpass("  Contraseña: ")
+    if not email:
+        print("📱 Ingresa tus credenciales de Smart Life:")
+        email = input("  Email: ").strip()
+
     if not password:
-        print("❌ Contraseña requerida")
+        password = getpass("  Contraseña: ")
+
+    if not email or not password:
+        print("❌ Email y contraseña requeridos")
         sys.exit(1)
 
     print("\n⏳ Conectando a Tuya Cloud...")
