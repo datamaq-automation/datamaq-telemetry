@@ -25,6 +25,7 @@ class OrganizacionResponseDTO(OrganizacionBaseDTO):
 class PlantaBaseDTO(BaseModel):
     organizacion_id: str
     nombre: str
+    slug: str
     direccion: str | None = None
     latitud: float | None = None
     longitud: float | None = None

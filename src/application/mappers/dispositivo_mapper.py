@@ -100,6 +100,7 @@ class OrganizacionMapper:
             id=entity.id,
             organizacion_id=entity.organizacion_id,
             nombre=entity.nombre,
+            slug=entity.slug,
             direccion=entity.direccion,
             latitud=entity.latitud,
             longitud=entity.longitud,

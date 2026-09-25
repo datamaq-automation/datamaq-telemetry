@@ -1,5 +1,7 @@
 """src/domain/telemetria/entities.py."""
 
+import re
+import unicodedata
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from decimal import Decimal
@@ -84,6 +86,18 @@ class Suscripcion:
         return cls(organizacion_id=organizacion_id)
 
 
+def generar_slug_planta(nombre: str) -> str:
+    """Deriva el slug legible de una planta a partir de su nombre (decisión 2026-09-25).
+
+    Solo se usa como valor por defecto cuando el YAML no declara `slug`: una vez
+    declarado, el slug queda fijo aunque la planta se renombre (no es mutable).
+    """
+    normalizado = unicodedata.normalize("NFKD", nombre).encode("ascii", "ignore").decode("ascii")
+    slug = re.sub(r"\s+", "-", normalizado.strip().lower())
+    slug = re.sub(r"[^a-z0-9-]", "", slug)
+    return re.sub(r"-{2,}", "-", slug).strip("-")
+
+
 @dataclass
 class Planta:
     id: str
@@ -93,8 +107,13 @@ class Planta:
     latitud: float | None = None
     longitud: float | None = None
     layout_svg_url: str | None = None
+    slug: str = ""
     creado_en: datetime = field(default_factory=ahora_utc)
     actualizado_en: datetime = field(default_factory=ahora_utc)
+
+    def __post_init__(self) -> None:
+        if not self.slug:
+            self.slug = generar_slug_planta(self.nombre)
 
 
 @dataclass

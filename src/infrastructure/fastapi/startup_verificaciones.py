@@ -25,3 +25,10 @@ def ejecutar_verificaciones_yaml() -> None:
         verificar_facturas_plantas()
     except Exception as e:
         logger.warning("verificacion_facturas_fallida", error=str(e))
+
+    try:
+        from src.infrastructure.yaml.verificador_slugs_planta import verificar_slugs_planta
+
+        verificar_slugs_planta()
+    except Exception as e:
+        logger.warning("verificacion_slugs_planta_fallida", error=str(e))

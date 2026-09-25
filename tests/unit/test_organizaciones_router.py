@@ -40,6 +40,7 @@ def _planta_dto(**kwargs) -> PlantaResponseDTO:
         "id": "planta-1",
         "organizacion_id": "org-1",
         "nombre": "Planta Principal",
+        "slug": "planta-principal",
         "direccion": "Av. Libertador 1000",
         "latitud": -34.6037,
         "longitud": -58.3816,
@@ -132,8 +133,8 @@ def test_post_plantas_ya_no_existe():
 
 def test_listar_plantas_superadmin():
     client, mock_use_case = _cliente(rol="superadmin")
-    planta1 = _planta_dto(id="planta-1", nombre="Planta Norte")
-    planta2 = _planta_dto(id="planta-2", nombre="Planta Sur")
+    planta1 = _planta_dto(id="planta-1", nombre="Planta Norte", slug="planta-norte")
+    planta2 = _planta_dto(id="planta-2", nombre="Planta Sur", slug="planta-sur")
     mock_use_case.listar_plantas.return_value = [planta1, planta2]
 
     response = client.get("/api/v1/plantas")
@@ -143,8 +144,10 @@ def test_listar_plantas_superadmin():
     assert len(data) == 2
     assert data[0]["id"] == "planta-1"
     assert data[0]["nombre"] == "Planta Norte"
+    assert data[0]["slug"] == "planta-norte"
     assert data[1]["id"] == "planta-2"
     assert data[1]["nombre"] == "Planta Sur"
+    assert data[1]["slug"] == "planta-sur"
     mock_use_case.listar_plantas.assert_called_once_with(None)
 
 
