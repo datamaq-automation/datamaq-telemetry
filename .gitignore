@@ -55,6 +55,11 @@ backups/
 tmp/
 scratch/
 
+# data/ es un repo git independiente (datamaq-automation/datamaq-data), no
+# submódulo: separa el historial de datos maestros del de código. Clonarlo
+# aparte dentro de esta carpeta (ver README.md).
+data/
+
 # Config local de scripts/deploy-server.sh y scripts/logs.sh — nunca trackear:
 # terminó commiteado una vez (eccc85d) con DEPLOY_SSH_USER=root, rompiendo el
 # guard anti-root del propio script y el pipeline de CD por ~14 horas.

@@ -61,6 +61,14 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
+### 1.1. Clonar los datos maestros (repo independiente)
+`data/` (organizaciones, facturas de distribuidora) vive en un repositorio git
+separado, no submódulo, para desacoplar su historial del de código:
+```bash
+git clone git@github.com:datamaq-automation/datamaq-data.git data
+```
+Requiere acceso al repo `datamaq-automation/datamaq-data` (privado).
+
 ### 2. Configurar variables de entorno
 Copia el archivo `.env.example` a `.env` y edita tus credenciales de MySQL y MQTT:
 ```bash

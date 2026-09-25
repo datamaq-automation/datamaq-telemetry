@@ -20,6 +20,13 @@ jobs:
       - name: "Guard: sin .env reales trackeados (D-2)"
         run: bash scripts/guard_secrets.sh
 
+      - name: Checkout datamaq-data (repo independiente de datos maestros)
+        uses: actions/checkout@v7
+        with:
+          repository: datamaq-automation/datamaq-data
+          ssh-key: ${{ secrets.SSH_DEPLOY_KEY_DATA }}
+          path: data
+
       - name: Detectar cambios de configuración (GitOps) vs código de producto
         id: changes
         run: |

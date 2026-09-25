@@ -66,6 +66,15 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
     echo "==> Instalando dependencias..."
     ./.venv/bin/pip install -r requirements.txt
 
+    echo "==> Actualizando datos maestros (repo independiente datamaq-data)..."
+    if [ -d "data/.git" ]; then
+        git -C data pull --ff-only
+    elif [ -d "data" ] && [ -n "$(ls -A data 2>/dev/null)" ]; then
+        echo "ADVERTENCIA: data/ existe pero no es un repo git (¿migración no aplicada?). Se omite la actualización."
+    else
+        git clone git@github.com-datamaq-data:datamaq-automation/datamaq-data.git data
+    fi
+
     echo "==> Backup de la base antes de migrar (D-5)..."
     source .env
     BACKUP_DIR="/tmp/datamaq-telemetry-pre-migracion"
