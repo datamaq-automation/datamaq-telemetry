@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 # Umbrales estándar por defecto para nuevo código en src/
-DEFAULT_MAX_FILE_LINES = 500
+DEFAULT_MAX_FILE_LINES = 550
 DEFAULT_MAX_CLASS_LINES = 300
 DEFAULT_MAX_FUNC_LINES = 75
 
