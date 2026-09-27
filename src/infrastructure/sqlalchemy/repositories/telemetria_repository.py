@@ -452,3 +452,18 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
         deleted = self.db.query(DeviceAlertModel).filter(DeviceAlertModel.id.in_(ids)).delete(synchronize_session=False)
         self.db.commit()
         return deleted
+
+    def guardar_anomalia(self, device_id: str, error_s: float, recorded_at: datetime) -> None:
+        """Guarda flag de coherencia baja (Capa 1: detección en ingesta)."""
+        from src.infrastructure.sqlalchemy.models import TelemetriaAnomaliaModel
+
+        anomalia = TelemetriaAnomaliaModel(
+            device_id=device_id,
+            recorded_at=recorded_at,
+            error_s=error_s,
+            flag_tipo="coherencia_baja",
+            contador_consecutivos=1,
+            estado="active",
+        )
+        self.db.add(anomalia)
+        self.db.commit()

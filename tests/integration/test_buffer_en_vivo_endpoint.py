@@ -116,6 +116,9 @@ class _RepoTelemetriaFakeSoloDb(RepositorioTelemetriaPort):
     def purgar_alertas_resueltas_anteriores_a(self, fecha_limite: datetime, batch_size: int = 1000) -> int:
         return 0
 
+    def guardar_anomalia(self, device_id: str, error_s: float, recorded_at: datetime) -> None:
+        pass
+
 
 def test_recarga_de_pagina_recupera_lectura_en_vivo_no_persistida_todavia():
     dispositivo = Dispositivo(id="dev-e2e-1", device_uid=MacAddress("D48C49F03564"), nombre="Medidor E2E")

@@ -12,9 +12,11 @@ erDiagram
     DEVICES ||--o{ CHARACTERIZATION_CAMPAIGNS : "FK_device_id"
     DEVICES ||--o{ DEVICE_ALERTS : "FK_device_id"
     DEVICES ||--o{ DEVICE_STATUS_LOGS : "FK_device_id"
+    DEVICES ||--o{ DISPOSITIVO_DIAGNOSTICOS : "FK_device_id"
     DEVICES ||--o{ LOADS : "FK_device_id"
     DEVICES ||--o{ LOAD_ACTIVITY_INTERVALS : "FK_device_id"
     DEVICES ||--o{ MACHINES : "FK_device_id"
+    DEVICES ||--o{ TELEMETRIA_ANOMALIAS : "FK_device_id"
     DEVICES ||--o{ TELEMETRY_ENERGY : "FK_device_id"
     DEVICES ||--o{ TELEMETRY_INSTANTANEOUS : "FK_device_id"
     FACILITIES ||--o{ DEVICES : "FK_facility_id"
@@ -123,6 +125,21 @@ erDiagram
         boolean penalizacion_reactiva_aplica
         datetime created_at
         datetime updated_at
+    }
+
+    DISPOSITIVO_DIAGNOSTICOS {
+        bigint id PK
+        string device_id FK
+        datetime ejecutado_en
+        string config_actual
+        boolean config_actual_invertido
+        string top_candidato
+        boolean top_candidato_invertido
+        float top_score
+        int registros_analizados
+        boolean mismatch
+        boolean alerta_enviada
+        datetime creado_en
     }
 
     DISPOSITIVOS_CONFIABLES {
@@ -248,6 +265,18 @@ erDiagram
         string reason
         string created_by_user_id
         datetime created_at
+    }
+
+    TELEMETRIA_ANOMALIAS {
+        bigint id PK
+        string device_id FK
+        datetime recorded_at
+        float error_s
+        string flag_tipo
+        int contador_consecutivos
+        string estado
+        datetime creado_en
+        datetime actualizado_en
     }
 
     TELEMETRY_ENERGY {
@@ -470,6 +499,26 @@ erDiagram
 **Índices:**
 - `ix_devices_device_uid` (UNIQUE): (`device_uid`)
 
+### Tabla `dispositivo_diagnosticos`
+
+| Columna | Tipo SQL | Clave / Restricción | Nullable |
+| :--- | :--- | :--- | :--- |
+| `id` | `BIGINT` | **PRIMARY KEY** | No |
+| `device_id` | `VARCHAR(36)` | FK -> `devices.id` | No |
+| `ejecutado_en` | `DATETIME` | - | No |
+| `config_actual` | `VARCHAR(50)` | - | Sí |
+| `config_actual_invertido` | `BOOLEAN` | - | Sí |
+| `top_candidato` | `VARCHAR(50)` | - | Sí |
+| `top_candidato_invertido` | `BOOLEAN` | - | Sí |
+| `top_score` | `FLOAT` | - | Sí |
+| `registros_analizados` | `INTEGER` | - | Sí |
+| `mismatch` | `BOOLEAN` | - | Sí |
+| `alerta_enviada` | `BOOLEAN` | - | No |
+| `creado_en` | `DATETIME` | - | No |
+
+**Índices:**
+- `idx_diagnosticos_device_ejecutado`: (`device_id`, `ejecutado_en`)
+
 ### Tabla `dispositivos_confiables`
 
 | Columna | Tipo SQL | Clave / Restricción | Nullable |
@@ -629,6 +678,24 @@ erDiagram
 
 **Índices:**
 - `idx_scheduled_stops_machine_range`: (`machine_id`, `start_at`, `end_at`)
+
+### Tabla `telemetria_anomalias`
+
+| Columna | Tipo SQL | Clave / Restricción | Nullable |
+| :--- | :--- | :--- | :--- |
+| `id` | `BIGINT` | **PRIMARY KEY** | No |
+| `device_id` | `VARCHAR(36)` | FK -> `devices.id` | No |
+| `recorded_at` | `DATETIME` | - | No |
+| `error_s` | `FLOAT` | - | No |
+| `flag_tipo` | `VARCHAR(15)` | - | No |
+| `contador_consecutivos` | `INTEGER` | - | No |
+| `estado` | `VARCHAR(8)` | - | No |
+| `creado_en` | `DATETIME` | - | No |
+| `actualizado_en` | `DATETIME` | - | No |
+
+**Índices:**
+- `idx_anomalias_device_recorded`: (`device_id`, `recorded_at`)
+- `idx_anomalias_estado`: (`estado`)
 
 ### Tabla `telemetry_energy`
 

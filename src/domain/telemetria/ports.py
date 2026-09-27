@@ -188,6 +188,11 @@ class RepositorioTelemetriaPort(ABC):
     def obtener_alerta_por_id(self, alerta_id: int) -> AlertaDispositivo | None:
         pass
 
+    @abstractmethod
+    def guardar_anomalia(self, device_id: str, error_s: float, recorded_at: datetime) -> None:
+        """Guarda flag de coherencia baja en telemetria_anomalias (Capa 1)."""
+        pass
+
 
 class RepositorioOrganizacionesPort(ABC):
     """Lectura del modelo declarativo de activos (`data/organizaciones.yml`).

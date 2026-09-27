@@ -304,6 +304,7 @@ class IngestarTelemetriaUseCase:
             if errores:
                 max_error = max(errores)
                 if max_error > 15.0:  # Umbral: 15%
+                    self.repo_telemetria.guardar_anomalia(dispositivo_id, max_error, recorded_at)
                     if self.logger:
                         self.logger.warning(
                             "coherencia_baja_detectada",

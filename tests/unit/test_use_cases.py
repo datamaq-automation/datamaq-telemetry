@@ -205,6 +205,9 @@ class MockTelemetriaRepo(RepositorioTelemetriaPort):
         ]
         return prev - len(self.alertas)
 
+    def guardar_anomalia(self, device_id: str, error_s: float, recorded_at: datetime) -> None:
+        pass
+
 
 class MockLogger(LoggerPort):
     def __init__(self):

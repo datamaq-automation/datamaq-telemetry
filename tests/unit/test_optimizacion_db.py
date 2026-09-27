@@ -308,6 +308,9 @@ class MockTelemetriaRepo(RepositorioTelemetriaPort):
         ]
         return prev - len(self.alertas)
 
+    def guardar_anomalia(self, device_id: str, error_s: float, recorded_at: datetime) -> None:
+        pass
+
 
 def test_downsampling_ingesta_5min():
     # Limpiar estado estático entre tests
