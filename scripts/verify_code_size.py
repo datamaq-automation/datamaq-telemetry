@@ -37,7 +37,7 @@ BASELINE_CEILINGS: dict[str, int] = {
     "class:src/application/mappers/payload_telemetria_parser.py::TelemetriaPayloadParser": 320,
     "class:src/domain/telemetria/servicios/evaluador_alertas_calidad.py::EvaluadorAlertasCalidadService": 400,
     "class:src/domain/telemetria/servicios/analizador_calidad_metrologica.py::AnalizadorMetrologicoService": 310,
-    "class:src/infrastructure/sqlalchemy/repositories/telemetria_repository.py::MySQLTelemetriaRepository": 450,
+    "class:src/infrastructure/sqlalchemy/repositories/telemetria_repository.py::MySQLTelemetriaRepository": 460,
     # Métodos y Funciones
     "func:src/domain/telemetria/servicios/analizador_calidad_metrologica.py::calcular_analitica_completa": 90,
     "func:src/domain/telemetria/servicios/evaluador_alertas_calidad.py::evaluar_alertas_distorsion_armonica": 120,

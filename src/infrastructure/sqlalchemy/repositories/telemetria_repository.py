@@ -467,3 +467,21 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
         )
         self.db.add(anomalia)
         self.db.commit()
+
+    def obtener_error_promedio(self, device_id: str, desde: datetime, hasta: datetime) -> float | None:
+        """Calcula promedio de error_s en rango (Capa 2: Gauntlet)."""
+        from sqlalchemy import func
+
+        from src.infrastructure.sqlalchemy.models import TelemetriaAnomaliaModel
+
+        result = (
+            self.db.query(func.avg(TelemetriaAnomaliaModel.error_s))
+            .filter(
+                TelemetriaAnomaliaModel.device_id == device_id,
+                TelemetriaAnomaliaModel.recorded_at >= desde,
+                TelemetriaAnomaliaModel.recorded_at <= hasta,
+            )
+            .scalar()
+        )
+
+        return float(result) if result is not None else None

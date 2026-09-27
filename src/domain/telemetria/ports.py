@@ -193,6 +193,14 @@ class RepositorioTelemetriaPort(ABC):
         """Guarda flag de coherencia baja en telemetria_anomalias (Capa 1)."""
         pass
 
+    @abstractmethod
+    def obtener_error_promedio(self, device_id: str, desde: datetime, hasta: datetime) -> float | None:
+        """Calcula promedio de error_s en rango (Capa 2: Gauntlet).
+
+        Devuelve None si sin datos en el rango.
+        """
+        pass
+
 
 class RepositorioOrganizacionesPort(ABC):
     """Lectura del modelo declarativo de activos (`data/organizaciones.yml`).

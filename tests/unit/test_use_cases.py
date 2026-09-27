@@ -208,6 +208,9 @@ class MockTelemetriaRepo(RepositorioTelemetriaPort):
     def guardar_anomalia(self, device_id: str, error_s: float, recorded_at: datetime) -> None:
         pass
 
+    def obtener_error_promedio(self, device_id: str, desde: datetime, hasta: datetime) -> float | None:
+        return None
+
 
 class MockLogger(LoggerPort):
     def __init__(self):
