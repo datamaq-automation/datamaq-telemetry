@@ -14,12 +14,24 @@ jobs:
   deploy:
     name: Desplegar al VPS
     runs-on: ubuntu-latest
+    # Dependencia explícita: deploy espera a que CI termine con éxito
+    # Protección: no corre si CI falla o está en progreso
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     environment: production
     concurrency:
       group: deploy-telemetry
       cancel-in-progress: false
     steps:
+      - name: Verificar que CI pasó
+        if: ${{ github.event_name != 'workflow_dispatch' }}
+        run: |
+          echo "✓ Deplegando después de CI exitoso"
+          echo "Workflow run conclusion: ${{ github.event.workflow_run.conclusion }}"
+          if [ "${{ github.event.workflow_run.conclusion }}" != "success" ]; then
+            echo "✗ ERROR: CI no pasó (conclusion: ${{ github.event.workflow_run.conclusion }})"
+            exit 1
+          fi
+
       - name: Checkout
         uses: actions/checkout@v7
 

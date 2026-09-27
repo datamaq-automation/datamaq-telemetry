@@ -44,15 +44,28 @@ jobs:
           echo "Archivos modificados detectados:"
           echo "$CHANGED_FILES"
 
-          ES_SOLO_CONFIG=false
+          # Modo GitOps: SOLO si todos los cambios son config/docs (sin .py, .sh, .txt productivos)
+          # Criterio: Si hay cualquier archivo .py, .sh, .toml, .txt → Gauntlet completo
+          ES_SOLO_CONFIG=true
+          if echo "$CHANGED_FILES" | grep -qE "\.py$|\.sh$|\.toml$|requirements\.txt|\.txt$"; then
+            # Si encontramos archivos productivos → gauntlet completo
+            ES_SOLO_CONFIG=false
+          fi
+
+          echo "Archivos encontrados:"
           if [ -n "$CHANGED_FILES" ]; then
-            if ! echo "$CHANGED_FILES" | grep -qvE "^data/|^docs/|\.md$|^tests/unit/test_yaml_|^tests/unit/test_verificador_unifilar"; then
-              ES_SOLO_CONFIG=true
+            echo "$CHANGED_FILES" | head -20
+            if echo "$CHANGED_FILES" | grep -qE "\.py$|\.sh$"; then
+              echo "→ Cambios en código productivo detectados"
             fi
           fi
 
           echo "is_config_only=$ES_SOLO_CONFIG" >> "$GITHUB_OUTPUT"
-          echo "Modo detectado: is_config_only=$ES_SOLO_CONFIG"
+          if [ "$ES_SOLO_CONFIG" = "true" ]; then
+            echo "✓ Modo GitOps: Solo cambios de configuración/docs"
+          else
+            echo "→ Modo Gauntlet Completo: Cambios en código de producto"
+          fi
 
       - name: Setup Python 3.12
         uses: actions/setup-python@v5
