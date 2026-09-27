@@ -1,5 +1,6 @@
 """src/application/use_cases/ingestar_telemetria.py."""
 
+import math
 import threading
 from datetime import datetime
 from typing import Any, ClassVar
@@ -184,6 +185,8 @@ class IngestarTelemetriaUseCase:
             self.repo_telemetria.guardar_instantanea(lectura)
             with self._lock:
                 self._ultimas_persistencias[dispositivo.id] = recorded_at
+            # Capa 1: Validar coherencia fasorial
+            self._validar_coherencia_instantanea(lectura, dispositivo.id, recorded_at)
 
         if self.logger:
             fp_tot = lectura.factor_potencia_total.valor if lectura.factor_potencia_total else None
@@ -271,6 +274,46 @@ class IngestarTelemetriaUseCase:
     ) -> None:
         alerta = TelemetriaPayloadParser.parsear_alerta_evento(payload, dispositivo.id)
         self.repo_telemetria.guardar_alerta(alerta)
+
+    def _validar_coherencia_instantanea(
+        self,
+        lectura: Any,
+        dispositivo_id: str,
+        recorded_at: datetime,
+    ) -> None:
+        """Capa 1: Valida coherencia fasorial. Flag si error_s > 15%."""
+        try:
+            errores = []
+            for fase in ["r", "s", "t"]:
+                p = getattr(lectura, f"potencia_activa_{fase}", None)
+                q = getattr(lectura, f"potencia_reactiva_{fase}", None)
+                s = getattr(lectura, f"potencia_aparente_{fase}", None)
+
+                if p is None or q is None or s is None:
+                    continue
+
+                p_val = float(p.vatios) if hasattr(p, "vatios") else float(p)
+                q_val = float(q.var) if hasattr(q, "var") else float(q)
+                s_val = float(s.va) if hasattr(s, "va") else float(s)
+
+                s_teorica = math.sqrt(p_val**2 + q_val**2)
+                if s_teorica > 0:
+                    error_pct = 100.0 * abs(s_val - s_teorica) / s_teorica
+                    errores.append(error_pct)
+
+            if errores:
+                max_error = max(errores)
+                if max_error > 15.0:  # Umbral: 15%
+                    if self.logger:
+                        self.logger.warning(
+                            "coherencia_baja_detectada",
+                            device_id=dispositivo_id,
+                            error_s_pct=round(max_error, 2),
+                            recorded_at=recorded_at.isoformat(),
+                        )
+        except Exception as e:
+            if self.logger:
+                self.logger.error("error_validar_coherencia", error=str(e))
 
 
 __all__ = [
