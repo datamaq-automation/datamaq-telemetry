@@ -263,3 +263,44 @@ class MetadatosPlaca:
     corriente_barra_a: float | None = None
     proteccion_in_a: float | None = None
     datos_adicionales: dict[str, Any] | None = None
+
+
+@dataclass(frozen=True)
+class MedicionFase:
+    """Medición de potencias y factor de una fase (P, Q, S, FP).
+
+    Value object inmutable para un punto en el tiempo de una fase específica.
+    """
+
+    p: float | None = None
+    q: float | None = None
+    s: float | None = None
+    fp: float | None = None
+
+
+@dataclass(frozen=True)
+class CandidatoTI:
+    """Candidato de configuración de TI (orden de fases e inversión) con score.
+
+    Resultado del ranking de diagnóstico: representa una hipótesis sobre cómo
+    deben estar ordenadas las fases y si la polaridad está invertida.
+    """
+
+    orden_fases: tuple[str, ...]
+    invertido: bool
+    score: float
+    justificacion: str
+
+    def posicion(self) -> str:
+        """Representación legible: orden + (INV) si aplica."""
+        inv_str = " (INV)" if self.invertido else ""
+        return f"{','.join(self.orden_fases)}{inv_str}"
+
+    def __post_init__(self) -> None:
+        if self.score < 0.0 or self.score > 1.0:
+            raise ValueError(f"Score fuera de rango [0.0, 1.0]: {self.score}")
+        if not (1 <= len(self.orden_fases) <= 3):
+            raise ValueError(f"Orden de fases debe tener 1-3 elementos: {self.orden_fases}")
+        for fase in self.orden_fases:
+            if fase not in ("R", "S", "T"):
+                raise ValueError(f"Fase inválida (debe ser R, S o T): {fase}")
