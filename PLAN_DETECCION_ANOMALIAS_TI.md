@@ -62,24 +62,24 @@ CREATE TABLE dispositivo_diagnosticos (
 def _validar_coherencia_fasorial(self, registro: dict) -> bool:
     """
     Calcula error_s para cada fase y retorna si flag debe activarse.
-    
+
     Args:
         registro: dict con p_r, q_r, s_r, p_s, q_s, s_s, etc.
-    
+
     Returns:
         bool: True si error_s > 15% en cualquier fase
     """
     errores = []
-    for fase in ['r', 's', 't']:
-        p = registro.get(f'active_power_{fase}')
-        q = registro.get(f'reactive_power_{fase}')
-        s_medida = registro.get(f'apparent_power_{fase}')
-        
+    for fase in ["r", "s", "t"]:
+        p = registro.get(f"active_power_{fase}")
+        q = registro.get(f"reactive_power_{fase}")
+        s_medida = registro.get(f"apparent_power_{fase}")
+
         if p is not None and q is not None and s_medida is not None:
             s_teorica = math.sqrt(p**2 + q**2)
             error_pct = 100 * abs(s_medida - s_teorica) / s_teorica if s_teorica > 0 else 0
             errores.append(error_pct)
-    
+
     max_error = max(errores) if errores else 0
     return max_error > 15.0  # Umbral 15%
 ```
@@ -95,26 +95,29 @@ if _validar_coherencia_fasorial(registro):
         device_id=dispositivo_id,
         recorded_at=timestamp,
         error_s=max_error,
-        flag_tipo='coherencia_baja',
-        contador_consecutivos=1
+        flag_tipo="coherencia_baja",
+        contador_consecutivos=1,
     )
     db.add(anomalia)
-    
+
     # Contar consecutivos para escalada
-    ultimas_10 = db.query(TelemetriaAnomalia)\
-        .filter(TelemetriaAnomalia.device_id == dispositivo_id)\
-        .filter(TelemetriaAnomalia.flag_tipo == 'coherencia_baja')\
-        .order_by(desc(TelemetriaAnomalia.recorded_at))\
-        .limit(10).all()
-    
+    ultimas_10 = (
+        db.query(TelemetriaAnomalia)
+        .filter(TelemetriaAnomalia.device_id == dispositivo_id)
+        .filter(TelemetriaAnomalia.flag_tipo == "coherencia_baja")
+        .order_by(desc(TelemetriaAnomalia.recorded_at))
+        .limit(10)
+        .all()
+    )
+
     if len(ultimas_10) >= 10:
         # Marcar dispositivo como WARN
-        dispositivo.estado_coherencia = 'WARN'
+        dispositivo.estado_coherencia = "WARN"
         logger.warning(f"WARN: {dispositivo_id} tiene 10+ flags consecutivos")
-    
+
     if len(ultimas_10) >= 100:  # 1+ día si cada 15min
         # Marcar como ERROR
-        dispositivo.estado_coherencia = 'ERROR'
+        dispositivo.estado_coherencia = "ERROR"
         logger.error(f"ERROR: {dispositivo_id} degradación crítica (100+ flags)")
 ```
 
@@ -147,47 +150,41 @@ def test_coherencia_dispositivos_vs_baseline():
     session = get_session_factory()()
     repo_disp = MySQLDispositivosRepository(session)
     repo_tele = MySQLTelemetriaRepository(session)
-    
+
     dispositivos = repo_disp.listar()  # Todos
-    
+
     resultados = []
     for dispositivo in dispositivos:
         # Últimas 24h
         ahora = datetime.now(timezone.utc)
         hace_24h = ahora - timedelta(hours=24)
-        
-        mediciones_24h = repo_tele.obtener_por_rango(
-            dispositivo_id=dispositivo.device_id,
-            inicio=hace_24h,
-            fin=ahora
-        )
-        
+
+        mediciones_24h = repo_tele.obtener_por_rango(dispositivo_id=dispositivo.device_id, inicio=hace_24h, fin=ahora)
+
         coherencia_24h = _calcular_coherencia_promedio(mediciones_24h)
-        
+
         # Baseline últimos 7 días
         hace_7d = ahora - timedelta(days=7)
-        mediciones_7d = repo_tele.obtener_por_rango(
-            dispositivo_id=dispositivo.device_id,
-            inicio=hace_7d,
-            fin=ahora
-        )
+        mediciones_7d = repo_tele.obtener_por_rango(dispositivo_id=dispositivo.device_id, inicio=hace_7d, fin=ahora)
         coherencia_baseline = _calcular_coherencia_promedio(mediciones_7d)
-        
+
         # Comparar
         degradacion_pct = (coherencia_baseline - coherencia_24h) / coherencia_baseline * 100
-        
-        resultados.append({
-            'device_id': dispositivo.device_id,
-            'coherencia_24h': coherencia_24h,
-            'baseline_7d': coherencia_baseline,
-            'degradacion_pct': degradacion_pct,
-            'ok': degradacion_pct <= 20.0  # Umbral 20%
-        })
-    
+
+        resultados.append(
+            {
+                "device_id": dispositivo.device_id,
+                "coherencia_24h": coherencia_24h,
+                "baseline_7d": coherencia_baseline,
+                "degradacion_pct": degradacion_pct,
+                "ok": degradacion_pct <= 20.0,  # Umbral 20%
+            }
+        )
+
     # FAIL si alguno excede umbral
-    fallos = [r for r in resultados if not r['ok']]
+    fallos = [r for r in resultados if not r["ok"]]
     assert not fallos, f"Degradación detectada:\n{fallos}"
-    
+
     # Guardar reporte CSV en artifact para auditoría
     _guardar_reporte_coherencia(resultados)
 ```
@@ -198,26 +195,26 @@ def test_coherencia_dispositivos_vs_baseline():
 def _calcular_coherencia_promedio(mediciones: list[dict]) -> float:
     """
     Calcula score de coherencia promedio: 1 - (error_s_promedio / 100)
-    
+
     Score 1.0 = perfecto
     Score 0.8 = 20% error promedio (bueno)
     Score 0.5 = 50% error promedio (malo)
     """
     if not mediciones:
         return 0.0
-    
+
     errores = []
     for med in mediciones:
-        for fase in ['r', 's', 't']:
-            p = med.get(f'p_{fase}')
-            q = med.get(f'q_{fase}')
-            s = med.get(f's_{fase}')
-            
+        for fase in ["r", "s", "t"]:
+            p = med.get(f"p_{fase}")
+            q = med.get(f"q_{fase}")
+            s = med.get(f"s_{fase}")
+
             if p and q and s:
                 s_teorica = math.sqrt(p**2 + q**2)
                 error = 100 * abs(s - s_teorica) / s_teorica if s_teorica > 0 else 0
                 errores.append(error)
-    
+
     error_promedio = sum(errores) / len(errores) if errores else 0
     return max(0.0, 1.0 - error_promedio / 100.0)  # Clamp a [0, 1]
 ```
@@ -243,6 +240,7 @@ def _calcular_coherencia_promedio(mediciones: list[dict]) -> float:
 ```python
 # scripts/job_diagnostico_semanal.py
 
+
 def ejecutar_diagnostico_semanal():
     """
     Ejecuta cada lunes a las 3 AM:
@@ -252,65 +250,67 @@ def ejecutar_diagnostico_semanal():
     4. Si mismatch + score > 0.95 → alertar ops
     """
     session_factory = get_session_factory()
-    
+
     with session_factory() as session:
         repo_disp = MySQLDispositivosRepository(session)
         dispositivos = repo_disp.listar()
-        
+
         alertas = []
-        
+
         for dispositivo in dispositivos:
             if not dispositivo.fases_con_ti:
                 continue  # No tiene TI
-            
+
             # Ejecutar diagnóstico
             adapter = TelemetriaDiagnosticoAdapter(session)
             service = EjecutarDiagnosticoTIApplicationService(adapter)
-            
-            fases = tuple(f.strip().upper() for f in dispositivo.fases_con_ti.split(','))
+
+            fases = tuple(f.strip().upper() for f in dispositivo.fases_con_ti.split(","))
             result = service.ejecutar(
                 dispositivo_id=dispositivo.device_id,
                 fases_con_ti=fases,
-                periodo_horas=24*7  # 7 días
+                periodo_horas=24 * 7,  # 7 días
             )
-            
+
             if result.error or not result.candidatos:
                 continue
-            
+
             top = result.candidatos[0]
-            
+
             # Guardar en BD
             diagnostico = DispositivoDiagnostico(
                 device_id=dispositivo.device_id,
                 ejecutado_en=datetime.now(timezone.utc),
-                config_actual=','.join(fases),
+                config_actual=",".join(fases),
                 config_actual_invertido=dispositivo.invertido,
-                top_candidato=','.join(top.orden_fases),
+                top_candidato=",".join(top.orden_fases),
                 top_candidato_invertido=top.invertido,
                 top_score=top.score,
                 registros_analizados=result.registros_analizados,
                 mismatch=(top.orden_fases != fases or top.invertido != dispositivo.invertido),
-                alerta_enviada=False
+                alerta_enviada=False,
             )
             session.add(diagnostico)
-            
+
             # Si mismatch + score alto → alerta
             if diagnostico.mismatch and top.score > 0.95:
-                alertas.append({
-                    'device_id': dispositivo.device_id,
-                    'ubicacion': dispositivo.ubicacion_tag,
-                    'config_actual': f"{','.join(fases)}, inv={dispositivo.invertido}",
-                    'top_candidato': f"{','.join(top.orden_fases)}, inv={top.invertido}",
-                    'score': top.score
-                })
+                alertas.append(
+                    {
+                        "device_id": dispositivo.device_id,
+                        "ubicacion": dispositivo.ubicacion_tag,
+                        "config_actual": f"{','.join(fases)}, inv={dispositivo.invertido}",
+                        "top_candidato": f"{','.join(top.orden_fases)}, inv={top.invertido}",
+                        "score": top.score,
+                    }
+                )
                 diagnostico.alerta_enviada = True
-        
+
         session.commit()
-        
+
         # Enviar alertas a Slack (si webhook disponible)
         if alertas:
             _enviar_alerta_slack(alertas)
-        
+
         logger.info(f"Job semanal completado. {len(alertas)} alertas enviadas.")
 
 
@@ -330,21 +330,22 @@ def _enviar_alerta_slack(alertas: list):
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
+
 def iniciar_scheduler():
     """Inicia scheduler en background."""
     scheduler = BackgroundScheduler()
-    
+
     # Cada lunes a las 3 AM UTC
     scheduler.add_job(
         func=ejecutar_diagnostico_semanal,
         trigger=CronTrigger(day_of_week=0, hour=3, minute=0),  # 0 = Monday
-        id='diagnostico_ti_semanal',
-        name='Diagnóstico TI Semanal'
+        id="diagnostico_ti_semanal",
+        name="Diagnóstico TI Semanal",
     )
-    
+
     scheduler.start()
     logger.info("Scheduler iniciado. Job diagnóstico TI: Lunes 3 AM UTC")
-    
+
     return scheduler
 ```
 
@@ -370,14 +371,15 @@ pip install apscheduler==3.10.4
 
 from src.infrastructure.jobs.scheduler import iniciar_scheduler
 
+
 def create_app():
     app = FastAPI(...)
-    
+
     # Iniciar scheduler en background
     @app.on_event("startup")
     def startup():
         iniciar_scheduler()
-    
+
     return app
 ```
 
