@@ -19,7 +19,11 @@ from src.domain.auth.services import (
 )
 from src.domain.auth.value_objects import NombreUsuario
 from src.domain.telemetria.entities import Suscripcion
-from src.domain.telemetria.ports import RepositorioPlanesPort, RepositorioSuscripcionesPort
+from src.domain.telemetria.ports import (
+    RepositorioOrganizacionesPort,
+    RepositorioPlanesPort,
+    RepositorioSuscripcionesPort,
+)
 from src.domain.telemetria.servicios.politicas_suscripcion import PoliticaSuscripcionService
 
 ROLES_VALIDOS = frozenset(
@@ -49,6 +53,7 @@ class AutenticarUsuarioUseCase:
         acceso_plantas: GestionarAccesoPlantasUseCase | None = None,
         repo_suscripciones: RepositorioSuscripcionesPort | None = None,
         repo_planes: RepositorioPlanesPort | None = None,
+        repo_organizaciones: RepositorioOrganizacionesPort | None = None,
     ):
         self.repo_usuarios = repo_usuarios
         self.hash_service = hash_service
@@ -60,6 +65,7 @@ class AutenticarUsuarioUseCase:
         self.acceso_plantas = acceso_plantas
         self.repo_suscripciones = repo_suscripciones
         self.repo_planes = repo_planes
+        self.repo_organizaciones = repo_organizaciones
 
     def _registrar_intento(self, clave: str) -> None:
         if self.rate_limiter is not None:
@@ -165,8 +171,13 @@ class AutenticarUsuarioUseCase:
 
         org_id = claims.get("org") or (user.organizacion_id if user else None)
         org_nombre = None
+        es_cooperativa = False
         if user and user.organizacion_id:
             org_id = user.organizacion_id
+        if org_id and self.repo_organizaciones:
+            org = self.repo_organizaciones.obtener_por_id(org_id)
+            if org:
+                es_cooperativa = org.es_cooperativa
 
         plantas = []
         if self.acceso_plantas is not None:
@@ -180,6 +191,7 @@ class AutenticarUsuarioUseCase:
             totp_enabled=totp_enabled,
             organizacion_id=org_id,
             organizacion_nombre=org_nombre,
+            es_cooperativa=es_cooperativa,
             plantas=plantas,
             planta_activa_id=GestionarAccesoPlantasUseCase.planta_activa(plantas),
             plan_nombre=plan_nombre,

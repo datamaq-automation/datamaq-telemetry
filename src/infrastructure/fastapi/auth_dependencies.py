@@ -86,6 +86,7 @@ def get_auth_use_case(
         acceso_plantas=acceso_plantas,
         repo_suscripciones=MySQLSuscripcionesRepository(db),
         repo_planes=MySQLPlanesRepository(db),
+        repo_organizaciones=YamlOrganizacionesRepository(),
     )
 
 

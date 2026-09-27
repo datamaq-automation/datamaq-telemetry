@@ -59,6 +59,7 @@ class MeResponseDTO(BaseModel):
     totp_enabled: bool = False
     organizacion_id: str | None = None
     organizacion_nombre: str | None = None
+    es_cooperativa: bool = False
     plantas: list[PlantaAccesoDTO] = Field(default_factory=list)
     planta_activa_id: str | None = None
     plan_nombre: str | None = None
