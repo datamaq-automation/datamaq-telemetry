@@ -170,6 +170,7 @@ class TelemetryInstantaneousModel(Base):
     thd_v_promedio_porcentaje: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     thd_i_total_porcentaje: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
 
+    es_dato_confiable: Mapped[bool] = mapped_column(default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
 
     device: Mapped["DeviceModel"] = relationship(back_populates="instantaneous_readings")

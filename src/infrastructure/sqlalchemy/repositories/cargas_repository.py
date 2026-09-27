@@ -154,6 +154,7 @@ class MySQLSeriePotenciaRepository(RepositorioSeriePotenciaPort):
             TelemetryInstantaneousModel.device_id == dispositivo_id,
             TelemetryInstantaneousModel.recorded_at >= desde,
             TelemetryInstantaneousModel.total_active_power.isnot(None),
+            TelemetryInstantaneousModel.es_dato_confiable.is_(True),
         )
         if hasta is not None:
             q = q.filter(TelemetryInstantaneousModel.recorded_at <= hasta)

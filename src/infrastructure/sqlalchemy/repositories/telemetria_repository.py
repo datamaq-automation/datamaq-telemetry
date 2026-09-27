@@ -248,7 +248,10 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
     def obtener_ultima_instantanea(self, dispositivo_id: str) -> LecturaInstantanea | None:
         m = (
             self.db.query(TelemetryInstantaneousModel)
-            .filter(TelemetryInstantaneousModel.device_id == dispositivo_id)
+            .filter(
+                TelemetryInstantaneousModel.device_id == dispositivo_id,
+                TelemetryInstantaneousModel.es_dato_confiable.is_(True),
+            )
             .order_by(desc(TelemetryInstantaneousModel.recorded_at))
             .first()
         )
@@ -266,7 +269,10 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
     def listar_instantaneas(
         self, dispositivo_id: str, limite: int, desde: datetime | None = None, hasta: datetime | None = None
     ) -> list[LecturaInstantanea]:
-        q = self.db.query(TelemetryInstantaneousModel).filter(TelemetryInstantaneousModel.device_id == dispositivo_id)
+        q = self.db.query(TelemetryInstantaneousModel).filter(
+            TelemetryInstantaneousModel.device_id == dispositivo_id,
+            TelemetryInstantaneousModel.es_dato_confiable.is_(True),
+        )
         if desde:
             q = q.filter(TelemetryInstantaneousModel.recorded_at >= desde)
         if hasta:
@@ -286,7 +292,8 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
         while emitidos < limite:
             lote = min(chunk_size, limite - emitidos)
             q = self.db.query(TelemetryInstantaneousModel).filter(
-                TelemetryInstantaneousModel.device_id == dispositivo_id
+                TelemetryInstantaneousModel.device_id == dispositivo_id,
+                TelemetryInstantaneousModel.es_dato_confiable.is_(True),
             )
             if desde:
                 q = q.filter(TelemetryInstantaneousModel.recorded_at >= desde)
@@ -522,6 +529,7 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
             TelemetryInstantaneousModel.recorded_at >= desde,
             TelemetryInstantaneousModel.recorded_at <= hasta,
             TelemetryInstantaneousModel.total_active_power.isnot(None),
+            TelemetryInstantaneousModel.es_dato_confiable.is_(True),
         )
         query = query.group_by(bucket_expr).order_by(bucket_expr)
 
