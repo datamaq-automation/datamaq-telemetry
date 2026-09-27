@@ -332,6 +332,7 @@ erDiagram
         decimal thd_i_t
         decimal thd_v_promedio_porcentaje
         decimal thd_i_total_porcentaje
+        boolean es_dato_confiable
         datetime created_at
     }
 
@@ -761,6 +762,7 @@ erDiagram
 | `thd_i_t` | `NUMERIC(5, 2)` | - | Sí |
 | `thd_v_promedio_porcentaje` | `NUMERIC(5, 2)` | - | Sí |
 | `thd_i_total_porcentaje` | `NUMERIC(5, 2)` | - | Sí |
+| `es_dato_confiable` | `BOOLEAN` | - | No |
 | `created_at` | `DATETIME` | - | No |
 
 **Índices:**
