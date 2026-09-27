@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Diagnóstico de orden de fases e inversión de TI analizando histórico de datos.
 
-Rankea 6 candidatos de configuración (3 órdenes × 2 polaridades) por coherencia fasorial.
+Rankea 6 candidatos de configuración (3 órdenes x 2 polaridades) por coherencia fasorial.
 
 Uso:
   venv/bin/python scripts/diagnosticar_ti.py \\
@@ -19,14 +19,14 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from src.application.adapters.telemetria_diagnostico_adapter import (
+from src.application.adapters.telemetria_diagnostico_adapter import (  # noqa: E402
     TelemetriaDiagnosticoAdapter,
 )
-from src.application.services.diagnostico_ti_app_service import (
+from src.application.services.diagnostico_ti_app_service import (  # noqa: E402
     EjecutarDiagnosticoTIApplicationService,
 )
-from src.infrastructure.sqlalchemy.database import get_session_factory
-from src.infrastructure.sqlalchemy.repositories.dispositivos_repository import (
+from src.infrastructure.sqlalchemy.database import get_session_factory  # noqa: E402
+from src.infrastructure.sqlalchemy.repositories.dispositivos_repository import (  # noqa: E402
     MySQLDispositivosRepository,
 )
 

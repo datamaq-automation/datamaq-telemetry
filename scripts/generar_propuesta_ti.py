@@ -18,8 +18,8 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from src.infrastructure.sqlalchemy.database import get_session_factory
-from src.infrastructure.sqlalchemy.repositories.dispositivos_repository import (
+from src.infrastructure.sqlalchemy.database import get_session_factory  # noqa: E402
+from src.infrastructure.sqlalchemy.repositories.dispositivos_repository import (  # noqa: E402
     MySQLDispositivosRepository,
 )
 

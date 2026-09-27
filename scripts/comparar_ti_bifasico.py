@@ -18,11 +18,11 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from sqlalchemy import select
+from sqlalchemy import select  # noqa: E402
 
-from src.infrastructure.sqlalchemy.database import get_session_factory
-from src.infrastructure.sqlalchemy.models import TelemetryInstantaneousModel
-from src.infrastructure.sqlalchemy.repositories.dispositivos_repository import (
+from src.infrastructure.sqlalchemy.database import get_session_factory  # noqa: E402
+from src.infrastructure.sqlalchemy.models import TelemetryInstantaneousModel  # noqa: E402
+from src.infrastructure.sqlalchemy.repositories.dispositivos_repository import (  # noqa: E402
     MySQLDispositivosRepository,
 )
 
@@ -67,20 +67,6 @@ def main() -> int:
 
             inicio = datetime.strptime(args.fecha_inicio, "%Y-%m-%d").replace(tzinfo=timezone.utc)
             fin = datetime.strptime(args.fecha_fin, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-
-            for device_id, dev in [(args.device_a, dev_a), (args.device_b, dev_b)]:
-                stmt = (
-                    select(TelemetryInstantaneousModel)
-                    .where(TelemetryInstantaneousModel.device_id == device_id)
-                    .where(TelemetryInstantaneousModel.recorded_at >= inicio)
-                    .where(TelemetryInstantaneousModel.recorded_at <= fin)
-                )
-                registros = session.execute(stmt).scalars().all()
-
-                q_a, tipo_a = calcular_promedio_q(registros, "total_reactive_power")
-                q_b, tipo_b = calcular_promedio_q(
-                    registros if device_id == args.device_b else [], "total_reactive_power"
-                )
 
             print("\n" + "=" * 100)
             print(f" COMPARATIVA: {dev_a.ubicacion_tag or 'A'} vs. {dev_b.ubicacion_tag or 'B'}")

@@ -158,4 +158,4 @@ class TestEjecutarDiagnosticoTIApplicationService:
         )
 
         assert result.error is None
-        assert len(result.candidatos) <= 4  # max 2 órdenes × 2 polaridades
+        assert len(result.candidatos) <= 4  # max 2 órdenes x 2 polaridades
