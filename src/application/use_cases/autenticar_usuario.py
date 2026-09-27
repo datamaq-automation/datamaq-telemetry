@@ -196,11 +196,11 @@ class AutenticarUsuarioUseCase:
             planta_activa_id=GestionarAccesoPlantasUseCase.planta_activa(plantas),
             plan_nombre=plan_nombre,
             modo_free=modo_free,
-            retention_days=retention_days,
+            retention_days=retention_days or 7,
             notificaciones_habilitadas=notificaciones_habilitadas,
         )
 
-    def _resolver_estado_plan(self, org_id: str | None) -> tuple[str | None, bool, int, bool]:
+    def _resolver_estado_plan(self, org_id: str | None) -> tuple[str | None, bool, int | None, bool]:
         """Consulta en vivo (no embebido en el JWT): el billing es sensible a tiempo, un
         downgrade debe reflejarse en /me sin esperar a que expire el token (D5)."""
         if not org_id or not self.repo_suscripciones:
