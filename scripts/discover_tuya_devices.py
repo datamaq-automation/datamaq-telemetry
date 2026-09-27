@@ -8,11 +8,10 @@ Requisitos:
     pip install tinytuya
 """
 
-import socket
 import ipaddress
-import threading
-from concurrent.futures import ThreadPoolExecutor
+import socket
 import sys
+from concurrent.futures import ThreadPoolExecutor
 
 
 def get_local_network() -> str | None:
@@ -88,7 +87,7 @@ def main() -> None:
         devices = tinytuya.deviceScan(verbose=False)
 
         if devices and len(devices) > 0:
-            print(f"\n  ✅ Dispositivos Tuya encontrados:\n")
+            print("\n  ✅ Dispositivos Tuya encontrados:\n")
             for dev_id, info in sorted(devices.items()):
                 print(f"    📦 Dispositivo: {info.get('name', 'Desconocido')}")
                 print(f"       Device ID:  {dev_id}")
