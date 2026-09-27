@@ -41,6 +41,19 @@ def db_session() -> Iterator[Session]:
         conn.execute(
             text(
                 """
+            CREATE TABLE IF NOT EXISTS telemetry_instantaneous (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                device_id VARCHAR(36) NOT NULL,
+                recorded_at DATETIME NOT NULL,
+                total_active_power DECIMAL(12, 2),
+                FOREIGN KEY(device_id) REFERENCES devices(id) ON DELETE CASCADE
+            )
+            """
+            )
+        )
+        conn.execute(
+            text(
+                """
             CREATE TABLE IF NOT EXISTS telemetria_anomalias (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 device_id VARCHAR(36) NOT NULL,

@@ -122,6 +122,11 @@ class _RepoTelemetriaFakeSoloDb(RepositorioTelemetriaPort):
     def obtener_error_promedio(self, device_id: str, desde: datetime, hasta: datetime) -> float | None:
         return None
 
+    def obtener_potencia_bucketizada_sql(
+        self, device_ids: list[str], desde: datetime, hasta: datetime, bucket_segundos: int = 300
+    ) -> list[float]:
+        return []
+
 
 def test_recarga_de_pagina_recupera_lectura_en_vivo_no_persistida_todavia():
     dispositivo = Dispositivo(id="dev-e2e-1", device_uid=MacAddress("D48C49F03564"), nombre="Medidor E2E")

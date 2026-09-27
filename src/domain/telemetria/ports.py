@@ -201,6 +201,26 @@ class RepositorioTelemetriaPort(ABC):
         """
         pass
 
+    @abstractmethod
+    def obtener_potencia_bucketizada_sql(
+        self, device_ids: list[str], desde: datetime, hasta: datetime, bucket_segundos: int = 300
+    ) -> list[float]:
+        """Bucketiza y suma potencia activa en SQL, retorna lista de valores para percentil.
+
+        Optimización para P99 con retención ilimitada: evita leer todas las lecturas crudas.
+        Cada bucket promedia los registros del intervalo; múltiples dispositivos se suman por bucket.
+
+        Args:
+            device_ids: IDs de dispositivos a agregar (para nodo, múltiples).
+            desde: Inicio de ventana.
+            hasta: Fin de ventana.
+            bucket_segundos: Tamaño del bucket (default 300 = 5 min).
+
+        Returns:
+            Lista de potencias [W] por bucket, lista vacía si sin datos.
+        """
+        pass
+
 
 class RepositorioOrganizacionesPort(ABC):
     """Lectura del modelo declarativo de activos (`data/organizaciones.yml`).

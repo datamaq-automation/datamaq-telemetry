@@ -485,3 +485,45 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
         )
 
         return float(result) if result is not None else None
+
+    def obtener_potencia_bucketizada_sql(
+        self, device_ids: list[str], desde: datetime, hasta: datetime, bucket_segundos: int = 300
+    ) -> list[float]:
+        """Bucketiza y suma potencia activa en SQL, retorna lista de valores para percentil.
+
+        Optimización para P99 con retención ilimitada: evita leer todas las lecturas crudas.
+        Cada bucket promedia los registros del intervalo; múltiples dispositivos se suman por bucket.
+
+        Args:
+            device_ids: IDs de dispositivos a agregar (para nodo, múltiples).
+            desde: Inicio de ventana.
+            hasta: Fin de ventana.
+            bucket_segundos: Tamaño del bucket (default 300 = 5 min).
+
+        Returns:
+            Lista de potencias [W] por bucket, lista vacía si sin datos.
+        """
+        from sqlalchemy.sql import literal_column
+
+        if not device_ids:
+            return []
+
+        dialect = self.db.bind.dialect.name if self.db.bind else "sqlite"
+        if dialect == "mysql":
+            bucket_expr = literal_column(f"FLOOR(UNIX_TIMESTAMP(recorded_at) / {bucket_segundos})")
+        else:
+            bucket_expr = literal_column(f"CAST(STRFTIME('%s', recorded_at) AS INTEGER) / {bucket_segundos}")
+
+        potencia_avg = func.avg(TelemetryInstantaneousModel.total_active_power).label("potencia_w")
+
+        query = self.db.query(bucket_expr, potencia_avg)
+        query = query.filter(
+            TelemetryInstantaneousModel.device_id.in_(device_ids),
+            TelemetryInstantaneousModel.recorded_at >= desde,
+            TelemetryInstantaneousModel.recorded_at <= hasta,
+            TelemetryInstantaneousModel.total_active_power.isnot(None),
+        )
+        query = query.group_by(bucket_expr).order_by(bucket_expr)
+
+        buckets = query.all()
+        return [float(potencia) for _, potencia in buckets if potencia is not None]

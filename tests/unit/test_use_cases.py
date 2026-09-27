@@ -211,6 +211,11 @@ class MockTelemetriaRepo(RepositorioTelemetriaPort):
     def obtener_error_promedio(self, device_id: str, desde: datetime, hasta: datetime) -> float | None:
         return None
 
+    def obtener_potencia_bucketizada_sql(
+        self, device_ids: list[str], desde: datetime, hasta: datetime, bucket_segundos: int = 300
+    ) -> list[float]:
+        return []
+
 
 class MockLogger(LoggerPort):
     def __init__(self):
