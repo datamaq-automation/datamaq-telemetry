@@ -421,3 +421,47 @@ class AuditLogModel(Base):
         Index("idx_audit_actor_fecha", "actor_usuario_id", "registrado_en"),
         Index("idx_audit_recurso", "recurso_tipo", "recurso_id"),
     )
+
+
+class TelemetriaAnomaliaModel(Base):
+    """Flag de coherencia baja en telemetría instantánea (Capa 1: detección ingesta)."""
+
+    __tablename__ = "telemetria_anomalias"
+    __table_args__ = (
+        Index("idx_anomalias_device_recorded", "device_id", "recorded_at"),
+        Index("idx_anomalias_estado", "estado"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    device_id: Mapped[str] = mapped_column(String(36), ForeignKey("devices.id", ondelete="CASCADE"), nullable=False)
+    recorded_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    error_s: Mapped[float] = mapped_column(nullable=False, comment="Error % entre S medida y S teórica")
+    flag_tipo: Mapped[str] = mapped_column(
+        Enum("coherencia_baja", "degradacion", "otros", name="anomalia_tipo"), nullable=False
+    )
+    contador_consecutivos: Mapped[int] = mapped_column(nullable=False, default=1)
+    estado: Mapped[str] = mapped_column(
+        Enum("active", "resolved", name="anomalia_estado"), nullable=False, default="active"
+    )
+    creado_en: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
+    actualizado_en: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, onupdate=ahora_utc, nullable=False)
+
+
+class DispositivoDiagnosticoModel(Base):
+    """Histórico de diagnósticos TI por dispositivo (Capa 3: job semanal)."""
+
+    __tablename__ = "dispositivo_diagnosticos"
+    __table_args__ = (Index("idx_diagnosticos_device_ejecutado", "device_id", "ejecutado_en"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    device_id: Mapped[str] = mapped_column(String(36), ForeignKey("devices.id", ondelete="CASCADE"), nullable=False)
+    ejecutado_en: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    config_actual: Mapped[str | None] = mapped_column(String(50), nullable=True, comment="R,S,T o S,R,T")
+    config_actual_invertido: Mapped[bool | None] = mapped_column(nullable=True)
+    top_candidato: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    top_candidato_invertido: Mapped[bool | None] = mapped_column(nullable=True)
+    top_score: Mapped[float | None] = mapped_column(nullable=True)
+    registros_analizados: Mapped[int | None] = mapped_column(nullable=True)
+    mismatch: Mapped[bool | None] = mapped_column(nullable=True, comment="true si top != actual")
+    alerta_enviada: Mapped[bool] = mapped_column(nullable=False, default=False)
+    creado_en: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
