@@ -19,11 +19,11 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from src.application.adapters.telemetria_diagnostico_adapter import (  # noqa: E402
-    TelemetriaDiagnosticoAdapter,
-)
 from src.application.services.diagnostico_ti_app_service import (  # noqa: E402
     EjecutarDiagnosticoTIApplicationService,
+)
+from src.infrastructure.sqlalchemy.adapters.telemetria_diagnostico_adapter import (  # noqa: E402
+    TelemetriaDiagnosticoAdapter,
 )
 from src.infrastructure.sqlalchemy.database import get_session_factory  # noqa: E402
 from src.infrastructure.sqlalchemy.repositories.dispositivos_repository import (  # noqa: E402

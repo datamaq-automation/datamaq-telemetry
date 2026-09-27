@@ -1,4 +1,4 @@
-"""Adaptador que implementa RepositorioTelemetriaPort para diagnostico_ti_app_service."""
+"""Adaptador SQLAlchemy que implementa RepositorioTelemetriaPort para diagnostico_ti_app_service."""
 
 from __future__ import annotations
 
