@@ -38,6 +38,7 @@ def _lecturas(valores: list[float], inicio: datetime = INICIO) -> list[SimpleNam
             registrado_en=inicio + timedelta(seconds=300 * i),
             potencia_activa_total_W=v,
             potencia_reactiva_total_VAR=None,
+            es_dato_confiable=True,
         )
         for i, v in enumerate(valores)
     ]
@@ -45,9 +46,30 @@ def _lecturas(valores: list[float], inicio: datetime = INICIO) -> list[SimpleNam
 
 
 def _consultar(series: dict[str, list[SimpleNamespace]], corte: datetime = INICIO - timedelta(days=1)) -> MagicMock:
+    def obtener_muestras_bucketizadas(dispositivos_ids, desde, hasta, bucket_segundos=300):
+        """Simula obtener_potencia_bucketizada_sql: suma potencias por dispositivo en cada bucket."""
+        # Crear buckets de 300 s
+        buckets = {}
+        for device_id in dispositivos_ids:
+            if device_id not in series:
+                continue
+            for lectura in series[device_id]:
+                if desde <= lectura.registrado_en <= hasta and lectura.es_dato_confiable:
+                    bucket_key = int(lectura.registrado_en.timestamp() // bucket_segundos)
+                    if bucket_key not in buckets:
+                        buckets[bucket_key] = []
+                    buckets[bucket_key].append(lectura.potencia_activa_total_W)
+
+        # Promediar por bucket
+        return [sum(valores) / len(valores) for valores in buckets.values()]
+
+    repo_telemetria = MagicMock()
+    repo_telemetria.obtener_potencia_bucketizada_sql.side_effect = obtener_muestras_bucketizadas
+
     consultar = MagicMock()
     consultar.listar_instantaneas.side_effect = lambda dispositivo_id, **_: series[dispositivo_id]
-    consultar.datos_desde.return_value = corte
+    consultar.datos_desde.side_effect = lambda dispositivo_id: corte
+    consultar.repo_telemetria = repo_telemetria
     return consultar
 
 
