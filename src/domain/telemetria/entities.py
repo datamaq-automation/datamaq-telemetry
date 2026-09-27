@@ -63,6 +63,7 @@ class Organizacion:
     cuit: str | None = None
     email_contacto: str | None = None
     telefono_contacto: str | None = None
+    es_cooperativa: bool = False
     creado_en: datetime = field(default_factory=ahora_utc)
     actualizado_en: datetime = field(default_factory=ahora_utc)
 

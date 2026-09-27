@@ -86,10 +86,20 @@ class ConsultarTelemetriaUseCase:
             pass
         raise DispositivoNoEncontradoError(f"Dispositivo '{id_o_uid}' no encontrado.")
 
-    def _obtener_contexto_suscripcion(self, dev: Dispositivo) -> tuple[bool, ModoFreeTier, int, int]:
+    def _obtener_contexto_suscripcion(self, dev: Dispositivo) -> tuple[bool, ModoFreeTier, int | None, int]:
         ahora = datetime.now(timezone.utc)
         sus = self._suscripcion_de_dispositivo(dev)
+
         if sus is not None:
+            # Obtener la organización para verificar si es cooperativa
+            if self.repo_organizaciones and dev.planta_id:
+                planta = self.repo_organizaciones.obtener_planta_por_id(dev.planta_id)
+                if planta:
+                    org = self.repo_organizaciones.obtener_por_id(planta.organizacion_id)
+                    if org and org.es_cooperativa:
+                        # Cooperativas: retención ilimitada, intervalo 0, sin restricciones
+                        return True, ModoFreeTier.PRIVADO_BASICO, None, 0
+
             es_pro = PoliticaSuscripcionService.es_pro_vigente(sus.pro_vence_en, ahora)
             retencion_dias = PoliticaSuscripcionService.resolver_retencion_dias(es_pro, sus.modo_free)
             min_intervalo = PoliticaSuscripcionService.resolver_intervalo_minimo_segundos(es_pro, sus.modo_free)
@@ -107,6 +117,9 @@ class ConsultarTelemetriaUseCase:
                     return PoliticaRetencionService.ventana_consulta(plan, ahora)
             es_pro = PoliticaSuscripcionService.es_pro_vigente(sus.pro_vence_en, ahora)
             dias = PoliticaSuscripcionService.resolver_retencion_dias(es_pro, sus.modo_free)
+            # Si dias es None (retención ilimitada), retornar fecha muy antigua
+            if dias is None:
+                return datetime(1900, 1, 1, tzinfo=timezone.utc)
             return ahora - timedelta(days=dias)
         return ahora - timedelta(days=14)
 

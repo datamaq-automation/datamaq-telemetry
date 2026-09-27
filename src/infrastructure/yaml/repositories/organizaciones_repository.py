@@ -178,6 +178,7 @@ class YamlOrganizacionesRepository(RepositorioOrganizacionesPort):
             cuit=d.get("cuit"),
             email_contacto=d.get("email_contacto"),
             telefono_contacto=d.get("telefono_contacto"),
+            es_cooperativa=bool(d.get("es_cooperativa", False)),
         )
 
     def obtener_por_id(self, organizacion_id: str) -> Organizacion | None:

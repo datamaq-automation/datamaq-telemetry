@@ -48,13 +48,16 @@ class GestionarDispositivosUseCase:
         return sus or Suscripcion.por_defecto(organizacion_id)
 
     def _validar_cupo_dispositivos(self, planta_id: str) -> None:
-        if not self.repo_planes:
-            return
         planta = self.repo_organizaciones.obtener_planta_por_id(planta_id)
         if not planta:
             return
         org = self.repo_organizaciones.obtener_por_id(planta.organizacion_id)
         if not org:
+            return
+        # Cooperativas no tienen límite de dispositivos
+        if org.es_cooperativa:
+            return
+        if not self.repo_planes:
             return
         plan_id = self._suscripcion_de(org.id).plan_id
         plan = self.repo_planes.obtener_por_id(plan_id) if plan_id else None

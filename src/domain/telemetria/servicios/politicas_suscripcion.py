@@ -50,7 +50,7 @@ class PoliticaSuscripcionService:
         return PoliticaSuscripcionService.es_pro_vigente(vencimiento, ahora)
 
     @staticmethod
-    def resolver_retencion_dias(es_pro: bool, modo_free: ModoFreeTier) -> int:
+    def resolver_retencion_dias(es_pro: bool, modo_free: ModoFreeTier) -> int | None:
         return 365 if es_pro else 7
 
     @staticmethod

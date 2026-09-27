@@ -47,6 +47,7 @@ class OrganizationModel(Base):
     plan_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("plans.id", ondelete="SET NULL"), nullable=True)
     pro_expires_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
     free_tier_mode: Mapped[str] = mapped_column(String(30), default="PRIVADO_BASICO", nullable=False)
+    es_cooperativa: Mapped[bool] = mapped_column(default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, onupdate=ahora_utc, nullable=False)
 

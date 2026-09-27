@@ -239,6 +239,7 @@ erDiagram
         string plan_id FK
         datetime pro_expires_at
         string free_tier_mode
+        boolean es_cooperativa
         datetime created_at
         datetime updated_at
     }
@@ -645,6 +646,7 @@ erDiagram
 | `plan_id` | `VARCHAR(36)` | FK -> `plans.id` | Sí |
 | `pro_expires_at` | `DATETIME` | - | Sí |
 | `free_tier_mode` | `VARCHAR(30)` | - | No |
+| `es_cooperativa` | `BOOLEAN` | - | No |
 | `created_at` | `DATETIME` | - | No |
 | `updated_at` | `DATETIME` | - | No |
 
