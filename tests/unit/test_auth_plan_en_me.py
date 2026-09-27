@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from src.application.use_cases.autenticar_usuario import AutenticarUsuarioUseCase
 from src.domain.auth.ports import RepositorioUsuariosPort
 from src.domain.auth.services import HashContrasenaService
-from src.domain.telemetria.entities import PlanTelemetria, Suscripcion
+from src.domain.telemetria.entities import Organizacion, PlanTelemetria, Suscripcion
 from src.domain.telemetria.value_objects import VisibilidadPlan
 
 
@@ -58,6 +58,21 @@ class FakeRepoPlanes:
         return plan
 
 
+class FakeRepoOrganizaciones:
+    def __init__(self, organizaciones: dict[str, Organizacion]):
+        self.organizaciones = organizaciones
+
+    def obtener_por_id(self, org_id):
+        return self.organizaciones.get(org_id)
+
+    def guardar(self, organizacion):
+        self.organizaciones[organizacion.id] = organizacion
+        return organizacion
+
+    def listar(self):
+        return list(self.organizaciones.values())
+
+
 def _plan() -> PlanTelemetria:
     return PlanTelemetria(
         id="plan-pro",
@@ -72,7 +87,7 @@ def _plan() -> PlanTelemetria:
     )
 
 
-def _use_case(repo_suscripciones=None, repo_planes=None) -> AutenticarUsuarioUseCase:
+def _use_case(repo_suscripciones=None, repo_planes=None, repo_organizaciones=None) -> AutenticarUsuarioUseCase:
     return AutenticarUsuarioUseCase(
         MockRepositorioUsuarios(),
         HashContrasenaService(),
@@ -80,6 +95,7 @@ def _use_case(repo_suscripciones=None, repo_planes=None) -> AutenticarUsuarioUse
         480,
         repo_suscripciones=repo_suscripciones,
         repo_planes=repo_planes,
+        repo_organizaciones=repo_organizaciones,
     )
 
 
@@ -135,3 +151,37 @@ def test_organizacion_con_pro_vencido_es_free_aunque_tenga_plan_id():
     assert dto.plan_nombre is None
     assert dto.notificaciones_habilitadas is False
     assert dto.retention_days == 7
+
+
+def test_cooperativa_sin_suscripcion_tiene_retencion_ilimitada():
+    org = Organizacion(id="coop-1", nombre="Cooperativa Test", es_cooperativa=True)
+    dto = _use_case(
+        FakeRepoSuscripciones({}),
+        FakeRepoPlanes({}),
+        FakeRepoOrganizaciones({"coop-1": org}),
+    ).me({"usuario": "u1", "rol": "admin", "org": "coop-1"})
+
+    assert dto.es_cooperativa is True
+    assert dto.modo_free is False
+    assert dto.plan_nombre is None
+    assert dto.retention_days == 7  # fallback, pero es_cooperativa=True indica ilimitado
+    assert dto.notificaciones_habilitadas is False
+
+
+def test_cooperativa_con_suscripcion_pro_ignora_plan_y_usa_retencion_ilimitada():
+    org = Organizacion(id="coop-2", nombre="Cooperativa con Pro", es_cooperativa=True)
+    plan = _plan()
+    sus = Suscripcion(
+        organizacion_id="coop-2", plan_id=plan.id, pro_vence_en=datetime.now(timezone.utc) + timedelta(days=10)
+    )
+    dto = _use_case(
+        FakeRepoSuscripciones({"coop-2": sus}),
+        FakeRepoPlanes({plan.id: plan}),
+        FakeRepoOrganizaciones({"coop-2": org}),
+    ).me({"usuario": "u1", "rol": "admin", "org": "coop-2"})
+
+    assert dto.es_cooperativa is True
+    assert dto.modo_free is False
+    assert dto.plan_nombre is None  # no refleja plan aunque tenga suscripcion vigente
+    assert dto.retention_days == 7  # fallback, pero es_cooperativa=True indica ilimitado
+    assert dto.notificaciones_habilitadas is False

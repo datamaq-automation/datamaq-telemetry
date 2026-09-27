@@ -183,7 +183,9 @@ class AutenticarUsuarioUseCase:
         if self.acceso_plantas is not None:
             plantas = self.acceso_plantas.resolver(user.id if user else None, str(rol), org_id)
 
-        plan_nombre, modo_free, retention_days, notificaciones_habilitadas = self._resolver_estado_plan(org_id)
+        plan_nombre, modo_free, retention_days, notificaciones_habilitadas = self._resolver_estado_plan(
+            org_id, es_cooperativa
+        )
 
         return MeResponseDTO(
             usuario=usuario,
@@ -200,9 +202,15 @@ class AutenticarUsuarioUseCase:
             notificaciones_habilitadas=notificaciones_habilitadas,
         )
 
-    def _resolver_estado_plan(self, org_id: str | None) -> tuple[str | None, bool, int | None, bool]:
+    def _resolver_estado_plan(
+        self, org_id: str | None, es_cooperativa: bool = False
+    ) -> tuple[str | None, bool, int | None, bool]:
         """Consulta en vivo (no embebido en el JWT): el billing es sensible a tiempo, un
-        downgrade debe reflejarse en /me sin esperar a que expire el token (D5)."""
+        downgrade debe reflejarse en /me sin esperar a que expire el token (D5).
+        Las cooperativas tienen retención ilimitada y no se clasifican como "free"."""
+        if es_cooperativa:
+            return None, False, None, False
+
         if not org_id or not self.repo_suscripciones:
             return None, True, 7, False
 
