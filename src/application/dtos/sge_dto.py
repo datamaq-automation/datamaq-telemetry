@@ -226,3 +226,51 @@ class LineaBaseResponseDTO(BaseModel):
         populate_by_name=True,
         serialize_by_alias=True,
     )
+
+
+class CostoEstimadoResponseDTO(BaseModel):
+    """Costo estimado en pesos del período de facturación en curso.
+
+    El componente de energía se calcula con datos en vivo (kWh consumidos hasta ahora en el
+    período) y el `$/kWh` promedio de la última factura de energía real de la planta. El
+    componente de potencia queda explícitamente "s/d" (`costo_potencia_ars=None`): requiere
+    tracking de demanda máxima del período en curso sobre datos en vivo, que todavía no existe
+    (ver `specs/costo-estimado-periodo-en-curso.md`) — nunca se infiere ni se reemplaza por 0.
+    """
+
+    planta_id: str = Field(validation_alias="plantaId", serialization_alias="plantaId")
+    periodo_actual: str = Field(validation_alias="periodoActual", serialization_alias="periodoActual")
+    kwh_consumido_periodo_actual: float | None = Field(
+        default=None,
+        validation_alias="kwhConsumidoPeriodoActual",
+        serialization_alias="kwhConsumidoPeriodoActual",
+    )
+    valor_energia_ars_kwh_promedio: float | None = Field(
+        default=None,
+        validation_alias="valorEnergiaArsKwhPromedio",
+        serialization_alias="valorEnergiaArsKwhPromedio",
+    )
+    costo_energia_ars: float | None = Field(
+        default=None, validation_alias="costoEnergiaArs", serialization_alias="costoEnergiaArs"
+    )
+    periodo_factura_origen: str | None = Field(
+        default=None, validation_alias="periodoFacturaOrigen", serialization_alias="periodoFacturaOrigen"
+    )
+    aviso_tarifa_desactualizada: bool = Field(
+        default=False,
+        validation_alias="avisoTarifaDesactualizada",
+        serialization_alias="avisoTarifaDesactualizada",
+    )
+    costo_potencia_ars: float | None = Field(
+        default=None, validation_alias="costoPotenciaArs", serialization_alias="costoPotenciaArs"
+    )
+    motivo_potencia_sin_dato: str | None = Field(
+        default=None,
+        validation_alias="motivoPotenciaSinDato",
+        serialization_alias="motivoPotenciaSinDato",
+    )
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+        serialize_by_alias=True,
+    )

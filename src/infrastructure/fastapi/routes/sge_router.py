@@ -3,6 +3,7 @@
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query, status
+from sqlalchemy.orm import Session
 
 from src.adapters.gateways.in_memory_documentacion_sge_repository import (
     InMemoryDocumentacionSgeRepository,
@@ -14,6 +15,7 @@ from src.application.dtos.sge_dto import (
     AcuseCapacitacionRequestDTO,
     AhorrosCusumResponseDTO,
     BalanceEnergiaResponseDTO,
+    CostoEstimadoResponseDTO,
     EstadoCompetenciasUsuarioDTO,
     FacturaDistribuidoraResponseDTO,
     LineaBaseResponseDTO,
@@ -34,6 +36,9 @@ from src.application.use_cases.consultar_balance_energia import (
 from src.application.use_cases.consultar_competencias_usuario import (
     ConsultarCompetenciasUsuarioUseCase,
 )
+from src.application.use_cases.consultar_costo_estimado import (
+    ConsultarCostoEstimadoUseCase,
+)
 from src.application.use_cases.consultar_documentacion_sge import (
     ConsultarDocumentacionSgeUseCase,
 )
@@ -48,9 +53,10 @@ from src.domain.sge.ports import (
     RepositorioRegistroCapacitacionesSgePort,
 )
 from src.domain.telemetria.ports import RepositorioOrganizacionesPort
-from src.infrastructure.fastapi.dependencies import get_usuario_actual
+from src.infrastructure.fastapi.dependencies import get_db_session, get_telemetria_use_case, get_usuario_actual
 from src.infrastructure.fastapi.error_handler import manejar_error_http
 from src.infrastructure.fastapi.planta_ownership import resolver_planta_permitida
+from src.infrastructure.sqlalchemy.mysql_repositories import MySQLTelemetriaRepository
 from src.infrastructure.yaml.repositories.organizaciones_repository import (
     YamlOrganizacionesRepository,
 )
@@ -140,6 +146,20 @@ def get_consultar_historico_facturas_use_case(
     ],
 ) -> ConsultarHistoricoFacturasUseCase:
     return ConsultarHistoricoFacturasUseCase(repo_organizaciones=repo_org)
+
+
+def get_consultar_costo_estimado_use_case(
+    db: Annotated[Session, Depends(get_db_session)],
+    repo_org: Annotated[
+        RepositorioOrganizacionesPort,
+        Depends(get_organizaciones_repository),
+    ],
+) -> ConsultarCostoEstimadoUseCase:
+    return ConsultarCostoEstimadoUseCase(
+        repo_organizaciones=repo_org,
+        repo_telemetria=MySQLTelemetriaRepository(db),
+        consultar_telemetria=get_telemetria_use_case(db),
+    )
 
 
 router = APIRouter(
@@ -351,5 +371,32 @@ def obtener_facturas_distribuidora(
     orden descendente por período."""
     try:
         return use_case.ejecutar(planta_id=planta_id)
+    except Exception as exc:
+        manejar_error_http(exc)
+
+
+@router.get(
+    "/plantas/{planta_id}/costo-estimado",
+    dependencies=[Depends(resolver_planta_permitida)],
+    response_model=CostoEstimadoResponseDTO,
+    response_model_by_alias=True,
+    summary="Costo estimado en pesos del período de facturación en curso (ISO 50001 §6.3 / §9.1)",
+)
+def obtener_costo_estimado(
+    planta_id: str,
+    use_case: Annotated[
+        ConsultarCostoEstimadoUseCase,
+        Depends(get_consultar_costo_estimado_use_case),
+    ],
+    claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
+    nodo_id: str | None = Query(
+        None, description="Nodo del unifilar a costear; por defecto, el TGBT/transformador principal"
+    ),
+) -> CostoEstimadoResponseDTO:
+    """Componente de energía calculado con datos en vivo del período en curso x `$/kWh` promedio
+    de la última factura real. Componente de potencia siempre "s/d" (`costoPotenciaArs=null`):
+    requiere tracking de demanda máxima en vivo, no implementado todavía."""
+    try:
+        return use_case.ejecutar(planta_id=planta_id, nodo_id=nodo_id)
     except Exception as exc:
         manejar_error_http(exc)
