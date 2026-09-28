@@ -143,6 +143,8 @@ class Settings(BaseSettings):
                 raise ValueError("API_SECRET_KEY debe tener al menos 16 caracteres en producción")
             if not self.DB_PASSWORD or len(self.DB_PASSWORD) < 8:
                 raise ValueError("DB_PASSWORD debe tener al menos 8 caracteres en producción")
+            if (self.CORS_ORIGINS or "").strip() == "*":
+                raise ValueError("CORS_ORIGINS no puede ser '*' en producción")
         elif not self.API_SECRET_KEY:
             object.__setattr__(self, "API_SECRET_KEY", secrets.token_urlsafe(32))
         return self

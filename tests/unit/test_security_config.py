@@ -63,6 +63,16 @@ def test_cors_vacio_en_produccion(monkeypatch):
     assert settings.CORS_ORIGINS == ""
 
 
+def test_produccion_rechaza_cors_asterisco(monkeypatch):
+    with pytest.raises(ValueError, match=r"CORS_ORIGINS no puede ser '\*' en producción"):
+        _settings(
+            monkeypatch,
+            API_SECRET_KEY="secreto-fuerte-123456",
+            DB_PASSWORD="clave-segura",
+            CORS_ORIGINS="*",
+        )
+
+
 def test_secret_key_default_vacia(monkeypatch):
     assert Settings.model_fields["API_SECRET_KEY"].default == ""
 

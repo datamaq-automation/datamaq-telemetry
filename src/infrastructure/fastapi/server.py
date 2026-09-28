@@ -21,6 +21,7 @@ from src.application.use_cases.ingesta.resolvedor_dispositivo import ResolvedorD
 from src.domain.telemetria.services import debe_recibir_evento
 from src.domain.telemetria.value_objects import MacAddress
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
+from src.infrastructure.fastapi.auth_cookies import ORIGENES_CORS_CYBERSYN
 from src.infrastructure.fastapi.dependencies import (
     extraer_token,
     get_mqtt_listener,
@@ -42,6 +43,7 @@ from src.infrastructure.fastapi.routes.dispositivos_router import router as disp
 from src.infrastructure.fastapi.routes.organizaciones_router import router as organizaciones_router
 from src.infrastructure.fastapi.routes.planes_router import router as planes_router
 from src.infrastructure.fastapi.routes.planta_estructura_router import router as planta_estructura_router
+from src.infrastructure.fastapi.routes.produccion_router import router as produccion_router
 from src.infrastructure.fastapi.routes.sge_router import router as sge_router
 from src.infrastructure.fastapi.routes.system_router import router as system_router
 from src.infrastructure.fastapi.routes.telemetria_router import router as telemetria_router
@@ -446,7 +448,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     # Con "*" no se permiten credenciales (la especificación CORS lo prohíbe).
     cors_abierto = (settings.CORS_ORIGINS or "").strip() == "*"
-    origins = ["*"] if cors_abierto else [o.strip() for o in (settings.CORS_ORIGINS or "").split(",") if o.strip()]
+    if cors_abierto and not settings.DEBUG:
+        raise ValueError("CORS_ORIGINS no puede ser '*' en producción")
+    origins = (
+        ["*"]
+        if cors_abierto
+        else list(
+            dict.fromkeys(
+                [o.strip() for o in (settings.CORS_ORIGINS or "").split(",") if o.strip()]
+                + list(ORIGENES_CORS_CYBERSYN)
+            )
+        )
+    )
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,
@@ -461,13 +474,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_exception_handler(Exception, manejar_excepcion_no_mapeada)
     app.add_exception_handler(StarletteHTTPException, manejar_404)
 
-    # Register Routers
-    # El asistente queda fuera hasta que el dueño decida reencenderlo
-    # (decisions/2026-09-24_bot-conversacional-aislamiento.md del repo padre, D1).
-    from src.infrastructure.fastapi.routes.produccion_router import (
-        router as produccion_router,
-    )
-
+    # Register Routers (asistente aislado según decisions/2026-09-24_bot-conversacional-aislamiento.md)
     routers = (system_router, disponibilidad_router, cargas_router, telemetria_router, dispositivos_router, organizaciones_router, planta_estructura_router, planes_router, alertas_router, auth_router, audit_router, sge_router, usuarios_router, analitica_router, billing_router, produccion_router)  # fmt: skip
     for r in routers:
         app.include_router(r)

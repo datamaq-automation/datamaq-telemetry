@@ -37,6 +37,15 @@ from src.application.use_cases.recuperar_contrasena import (
 )
 from src.domain.auth.ports import RepositorioUsuariosPort
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
+from src.infrastructure.fastapi.auth_cookies import (
+    DEVICE_TRUST_COOKIE,
+    _eliminar_cookie,
+    _fijar_cookie,
+    _fijar_cookie_dispositivo,
+)
+from src.infrastructure.fastapi.auth_cookies import (
+    DEVICE_TRUST_MAX_AGE as DEVICE_TRUST_MAX_AGE,
+)
 from src.infrastructure.fastapi.auth_dependencies import (
     get_activar_2fa_use_case,
     get_auth_use_case,
@@ -61,32 +70,6 @@ from src.infrastructure.settings.config import Settings
 router = APIRouter(prefix="/api/v1/auth", tags=["Autenticación"])
 
 logger = structlog.get_logger("auth")
-
-DEVICE_TRUST_COOKIE = "datamaq_device_trust"
-DEVICE_TRUST_MAX_AGE = 60 * 60 * 24 * 30  # 30 días
-
-
-def _fijar_cookie(response: Response, settings: Settings, token: str) -> None:
-    response.set_cookie(
-        key=settings.AUTH_COOKIE_NOMBRE,
-        value=token,
-        max_age=settings.auth_cookie_max_age,
-        httponly=settings.AUTH_COOKIE_HTTPONLY,
-        samesite=settings.AUTH_COOKIE_SAMESITE,
-        secure=settings.auth_cookie_secure,
-    )
-
-
-def _fijar_cookie_dispositivo(response: Response, settings: Settings, token: str) -> None:
-    response.set_cookie(
-        key=DEVICE_TRUST_COOKIE,
-        value=token,
-        max_age=DEVICE_TRUST_MAX_AGE,
-        httponly=True,
-        samesite=settings.AUTH_COOKIE_SAMESITE,
-        secure=settings.auth_cookie_secure,
-        path="/api/v1/auth",
-    )
 
 
 def _obtener_ip_cliente(request: Request | None) -> str:
@@ -122,7 +105,7 @@ def login(
             request_id=structlog.contextvars.get_contextvars().get("request_id"),
         )
         if resultado.token:
-            _fijar_cookie(response, settings, resultado.token)
+            _fijar_cookie(response, settings, resultado.token, request=request)
 
         if audit_use_case is not None:
             try:
@@ -184,7 +167,7 @@ def guest(
             request_id=structlog.contextvars.get_contextvars().get("request_id"),
         )
         if resultado.token:
-            _fijar_cookie(response, settings, resultado.token)
+            _fijar_cookie(response, settings, resultado.token, request=request)
         return resultado
     except Exception as e:
         manejar_error_http(e)
@@ -197,7 +180,7 @@ def logout(
     request: Request = None,  # type: ignore[assignment]
     audit_use_case: Annotated[RegistrarEventoAuditoriaUseCase | None, Depends(get_registrar_auditoria_use_case)] = None,
 ) -> dict[str, str]:
-    response.delete_cookie(key=settings.AUTH_COOKIE_NOMBRE)
+    _eliminar_cookie(response, settings, request=request)
     if audit_use_case is not None and request is not None:
         try:
             ip = _obtener_ip_cliente(request)
@@ -249,7 +232,7 @@ def logout_todas(
     revocation.revocar_usuario(usuario_id, int(ahora.timestamp()))
 
     # Limpia la cookie del cliente invocador
-    response.delete_cookie(key=settings.AUTH_COOKIE_NOMBRE)
+    _eliminar_cookie(response, settings, request=request)
 
     # Registra evento inmutable en audit_logs (ISO 27001 A.5.15 & A.8.15)
     if audit_use_case is not None:
@@ -301,9 +284,9 @@ def verificar_2fa(
     try:
         resultado = use_case.verificar(dto, ip_origen=ip, user_agent=user_agent)
         if resultado.token:
-            _fijar_cookie(response, settings, resultado.token)
+            _fijar_cookie(response, settings, resultado.token, request=request)
         if resultado.device_trust_token:
-            _fijar_cookie_dispositivo(response, settings, resultado.device_trust_token)
+            _fijar_cookie_dispositivo(response, settings, resultado.device_trust_token, request=request)
 
         if audit_use_case is not None:
             try:
