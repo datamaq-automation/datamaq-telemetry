@@ -1,12 +1,15 @@
-# Factura de la distribuidora como dato histórico en YAML
+# [COMPLETADO] Factura de la distribuidora como dato histórico en YAML
 
 > **Decisión aplicable:** `decisions/2026-09-24_factura-distribuidora-yaml.md` (repo padre).
-> **Traspasada a hija:** sí · **Bloque cerrado:** parcial — rediseñado e implementado tras
-> corregir un supuesto falso (ver nota 2026-09-24 abajo), gauntlet en verde, sin pushear.
-> Parsers reales de EdeLAP y CAMMESA resueltos (2026-09-24, segunda pasada, ver §2.2). Pendiente
-> antes del cierre total: confirmar con `app-datamaq` si hace falta exponer `cargadaEn` en el
-> DTO, y relevar EDESUR/Edenor/distribuidoras locales para el resto de las plantas — ver
-> "Pendientes" al final de §2.2.
+> **Traspasada a hija:** sí · **Bloque cerrado:** ✓ SÍ — UPP con EdeLAP (potencia) + CAMMESA (energía) 
+> completamente implementado, pusheado a `main` (commit `4729849`, 2026-09-24). Parsers reales 
+> verificados contra 2+ facturas cada uno. Datos en producción: 2 facturas UPP (2026-08) cargadas 
+> en `data/facturas_distribuidora.yml`. 
+> 
+> **Pendiente (sin urgencia, sin consumidor real hasta que se instale medidor):**
+> - Confirmar con `app-datamaq` si necesita campo `cargadaEn` en DTO (existe en domain)
+> - EDESUR/Edenor/distribuidoras locales: relevar al instalar medidor + obtener 2+ muestras reales
+> — ver "Pendientes" al final de §2.2.
 
 ## 1. Objetivo y Contexto
 
@@ -326,46 +329,40 @@ las 3 muestras y verifican los valores contra el PDF original a mano. Un test es
 que las dos facturas EdeLAP dan la misma potencia contratada (800/850 kW), como señal de que el
 parser generaliza y no quedó hardcodeado a una sola factura.
 
-### Pendientes (actualizado 2026-09-24, tras el rediseño a dos documentos y los parsers reales)
+### Pendientes (actualizado 2026-09-27 — UPP completado, otros en espera de medidor)
 
-1. **[Resuelto] Parser real de EdeLAP (potencia).** Ver arriba — verificado contra 2 facturas
-   reales de distinto período.
-2. **[Resuelto, con vuelta] Parser de CAMMESA (energía).** La primera versión (regex sobre
-   `extract_text()` lineal, ancladas a la única factura real vista en ese momento) **falló
-   directo** contra una segunda factura real de CAMMESA (cliente EITAR, período 2024-08, no UPP):
-   no extraía ni período ni energía. Causa: el texto lineal pega sin separador el valor de
-   "Energía Demandada" a un código de barras/referencia adyacente (`"0006849353,610 MWh"`), de
-   forma no reproducible con regex porque no hay ningún separador entre ambos tokens — no era un
-   problema de qué etiqueta usar, sino del mecanismo de extracción en sí. Se verificó con
-   `page.extract_words()` sobre los dos PDFs reales (UPP y EITAR, clientes y períodos distintos)
-   que el valor de energía SÍ es una palabra propia por coordenadas, separada del código, en la
-   misma posición relativa de la tabla — `ParserFacturaEnergiaCammesa` se reescribió para usar
-   `extract_words()` en vez de regex sobre texto lineal, y ahora da precisión exacta contra ambas
-   facturas reales (`tests/unit/test_parser_factura_distribuidora.py`,
-   `test_cammesa_factura_202408_confirma_layout_estable_entre_clientes`). Lección para el próximo
-   proveedor: no dar por buena una regex sobre texto lineal con una sola muestra — pedir una
-   segunda antes de darlo por cerrado, o partir directo de `extract_words()`.
-3. **[Sin fecha] EDESUR (Eitec/EITAR, Cristal Avellaneda).** Se inspeccionó una factura real de
-   EDESUR (EITAR S.A.I.C., tarifa T3 MT, LSP N° A 9904-02246147) — confirma un **tercer formato**
-   estructural, distinto de EdeLAP y de CAMMESA: un solo documento que factura todo junto (como
-   EdeLAP), pero la potencia **no** se discrimina Punta/Fuera de Punta a nivel de cargo (un solo
-   par Convenida/Adquirida — el DRP/DRFP que trae es solo un historial informativo de lecturas,
-   no un ítem facturado aparte), y la energía sí viene en tres franjas pero con otros nombres
-   ("Horas Restantes"/"Valle Nocturno"/"Horas Punta"). **Decisión del dueño (2026-09-24): no
-   implementar todavía** — EITAR no tiene medidor de datamaq instalado (lo va a tener "en breve"),
-   así que no hay consumidor real del dato hoy; implementar contra una sola muestra sin urgencia
-   real repetiría el mismo error que ya costó una vuelta con CAMMESA. Cuando EITAR o Cristal
-   Avellaneda tengan medidor, conseguir más de una factura real antes de diseñar el parser.
-4. **[Sin fecha] Edenor (Madygraf, Los Constituyentes), distribuidoras locales (El Gringo,
-   Textiles Pigué).** Sin ninguna muestra real todavía — mismo criterio que el punto 3.
-5. **[Prioridad baja, a confirmar con `app-datamaq`] Exponer `cargadaEn`.** La sesión hija pidió
-   este campo (`FacturaDistribuidora.cargada_en` existe en el dominio pero no se serializa en
-   `FacturaDistribuidoraResponseDTO`) para distinguir una resubida/corrección de un mismo período
-   y tipo de dato. Agregar `cargadaEn` al DTO y al mapper si confirman que lo necesitan — cambio
-   acotado, no rompe el contrato existente (es un campo nuevo, no un rename).
-6. **Sin decisión tomada:** si en algún momento se quiere que la UI suba el PDF directo (en vez
-   del flujo GitOps por script + commit), hace falta una decisión nueva del dueño — hoy
-   `RepositorioOrganizacionesPort` es solo lectura por diseño explícito y no hay endpoint `POST`.
+#### ✅ Resueltos (2026-09-24)
+
+1. **Parser real de EdeLAP (potencia).** Verificado contra 2 facturas reales UPP de períodos 
+   distintos (2026-08 en producción).
+2. **Parser de CAMMESA (energía).** Primera versión falló contra 2ª muestra (EITAR 2024-08): 
+   regex sobre `extract_text()` lineal es insuficiente. Causa: valor de energía pegado a código 
+   sin separador (`"0006849353,610 MWh"`). Reescrito con `page.extract_words()` por coordenadas 
+   (commit `4729849`) — ahora exacto en ambas facturas UPP y EITAR. **Lección:** no dar por buena 
+   una regex con una sola muestra; pedir 2+ reales antes de cerrar, o partir directo de coordenadas.
+
+#### ⏳ Sin Fecha (esperando medidor + 2+ muestras reales)
+
+3. **EDESUR (Eitec/EITAR, Cristal Avellaneda).** 1 factura real inspeccionada (tarifa T3 MT 
+   LSP N° A 9904-02246147): tercer formato — documento único como EdeLAP, pero potencia SIN 
+   Punta/Fuera Punta a nivel de cargo (solo Convenida/Adquirida), energía con nombres distintos 
+   (Horas Restantes/Valle Nocturno/Horas Punta). **Decisión del dueño:** NO implementar hasta 
+   EITAR tenga medidor datamaq + conseguir 2+ facturas reales. Criterio: repetir el error de 
+   CAMMESA (1 muestra → fallo) sería costoso.
+
+4. **Edenor (Madygraf, Los Constituyentes), distribuidoras locales (El Gringo, Textiles Pigué).** 
+   0 muestras reales. Mismo criterio que EDESUR.
+
+#### 🔧 Prioridad Baja (confirmar alcance con app-datamaq)
+
+5. **Exponer `cargadaEn` en DTO.** `FacturaDistribuidora.cargada_en` existe en domain, no en 
+   `FacturaDistribuidoraResponseDTO`. app-datamaq lo pidió para distinguir recargas de un mismo 
+   período. Cambio trivial si lo confirman que lo necesitan — agregar campo al DTO y mapper, no 
+   rompe contrato (es un field nuevo).
+
+6. **Upload directo de PDF desde UI.** Si la UI sube el PDF directo (en vez de GitOps por script), 
+   hace falta decisión nueva del dueño — hoy `RepositorioOrganizacionesPort` es solo lectura por 
+   diseño explícito, no hay endpoint `POST`.
 
 **Script de ingesta** `scripts/importar_factura_distribuidora.py <ruta_pdf> <planta_id> --tipo
 potencia|energia`: instancia el parser correspondiente (`--tipo potencia` → EdeLAP, `--tipo
