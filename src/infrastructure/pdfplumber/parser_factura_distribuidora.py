@@ -111,7 +111,11 @@ class ParserFacturaPotenciaEdelap(ParserFacturaDistribuidoraPort):
             importes = re.findall(r"\d[\d.]*,\d{2}", seccion_potencia_m.group(1))
             importe_potencia = sum(_numero_ar(m) for m in importes)
 
-        vencimiento_m = re.search(r"Vencimientos Recargo 1[ºo°]2[ºo°]\s*\n?\d{2}/\d{2}/\d{4}\s+([\d.]+,\d{2})", texto)
+        # El PDF real trae "Vencimientos Recargo\n1º 10/12/2024 21.031.736,78" (verificado con las
+        # 11 facturas de UPP 2023-12..2024-11); se tolera también el "1º2º" pegado en la cabecera.
+        vencimiento_m = re.search(
+            r"Vencimientos Recargo\s*1[ºo°]\s*(?:2[ºo°]\s*)?\d{2}/\d{2}/\d{4}\s+([\d.]+,\d{2})", texto
+        )
         importe_total = _numero_ar(vencimiento_m.group(1)) if vencimiento_m else 0.0
 
         return FacturaDistribuidora(

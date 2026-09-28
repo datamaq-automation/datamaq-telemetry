@@ -142,22 +142,21 @@ def test_endpoint_facturas_distribuidora_gitops(client):
     assert resp.status_code == 200
     data = resp.json()
     assert isinstance(data, list)
-    # UPP: EdeLAP factura potencia y CAMMESA factura energía en dos documentos separados del
-    # mismo período (ver data/facturas_distribuidora.yml). Corregido 2026-09-27: estas 2 facturas
-    # estaban cargadas con el planta_id de Durax por error (confirmado por el dueño).
-    assert len(data) >= 2
-    del_periodo = [f for f in data if f["periodo"] == "2026-08" and f["plantaId"] == PLANTA_UPP_ID]
-    assert {f["tipoDato"] for f in del_periodo} == {"potencia", "energia"}
+    # UPP: facturas reales de potencia de EdeLAP (ver data/facturas_distribuidora.yml). Corregido
+    # 2026-09-28: el test afirmaba un par EDELAP+CAMMESA "2026-08" que en realidad era la factura
+    # EdeLAP 2024-11 mal fechada más una fila de CAMMESA armada a mano. Ya no están en el YAML.
+    assert len(data) >= 11
+    assert all(f["plantaId"] == PLANTA_UPP_ID for f in data)
+    assert not [f for f in data if f["periodo"] == "2026-08"]
 
-    potencia = next(f for f in del_periodo if f["tipoDato"] == "potencia")
+    potencia = next(f for f in data if f["periodo"] == "2024-11")
+    assert potencia["tipoDato"] == "potencia"
     assert potencia["proveedor"] == "EDELAP"
     assert potencia["tarifa"] == "T5M12"
+    assert potencia["numeroFactura"] == "0020-01988580"
     assert potencia["potenciaExcedidaPuntaKw"] == pytest.approx(249.0)
     assert potencia["potenciaExcedidaFueraPuntaKw"] == pytest.approx(232.0)
-
-    energia = next(f for f in del_periodo if f["tipoDato"] == "energia")
-    assert energia["proveedor"] == "CAMMESA"
-    assert energia["energiaFacturadaKwh"] == pytest.approx(315810.0)
+    assert potencia["importeTotalArs"] == pytest.approx(21031736.78)
 
 
 def test_endpoint_facturas_distribuidora_planta_inexistente_404(client):
