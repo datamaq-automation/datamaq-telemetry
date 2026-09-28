@@ -16,9 +16,11 @@ from src.infrastructure.yaml.repositories.organizaciones_repository import YamlO
 
 PLANTA_DURAX_ID = "c64fd625-0037-4caa-b68a-800e8e0ee548"
 ORG_DURAX_ID = "cf82b4be-0798-4beb-8978-2a27612d5761"
+PLANTA_UPP_ID = "4f68f653-a604-4834-8154-31f938248572"
+ORG_UPP_ID = "edebb9a0-85e5-4bde-a370-e64bd9b9608c"
 
 
-def _crear_token(rol: str, exp_minutos: int = 60) -> str:
+def _crear_token(rol: str, exp_minutos: int = 60, organizacion_id: str = ORG_DURAX_ID) -> str:
     settings = get_settings()
     token_service = JwtTokenService(settings.API_SECRET_KEY)
     expira = datetime.now(timezone.utc) + timedelta(minutes=exp_minutos)
@@ -27,7 +29,7 @@ def _crear_token(rol: str, exp_minutos: int = 60) -> str:
         usuario="test@datamaq.com.ar",
         rol=rol,
         expira_en=expira,
-        organizacion_id=ORG_DURAX_ID,
+        organizacion_id=organizacion_id,
     )
 
 
@@ -132,18 +134,19 @@ def test_endpoint_lineas_base_gitops(client):
 
 
 def test_endpoint_facturas_distribuidora_gitops(client):
-    token = _crear_token(rol="operador")
+    token = _crear_token(rol="operador", organizacion_id=ORG_UPP_ID)
     resp = client.get(
-        f"/api/v1/sge/plantas/{PLANTA_DURAX_ID}/facturas-distribuidora",
+        f"/api/v1/sge/plantas/{PLANTA_UPP_ID}/facturas-distribuidora",
         headers={"Authorization": f"Bearer {token}"},
     )
     assert resp.status_code == 200
     data = resp.json()
     assert isinstance(data, list)
-    # UPP-como-Durax: EdeLAP factura potencia y CAMMESA factura energía en dos documentos
-    # separados del mismo período (ver data/facturas_distribuidora.yml).
+    # UPP: EdeLAP factura potencia y CAMMESA factura energía en dos documentos separados del
+    # mismo período (ver data/facturas_distribuidora.yml). Corregido 2026-09-27: estas 2 facturas
+    # estaban cargadas con el planta_id de Durax por error (confirmado por el dueño).
     assert len(data) >= 2
-    del_periodo = [f for f in data if f["periodo"] == "2026-08" and f["plantaId"] == PLANTA_DURAX_ID]
+    del_periodo = [f for f in data if f["periodo"] == "2026-08" and f["plantaId"] == PLANTA_UPP_ID]
     assert {f["tipoDato"] for f in del_periodo} == {"potencia", "energia"}
 
     potencia = next(f for f in del_periodo if f["tipoDato"] == "potencia")
