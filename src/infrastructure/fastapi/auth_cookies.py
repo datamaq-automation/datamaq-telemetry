@@ -15,9 +15,10 @@ from src.infrastructure.settings.config import Settings
 ORIGENES_CORS_CYBERSYN: tuple[str, ...] = (
     "https://cybersyn.com.ar",
     "https://www.cybersyn.com.ar",
+    "https://app.cybersyn.com.ar",
 )
 
-CYBERSYN_HOSTS: frozenset[str] = frozenset({"cybersyn.com.ar", "www.cybersyn.com.ar"})
+CYBERSYN_HOSTS: frozenset[str] = frozenset({"cybersyn.com.ar", "www.cybersyn.com.ar", "app.cybersyn.com.ar"})
 
 DEVICE_TRUST_COOKIE = "datamaq_device_trust"
 DEVICE_TRUST_MAX_AGE = 60 * 60 * 24 * 30  # 30 días

@@ -105,6 +105,20 @@ def test_cors_options_www_cybersyn_permitido(client):
     assert response.headers.get("access-control-allow-credentials") == "true"
 
 
+def test_cors_options_app_cybersyn_permitido(client):
+    response = client.options(
+        "/api/v1/auth/login",
+        headers={
+            "Origin": "https://app.cybersyn.com.ar",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "Content-Type",
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers.get("access-control-allow-origin") == "https://app.cybersyn.com.ar"
+    assert response.headers.get("access-control-allow-credentials") == "true"
+
+
 def test_cors_options_synco_rechazado(client):
     response = client.options(
         "/api/v1/auth/login",
@@ -142,6 +156,18 @@ def test_login_cookie_www_cybersyn_samesite_none_secure(client):
         "/api/v1/auth/login",
         json={"usuario": "admin@cybersyn.com.ar", "contrasena": "SecretPassword123"},
         headers={"Origin": "https://www.cybersyn.com.ar"},
+    )
+    assert response.status_code == 200
+    cookie_header = response.headers.get("set-cookie", "")
+    assert "SameSite=none" in cookie_header
+    assert "Secure" in cookie_header
+
+
+def test_login_cookie_app_cybersyn_samesite_none_secure(client):
+    response = client.post(
+        "/api/v1/auth/login",
+        json={"usuario": "admin@cybersyn.com.ar", "contrasena": "SecretPassword123"},
+        headers={"Origin": "https://app.cybersyn.com.ar"},
     )
     assert response.status_code == 200
     cookie_header = response.headers.get("set-cookie", "")
