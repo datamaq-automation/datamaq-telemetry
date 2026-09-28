@@ -145,7 +145,7 @@ def test_endpoint_facturas_distribuidora_gitops(client):
     # UPP: facturas reales de potencia de EdeLAP (ver data/facturas_distribuidora.yml). Corregido
     # 2026-09-28: el test afirmaba un par EDELAP+CAMMESA "2026-08" que en realidad era la factura
     # EdeLAP 2024-11 mal fechada más una fila de CAMMESA armada a mano. Ya no están en el YAML.
-    assert len(data) >= 11
+    assert len(data) >= 12
     assert all(f["plantaId"] == PLANTA_UPP_ID for f in data)
     assert not [f for f in data if f["periodo"] == "2026-08"]
 
@@ -157,6 +157,11 @@ def test_endpoint_facturas_distribuidora_gitops(client):
     assert potencia["potenciaExcedidaPuntaKw"] == pytest.approx(249.0)
     assert potencia["potenciaExcedidaFueraPuntaKw"] == pytest.approx(232.0)
     assert potencia["importeTotalArs"] == pytest.approx(21031736.78)
+
+    # 2024-02: mes sin exceso de potencia (demanda registrada por debajo de la contratada).
+    sin_exceso = next(f for f in data if f["periodo"] == "2024-02")
+    assert sin_exceso["potenciaAdquiridaPuntaKw"] == pytest.approx(508.0)
+    assert sin_exceso["potenciaExcedidaPuntaKw"] == pytest.approx(0.0)
 
 
 def test_endpoint_facturas_distribuidora_planta_inexistente_404(client):

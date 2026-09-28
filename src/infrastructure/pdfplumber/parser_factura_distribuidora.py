@@ -92,24 +92,32 @@ class ParserFacturaPotenciaEdelap(ParserFacturaDistribuidoraPort):
         contratada_punta = _numero_kw(contratadas_m.group(1))
         contratada_fp = _numero_kw(contratadas_m.group(2))
 
-        kw_tarifados = re.findall(r"(\d+)kW\s*\*[\d,.]+\s*\$/kW", texto)
-        if len(kw_tarifados) < 4:
+        # Demanda registrada por el medidor ("241609298 Potencia punta 605 583 1.800 1049 R"): es la
+        # medición, no un derivado de contratada + exceso (que pondría la contratada en un mes sin
+        # exceso, ej. 2024-02 con 508 kW). Un cambio de medidor duplica la línea con 0, por eso el
+        # máximo. Fuera de punta = máx(resto, valle), verificado contra las 11 facturas con exceso.
+        registrada: dict[str, float] = {}
+        for franja, valor in re.findall(r"Potencia (punta|resto|valle) \d+ \d+ [\d.]+ (\d+) R", texto):
+            registrada[franja] = max(registrada.get(franja, 0.0), float(valor))
+        if "punta" not in registrada or not {"resto", "valle"} & registrada.keys():
             raise FacturaDistribuidoraIlegibleError(
-                f"No se pudieron extraer los 4 conceptos de potencia tarifados (pico, f.pico y sus "
-                f"excesos) de '{ruta_pdf}': se encontraron {len(kw_tarifados)}."
+                f"No se pudo extraer la demanda de potencia registrada (punta, resto, valle) de '{ruta_pdf}'."
             )
-        excedida_punta = float(kw_tarifados[2])
-        excedida_fp = float(kw_tarifados[3])
+        adquirida_punta = registrada["punta"]
+        adquirida_fp = max(registrada.get("resto", 0.0), registrada.get("valle", 0.0))
 
         numero_factura = re.search(r"N[ºo°]\s*de\s*factura:\s*([\d-]+)", texto)
         tarifa = re.search(r"Tipo de tarifa:\s*([A-Z0-9]+)", texto)
         dias = re.search(r"D[ií]as:\s*(\d+)", texto)
 
-        seccion_potencia_m = re.search(r"Potencia Pico por Transporte(.*?)241609298 Potencia punta", texto, re.DOTALL)
-        importe_potencia = 0.0
-        if seccion_potencia_m:
-            importes = re.findall(r"\d[\d.]*,\d{2}", seccion_potencia_m.group(1))
-            importe_potencia = sum(_numero_ar(m) for m in importes)
+        # Suma solo las líneas de potencia contratada y exceso (los excesos faltan en un mes sin
+        # exceso), no un tramo de texto: en ese tramo también caen intereses por mora y el CTT.
+        importes_potencia = re.findall(
+            r"(?:Potencia (?:Fuera de )?Pico por Transporte|Exceso de Potencia (?:en|Fuera de) Pico Transporte)"
+            r"\s*\d+kW\s*\*[\d.,]+\s*\$/kW\s*([\d.]+,\d{2})",
+            texto,
+        )
+        importe_potencia = sum(_numero_ar(m) for m in importes_potencia)
 
         # El PDF real trae "Vencimientos Recargo\n1º 10/12/2024 21.031.736,78" (verificado con las
         # 11 facturas de UPP 2023-12..2024-11); se tolera también el "1º2º" pegado en la cabecera.
@@ -130,8 +138,8 @@ class ParserFacturaPotenciaEdelap(ParserFacturaDistribuidoraPort):
             dias_facturados=int(dias.group(1)) if dias else None,
             potencia_contratada_punta_kw=contratada_punta,
             potencia_contratada_fuera_punta_kw=contratada_fp,
-            potencia_adquirida_punta_kw=contratada_punta + excedida_punta,
-            potencia_adquirida_fuera_punta_kw=contratada_fp + excedida_fp,
+            potencia_adquirida_punta_kw=adquirida_punta,
+            potencia_adquirida_fuera_punta_kw=adquirida_fp,
             importe_potencia_ars=importe_potencia,
             fuente_archivo=ruta_pdf.rsplit("/", 1)[-1],
         )

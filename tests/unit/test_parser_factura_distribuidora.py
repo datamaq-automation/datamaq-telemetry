@@ -185,6 +185,158 @@ Esta factura incluye Subsidio Estado Nacional por $0 Vencimientos Recargo Import
 2º 15/01/2024 150.104,51 5.358.439,77
 No debe abonarse en banco.""".splitlines()
 
+# EdeLAP, UPP, período 202402: mes sin exceso de potencia (demanda registrada 508/529 kW, por
+# debajo de la contratada), con cambio de medidor (líneas de lectura duplicadas en 0), interés por
+# mora y CTT entre las líneas de potencia, y el total solo en la página 2 (la 1 lo trae enmascarado).
+LINEAS_EDELAP_202402 = """FRANQUEO A PAGAR
+LIQUIDACION DE SERVICIOS PUBLICOS CLASE A TRANSLYF SA
+R.N.P.S.P. Nro. 180
+202402 0020-01766800
+Período Nº de Factura
+EMPRESA DISTRIBUIDORA LA PLATA S.A.
+COOP UNION PAPELERA PLATENSE LIMITADA
+Diagonal 80 Nro 1001 I.V.A.: Responsable Inscripto
+Titular del Suministro
+Ing. Brutos: Exento Ag.Percepcion: 000-650839-6
+514 s/n Cno Centenario 1901 RINGUELET
+Remite Sucursal: CITY BELL
+Domicilio Postal
+14 364 1896 CITY BELL - Tel.: 4722923
+CAMINO CENTENARIO s/n . Esq 515 Fondo a 12 / Union Papelera Platense
+Ringu GONNET
+NIR 0 3512065 01 01/03/2024 Domicilio del suministro
+Condición Fiscal: Resp. inscripto CUIT:30707619089 Cond. Ing Br.: Contr. Exento
+Indique el número resaltado del renglón superior al momento de
+efectuar un reclamo ante nuestras oficinas comerciales
+Nº CESP: 35099005105506 Vto.: 07/03/2024 CIIU: 210102
+Tipo de tarifa:T5M12 - Media Tension Fecha de emisión: 01/03/2024 Fecha lect. ant.: 01/02/2024 Fecha lect. actual: 01/03/2024 Días: 29
+Potencias Contratadas (KW): Punta: Fuera Punta: Transporte Punta: 800.000 Transporte Fuera Punta: 850.000
+Consumos de energía (KWh): Excesos de potencias Pond. de cuadros tarif. por unidad:
+202308 202309 202310 202311 202312 202401 202402 Punta F. de punta Potencia
+Punta: 91836 77886 87048 72072 76914 80514 47826 Valor 0 0 Fecha Días Punta F. Punta
+Resto: 217206 165690 191898 160092 191304 186750 103086 Fecha Exceso: 29991231 29991231 1 - 29 1630,3042 1188,2103
+Valle: 103680 89982 94230 85320 90954 86346 51210 Fecha de recontratación: 29991231 29991231 2 3 - - 0 0 0 0 , , 0 0 0 0 0 0 0 0 0 0 , , 0 0 0 0 0 0 0 0
+Total: 412722 333558 373176 317484 359172 353610 202122 29 1630,3042 1188,2103
+Consumos de Potencia (KW):
+Subsidio al Csmo Energía sin Sub.
+Periodos
+Descripción de Códigos: Fecha Días Punta Resto Valle Punta Resto Valle
+202308 202309 202310 202311 202312 202401 202402
+R: Consumo real 1 - 29 3,4217 3,3098 3,2457
+E: Consumo estimado Punta: 1035 1073 1042 1040 1069 1046 508 2 - 0 0,0000 0,0000 0,0000
+Fuera Punta: 1053 1044 1055 1057 1062 1073 529 3 - 0 0,0000 0,0000 0,0000
+29 3,4217 3,3098 3,2457
+Factor de Potencia:
+Concepto Punta Valle Resto
+Tg. Fi.: 0,196 0,191 0,195
+Total de energía activa: 202122KWh
+Recargo:
+Lecturas
+Nº Medidor Concepto: Cte. Consumo Detalle de Facturación Importe:
+Anterior: Actual:
+241609298 Energia activa punta 95852 98509 18.000 47826 R Cargo Variable Pico Transp. Sin Subsidio 47826 kWh *3.4217$/kWh 163.644,74
+241609298 Energia activa punta 95852 95852 18.000 0 R Cargo Variable Valle Transp. Sin Subsidio 51210 kWh *3.2457$/kWh 166.209,99
+241609298 Energia Reactiva Punta 46583 47104 18.000 9378 R Cargo Variable Resto Transp. Sin Subsidio 103086 kWh *3.3098$/kWh 341.197,75
+241609298 Energia Reactiva Punta 46583 46583 18.000 0 R Potencia Pico por Transporte 800kW *1630.304 $/kW 1.304.243,38
+Potencia Fuera de Pico por Transporte 850kW *1188.210 $/kW 1.009.978,80
+241609298 Energia activa resto 221140 226867 18.000 103086 R
+Ajuste de Interes por mora 132.493,29
+241609298 Energia activa resto 221140 221140 18.000 0 R
+CTT - Art.49 Res MIySP 763/25 40.424,40
+241609298 Energia Reactiva Resto 104436 105554 18.000 20124 R
+241609298 Energia Reactiva Resto 104436 104436 18.000 0 R
+241609298 Energia activa valle 107304 110149 18.000 51210 R
+241609298 Energia activa valle 107304 107304 18.000 0 R
+241609298 Energia Reactiva Valle 52172 52716 18.000 9792 R
+241609298 Energia Reactiva Valle 52172 52172 18.000 0 R
+241609298 Potencia punta 0 282 1.800 508 R
+241609298 Potencia punta 581 0 1.800 0 R
+241609298 Potencia resto 0 294 1.800 529 R
+241609298 Potencia resto 596 0 1.800 0 R
+241609298 Potencia valle 0 287 1.800 517 R
+241609298 Potencia valle 587 0 1.800 0 R
+Subtotal Por Servicio Eléctrico sin Subsidio 3.158.192,35
+SUBTOTAL POR SERVICIO ELECTRICO 3.158.192,35
+IVA Responsable Inscripto - Ley Nac 23.349 27.00000% 852.711,93
+Ley 11.769 Art. 74 0.00100% 31,58
+Ley 11.769 Art. 75 6.00000% 189.491,54
+Resolucion Gral. 3337/91 DGI 3.00000% 94.745,77
+Su gasto diario de electricidad es de $ 102940,51 Vencimientos Recargo
+1º ******** ********
+Próximo Vencimiento: ********
+I.V.A. del recargo: ******** 2º ******** ******** ********
+Página nº 1de 2
+Remite Sucursal: CITY BELL
+14 364 1896 CITY BELL - Tel.: 4722923
+Período: 202402 Nº de factura:0020-01766800
+Información Complementaria: Tarifa: T5M12 - Media Tension NIR: 0-3512065-01-01/03/2024
+Esta factura incluye Subsidio Estado Nacional por $0 Vencimientos Recargo Importe:
+1º ******** ********
+2º ******** ******** ********
+No debe abonarse en banco.
+FRANQUEO A PAGAR
+LIQUIDACION DE SERVICIOS PUBLICOS CLASE A TRANSLYF SA
+R.N.P.S.P. Nro. 180
+202402 0020-01766800
+Período Nº de Factura
+EMPRESA DISTRIBUIDORA LA PLATA S.A.
+COOP UNION PAPELERA PLATENSE LIMITADA
+Diagonal 80 Nro 1001 I.V.A.: Responsable Inscripto
+Titular del Suministro
+Ing. Brutos: Exento Ag.Percepcion: 000-650839-6
+514 s/n Cno Centenario 1901 RINGUELET
+Remite Sucursal: CITY BELL
+Domicilio Postal
+14 364 1896 CITY BELL - Tel.: 4722923
+CAMINO CENTENARIO s/n . Esq 515 Fondo a 12 / Union Papelera Platense
+Ringu GONNET
+NIR 0 3512065 01 01/03/2024 Domicilio del suministro
+Condición Fiscal: Resp. inscripto CUIT:30707619089 Cond. Ing Br.: Contr. Exento
+Indique el número resaltado del renglón superior al momento de
+efectuar un reclamo ante nuestras oficinas comerciales
+Nº CESP: 35099005105506 Vto.: 07/03/2024 CIIU: 210102
+Tipo de tarifa:T5M12 - Media Tension Fecha de emisión: 01/03/2024 Fecha lect. ant.: 01/02/2024 Fecha lect. actual: 01/03/2024 Días: 29
+Potencias Contratadas (KW): Punta: Fuera Punta: Transporte Punta: 800.000 Transporte Fuera Punta: 850.000
+Consumos de energía (KWh): Excesos de potencias Pond. de cuadros tarif. por unidad:
+202308 202309 202310 202311 202312 202401 202402 Punta F. de punta Potencia
+Punta: 91836 77886 87048 72072 76914 80514 47826 Valor 0 0 Fecha Días Punta F. Punta
+Resto: 217206 165690 191898 160092 191304 186750 103086 Fecha Exceso: 29991231 29991231 1 - 29 1630,3042 1188,2103
+Valle: 103680 89982 94230 85320 90954 86346 51210 Fecha de recontratación: 29991231 29991231 2 3 - - 0 0 0 0 , , 0 0 0 0 0 0 0 0 0 0 , , 0 0 0 0 0 0 0 0
+Total: 412722 333558 373176 317484 359172 353610 202122 29 1630,3042 1188,2103
+Consumos de Potencia (KW):
+Subsidio al Csmo Energía sin Sub.
+Periodos
+Descripción de Códigos: Fecha Días Punta Resto Valle Punta Resto Valle
+202308 202309 202310 202311 202312 202401 202402
+R: Consumo real 1 - 29 3,4217 3,3098 3,2457
+E: Consumo estimado Punta: 1035 1073 1042 1040 1069 1046 508 2 - 0 0,0000 0,0000 0,0000
+Fuera Punta: 1053 1044 1055 1057 1062 1073 529 3 - 0 0,0000 0,0000 0,0000
+29 3,4217 3,3098 3,2457
+Factor de Potencia:
+Concepto Punta Valle Resto
+Tg. Fi.: 0,196 0,191 0,195
+Total de energía activa: 202122KWh
+Recargo:
+Lecturas
+Nº Medidor Concepto: Cte. Consumo Detalle de Facturación Importe:
+Anterior: Actual:
+SUBTOTAL IMPUESTOS 1.136.980,82
+Tasa de iluminacion municipal - La Plata 30.000,00
+SUBTOTAL CARGOS VARIOS EXENTOS 30.000,00
+Su gasto diario de electricidad es de $ 102940,51 Vencimientos Recargo
+1º 11/03/2024 4.325.173,17
+Próximo Vencimiento: 08/04/2024
+I.V.A. del recargo: 29175,65 2º 18/03/2024 146.959,92 4.472.133,09
+Página nº 2de 2
+Remite Sucursal: CITY BELL
+14 364 1896 CITY BELL - Tel.: 4722923
+Período: 202402 Nº de factura:0020-01766800
+Información Complementaria: Tarifa: T5M12 - Media Tension NIR: 0-3512065-01-01/03/2024
+Esta factura incluye Subsidio Estado Nacional por $0 Vencimientos Recargo Importe:
+1º 11/03/2024 4.325.173,17
+2º 18/03/2024 146.959,92 4.472.133,09
+No debe abonarse en banco.""".splitlines()
+
 # CAMMESA: coordenadas (texto, x, top) verificadas con `page.extract_words()` contra dos facturas
 # reales (UPP período 2024-01 y EITAR período 2024-08, clientes distintos) — no una reconstrucción
 # de línea de texto: el parser de CAMMESA necesita palabras separadas por posición, no texto lineal
@@ -243,9 +395,10 @@ def _generar_pdf_por_palabras(ruta: str, palabras: list[tuple[str, float, float]
 def _generar_pdf(ruta: str, lineas: list[str]) -> None:
     """Una línea del texto real por línea del PDF — reproduce el mismo `extract_text()` jumbled
     que produce la factura real, no un layout limpio inventado."""
-    c = canvas.Canvas(ruta, pagesize=(2200, 1600))
+    alto = max(1600, 13 * len(lineas) + 50)
+    c = canvas.Canvas(ruta, pagesize=(2200, alto))
     c.setFont("Helvetica", 9)
-    y = 1550
+    y = alto - 50
     for linea in lineas:
         c.drawString(20, y, linea)
         y -= 13
@@ -300,6 +453,29 @@ def test_edelap_factura_202312_confirma_layout_estable_entre_periodos(tmp_path):
     assert factura.potencia_excedida_fuera_punta_kw == pytest.approx(212.0)
     assert factura.importe_potencia_ars == pytest.approx(1167805.19 + 1009978.80 + 589011.74 + 377850.89)
     assert factura.importe_total_ars == pytest.approx(5208335.26)
+
+
+def test_edelap_factura_202402_sin_exceso_usa_demanda_registrada(tmp_path):
+    """Mes sin exceso: la demanda registrada (508/529 kW) queda por debajo de la contratada. Derivarla
+    de contratada + exceso daría 800/850 kW, y exigir los 4 conceptos tarifados rechazaba la factura."""
+    ruta_pdf = str(tmp_path / "edelap_202402.pdf")
+    _generar_pdf(ruta_pdf, LINEAS_EDELAP_202402)
+
+    factura = ParserFacturaPotenciaEdelap().parsear(ruta_pdf, PLANTA_ID)
+
+    assert factura.periodo == "2024-02"
+    assert factura.numero_factura == "0020-01766800"
+    assert factura.dias_facturados == 29
+    assert factura.potencia_contratada_punta_kw == pytest.approx(800.0)
+    assert factura.potencia_contratada_fuera_punta_kw == pytest.approx(850.0)
+    assert factura.potencia_adquirida_punta_kw == pytest.approx(508.0)
+    # Fuera de punta = máx(resto 529, valle 517).
+    assert factura.potencia_adquirida_fuera_punta_kw == pytest.approx(529.0)
+    assert factura.potencia_excedida_punta_kw == pytest.approx(0.0)
+    assert factura.potencia_excedida_fuera_punta_kw == pytest.approx(0.0)
+    # Solo pico + fuera de pico por transporte: ni el interés por mora ni el CTT.
+    assert factura.importe_potencia_ars == pytest.approx(1304243.38 + 1009978.80)
+    assert factura.importe_total_ars == pytest.approx(4325173.17)
 
 
 def test_edelap_factura_sin_campos_obligatorios_lanza_ilegible(tmp_path):
