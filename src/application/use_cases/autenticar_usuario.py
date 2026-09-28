@@ -178,6 +178,7 @@ class AutenticarUsuarioUseCase:
             org = self.repo_organizaciones.obtener_por_id(org_id)
             if org:
                 es_cooperativa = org.es_cooperativa
+                org_nombre = org.nombre
 
         plantas = []
         if self.acceso_plantas is not None:
