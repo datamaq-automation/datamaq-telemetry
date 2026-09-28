@@ -3,9 +3,20 @@
 > **Decisión aplicable:** `decisions/2026-09-24_factura-distribuidora-yaml.md` (repo padre).
 > **Traspasada a hija:** sí · **Bloque cerrado:** ✓ SÍ — UPP con EdeLAP (potencia) + CAMMESA (energía) 
 > completamente implementado, pusheado a `main` (commit `4729849`, 2026-09-24). Parsers reales 
-> verificados contra 2+ facturas cada uno. Datos en producción: 2 facturas UPP (2026-08) cargadas 
-> en `data/facturas_distribuidora.yml`. 
-> 
+> verificados contra 2+ facturas cada uno. Datos en producción: 11 facturas EDELAP de potencia de
+> UPP (2023-12 a 2024-11, sin 2024-02), ninguna de energía. Ver la corrección de abajo.
+>
+> **Corrección 2026-09-28 (`690b868` + datamaq-data `001771a`):** las "2 facturas UPP (2026-08)"
+> que esta spec daba por reales no lo eran. La de EDELAP era la factura 2024-11 (mismo Nº
+> 0020-01988580 y mismo total de $ 21.031.736,78, con vencimiento 10/12/2024), cargada con el
+> período y la planta equivocados. La de CAMMESA (`CAM-2026-08-00312`) era de ejemplo, como ya
+> advertía §3, y se armó con la energía y los cargos variables de esa misma factura EDELAP.
+> Se quitaron las dos. Además, la regex del importe total no coincidía con el texto real del PDF
+> (`importe_total_ars` salía 0.0), y los fixtures del test del parser eran una reconstrucción a
+> mano que lo ocultaba. Las menciones a "la factura real de Durax" y a "2026-08 en producción"
+> más abajo son registro histórico de la implementación: quedan tal cual, pero son incorrectas.
+> Los ejemplos de YAML (§2.2) y de JSON (§3) se reemplazaron por la factura 2024-11 real.
+>
 > **Pendiente (sin urgencia, sin consumidor real hasta que se instale medidor):**
 > - Confirmar con `app-datamaq` si necesita campo `cargadaEn` en DTO (existe en domain)
 > - EDESUR/Edenor/distribuidoras locales: relevar al instalar medidor + obtener 2+ muestras reales
@@ -244,34 +255,20 @@ cada mes; anidarlo infla el archivo de estructura con filas que no cambian la to
 # Campos de potencia discriminados Punta / Fuera de Punta porque así factura la distribuidora
 # en Media Tensión (confirmado con una factura real EDELAP tarifa T5M12, ver §2.1 punto 4).
 facturas:
-  - planta_id: "c64fd625-0037-4caa-b68a-800e8e0ee548"
-    periodo: "2026-08"
+  - planta_id: "4f68f653-a604-4834-8154-31f938248572"
+    periodo: "2024-11"
     proveedor: "EDELAP"
     tipo_dato: "potencia"
     numero_factura: "0020-01988580"
     importe_total_ars: 21031736.78
-    tarifa: "T5M12"
+    tarifa: T5M12
     dias_facturados: 30
     potencia_contratada_punta_kw: 800.0
     potencia_contratada_fuera_punta_kw: 850.0
     potencia_adquirida_punta_kw: 1049.0
     potencia_adquirida_fuera_punta_kw: 1082.0
-    importe_potencia_ars: 7664856.62
-    fuente_archivo: "factura-durax-2026-08-edelap.pdf"
-    cargada_en: "2026-09-24"
-  - planta_id: "c64fd625-0037-4caa-b68a-800e8e0ee548"
-    periodo: "2026-08"
-    proveedor: "CAMMESA"
-    tipo_dato: "energia"
-    numero_factura: "CAM-2026-08-00312"
-    importe_total_ars: 638572.35
-    dias_facturados: 30
-    energia_activa_punta_kwh: 68310.0
-    energia_activa_resto_kwh: 187506.0
-    energia_activa_valle_kwh: 59994.0
-    importe_energia_ars: 638572.35
-    fuente_archivo: "factura-durax-2026-08-cammesa.pdf"
-    cargada_en: "2026-09-24"
+    importe_potencia_ars: 13666250.370000001
+    fuente_archivo: "2024-11.pdf"
 ```
 
 Cargado en el repo con la planta Durax real (`c64fd625-0037-4caa-b68a-800e8e0ee548`, la misma que
@@ -334,7 +331,8 @@ parser generaliza y no quedó hardcodeado a una sola factura.
 #### ✅ Resueltos (2026-09-24)
 
 1. **Parser real de EdeLAP (potencia).** Verificado contra 2 facturas reales UPP de períodos 
-   distintos (2026-08 en producción).
+   distintos (2023-12 y 2024-11; la que figuraba como "2026-08 en producción" era la 2024-11 mal
+   fechada, ver corrección 2026-09-28 en la cabecera).
 2. **Parser de CAMMESA (energía).** Primera versión falló contra 2ª muestra (EITAR 2024-08): 
    regex sobre `extract_text()` lineal es insuficiente. Causa: valor de energía pegado a código 
    sin separador (`"0006849353,610 MWh"`). Reescrito con `page.extract_words()` por coordenadas 
@@ -436,15 +434,16 @@ Auth: Depends(get_usuario_actual) + Depends(resolver_planta_permitida)   (mismo 
 ```
 
 Payload real (JSON, camelCase — ver DTO arriba): **dos elementos por período** cuando hay dos
-proveedores, cada uno con los campos del OTRO tipo en `null`. Valores reales de la factura de
-potencia EDELAP inspeccionada durante la sesión (los de CAMMESA/energía son de ejemplo, sin
-muestra real todavía — ver "Pendientes"):
+proveedores, cada uno con los campos del OTRO tipo en `null`. Ejemplo con la factura EDELAP
+2024-11 real de UPP. Hoy no hay ninguna factura de energía (CAMMESA) cargada, así que UPP devuelve
+solo documentos `tipoDato: "potencia"`. El ejemplo anterior de CAMMESA era inventado y se quitó
+(corrección 2026-09-28):
 ```json
 [
   {
-    "id": "c64fd625-0037-4caa-b68a-800e8e0ee548-2026-08-potencia",
-    "plantaId": "c64fd625-0037-4caa-b68a-800e8e0ee548",
-    "periodo": "2026-08",
+    "id": "4f68f653-a604-4834-8154-31f938248572-2024-11-potencia",
+    "plantaId": "4f68f653-a604-4834-8154-31f938248572",
+    "periodo": "2024-11",
     "proveedor": "EDELAP",
     "tipoDato": "potencia",
     "numeroFactura": "0020-01988580",
@@ -459,28 +458,9 @@ muestra real todavía — ver "Pendientes"):
     "potenciaAdquiridaFueraPuntaKw": 1082.0,
     "potenciaExcedidaPuntaKw": 249.0,
     "potenciaExcedidaFueraPuntaKw": 232.0,
-    "importePotenciaArs": 7664856.62,
+    "importePotenciaArs": 13666250.37,
     "importeEnergiaArs": null,
     "valorEnergiaArsKwhPromedio": null
-  },
-  {
-    "id": "c64fd625-0037-4caa-b68a-800e8e0ee548-2026-08-energia",
-    "plantaId": "c64fd625-0037-4caa-b68a-800e8e0ee548",
-    "periodo": "2026-08",
-    "proveedor": "CAMMESA",
-    "tipoDato": "energia",
-    "numeroFactura": "CAM-2026-08-00312",
-    "importeTotalArs": 638572.35,
-    "tarifa": null,
-    "diasFacturados": 30,
-    "energiaActivaPuntaKwh": 68310.0,
-    "energiaActivaRestoKwh": 187506.0,
-    "energiaActivaValleKwh": 59994.0,
-    "energiaFacturadaKwh": 315810.0,
-    "potenciaContratadaPuntaKw": null,
-    "importePotenciaArs": null,
-    "importeEnergiaArs": 638572.35,
-    "valorEnergiaArsKwhPromedio": 2.0220143440676357
   }
 ]
 ```
