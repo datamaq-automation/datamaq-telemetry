@@ -30,7 +30,7 @@
 > **2. Dominio & Puertos**, **3. Casos de Uso & DTOs**, **4. Matriz de Pruebas (RED Suite)** y
 > **5. Criterios del Gauntlet** siguiendo su `AGENTS.md`.
 
-**Traspasada a hija:** sí · **Bloque cerrado:** no
+**Traspasada a hija:** sí · **Bloque cerrado:** sí (implementación core completa, tests unitarios pasados)
 
 ### 1. Objetivo y Contexto
 
