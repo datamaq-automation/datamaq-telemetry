@@ -67,6 +67,24 @@ jobs:
             echo "→ Modo Gauntlet Completo: Cambios en código de producto"
           fi
 
+      - name: "Guard: requirements.lock sincronizado con requirements.txt (D3)"
+        run: |
+          # Si requirements.txt fue modificado, requirements.lock también debe serlo
+          if git diff HEAD~1..HEAD --name-only | grep -q "requirements.txt"; then
+            echo "requirements.txt fue modificado. Verificando requirements.lock..."
+            if ! git diff HEAD~1..HEAD --name-only | grep -q "requirements.lock"; then
+              echo "❌ ERROR: requirements.txt cambió pero requirements.lock no fue regenerado"
+              echo ""
+              echo "Solución:"
+              echo "  pip install pip-tools"
+              echo "  pip-compile requirements.txt -o requirements.lock"
+              echo "  git add requirements.txt requirements.lock"
+              echo "  git commit"
+              exit 1
+            fi
+            echo "✓ requirements.lock está sincronizado con requirements.txt"
+          fi
+
       - name: Setup Python 3.12
         uses: actions/setup-python@v5
         with:
