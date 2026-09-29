@@ -1,15 +1,15 @@
 """src/application/use_cases/monitorear_potencia_y_alarma.py."""
 
+import logging
 from datetime import datetime, timezone
 
 from src.application.dtos.notificador_dto import NotificadorEstadoDTO
+from src.domain.notificaciones.ports import PublicadorAlarmaPort
 from src.domain.notificaciones.servicios.monitor_potencia_tuya import MonitorPotenciaTuyaService
 from src.domain.telemetria.exceptions import PlantaNoEncontradaError
 from src.domain.telemetria.ports import BufferTelemetriaEnVivoPort, RepositorioOrganizacionesPort
-from src.infrastructure.settings.logger import get_logger
-from src.infrastructure.tuya.tuya_publisher import TuyaPublisher
 
-logger = get_logger("monitorear_potencia_y_alarma")
+logger = logging.getLogger(__name__)
 
 
 class MonitorearPotenciaYAlarmaUseCase:
@@ -22,7 +22,7 @@ class MonitorearPotenciaYAlarmaUseCase:
         self,
         repo_organizaciones: RepositorioOrganizacionesPort,
         buffer_telemetria: BufferTelemetriaEnVivoPort,
-        publisher: TuyaPublisher,
+        publisher: PublicadorAlarmaPort,
     ):
         self._repo_org = repo_organizaciones
         self._buffer = buffer_telemetria

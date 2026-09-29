@@ -4,13 +4,14 @@ import json
 
 import paho.mqtt.client as mqtt
 
+from src.domain.notificaciones.ports import PublicadorAlarmaPort
 from src.infrastructure.settings.config import get_settings
 from src.infrastructure.settings.logger import get_logger
 
 logger = get_logger("tuya_publisher")
 
 
-class TuyaPublisher:
+class TuyaPublisher(PublicadorAlarmaPort):
     """Publicador de comandos MQTT al dispositivo GF-SMBOX-PLUS."""
 
     TOPIC_CONTROL = "/control/tuya/smbox"
