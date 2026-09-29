@@ -1,6 +1,6 @@
 """tests/unit/test_monitor_potencia_tuya.py."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 

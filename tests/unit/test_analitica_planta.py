@@ -121,7 +121,7 @@ def test_banco_capacitores_respeta_q_reactiva_negativa():
         resultado = use_case.obtener_banco_capacitores(planta_id="planta-capacitiva", periodo_dias=30)
 
     # Validaciones: Q_max <= 0 → sobrecompensada, no instalar banco
-    assert resultado.potencia_reactiva_max_kvar == 0.0  # max([−50, −30, 0])
+    assert resultado.potencia_reactiva_max_kvar == 0.0  # max([-50, -30, 0])
     assert resultado.sobrecompensacion_sostenida is True
     assert resultado.banco_comercial_sugerido_kvar is None
     assert resultado.razon_no_recomendacion is not None

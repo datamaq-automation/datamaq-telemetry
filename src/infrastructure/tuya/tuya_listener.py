@@ -1,7 +1,6 @@
 """src/infrastructure/tuya/tuya_listener.py."""
 
 import json
-from datetime import datetime
 
 import paho.mqtt.client as mqtt
 from paho.mqtt.enums import CallbackAPIVersion

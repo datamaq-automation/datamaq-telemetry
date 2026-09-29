@@ -59,9 +59,9 @@ from src.infrastructure.fastapi.dependencies import (
     get_telemetria_use_case,
     get_usuario_actual,
 )
-from src.infrastructure.settings.config import Settings
 from src.infrastructure.fastapi.error_handler import manejar_error_http
 from src.infrastructure.fastapi.planta_ownership import resolver_planta_permitida
+from src.infrastructure.settings.config import Settings
 from src.infrastructure.sqlalchemy.mysql_repositories import MySQLTelemetriaRepository
 from src.infrastructure.yaml.repositories.organizaciones_repository import (
     YamlOrganizacionesRepository,
