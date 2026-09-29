@@ -93,7 +93,14 @@ def resumen_nodo_unifilar(
 ):
     try:
         org_id = _resolver_org_id(claims)
-        return use_case.resumen(planta_id, nodo_id, org_id, granularity, timezone, dias)
+        return use_case.resumen(
+            planta_id=planta_id,
+            nodo_id=nodo_id,
+            organizacion_id=org_id,
+            granularity=granularity,
+            timezone=timezone,
+            dias=dias,
+        )
     except Exception as e:
         manejar_error_http(e)
 
