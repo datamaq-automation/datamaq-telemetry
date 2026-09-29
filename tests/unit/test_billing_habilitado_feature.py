@@ -4,7 +4,7 @@ Tests del flag BILLING_HABILITADO para desactivar cobro de suscripciones.
 Verifica que cuando billing_habilitado=False, todos actúan como PRO ilimitado.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from unittest.mock import Mock
 
 import pytest
@@ -59,7 +59,7 @@ class TestConsultarTelemetriaConBillingDisabled:
             planta_id="planta-001",
         )
 
-        es_pro, modo_free, retencion_dias, min_intervalo = use_case._obtener_contexto_suscripcion(
+        es_pro, _, retencion_dias, min_intervalo = use_case._obtener_contexto_suscripcion(
             dispositivo
         )
 
@@ -103,7 +103,7 @@ class TestConsultarTelemetriaConBillingDisabled:
             planta_id="planta-001",
         )
 
-        es_pro, modo_free, retencion_dias, min_intervalo = use_case._obtener_contexto_suscripcion(
+        es_pro, _, retencion_dias, min_intervalo = use_case._obtener_contexto_suscripcion(
             dispositivo
         )
 
@@ -120,8 +120,6 @@ class TestAutenticarUsuarioConBillingDisabled:
     ):
         """Cuando billing_habilitado=False, /me retorna notificaciones habilitadas y sin modo free."""
         mock_repo_usuarios = Mock()
-        mock_repo_dispositivos = Mock()
-        mock_acceso_plantas = Mock()
 
         use_case = AutenticarUsuarioUseCase(
             repo_usuarios=mock_repo_usuarios,
@@ -146,8 +144,6 @@ class TestAutenticarUsuarioConBillingDisabled:
     ):
         """Cuando billing_habilitado=True, se respeta el estado free vs. pro."""
         mock_repo_usuarios = Mock()
-        mock_repo_dispositivos = Mock()
-        mock_acceso_plantas = Mock()
         mock_repo_suscripciones = Mock()
 
         # Sin PRO vigente = free
@@ -182,9 +178,11 @@ class TestAutenticarUsuarioConBillingDisabled:
         self, hash_service, token_service, rate_limiter
     ):
         """Cuando billing_habilitado=True y PRO vigente, se retorna plan y Sin restricciones."""
+        from decimal import Decimal
+
+        from src.domain.telemetria.entities import PlanTelemetria
+
         mock_repo_usuarios = Mock()
-        mock_repo_dispositivos = Mock()
-        mock_acceso_plantas = Mock()
         mock_repo_suscripciones = Mock()
         mock_repo_planes = Mock()
 
@@ -197,9 +195,6 @@ class TestAutenticarUsuarioConBillingDisabled:
             modo_free=ModoFreeTier.PRIVADO_BASICO,
         )
         mock_repo_suscripciones.obtener_por_organizacion.return_value = sus_pro
-
-        from src.domain.telemetria.entities import PlanTelemetria
-        from decimal import Decimal
 
         plan = PlanTelemetria(
             id="plan-pro",
@@ -256,50 +251,16 @@ class TestVerificadorNotificacionesBilling:
         mock_session_factory.assert_not_called()
 
     def test_billing_enabled_notificaciones_respetan_suscripcion(self):
-        """Cuando billing_habilitado=True, se respeta el estado PRO/free."""
+        """Cuando billing_habilitado=True, el verificador se construye aceptando el parámetro."""
         from src.infrastructure.paho_mqtt.verificador_notificaciones import (
             construir_verificador_notificaciones,
         )
-        from src.domain.telemetria.ports import RepositorioOrganizacionesPort
 
         mock_session_factory = Mock()
-        mock_db = Mock()
-        mock_session_factory.return_value = mock_db
 
-        # Setup de mocks para el flujo normal
-        mock_repo_disp = Mock()
-        mock_repo_sus = Mock()
-
-        dispositivo = Dispositivo(
-            id="dev-001",
-            device_uid=MacAddress("00:00:00:00:00:01"),
-            nombre="Medidor Test",
-            planta_id="planta-001",
-        )
-        mock_repo_disp.obtener_por_id.return_value = dispositivo
-
-        planta = Planta(id="planta-001", organizacion_id="org-001", nombre="Planta Test")
-        org = Organizacion(id="org-001", nombre="Org Test")
-
-        # Mock para inyectar los repositorios
-        mock_repo_org = Mock(spec=RepositorioOrganizacionesPort)
-        mock_repo_org.obtener_planta_por_id.return_value = planta
-        mock_repo_org.obtener_por_id.return_value = org
-
-        # Con PRO vigente, debe retornar True
-        futuro = ahora_utc() + timedelta(days=30)
-        sus_pro = Suscripcion(
-            organizacion_id="org-001",
-            plan_id="plan-pro",
-            pro_vence_en=futuro,
-        )
-        mock_repo_sus.obtener_por_organizacion.return_value = sus_pro
-
-        verificador = construir_verificador_notificaciones(
+        # Verifica que construir_verificador_notificaciones acepta el parámetro billing_habilitado=True
+        # Sin llamar al verificador (requeriría mock completo de MySQLRepositories)
+        construir_verificador_notificaciones(
             session_factory=mock_session_factory,
-            repo_organizaciones=mock_repo_org,
             billing_habilitado=True,
         )
-
-        # No llamamos al verificador sin mock completo de MySQLRepositories
-        # Este test verifica que el parámetro se acepta correctamente
