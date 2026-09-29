@@ -54,6 +54,7 @@ class AutenticarUsuarioUseCase:
         repo_suscripciones: RepositorioSuscripcionesPort | None = None,
         repo_planes: RepositorioPlanesPort | None = None,
         repo_organizaciones: RepositorioOrganizacionesPort | None = None,
+        billing_habilitado: bool = True,
     ):
         self.repo_usuarios = repo_usuarios
         self.hash_service = hash_service
@@ -66,6 +67,7 @@ class AutenticarUsuarioUseCase:
         self.repo_suscripciones = repo_suscripciones
         self.repo_planes = repo_planes
         self.repo_organizaciones = repo_organizaciones
+        self.billing_habilitado = billing_habilitado
 
     def _registrar_intento(self, clave: str) -> None:
         if self.rate_limiter is not None:
@@ -211,6 +213,9 @@ class AutenticarUsuarioUseCase:
         Las cooperativas tienen retención ilimitada y no se clasifican como "free"."""
         if es_cooperativa:
             return None, False, None, False
+
+        if not self.billing_habilitado:
+            return None, False, None, True
 
         if not org_id or not self.repo_suscripciones:
             return None, True, 7, False

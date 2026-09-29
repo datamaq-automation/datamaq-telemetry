@@ -87,6 +87,7 @@ def get_auth_use_case(
         repo_suscripciones=MySQLSuscripcionesRepository(db),
         repo_planes=MySQLPlanesRepository(db),
         repo_organizaciones=YamlOrganizacionesRepository(),
+        billing_habilitado=settings.BILLING_HABILITADO,
     )
 
 

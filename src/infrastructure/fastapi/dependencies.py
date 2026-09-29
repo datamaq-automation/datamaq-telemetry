@@ -122,6 +122,7 @@ def get_rate_limiter() -> RateLimiterService:
 
 def get_telemetria_use_case(
     db: Annotated[Session, Depends(get_db_session)],
+    settings: Annotated[Settings, Depends(get_settings_dep)],
 ) -> ConsultarTelemetriaUseCase:
     repo_disp = repo_dispositivos_resuelto(db)
     repo_telem = MySQLTelemetriaRepository(db)
@@ -134,6 +135,7 @@ def get_telemetria_use_case(
         repo_planes,
         buffer_en_vivo=global_telemetria_buffer,
         repo_suscripciones=MySQLSuscripcionesRepository(db),
+        billing_habilitado=settings.BILLING_HABILITADO,
     )
 
 

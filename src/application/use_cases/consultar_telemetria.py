@@ -47,6 +47,7 @@ class ConsultarTelemetriaUseCase:
         repo_planes: RepositorioPlanesPort | None = None,
         buffer_en_vivo: BufferTelemetriaEnVivoPort | None = None,
         repo_suscripciones: RepositorioSuscripcionesPort | None = None,
+        billing_habilitado: bool = True,
     ):
         self.repo_telemetria = repo_telemetria
         self.repo_dispositivos = repo_dispositivos
@@ -54,6 +55,7 @@ class ConsultarTelemetriaUseCase:
         self.repo_planes = repo_planes
         self.buffer_en_vivo = buffer_en_vivo
         self.repo_suscripciones = repo_suscripciones
+        self.billing_habilitado = billing_habilitado
 
     def _suscripcion_de_dispositivo(self, dev: Dispositivo) -> Suscripcion | None:
         """Suscripción de la organización del dispositivo; None si no se puede resolver la organización."""
@@ -89,6 +91,10 @@ class ConsultarTelemetriaUseCase:
     def _obtener_contexto_suscripcion(self, dev: Dispositivo) -> tuple[bool, ModoFreeTier, int | None, int]:
         ahora = datetime.now(timezone.utc)
         sus = self._suscripcion_de_dispositivo(dev)
+
+        if not self.billing_habilitado:
+            # Cuando billing está deshabilitado, todos actúan como PRO ilimitado
+            return True, ModoFreeTier.PRIVADO_BASICO, None, 0
 
         if sus is not None:
             # Obtener la organización para verificar si es cooperativa

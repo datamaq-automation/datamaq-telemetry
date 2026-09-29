@@ -40,6 +40,9 @@ def crear_checkout_suscripcion(
 ):
     """D1/D2 del plan de billing: solo para la organización del usuario autenticado
     (ya instalada) — no da de alta organizaciones nuevas."""
+    settings = get_settings()
+    if not settings.BILLING_HABILITADO:
+        raise HTTPException(status_code=503, detail="El servicio de billing está deshabilitado.")
     organizacion_id = claims.get("org")
     if not organizacion_id:
         raise HTTPException(status_code=422, detail="El usuario autenticado no tiene organización asociada.")
@@ -60,6 +63,8 @@ async def webhook_mercadopago(
     """Sin autenticación de usuario (lo llama Mercado Pago, no un cliente nuestro) — la
     verificación de identidad es la firma HMAC de `x-signature`, no un JWT."""
     settings = get_settings()
+    if not settings.BILLING_HABILITADO:
+        raise HTTPException(status_code=503, detail="El servicio de billing está deshabilitado.")
     data_id = request.query_params.get("data.id") or request.query_params.get("id")
     if not data_id:
         raise HTTPException(status_code=400, detail="Falta data.id en la notificación.")
