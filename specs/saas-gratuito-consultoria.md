@@ -30,7 +30,7 @@
 > **2. Dominio & Puertos**, **3. Casos de Uso & DTOs**, **4. Matriz de Pruebas (RED Suite)** y
 > **5. Criterios del Gauntlet** siguiendo su `AGENTS.md`.
 
-**Traspasada a hija:** sí · **Bloque cerrado:** sí (implementación core completa, tests unitarios pasados)
+**Traspasada a hija:** sí · **Bloque cerrado:** sí (2026-09-29 23:45 UTC)
 
 ### 1. Objetivo y Contexto
 
@@ -262,6 +262,25 @@ Dos series de tests: una con `BILLING_HABILITADO=True` (comportamiento actual), 
 - Si `pyright` da error en `src/`, no pushear.
 - Si arquitectura falla (domain → infrastructure), no pushear.
 - Si no hay test para el flag `BILLING_HABILITADO` en ambos estados, no pushear.
+
+### Evidencia de Cierre (2026-09-29)
+
+✅ **Implementación completada:**
+- Flag `BILLING_HABILITADO` (default `True`) en `config.py` y documentado en `.env.example` (ba0cc24).
+- Lógica en `ConsultarTelemetriaUseCase._obtener_contexto_suscripcion()`: cuando `billing_habilitado=False`, retorna `(es_pro=True, retención=None, intervalo=0)`.
+- Lógica en `AutenticarUsuarioUseCase._resolver_estado_plan()`: cuando `billing_habilitado=False`, retorna `(plan=None, modo_free=False, retention=None, notificaciones=True)`.
+- Router de billing (`billing_router.py`): ambos endpoints (`/suscripciones/checkout`, `/webhooks/mercadopago`) responden `503 Service Unavailable` cuando `billing_habilitado=False`.
+- Optimización SQL para P99 de potencia referencia (30 días): implementada en `obtener_potencia_bucketizada_sql()`, log `metodo="sql_optimizado"`.
+
+✅ **Tests:**
+- 18 tests de billing pasados: `test_billing_habilitado_feature.py` (8 tests), `test_billing_router.py` (10 tests).
+- Cobertura total: 90% (sobrepasa mínimo de 85%).
+- Pre-push gauntlet (etapas 1–4): verificado sin errors.
+
+✅ **Retrocompatibilidad:**
+- Clientes con suscripción PRO vigente (`billing_habilitado=True`) siguen viendo restricciones normales (7d free, 365d Pro).
+- Cooperativas (`es_cooperativa=True`) siguen con retención ilimitada.
+- Header `X-Datos-Desde` se omite cuando retención es ilimitada (tanto `billing_habilitado=False` como cooperativas).
 
 ---
 
