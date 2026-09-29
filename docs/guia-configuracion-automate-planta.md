@@ -59,7 +59,7 @@ Una vez obtenidas las MACs/IDs en planta, ingresar por SSH a la VPS y ejecutar e
 
 ```bash
 cd /ruta/al/proyecto/datamaq-telemetry
-venv/bin/python scripts/provision_confeccionadora.py \
+.venv/bin/python scripts/provision_confeccionadora.py \
   --smartplus-mac <MAC_SMARTPLUS> \
   --automate-id <ID_AUTOMATE> \
   --org "Cliente Confecciones" \

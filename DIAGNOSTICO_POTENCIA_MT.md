@@ -141,7 +141,7 @@ _log.debug(
 cd /home/agustin/proyectos_software/datamaq/datamaq-telemetry
 
 # Ejecutar script de diagnóstico SQL
-venv/bin/python -m scripts.diagnose_mt_potencia_bug \
+.venv/bin/python -m scripts.diagnose_mt_potencia_bug \
   --planta-id c64fd625-0037-4caa-b68a-800e8e0ee548 \
   --nodo-id acometida-13200v
 ```

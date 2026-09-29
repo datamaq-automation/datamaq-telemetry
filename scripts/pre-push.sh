@@ -5,19 +5,46 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$DIR/.." && pwd)"
 cd "$ROOT_DIR"
 
-if [ -d "venv" ]; then
-    source venv/bin/activate
-    # `source activate` no garantiza que venv/bin quede primero en PATH (algunos shells
+if [ -d ".venv" ]; then
+    # Mismo Python que CI y producción (3.12): un gauntlet local en otra versión puede dar
+    # verde donde CI/prod fallan, o al revés.
+    .venv/bin/python -c 'import sys; sys.exit(sys.version_info[:2] != (3, 12))' \
+        || { echo "ERROR: .venv no es Python 3.12. Recrearlo (ver README §1)."; exit 1; }
+    source .venv/bin/activate
+    # `source activate` no garantiza que .venv/bin quede primero en PATH (algunos shells
     # reordenan tras el activate, ej. ~/.local/bin adelante) — sin esto, "pytest"/"pyright"
     # a secas pueden resolver a un binario global sin las dependencias del proyecto
     # instaladas, y el gauntlet falla con ImportError en vez de con un resultado real.
-    export PATH="$ROOT_DIR/venv/bin:$PATH"
+    export PATH="$ROOT_DIR/.venv/bin:$PATH"
+    # Aviso (no bloquea): paquetes cuya versión instalada difiere de requirements.lock.
+    python3 - <<'PY' || true
+import re
+from importlib.metadata import PackageNotFoundError, version
+distintos = []
+for linea in open("requirements.lock"):
+    m = re.match(r"^([A-Za-z0-9_.-]+)(\[[^]]*\])?==(\S+)", linea)
+    if not m:
+        continue
+    try:
+        instalada = version(m.group(1))
+    except PackageNotFoundError:
+        instalada = "ausente"
+    if instalada != m.group(3):
+        distintos.append(f"{m.group(1)} (lock {m.group(3)}, .venv {instalada})")
+if distintos:
+    print("AVISO: .venv no coincide con requirements.lock -> uv pip sync --python .venv/bin/python requirements.lock")
+    print("  " + ", ".join(distintos))
+PY
+elif [ -z "$CI" ]; then
+    # En CI (nightly) no hay .venv: usa el Python de setup-python. En local es obligatorio.
+    echo "ERROR: falta .venv. Crearlo con Python 3.12 (ver README §1)."
+    exit 1
 fi
 
-# Invocación por módulo (`python3 -m X`), no el script `venv/bin/X`: si el repo se movió
+# Invocación por módulo (`python3 -m X`), no el script `.venv/bin/X`: si el repo se movió
 # de carpeta después de crear el venv, el shebang de esos scripts queda apuntando a la
-# ruta vieja ("bad interpreter") mientras que `venv/bin/python3` (symlink al intérprete
-# del sistema) sigue siendo válido.
+# ruta vieja ("bad interpreter") mientras que `.venv/bin/python3` (symlink al intérprete)
+# sigue siendo válido.
 PYTEST="python3 -m pytest"
 PYRIGHT="python3 -m pyright"
 

@@ -110,7 +110,7 @@ Backend datamaq-telemetry (consume comandos de alivio)
 
 ```bash
 cd /home/agustin/proyectos_software/datamaq-telemetry
-source venv/bin/activate
+source .venv/bin/activate
 python scripts/extract_tuya_credentials.py
 ```
 

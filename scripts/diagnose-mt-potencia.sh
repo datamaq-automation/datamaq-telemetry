@@ -32,7 +32,7 @@ fi
 cd "$(dirname "$0")/.." || exit 1
 
 # Ejecutar script Python con los parámetros
-venv/bin/python -m scripts.diagnose_mt_potencia_bug \
+.venv/bin/python -m scripts.diagnose_mt_potencia_bug \
     --planta-id "$FACILITY_ID" \
     ${NODO_ID:+--nodo-id "$NODO_ID"}
 

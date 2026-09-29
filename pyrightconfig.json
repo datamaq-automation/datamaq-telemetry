@@ -9,7 +9,7 @@
     "tests"
   ],
   "venvPath": ".",
-  "venv": "venv",
+  "venv": ".venv",
   "typeCheckingMode": "standard",
   "pythonVersion": "3.10"
 }

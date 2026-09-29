@@ -13,7 +13,7 @@ Este documento explica cómo usar los scripts de diagnóstico para validar si la
 **Uso:**
 
 ```bash
-venv/bin/python scripts/diagnosticar_ti.py \
+.venv/bin/python scripts/diagnosticar_ti.py \
   --device-id c91713f1-0621-4a33-9279-c5327a317d96 \
   --periodo-horas 24 \
   --metrica coherencia \
@@ -58,7 +58,7 @@ Recomendación: R,S,T (Score: 0.9876)
 **Uso:**
 
 ```bash
-venv/bin/python scripts/comparar_ti_bifasico.py \
+.venv/bin/python scripts/comparar_ti_bifasico.py \
   --device-a 7434647d-5b87-4d4e-b4a5-a0d351315f0a \
   --device-b c91713f1-0621-4a33-9279-c5327a317d96 \
   --fecha-inicio 2026-09-17 \
@@ -80,7 +80,7 @@ venv/bin/python scripts/comparar_ti_bifasico.py \
 **Uso:**
 
 ```bash
-venv/bin/python scripts/generar_propuesta_ti.py \
+.venv/bin/python scripts/generar_propuesta_ti.py \
   --device-id c91713f1-0621-4a33-9279-c5327a317d96 \
   --candidato-rango 1 \
   --output propuesta.json
@@ -174,7 +174,7 @@ Además del score, se reporta el signo predominante de Q:
 ### Caso A: Trafo 2 está correctamente configurado
 
 ```bash
-$ venv/bin/python scripts/diagnosticar_ti.py \
+$ .venv/bin/python scripts/diagnosticar_ti.py \
     --device-id c91713f1-0621-4a33-9279-c5327a317d96 \
     --periodo-horas 24
 
@@ -185,13 +185,13 @@ $ venv/bin/python scripts/diagnosticar_ti.py \
 ### Caso B: Trafo 1 tiene Q invertida (error potencial)
 
 ```bash
-$ venv/bin/python scripts/diagnosticar_ti.py \
+$ .venv/bin/python scripts/diagnosticar_ti.py \
     --device-id 7434647d-5b87-4d4e-b4a5-a0d351315f0a \
     --periodo-horas 24
 
 # Resultado: Score 0.42 (candidato #1), Q=-31,000 VAr
 # Comparativa:
-$ venv/bin/python scripts/comparar_ti_bifasico.py \
+$ .venv/bin/python scripts/comparar_ti_bifasico.py \
     --device-a 7434647d-5b87-4d4e-b4a5-a0d351315f0a \
     --device-b c91713f1-0621-4a33-9279-c5327a317d96
 
@@ -203,7 +203,7 @@ $ venv/bin/python scripts/comparar_ti_bifasico.py \
 ### Caso C: Necesita corrección basada en ranking
 
 ```bash
-$ venv/bin/python scripts/diagnosticar_ti.py \
+$ .venv/bin/python scripts/diagnosticar_ti.py \
     --device-id abc123... \
     --periodo-horas 168
 
@@ -212,7 +212,7 @@ $ venv/bin/python scripts/diagnosticar_ti.py \
 # Acción: Evaluar candidato #2 con patrón certificado
 # Si es correcto:
 
-$ venv/bin/python scripts/generar_propuesta_ti.py \
+$ .venv/bin/python scripts/generar_propuesta_ti.py \
     --device-id abc123... \
     --candidato-rango 2 \
     --output propuesta.json

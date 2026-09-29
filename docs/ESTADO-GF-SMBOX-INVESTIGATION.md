@@ -105,7 +105,7 @@ celular/tablet si el panel de Tuya tiene versión liviana/móvil viable.
 
 1. Vincular cuenta Smart Life al proyecto Cloud (paso de arriba), desde un
    equipo con más recursos.
-2. Correr `venv/bin/python scripts/extract_tuya_credentials.py` (lee
+2. Correr `.venv/bin/python scripts/extract_tuya_credentials.py` (lee
    `TUYA_ACCESS_ID`/`TUYA_ACCESS_SECRET`/`TUYA_API_REGION` desde `.env`).
 3. Confirmar que devuelve el Local Key del GF-SMBOX-PLUS
    (Device ID ya conocido: `eb9195f0784612c29cy6dd`).
