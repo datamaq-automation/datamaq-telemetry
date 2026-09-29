@@ -97,8 +97,8 @@ def resumen_nodo_unifilar(
             planta_id=planta_id,
             nodo_id=nodo_id,
             organizacion_id=org_id,
-            granularity=granularity,
-            timezone=timezone,
+            granularidad=granularity,
+            zona=timezone,
             dias=dias,
         )
     except Exception as e:
