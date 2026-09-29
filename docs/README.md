@@ -21,6 +21,8 @@ Bienvenido al centro de documentación técnica del backend de telemetría de en
   - **Alertas e Incidentes:** `GET /api/v1/alertas` y `PATCH /api/v1/alertas/{id}/resolver`.
   - **Metrología 2-TI:** `PATCH /api/v1/dispositivos/{id}` (`fases_con_ti`, `tipo_instalacion`).
   - **Topología Unifilar y Layout 2D:** `/api/v1/planta/unifilar` y `/api/v1/planta/layout`.
+* 📄 [`docs/informe-cambios-contrato-facturas.md`](informe-cambios-contrato-facturas.md)  
+  *Informe de Cambios de Contrato — Facturas de la distribuidora (2026-09-28):* sin cambios de forma; cambian los datos de UPP (12 facturas EDELAP reales, sin documentos de energía) y la semántica de `potenciaAdquirida*Kw` (demanda registrada). Incluye los pendientes del frontend (404 por slug en Facturas) y cómo leer `/openapi.json` por Tailscale o SSH.
 
 ---
 
