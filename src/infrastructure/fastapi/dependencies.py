@@ -493,3 +493,17 @@ def no_permitido_para_invitados_2fa(claims: Annotated[dict[str, Any], Depends(ge
     if claims.get("rol") in ("invitado", "invitado_global"):
         raise HTTPException(status_code=403, detail="2fa_no_disponible_para_invitado")
     return claims
+
+
+def get_monitorear_potencia_use_case(
+    db: Annotated[Session, Depends(get_db_session)],
+) -> Any:
+    from src.application.use_cases.monitorear_potencia_y_alarma import (
+        MonitorearPotenciaYAlarmaUseCase,
+    )
+    from src.infrastructure.tuya.tuya_publisher import TuyaPublisher
+
+    repo_org = YamlOrganizacionesRepository()
+    buffer = global_telemetria_buffer
+    publisher = TuyaPublisher()
+    return MonitorearPotenciaYAlarmaUseCase(repo_org, buffer, publisher)
