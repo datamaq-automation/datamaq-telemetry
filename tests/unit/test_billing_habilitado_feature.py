@@ -59,9 +59,7 @@ class TestConsultarTelemetriaConBillingDisabled:
             planta_id="planta-001",
         )
 
-        es_pro, _, retencion_dias, min_intervalo = use_case._obtener_contexto_suscripcion(
-            dispositivo
-        )
+        es_pro, _, retencion_dias, min_intervalo = use_case._obtener_contexto_suscripcion(dispositivo)
 
         assert es_pro is True, "billing_disabled debe retornar es_pro=True"
         assert retencion_dias is None, "billing_disabled debe retornar retencion_dias=None (ilimitado)"
@@ -103,9 +101,7 @@ class TestConsultarTelemetriaConBillingDisabled:
             planta_id="planta-001",
         )
 
-        es_pro, _, retencion_dias, min_intervalo = use_case._obtener_contexto_suscripcion(
-            dispositivo
-        )
+        es_pro, _, retencion_dias, min_intervalo = use_case._obtener_contexto_suscripcion(dispositivo)
 
         assert es_pro is False, "Sin PRO vigente debe retornar es_pro=False"
         assert retencion_dias == 7, "Free debe retornar retencion_dias=7"
@@ -115,9 +111,7 @@ class TestConsultarTelemetriaConBillingDisabled:
 class TestAutenticarUsuarioConBillingDisabled:
     """Pruebas de /me cuando billing_habilitado=False."""
 
-    def test_billing_disabled_me_sin_restricciones(
-        self, hash_service, token_service, rate_limiter
-    ):
+    def test_billing_disabled_me_sin_restricciones(self, hash_service, token_service, rate_limiter):
         """Cuando billing_habilitado=False, /me retorna notificaciones habilitadas y sin modo free."""
         mock_repo_usuarios = Mock()
 
@@ -139,9 +133,7 @@ class TestAutenticarUsuarioConBillingDisabled:
         assert retention_days is None, "retention_days debe ser None (ilimitado) cuando billing_disabled"
         assert notificaciones is True, "notificaciones deben estar habilitadas cuando billing_disabled"
 
-    def test_billing_enabled_me_respeta_free(
-        self, hash_service, token_service, rate_limiter
-    ):
+    def test_billing_enabled_me_respeta_free(self, hash_service, token_service, rate_limiter):
         """Cuando billing_habilitado=True, se respeta el estado free vs. pro."""
         mock_repo_usuarios = Mock()
         mock_repo_suscripciones = Mock()
@@ -174,9 +166,7 @@ class TestAutenticarUsuarioConBillingDisabled:
         assert retention_days == 7, "retention_days debe ser 7 días para free"
         assert notificaciones is False, "notificaciones no habilitadas para free"
 
-    def test_billing_enabled_me_pro_vigente(
-        self, hash_service, token_service, rate_limiter
-    ):
+    def test_billing_enabled_me_pro_vigente(self, hash_service, token_service, rate_limiter):
         """Cuando billing_habilitado=True y PRO vigente, se retorna plan y Sin restricciones."""
         from decimal import Decimal
 
