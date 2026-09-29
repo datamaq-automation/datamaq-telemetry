@@ -53,7 +53,13 @@ from src.domain.sge.ports import (
     RepositorioRegistroCapacitacionesSgePort,
 )
 from src.domain.telemetria.ports import RepositorioOrganizacionesPort
-from src.infrastructure.fastapi.dependencies import get_db_session, get_telemetria_use_case, get_usuario_actual
+from src.infrastructure.fastapi.dependencies import (
+    get_db_session,
+    get_settings_dep,
+    get_telemetria_use_case,
+    get_usuario_actual,
+)
+from src.infrastructure.settings.config import Settings
 from src.infrastructure.fastapi.error_handler import manejar_error_http
 from src.infrastructure.fastapi.planta_ownership import resolver_planta_permitida
 from src.infrastructure.sqlalchemy.mysql_repositories import MySQLTelemetriaRepository
@@ -154,11 +160,15 @@ def get_consultar_costo_estimado_use_case(
         RepositorioOrganizacionesPort,
         Depends(get_organizaciones_repository),
     ],
+    settings: Annotated[
+        Settings,
+        Depends(get_settings_dep),
+    ],
 ) -> ConsultarCostoEstimadoUseCase:
     return ConsultarCostoEstimadoUseCase(
         repo_organizaciones=repo_org,
         repo_telemetria=MySQLTelemetriaRepository(db),
-        consultar_telemetria=get_telemetria_use_case(db),
+        consultar_telemetria=get_telemetria_use_case(db, settings),
     )
 
 

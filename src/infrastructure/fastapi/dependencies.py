@@ -223,13 +223,14 @@ def get_procesar_pregunta_asistente_use_case(
 
 def get_consultar_analitica_planta_use_case(
     db: Annotated[Session, Depends(get_db_session)],
+    settings: Annotated[Settings, Depends(get_settings_dep)],
 ) -> Any:
     from src.application.use_cases.consultar_analitica_planta import (
         ConsultarAnaliticaPlantaUseCase,
     )
 
     # Reutilizar la misma sesión de telemetría
-    consultar_telemetria = get_telemetria_use_case(db)
+    consultar_telemetria = get_telemetria_use_case(db, settings)
     return ConsultarAnaliticaPlantaUseCase(consultar_telemetria=consultar_telemetria)
 
 
@@ -299,11 +300,12 @@ def get_planta_estructura_use_case(
 
 def get_consultar_nodo_unifilar_use_case(
     db: Annotated[Session, Depends(get_db_session)],
+    settings: Annotated[Settings, Depends(get_settings_dep)],
 ) -> ConsultarNodoUnifilarUseCase:
     return ConsultarNodoUnifilarUseCase(
         YamlOrganizacionesRepository(),
         MySQLTelemetriaRepository(db),
-        get_telemetria_use_case(db),
+        get_telemetria_use_case(db, settings),
     )
 
 
