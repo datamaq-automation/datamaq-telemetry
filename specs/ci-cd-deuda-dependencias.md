@@ -44,7 +44,7 @@ sqlalchemy>=2.0.0 (ya pineado a <2.1.0)
 > La sesión iniciada en este repo copia este bloque como `specs/ci-cd-deuda-dependencias.md` y
 > completa las secciones 2–5 siguiendo su `AGENTS.md`.
 
-**Traspasada a hija:** sí · **Bloque cerrado:** no (reabierto 2026-09-29, entrega 2 abajo)
+**Traspasada a hija:** sí · **Bloque cerrado:** sí (entrega 2 desplegada y verificada 2026-09-29)
 
 ### 1. Objetivo y Contexto
 
@@ -182,8 +182,8 @@ No aplica. Cambios:
 | Gauntlet unitario con el lock en 3.12 | verde | `pytest tests/unit` en ese venv, DB desviada (`DB_HOST=127.0.0.2`) |
 | Clasificación de cambios | `requirements.lock`, `.github/workflows/*` → completo; `data/*.yml`, `README.md` → solo config | regex probada localmente |
 | Workflows válidos | YAML parsea | `yaml.safe_load` de ambos |
-| CI remoto con el lock | verde | **pendiente: primer push** |
-| Deploy con el lock | `pip freeze` del VPS == lock | **pendiente: después del push del deploy** |
+| CI remoto con el lock | verde | runs `36590791331` (`1ec0f28`) y `36592156359` (`ca04855`): modo completo, `pip install -r requirements.lock` |
+| Deploy con el lock | `pip freeze` del VPS == lock | CD `36592645865` verde; VPS en `ca04855`, 57/57 paquetes del lock con versión exacta (2026-09-29) |
 
 ### 5. Criterios del Gauntlet
 
