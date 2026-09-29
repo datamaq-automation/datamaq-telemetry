@@ -66,8 +66,7 @@ class MonitorearPotenciaYAlarmaUseCase:
             if exito:
                 self._estado_alarma_anterior = alarma_nueva
                 logger.info(
-                    f"Alarma {'activada' if alarma_nueva else 'desactivada'} "
-                    f"({resultado_eval['porcentaje_uso']:.1f}%)"
+                    f"Alarma {'activada' if alarma_nueva else 'desactivada'} ({resultado_eval['porcentaje_uso']:.1f}%)"
                 )
             else:
                 logger.error("Fallo al publicar comando de alarma")

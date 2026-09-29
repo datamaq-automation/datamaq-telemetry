@@ -116,7 +116,9 @@ def test_banco_capacitores_respeta_q_reactiva_negativa():
         _crear_punto_potencia_fake(fp=0.99, potencia_w=120000.0, q_var=0.0),  # Q cero
     ]
 
-    with patch("src.application.use_cases.consultar_analitica_planta.calcular_historico", return_value=puntos_capacitivos):
+    with patch(
+        "src.application.use_cases.consultar_analitica_planta.calcular_historico", return_value=puntos_capacitivos
+    ):
         use_case = ConsultarAnaliticaPlantaUseCase(consultar_telemetria=mock_consultar)
         resultado = use_case.obtener_banco_capacitores(planta_id="planta-capacitiva", periodo_dias=30)
 
