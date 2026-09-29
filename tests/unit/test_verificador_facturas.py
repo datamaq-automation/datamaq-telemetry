@@ -83,3 +83,40 @@ def test_planta_sin_facturas_no_reporta_invalidas():
     repo = _repo([])
     resultado = verificar_facturas_plantas(repo)
     assert resultado == {"plantas": 1, "invalidas": 0}
+
+
+_REGISTRADA = dict(
+    energia_registrada_punta_kwh=68310.0,
+    energia_registrada_resto_kwh=187506.0,
+    energia_registrada_valle_kwh=59994.0,
+    energia_registrada_total_kwh=315810.0,
+)
+
+
+def test_energia_registrada_coherente_es_valida():
+    repo = _repo([_factura(**_REGISTRADA, energia_reactiva_punta_kvarh=29538.0)])
+    assert verificar_facturas_plantas(repo)["invalidas"] == 0
+
+
+def test_energia_registrada_con_suma_de_franjas_distinta_del_total_es_invalida():
+    """D6: el total guardado es el impreso en la factura; si no coincide con las franjas, algo
+    se copió mal."""
+    repo = _repo([_factura(**{**_REGISTRADA, "energia_registrada_total_kwh": 315811.0})])
+    assert verificar_facturas_plantas(repo)["invalidas"] == 1
+
+
+def test_energia_registrada_incompleta_es_invalida():
+    repo = _repo([_factura(energia_registrada_total_kwh=315810.0)])
+    assert verificar_facturas_plantas(repo)["invalidas"] == 1
+
+
+def test_energia_registrada_negativa_es_invalida():
+    repo = _repo([_factura(energia_reactiva_valle_kvarh=-1.0)])
+    assert verificar_facturas_plantas(repo)["invalidas"] == 1
+
+
+def test_documento_de_energia_con_energia_registrada_es_invalido():
+    """D1: la registrada es del documento de la distribuidora; un documento de energía es lo que
+    factura quien la vende (CAMMESA). Así se armó la fila falsa "2026-08"."""
+    repo = _repo([_factura(tipo_dato="energia", proveedor="CAMMESA", **_REGISTRADA)])
+    assert verificar_facturas_plantas(repo)["invalidas"] == 1

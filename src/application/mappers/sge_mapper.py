@@ -37,6 +37,13 @@ def factura_to_dto(f: FacturaDistribuidora) -> FacturaDistribuidoraResponseDTO:
         potencia_excedida_fuera_punta_kw=f.potencia_excedida_fuera_punta_kw,
         importe_potencia_ars=f.importe_potencia_ars,
         importe_energia_ars=f.importe_energia_ars,
+        energia_registrada_punta_kwh=f.energia_registrada_punta_kwh,
+        energia_registrada_resto_kwh=f.energia_registrada_resto_kwh,
+        energia_registrada_valle_kwh=f.energia_registrada_valle_kwh,
+        energia_registrada_total_kwh=f.energia_registrada_total_kwh,
+        energia_reactiva_punta_kvarh=f.energia_reactiva_punta_kvarh,
+        energia_reactiva_resto_kvarh=f.energia_reactiva_resto_kvarh,
+        energia_reactiva_valle_kvarh=f.energia_reactiva_valle_kvarh,
         valor_energia_ars_kwh_promedio=f.valor_energia_ars_kwh_promedio,
     )
 

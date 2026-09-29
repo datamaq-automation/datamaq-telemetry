@@ -106,6 +106,34 @@ def test_sin_factura_de_energia_costo_es_sin_dato_no_cero():
     assert resultado.costo_energia_ars is None
 
 
+def test_energia_registrada_de_la_distribuidora_no_alimenta_el_costo():
+    """D4 (decisión 2026-09-28): la energía registrada viaja en el documento de potencia de
+    EDELAP y no es energía facturada; sin documento de energía el costo sigue en "s/d"."""
+    potencia_con_registrada = FacturaDistribuidora(
+        id=f"{PLANTA_ID}-2024-11-potencia",
+        planta_id=PLANTA_ID,
+        periodo="2024-11",
+        proveedor="EDELAP",
+        tipo_dato="potencia",
+        numero_factura="0020-01988580",
+        importe_total_ars=21031736.78,
+        energia_registrada_punta_kwh=68310.0,
+        energia_registrada_resto_kwh=187506.0,
+        energia_registrada_valle_kwh=59994.0,
+        energia_registrada_total_kwh=315810.0,
+    )
+    use_case = _use_case([potencia_con_registrada], [_nodo_tgbt()])
+
+    with patch(
+        "src.application.use_cases.consultar_costo_estimado.calcular_resumen",
+        return_value=_mockear_kwh_mes_actual(500.0),
+    ):
+        resultado = use_case.ejecutar(planta_id=PLANTA_ID)
+
+    assert resultado.valor_energia_ars_kwh_promedio is None
+    assert resultado.costo_energia_ars is None
+
+
 def test_sin_nodos_no_hay_dato_de_kwh_en_vivo():
     use_case = _use_case([_factura_energia("2026-08", valor_kwh_promedio=2.0)], [])
 

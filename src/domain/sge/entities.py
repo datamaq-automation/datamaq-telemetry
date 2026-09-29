@@ -73,7 +73,13 @@ class FacturaDistribuidora:
     Por eso cada instancia es un documento (`tipo_dato`), no "el período completo" — dos
     instancias con el mismo `planta_id` y `periodo` pero distinto `tipo_dato` representan el
     mismo mes facturado por dos proveedores. Un registro `tipo_dato="potencia"` tiene poblados
-    los campos de potencia (los de energía quedan en `None`) y viceversa.
+    los campos de potencia (los de energía facturada quedan en `None`) y viceversa.
+
+    Un documento de potencia trae potencia y, si la factura la informa, la energía registrada
+    (`energia_registrada_*`, `energia_reactiva_*`); nunca energía facturada (decisión
+    `2026-09-28_energia-registrada-edelap.md`, D1 a D3). La registrada es la lectura del medidor de
+    la distribuidora; la facturada (`energia_activa_*`) es la que cobra quien vende la energía
+    (UPP: CAMMESA). Por eso `energia_facturada_kwh` no mira los campos de registrada.
 
     Potencia y su valor van discriminados Punta / Fuera de Punta porque así factura la
     distribuidora en tarifas de Media Tensión (confirmado con una factura real EDELAP,
@@ -99,6 +105,13 @@ class FacturaDistribuidora:
     potencia_adquirida_fuera_punta_kw: float | None = None
     importe_potencia_ars: float | None = None
     importe_energia_ars: float | None = None
+    energia_registrada_punta_kwh: float | None = None
+    energia_registrada_resto_kwh: float | None = None
+    energia_registrada_valle_kwh: float | None = None
+    energia_registrada_total_kwh: float | None = None  # el impreso en la factura, no la suma
+    energia_reactiva_punta_kvarh: float | None = None
+    energia_reactiva_resto_kvarh: float | None = None
+    energia_reactiva_valle_kvarh: float | None = None
     fuente_archivo: str | None = None
     cargada_en: str | None = None
 

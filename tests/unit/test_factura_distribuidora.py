@@ -5,6 +5,7 @@ import dataclasses
 import pytest
 import yaml
 
+from src.application.mappers.sge_mapper import factura_to_dto
 from src.domain.sge.entities import FacturaDistribuidora
 from src.infrastructure.yaml.repositories.organizaciones_repository import YamlOrganizacionesRepository
 
@@ -181,3 +182,71 @@ def test_obtener_facturas_planta_sin_facturas_devuelve_lista_vacia(data_dir):
 def test_obtener_facturas_planta_sin_archivo_devuelve_lista_vacia(tmp_path):
     repo = YamlOrganizacionesRepository(data_dir=str(tmp_path))
     assert repo.obtener_facturas_planta(PLANTA_A) == []
+
+
+_REGISTRADA_202411 = dict(
+    energia_registrada_punta_kwh=68310.0,
+    energia_registrada_resto_kwh=187506.0,
+    energia_registrada_valle_kwh=59994.0,
+    energia_registrada_total_kwh=315810.0,
+    energia_reactiva_punta_kvarh=29538.0,
+    energia_reactiva_resto_kvarh=83304.0,
+    energia_reactiva_valle_kvarh=23202.0,
+)
+
+
+def _documento_potencia_con_registrada() -> FacturaDistribuidora:
+    """Documento EDELAP 2024-11 real: potencia + energía registrada por el medidor, sin energía
+    facturada (esa la emite CAMMESA, decisión 2026-09-28 D1)."""
+    return FacturaDistribuidora(
+        id="planta-a-2024-11-potencia",
+        planta_id=PLANTA_A,
+        periodo="2024-11",
+        proveedor="EDELAP",
+        tipo_dato="potencia",
+        numero_factura="0020-01988580",
+        importe_total_ars=21031736.78,
+        potencia_contratada_punta_kw=800.0,
+        potencia_adquirida_punta_kw=1049.0,
+        **_REGISTRADA_202411,
+    )
+
+
+def test_energia_registrada_no_alimenta_la_energia_facturada():
+    """D2: la registrada es la lectura del medidor de la distribuidora, no energía facturada."""
+    factura = _documento_potencia_con_registrada()
+    assert factura.energia_registrada_total_kwh == pytest.approx(315810.0)
+    assert factura.energia_facturada_kwh is None
+    assert factura.valor_energia_ars_kwh_promedio is None
+
+
+def test_repositorio_lee_la_energia_registrada_del_yaml(tmp_path):
+    fila = {
+        "planta_id": PLANTA_A,
+        "periodo": "2024-11",
+        "proveedor": "EDELAP",
+        "tipo_dato": "potencia",
+        "numero_factura": "0020-01988580",
+        "importe_total_ars": 21031736.78,
+        # enteros en el YAML, como los emite el importador
+        **{k: int(v) for k, v in _REGISTRADA_202411.items()},
+    }
+    (tmp_path / "facturas_distribuidora.yml").write_text(yaml.safe_dump({"facturas": [fila]}), encoding="utf-8")
+    [factura] = YamlOrganizacionesRepository(data_dir=str(tmp_path)).obtener_facturas_planta(PLANTA_A)
+    for campo, valor in _REGISTRADA_202411.items():
+        assert getattr(factura, campo) == valor
+        assert isinstance(getattr(factura, campo), float)
+    assert factura.energia_facturada_kwh is None
+
+
+def test_dto_expone_la_energia_registrada_en_camel_case_sin_energia_facturada():
+    datos = factura_to_dto(_documento_potencia_con_registrada()).model_dump()
+    assert datos["energiaRegistradaPuntaKwh"] == 68310.0
+    assert datos["energiaRegistradaRestoKwh"] == 187506.0
+    assert datos["energiaRegistradaValleKwh"] == 59994.0
+    assert datos["energiaRegistradaTotalKwh"] == 315810.0
+    assert datos["energiaReactivaPuntaKvarh"] == 29538.0
+    assert datos["energiaReactivaRestoKvarh"] == 83304.0
+    assert datos["energiaReactivaValleKvarh"] == 23202.0
+    assert datos["energiaFacturadaKwh"] is None
+    assert datos["energiaActivaPuntaKwh"] is None

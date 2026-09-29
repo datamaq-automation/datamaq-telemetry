@@ -191,6 +191,48 @@ class FacturaDistribuidoraResponseDTO(BaseModel):
     valor_energia_ars_kwh_promedio: float | None = Field(
         default=None, validation_alias="valorEnergiaArsKwhPromedio", serialization_alias="valorEnergiaArsKwhPromedio"
     )
+    energia_registrada_punta_kwh: float | None = Field(
+        default=None,
+        validation_alias="energiaRegistradaPuntaKwh",
+        serialization_alias="energiaRegistradaPuntaKwh",
+        description="Energía activa registrada en punta por el medidor de la distribuidora (kWh). No es energía facturada.",
+    )
+    energia_registrada_resto_kwh: float | None = Field(
+        default=None,
+        validation_alias="energiaRegistradaRestoKwh",
+        serialization_alias="energiaRegistradaRestoKwh",
+        description="Energía activa registrada en resto por el medidor de la distribuidora (kWh). No es energía facturada.",
+    )
+    energia_registrada_valle_kwh: float | None = Field(
+        default=None,
+        validation_alias="energiaRegistradaValleKwh",
+        serialization_alias="energiaRegistradaValleKwh",
+        description="Energía activa registrada en valle por el medidor de la distribuidora (kWh). No es energía facturada.",
+    )
+    energia_registrada_total_kwh: float | None = Field(
+        default=None,
+        validation_alias="energiaRegistradaTotalKwh",
+        serialization_alias="energiaRegistradaTotalKwh",
+        description="Total de energía activa registrada impreso en la factura de la distribuidora (kWh). No es energía facturada.",
+    )
+    energia_reactiva_punta_kvarh: float | None = Field(
+        default=None,
+        validation_alias="energiaReactivaPuntaKvarh",
+        serialization_alias="energiaReactivaPuntaKvarh",
+        description="Energía reactiva registrada en punta por el medidor de la distribuidora (kVArh).",
+    )
+    energia_reactiva_resto_kvarh: float | None = Field(
+        default=None,
+        validation_alias="energiaReactivaRestoKvarh",
+        serialization_alias="energiaReactivaRestoKvarh",
+        description="Energía reactiva registrada en resto por el medidor de la distribuidora (kVArh).",
+    )
+    energia_reactiva_valle_kvarh: float | None = Field(
+        default=None,
+        validation_alias="energiaReactivaValleKvarh",
+        serialization_alias="energiaReactivaValleKvarh",
+        description="Energía reactiva registrada en valle por el medidor de la distribuidora (kVArh).",
+    )
 
     model_config = ConfigDict(
         populate_by_name=True,
