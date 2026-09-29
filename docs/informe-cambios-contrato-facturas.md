@@ -7,9 +7,10 @@
 > **Versión para compartir:** artefacto "Contrato de facturas UPP"
 > (https://claude.ai/artifact/FuYW45JEfGJcQdtNiC1QRV). Si difieren, manda este archivo.
 >
-> **Actualización 2026-09-28 (sin desplegar):** `FacturaDistribuidoraResponseDTO` suma siete campos
+> **Actualización 2026-09-28 (desplegada el 2026-09-29):** `FacturaDistribuidoraResponseDTO` suma siete campos
 > opcionales de **energía registrada** (cambio aditivo). Ver §6. Commits `f4bb89a` y `13d81b7`;
-> datos: datamaq-data `10d7306`. Hasta que se despliegue, producción no los manda.
+> datos: datamaq-data `10d7306`. En producción desde el CD Deploy `36514738325` (2026-09-29 02:54
+> UTC, `e967e7c`): las 12 facturas de UPP los traen.
 
 ---
 
