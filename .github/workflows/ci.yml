@@ -45,9 +45,10 @@ jobs:
           echo "$CHANGED_FILES"
 
           # Modo GitOps: SOLO si todos los cambios son config/docs (sin .py, .sh, .txt productivos)
-          # Criterio: Si hay cualquier archivo .py, .sh, .toml, .txt → Gauntlet completo
+          # Criterio: Si hay cualquier archivo .py, .sh, .toml, .txt, el lockfile o un workflow → Gauntlet completo
+          # (el lock y los workflows cambian lo que se instala/corre: nunca son "solo config")
           ES_SOLO_CONFIG=true
-          if echo "$CHANGED_FILES" | grep -qE "\.py$|\.sh$|\.toml$|requirements\.txt|\.txt$"; then
+          if echo "$CHANGED_FILES" | grep -qE "\.py$|\.sh$|\.toml$|requirements\.txt|\.txt$|^requirements\.lock$|^\.github/workflows/"; then
             # Si encontramos archivos productivos → gauntlet completo
             ES_SOLO_CONFIG=false
           fi
@@ -61,6 +62,9 @@ jobs:
           fi
 
           echo "is_config_only=$ES_SOLO_CONFIG" >> "$GITHUB_OUTPUT"
+          # Para el guard D3: mismo rango de commits (todo el push / PR), no solo HEAD~1.
+          echo "txt_cambio=$(echo "$CHANGED_FILES" | grep -qx 'requirements.txt' && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "lock_cambio=$(echo "$CHANGED_FILES" | grep -qx 'requirements.lock' && echo true || echo false)" >> "$GITHUB_OUTPUT"
           if [ "$ES_SOLO_CONFIG" = "true" ]; then
             echo "✓ Modo GitOps: Solo cambios de configuración/docs"
           else
@@ -69,15 +73,15 @@ jobs:
 
       - name: "Guard: requirements.lock sincronizado con requirements.txt (D3)"
         run: |
-          # Si requirements.txt fue modificado, requirements.lock también debe serlo
-          if git diff HEAD~1..HEAD --name-only | grep -q "requirements.txt"; then
+          # Si requirements.txt fue modificado en el push/PR, requirements.lock también debe serlo
+          if [ "${{ steps.changes.outputs.txt_cambio }}" = "true" ]; then
             echo "requirements.txt fue modificado. Verificando requirements.lock..."
-            if ! git diff HEAD~1..HEAD --name-only | grep -q "requirements.lock"; then
+            if [ "${{ steps.changes.outputs.lock_cambio }}" != "true" ]; then
               echo "❌ ERROR: requirements.txt cambió pero requirements.lock no fue regenerado"
               echo ""
               echo "Solución:"
-              echo "  pip install pip-tools"
-              echo "  pip-compile requirements.txt -o requirements.lock"
+              echo "  uvx --python 3.12 --from pip-tools pip-compile -o requirements.lock requirements.txt"
+              echo "  (Python 3.12 = el de producción; sin -o pip-compile falla)"
               echo "  git add requirements.txt requirements.lock"
               echo "  git commit"
               exit 1
@@ -92,7 +96,8 @@ jobs:
           cache: pip
 
       - name: Instalar dependencias
-        run: pip install -r requirements.txt
+        # Versiones exactas del lockfile (D1): lo mismo que instala el deploy en producción.
+        run: pip install -r requirements.lock
 
       # ---- MODO RÁPIDO: Solo cambios de configuración GitOps / docs ----
       - name: "GitOps: Validar sintaxis y esquemas YAML"

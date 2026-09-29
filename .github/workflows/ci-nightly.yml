@@ -13,10 +13,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Python 3.13
+      # Misma versión que producción (VPS: 3.12.14): una rotura acá significa "rompería en prod".
+      - name: Setup Python 3.12
         uses: actions/setup-python@v5
         with:
-          python-version: '3.13'
+          python-version: '3.12'
 
       - name: Instalar desde requirements.txt (versiones frescas, no pinadas)
         run: |
@@ -41,7 +42,7 @@ jobs:
           Posible solución:
           1. Revisar qué cambió en las dependencias
           2. Actualizar requirements.txt con versiones compatibles
-          3. Regenerar requirements.lock: pip-compile requirements.txt -o requirements.lock"
+          3. Regenerar requirements.lock: uvx --python 3.12 --from pip-tools pip-compile -o requirements.lock requirements.txt"
 
           curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
             --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \

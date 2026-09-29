@@ -44,7 +44,7 @@ sqlalchemy>=2.0.0 (ya pineado a <2.1.0)
 > La sesión iniciada en este repo copia este bloque como `specs/ci-cd-deuda-dependencias.md` y
 > completa las secciones 2–5 siguiendo su `AGENTS.md`.
 
-**Traspasada a hija:** sí · **Bloque cerrado:** sí
+**Traspasada a hija:** sí · **Bloque cerrado:** no (reabierto 2026-09-29, entrega 2 abajo)
 
 ### 1. Objetivo y Contexto
 
@@ -130,6 +130,66 @@ N/A — Esta es una iniciativa de CI/CD, no código de dominio.
 - [ ] CI nightly activo y corriendo diariamente (verificar en Actions)
 - [ ] Paso de sincronización en CI falla cuando `requirements.txt` cambió sin `.lock` (test: editar `.txt`, hacer push, verificar rechazo)
 - [ ] Notificación por Telegram funciona si nightly falla (manual: editar una dep en `.txt`, esperar 2 AM o forzar manualmente)
+
+## Entrega 2 — el `.lock` se usa de verdad (reapertura 2026-09-29)
+
+### 1. Objetivo y Contexto
+
+Que CI y el deploy instalen exactamente `requirements.lock`, resuelto para el Python de producción.
+La entrega 1 generó el lock y el guard D3, pero nadie instalaba desde él.
+
+**Certezas (verificadas en esta sesión, 2026-09-29):**
+- `ci.yml` y `scripts/deploy-server.sh:69` instalaban `requirements.txt`. `pre-push.sh` no instala
+  nada (usa `venv/` tal como esté). `deploy-server.sh:56/105` (`pip freeze` → reinstalar en
+  rollback) es un camino aparte y correcto: no se toca.
+- Producción (`/var/www/datamaq-telemetry/.venv`): **Python 3.12.14**. CI: 3.12. Nightly: 3.13.
+  El lock se había generado con 3.13; `venv/` local está en 3.14.7.
+- Regenerado con `uvx --python 3.12 --from pip-tools pip-compile -o requirements.lock requirements.txt`:
+  **mismas versiones** que el lock de 3.13; solo cambian la cabecera y 2 anotaciones `# via` de
+  `typing-extensions`. No hay incompatibilidad 3.12 latente.
+- El `--no-index` de la cabecera **es cosmético**: pip-tools lo escribe igual resolviendo contra
+  PyPI (probado resolviendo un paquete que no estaba en caché). La entrega 1 no se resolvió offline.
+- `pip-compile requirements.txt` sin `-o` **falla**: `input and output filenames must not be
+  matched`. El `CLAUDE.md` del padre documenta ese comando.
+- El guard D3 comparaba `HEAD~1..HEAD`: en un push de varios commits no veía los intermedios. El
+  paso `changes` ya calculaba el rango correcto (`github.event.before`..`sha` / base del PR).
+- **Hallazgo nuevo:** el paso `changes` clasificaba como "solo config" (sin gauntlet) un cambio que
+  tocara solo `requirements.lock` o `.github/workflows/`. Un `pip-compile --upgrade` hubiera pasado
+  CI sin tests y `deploy.yml` (que se dispara por éxito de CI) lo habría instalado en producción.
+
+**Fuera de alcance:** subir Python del VPS; alinear el `venv/` local (decisión del dueño); el mismo
+patrón `HEAD~1` como *fallback* del paso `changes` (solo aplica si no hay `before`); P2/P3.
+
+### 2. Dominio & Puertos
+
+No aplica: solo CI/CD, sin cambios en `src/`.
+
+### 3. Casos de Uso & DTOs
+
+No aplica. Cambios:
+- `requirements.lock`: regenerado con Python 3.12.
+- `ci.yml`: instala `requirements.lock`; el paso `changes` exporta `txt_cambio`/`lock_cambio` sobre
+  el rango real del push/PR y el guard D3 los usa; lock y workflows fuerzan gauntlet completo.
+- `ci-nightly.yml`: Python 3.12 (misma versión que producción).
+- `deploy-server.sh:69`: instala `requirements.lock` — **commit separado**, pushear solo después de
+  una corrida verde de CI con el commit anterior.
+
+### 4. Matriz de Pruebas
+
+| Caso | Resultado esperado | Cómo se verificó |
+|---|---|---|
+| Lock instala en 3.12 | instala sin errores | venv 3.12 limpio + `uv pip install -r requirements.lock` (local) |
+| Gauntlet unitario con el lock en 3.12 | verde | `pytest tests/unit` en ese venv, DB desviada (`DB_HOST=127.0.0.2`) |
+| Clasificación de cambios | `requirements.lock`, `.github/workflows/*` → completo; `data/*.yml`, `README.md` → solo config | regex probada localmente |
+| Workflows válidos | YAML parsea | `yaml.safe_load` de ambos |
+| CI remoto con el lock | verde | **pendiente: primer push** |
+| Deploy con el lock | `pip freeze` del VPS == lock | **pendiente: después del push del deploy** |
+
+### 5. Criterios del Gauntlet
+
+- `scripts/pre-push.sh` verde (lo corre el hook al pushear).
+- CI remoto verde en modo completo con `pip install -r requirements.lock`.
+- Tras el deploy: `ssh vps` → `pip freeze` coincide con `requirements.lock` en los paquetes directos.
 
 ## Verificación cruzada final (la hace el padre al cierre)
 
