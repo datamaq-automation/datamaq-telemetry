@@ -16,6 +16,7 @@ from src.infrastructure.fastapi.dependencies import (
     get_usuario_actual,
 )
 from src.infrastructure.fastapi.device_ownership import verificar_propiedad_dispositivo
+from src.infrastructure.fastapi.planta_ownership import resolver_planta_permitida
 from src.infrastructure.fastapi.server import create_app
 
 AHORA = datetime(2026, 9, 12, 10, 0, tzinfo=timezone.utc)
@@ -50,6 +51,7 @@ def _cliente(
     org: str | None = "org-1",
     sub: str = "u1",
     mock_propiedad: bool = True,
+    planta_id_permitida: str | None = None,
 ) -> tuple[TestClient, dict[str, MagicMock]]:
     app = create_app()
     mocks = {
@@ -61,6 +63,9 @@ def _cliente(
     if org is not None:
         claims["org"] = org
     app.dependency_overrides[get_usuario_actual] = lambda: claims
+
+    # Mock resolver_planta_permitida para retornar la planta permitida (o None para todas)
+    app.dependency_overrides[resolver_planta_permitida] = lambda planta_id=None: planta_id_permitida or planta_id
 
     if mock_propiedad:
         app.dependency_overrides[verificar_propiedad_dispositivo] = lambda: None
@@ -91,7 +96,7 @@ def test_listar_dispositivos_usuario_con_org():
 
 
 def test_listar_dispositivos_con_filtro_planta():
-    client, mocks = _cliente(rol="operador", org="org-1")
+    client, mocks = _cliente(rol="operador", org="org-1", planta_id_permitida="planta-abc")
     mocks["dispositivos"].listar_dispositivos.return_value = [
         _dispositivo_dto(id="dev-1", planta_id="planta-abc"),
     ]

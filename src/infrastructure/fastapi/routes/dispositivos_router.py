@@ -21,6 +21,7 @@ from src.infrastructure.fastapi.dependencies import (
 )
 from src.infrastructure.fastapi.device_ownership import verificar_propiedad_dispositivo
 from src.infrastructure.fastapi.error_handler import manejar_error_http
+from src.infrastructure.fastapi.planta_ownership import resolver_planta_permitida
 
 router = APIRouter(
     prefix="/api/v1/dispositivos",
@@ -28,12 +29,14 @@ router = APIRouter(
     dependencies=[Depends(get_usuario_actual)],
 )
 
+PlantaPermitida = Annotated[str | None, Depends(resolver_planta_permitida)]
+
 
 @router.get("", response_model=list[DispositivoResponseDTO])
 def list_dispositivos(
     use_case: Annotated[GestionarDispositivosUseCase, Depends(get_dispositivos_use_case)],
     claims: Annotated[dict, Depends(get_usuario_actual)],
-    planta_id: str | None = None,
+    planta_id: PlantaPermitida,
 ):
     rol = claims.get("rol")
     if rol in ("superadmin", "invitado_global"):

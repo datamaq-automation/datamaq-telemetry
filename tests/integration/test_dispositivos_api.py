@@ -75,3 +75,26 @@ def test_listar_dispositivos_end_to_end():
     data = response.json()
     assert len(data) == 1
     assert data[0]["device_uid"] == "PM-001"
+
+
+def test_listar_dispositivos_rechaza_planta_ajena():
+    """Verifica que el endpoint rechaza acceso a plantas de otras organizaciones (IDOR fix)."""
+    app = create_app()
+
+    mock_use_case = MagicMock()
+    app.dependency_overrides[get_usuario_actual] = lambda: {
+        "sub": "user-org-1",
+        "rol": "operador",
+        "org": "org-1",
+    }
+    app.dependency_overrides[get_dispositivos_use_case] = lambda: mock_use_case
+
+    client = TestClient(app)
+
+    # Intento de acceso a planta de otra org debe devolver 404
+    response = client.get("/api/v1/dispositivos?planta_id=foreign-planta-id")
+    assert response.status_code == 404
+    assert response.json()["detail"] == "planta_no_encontrada"
+
+    # El use_case nunca debe ser llamado para plantas ajenas
+    mock_use_case.listar_dispositivos.assert_not_called()
