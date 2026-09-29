@@ -6,6 +6,10 @@
 > `potenciaAdquirida*Kw`. **Cero breaking changes** según `CONVENTIONS.md` §5.
 > **Versión para compartir:** artefacto "Contrato de facturas UPP"
 > (https://claude.ai/artifact/FuYW45JEfGJcQdtNiC1QRV). Si difieren, manda este archivo.
+>
+> **Actualización 2026-09-28 (sin desplegar):** `FacturaDistribuidoraResponseDTO` suma siete campos
+> opcionales de **energía registrada** (cambio aditivo). Ver §6. Commits `f4bb89a` y `13d81b7`;
+> datos: datamaq-data `10d7306`. Hasta que se despliegue, producción no los manda.
 
 ---
 
@@ -93,3 +97,36 @@ avisando con un informe como este.
 - **Penalización por energía reactiva.** Cambiaría la fórmula del banner a kVArh excedente × $/kVArh
   del cuadro tarifario, y se presentaría como exposición, no como recargo ya cobrado. Afecta a
   `BannerPenalizacionReactiva.vue`.
+
+---
+
+## 6. Campos nuevos: energía registrada por el medidor (aditivo)
+
+Decisión `2026-09-28_energia-registrada-edelap.md` (repo padre), spec
+`specs/energia-registrada-edelap.md`. Afecta a `GET /api/v1/sge/plantas/{plantaId}/facturas-distribuidora`.
+
+| Campo (camelCase) | Tipo | Unidad | Qué es |
+|---|---|---|---|
+| `energiaRegistradaPuntaKwh` | `number \| null` | kWh | Energía activa en punta que midió el medidor de la distribuidora |
+| `energiaRegistradaRestoKwh` | `number \| null` | kWh | Ídem, resto |
+| `energiaRegistradaValleKwh` | `number \| null` | kWh | Ídem, valle |
+| `energiaRegistradaTotalKwh` | `number \| null` | kWh | "Total de energía activa" impreso en la factura (= punta + resto + valle) |
+| `energiaReactivaPuntaKvarh` | `number \| null` | kVArh | Energía reactiva en punta que midió el mismo medidor |
+| `energiaReactivaRestoKvarh` | `number \| null` | kVArh | Ídem, resto |
+| `energiaReactivaValleKvarh` | `number \| null` | kVArh | Ídem, valle |
+
+- **Dónde vienen:** en el documento `tipoDato: "potencia"` de EDELAP, **no** en uno de energía. Los
+  12 de UPP (2023-12 a 2024-11) los traen todos. Ejemplo, 2024-11: 68.310 / 187.506 / 59.994,
+  total 315.810 kWh; reactiva 29.538 / 83.304 / 23.202 kVArh.
+- **Qué no cambia:** `energiaFacturadaKwh`, `energiaActiva*Kwh`, `importeEnergiaArs` y
+  `valorEnergiaArsKwhPromedio` siguen en `null` en esos documentos. El costo estimado de UPP sigue en
+  "s/d" (D4).
+- **No es energía facturada.** La registrada es lo que midió la distribuidora; la facturada es la
+  que cobra quien vende la energía (CAMMESA). Mostrarla con su propio rótulo (por ejemplo, "Energía
+  registrada (medidor distribuidora)"), nunca bajo "Energía facturada", y no sumarla con
+  `energiaFacturadaKwh` (D5). Cuando haya factura de CAMMESA del mismo mes, se muestran las dos.
+- **Punto físico:** el medidor está en media tensión, antes del transformador. No es comparable
+  directo con el TGBT (incluye las pérdidas del transformador).
+- **Zod:** declarar los siete como `z.number().nullable().optional()` (o `.nullable().default(null)`),
+  para no romper contra un backend anterior al despliegue.
+- **OpenAPI:** a diferencia del resto de la DTO, estos siete campos llevan `description`.
