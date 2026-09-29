@@ -55,10 +55,18 @@ Construido para despliegues ligeros y directos sin Docker (**Python 3 + venv + M
 
 ### 1. Clonar e inicializar el entorno virtual
 ```bash
-cd ~/proyectos_software/datamaq-telemetry
-python3 -m venv venv
+cd ~/proyectos_software/datamaq/datamaq-telemetry
+uv venv --python 3.12 venv          # o: python3.12 -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements.lock    # versiones exactas, las mismas que CI y producción
+```
+
+Python 3.12 es la versión de producción y de CI. `requirements.txt` declara los rangos aceptados;
+`requirements.lock` fija las versiones exactas que se instalan. Si cambiás `requirements.txt`,
+regenerá el lock y commiteá los dos (CI falla si solo cambia el `.txt`):
+
+```bash
+uvx --python 3.12 --from pip-tools pip-compile -o requirements.lock requirements.txt
 ```
 
 ### 1.1. Clonar los datos maestros (repo independiente)
