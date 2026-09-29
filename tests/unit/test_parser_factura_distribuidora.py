@@ -478,6 +478,125 @@ def test_edelap_factura_202402_sin_exceso_usa_demanda_registrada(tmp_path):
     assert factura.importe_total_ars == pytest.approx(4325173.17)
 
 
+def _registrada(factura) -> tuple:
+    return (
+        factura.energia_registrada_punta_kwh,
+        factura.energia_registrada_resto_kwh,
+        factura.energia_registrada_valle_kwh,
+        factura.energia_registrada_total_kwh,
+    )
+
+
+def _reactiva(factura) -> tuple:
+    return (
+        factura.energia_reactiva_punta_kvarh,
+        factura.energia_reactiva_resto_kvarh,
+        factura.energia_reactiva_valle_kvarh,
+    )
+
+
+def _parsear(tmp_path, lineas: list[str]):
+    ruta_pdf = str(tmp_path / "edelap.pdf")
+    _generar_pdf(ruta_pdf, lineas)
+    return ParserFacturaPotenciaEdelap().parsear(ruta_pdf, PLANTA_ID)
+
+
+def _variante(lineas: list[str], viejo: str, nuevo: str | None) -> list[str]:
+    """Deriva del fixture literal una variante que cambia (o quita, con `nuevo=None`) UN token
+    puntual; el resto del texto sigue siendo el real, no se retipea."""
+    tocadas = [i for i, linea in enumerate(lineas) if viejo in linea]
+    assert len(tocadas) == 1, f"'{viejo}' tiene que estar en una sola línea del fixture"
+    i = tocadas[0]
+    if nuevo is None:
+        return lineas[:i] + lineas[i + 1 :]
+    return [*lineas[:i], lineas[i].replace(viejo, nuevo), *lineas[i + 1 :]]
+
+
+def test_edelap_202411_extrae_la_energia_registrada_sin_energia_facturada(tmp_path):
+    """Bloque "Lecturas" del medidor 241609298. `extract_text()` pega en la misma línea la columna
+    de cargos de otro renglón (la fila de reactiva punta trae "59994 kWh", el cargo de valle): solo
+    se lee hasta la marca "R". Decisión 2026-09-28 D1/D2: nada de esto es energía facturada."""
+    factura = _parsear(tmp_path, LINEAS_EDELAP_202411)
+
+    assert _registrada(factura) == (68310.0, 187506.0, 59994.0, 315810.0)
+    assert _reactiva(factura) == (29538.0, 83304.0, 23202.0)
+    assert factura.energia_facturada_kwh is None
+    assert factura.energia_activa_punta_kwh is None
+    assert factura.energia_activa_total_kwh is None
+    assert factura.importe_energia_ars is None
+
+
+def test_edelap_202312_extrae_la_energia_registrada(tmp_path):
+    factura = _parsear(tmp_path, LINEAS_EDELAP_202312)
+
+    assert _registrada(factura) == (76914.0, 191304.0, 90954.0, 359172.0)
+    assert _reactiva(factura) == (37152.0, 92034.0, 44730.0)
+
+
+def test_edelap_202402_suma_las_filas_duplicadas_por_cambio_de_medidor(tmp_path):
+    """2024-02 trae cada fila dos veces (una con consumo 0) y el total impreso dos veces. La
+    energía se acumula, así que se suma por franja; la potencia, en cambio, toma el máximo."""
+    factura = _parsear(tmp_path, LINEAS_EDELAP_202402)
+
+    assert _registrada(factura) == (47826.0, 103086.0, 51210.0, 202122.0)
+    assert _reactiva(factura) == (9378.0, 20124.0, 9792.0)
+
+
+def test_edelap_marca_de_lectura_distinta_de_r_lanza_ilegible(tmp_path):
+    """Una marca que no es "R" (lectura real) puede ser un consumo estimado: no se adivina."""
+    lineas = _variante(LINEAS_EDELAP_202411, "18.000 68310 R Cargo", "18.000 68310 E Cargo")
+
+    with pytest.raises(FacturaDistribuidoraIlegibleError, match="marca"):
+        _parsear(tmp_path, lineas)
+
+
+def test_edelap_suma_de_franjas_distinta_del_total_impreso_lanza_ilegible(tmp_path):
+    """D6: punta + resto + valle tiene que dar el "Total de energía activa" impreso."""
+    lineas = _variante(LINEAS_EDELAP_202411, "activa: 315810KWh", "activa: 315811KWh")
+
+    with pytest.raises(FacturaDistribuidoraIlegibleError, match="315811"):
+        _parsear(tmp_path, lineas)
+
+
+def test_edelap_sin_una_franja_de_energia_activa_lanza_ilegible(tmp_path):
+    lineas = _variante(LINEAS_EDELAP_202411, "241609298 Energia activa valle", None)
+
+    with pytest.raises(FacturaDistribuidoraIlegibleError, match="valle"):
+        _parsear(tmp_path, lineas)
+
+
+def test_edelap_fila_de_lectura_de_energia_mal_formada_lanza_ilegible(tmp_path):
+    """Sin la constante, la fila no tiene la forma medidor · concepto · anterior · actual ·
+    constante · consumo · marca: se rechaza en vez de saltearla."""
+    lineas = _variante(LINEAS_EDELAP_202411, "132120 18.000 68310 R", "132120 68310 R")
+
+    with pytest.raises(FacturaDistribuidoraIlegibleError, match="Energia activa punta"):
+        _parsear(tmp_path, lineas)
+
+
+def test_edelap_factura_que_no_informa_la_energia_deja_los_campos_en_none(tmp_path):
+    """D3: la registrada va "si la factura la informa". Sin filas de lectura de energía ni total
+    impreso, los campos quedan en None y la potencia se sigue leyendo."""
+    lineas = [
+        linea
+        for linea in LINEAS_EDELAP_202411
+        if not linea.startswith("241609298 Energia") and not linea.startswith("Total de energía activa")
+    ]
+
+    factura = _parsear(tmp_path, lineas)
+
+    assert _registrada(factura) == (None, None, None, None)
+    assert _reactiva(factura) == (None, None, None)
+    assert factura.potencia_adquirida_punta_kw == pytest.approx(1049.0)
+
+
+def test_edelap_total_impreso_sin_filas_de_lectura_lanza_ilegible(tmp_path):
+    lineas = [linea for linea in LINEAS_EDELAP_202411 if not linea.startswith("241609298 Energia")]
+
+    with pytest.raises(FacturaDistribuidoraIlegibleError):
+        _parsear(tmp_path, lineas)
+
+
 def test_edelap_factura_sin_campos_obligatorios_lanza_ilegible(tmp_path):
     ruta_pdf = str(tmp_path / "edelap_incompleta.pdf")
     _generar_pdf(ruta_pdf, ["Distribuidora: EDELAP", "Tarifa: T5M12"])

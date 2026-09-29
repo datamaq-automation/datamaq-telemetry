@@ -19,6 +19,7 @@ con el campo que faltó), no un fallo silencioso.
 """
 
 import re
+from dataclasses import dataclass
 
 import pdfplumber
 
@@ -69,11 +70,87 @@ def _normalizar_distribuidora(texto: str) -> str:
     return "DESCONOCIDA"
 
 
+# Fila de lectura de energía del bloque "Lecturas": medidor · concepto · lectura anterior · actual ·
+# constante · consumo · marca. `extract_text()` pega a continuación la columna de cargos de OTRO
+# renglón (la fila de reactiva punta trae el cargo de valle), así que se lee solo hasta la marca.
+_RE_FILA_ENERGIA = re.compile(
+    r"^\d+ Energia (activa|reactiva) (punta|resto|valle) \d+ \d+ [\d.]+ (\d+) (\S+)(?: |$)", re.IGNORECASE
+)
+_RE_TOTAL_ENERGIA = re.compile(r"Total de energ[ií]a activa:\s*(\d+)\s*KWh")
+_FRANJAS = ("punta", "resto", "valle")
+
+
+@dataclass(frozen=True)
+class _EnergiaRegistrada:
+    punta_kwh: float | None = None
+    resto_kwh: float | None = None
+    valle_kwh: float | None = None
+    total_kwh: float | None = None
+    reactiva_punta_kvarh: float | None = None
+    reactiva_resto_kvarh: float | None = None
+    reactiva_valle_kvarh: float | None = None
+
+
+def _energia_registrada(texto: str, ruta_pdf: str) -> _EnergiaRegistrada:
+    """Energía activa y reactiva registradas por el medidor de la distribuidora, por franja.
+
+    No es energía facturada (decisión 2026-09-28, D1): la vende CAMMESA. Las filas repetidas (cambio
+    de medidor, 2024-02, una con consumo 0) se suman, porque la energía se acumula. La activa se
+    cruza contra el "Total de energía activa" impreso (D6). Cualquier fila que no se entienda es un
+    error: no se adivina. Sin filas ni total, la factura no informa el dato y todo queda en None.
+    """
+    suma: dict[tuple[str, str], float] = {}
+    for linea in texto.splitlines():
+        if not re.match(r"^\d+ Energia ", linea):
+            continue
+        fila = _RE_FILA_ENERGIA.match(linea)
+        if fila is None:
+            raise FacturaDistribuidoraIlegibleError(f"Fila de lectura de energía ilegible en '{ruta_pdf}': '{linea}'")
+        tipo, franja, consumo, marca = fila.group(1).lower(), fila.group(2).lower(), fila.group(3), fila.group(4)
+        if marca != "R":
+            raise FacturaDistribuidoraIlegibleError(
+                f"Marca de lectura '{marca}' (se esperaba 'R', lectura real) en '{ruta_pdf}': '{linea}'"
+            )
+        suma[(tipo, franja)] = suma.get((tipo, franja), 0.0) + float(consumo)
+
+    totales = {float(t) for t in _RE_TOTAL_ENERGIA.findall(texto)}
+    if not suma and not totales:
+        return _EnergiaRegistrada()
+    if len(totales) != 1:
+        raise FacturaDistribuidoraIlegibleError(
+            f"'{ruta_pdf}' no trae un único 'Total de energía activa' para cruzar la energía registrada: {sorted(totales)}."
+        )
+    total = totales.pop()
+    for tipo in ("activa", "reactiva"):
+        faltan = [f for f in _FRANJAS if (tipo, f) not in suma]
+        if faltan and (tipo == "activa" or len(faltan) < len(_FRANJAS)):
+            raise FacturaDistribuidoraIlegibleError(
+                f"Faltan filas de energía {tipo} ({', '.join(faltan)}) del bloque Lecturas en '{ruta_pdf}'."
+            )
+    punta, resto, valle = (suma[("activa", f)] for f in _FRANJAS)
+    if punta + resto + valle != total:
+        raise FacturaDistribuidoraIlegibleError(
+            f"En '{ruta_pdf}' punta + resto + valle = {punta + resto + valle:.0f} kWh no coincide con el "
+            f"'Total de energía activa' impreso ({total:.0f} kWh)."
+        )
+    return _EnergiaRegistrada(
+        punta_kwh=punta,
+        resto_kwh=resto,
+        valle_kwh=valle,
+        total_kwh=total,
+        reactiva_punta_kvarh=suma.get(("reactiva", "punta")),
+        reactiva_resto_kvarh=suma.get(("reactiva", "resto")),
+        reactiva_valle_kvarh=suma.get(("reactiva", "valle")),
+    )
+
+
 class ParserFacturaPotenciaEdelap(ParserFacturaDistribuidoraPort):
     """Extrae los campos de POTENCIA de una factura de EdeLAP (tarifa T5M12, Media Tensión).
 
-    Produce siempre `tipo_dato="potencia"` con los campos de energía en `None` — la energía de
-    UPP la factura CAMMESA en un documento aparte (`ParserFacturaEnergiaCammesa`).
+    Produce siempre `tipo_dato="potencia"`: la potencia y, si la factura la informa, la energía
+    registrada por el medidor (`energia_registrada_*`, `energia_reactiva_*`). Nunca energía
+    facturada (`energia_activa_*` en `None`): la de UPP la factura CAMMESA en un documento aparte
+    (`ParserFacturaEnergiaCammesa`). Decisión 2026-09-28, D1 a D3.
     """
 
     def parsear(self, ruta_pdf: str, planta_id: str) -> FacturaDistribuidora:
@@ -125,6 +202,7 @@ class ParserFacturaPotenciaEdelap(ParserFacturaDistribuidoraPort):
             r"Vencimientos Recargo\s*1[ºo°]\s*(?:2[ºo°]\s*)?\d{2}/\d{2}/\d{4}\s+([\d.]+,\d{2})", texto
         )
         importe_total = _numero_ar(vencimiento_m.group(1)) if vencimiento_m else 0.0
+        energia = _energia_registrada(texto, ruta_pdf)
 
         return FacturaDistribuidora(
             id=f"{planta_id}-{periodo}-potencia",
@@ -141,6 +219,13 @@ class ParserFacturaPotenciaEdelap(ParserFacturaDistribuidoraPort):
             potencia_adquirida_punta_kw=adquirida_punta,
             potencia_adquirida_fuera_punta_kw=adquirida_fp,
             importe_potencia_ars=importe_potencia,
+            energia_registrada_punta_kwh=energia.punta_kwh,
+            energia_registrada_resto_kwh=energia.resto_kwh,
+            energia_registrada_valle_kwh=energia.valle_kwh,
+            energia_registrada_total_kwh=energia.total_kwh,
+            energia_reactiva_punta_kvarh=energia.reactiva_punta_kvarh,
+            energia_reactiva_resto_kvarh=energia.reactiva_resto_kvarh,
+            energia_reactiva_valle_kvarh=energia.reactiva_valle_kvarh,
             fuente_archivo=ruta_pdf.rsplit("/", 1)[-1],
         )
 

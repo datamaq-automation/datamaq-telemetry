@@ -60,6 +60,15 @@ def _bloque_yaml(f) -> str:
         ("potencia_adquirida_fuera_punta_kw", f.potencia_adquirida_fuera_punta_kw),
         ("importe_potencia_ars", f.importe_potencia_ars),
         ("importe_energia_ars", f.importe_energia_ars),
+        # Energía registrada por el medidor de la distribuidora: no es energía facturada
+        # (decisión 2026-09-28, D1 a D3).
+        ("energia_registrada_punta_kwh", f.energia_registrada_punta_kwh),
+        ("energia_registrada_resto_kwh", f.energia_registrada_resto_kwh),
+        ("energia_registrada_valle_kwh", f.energia_registrada_valle_kwh),
+        ("energia_registrada_total_kwh", f.energia_registrada_total_kwh),
+        ("energia_reactiva_punta_kvarh", f.energia_reactiva_punta_kvarh),
+        ("energia_reactiva_resto_kvarh", f.energia_reactiva_resto_kvarh),
+        ("energia_reactiva_valle_kvarh", f.energia_reactiva_valle_kvarh),
     ]
     lineas = [
         f'  - {nombre}: "{valor}"' if i == 0 else f'    {nombre}: "{valor}"'
