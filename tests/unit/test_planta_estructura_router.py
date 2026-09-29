@@ -371,6 +371,24 @@ def test_resumen_nodo_unifilar_no_encontrado():
     assert response.status_code == 404
 
 
+def test_resumen_nodo_unifilar_default_dias_30():
+    client, mock_use_case = _cliente()
+    mock_use_case.resumen.return_value = ResumenNodoUnifilarDTO(
+        planta_id="planta-1",
+        nodo_id="mt",
+        es_virtual=True,
+        dispositivos_ids=["dev-1"],
+        potencia_activa_total_w=450000.0,
+    )
+
+    response = client.get("/api/v1/plantas/planta-1/unifilar/nodos/mt/resumen")
+
+    assert response.status_code == 200
+    # Sin parámetro dias, debe usar default=30 (ISO 50001)
+    call_args = mock_use_case.resumen.call_args.args
+    assert call_args[4] == 30  # quinto argumento es dias
+
+
 def test_historico_nodo_unifilar_exitoso():
     client, mock_use_case = _cliente()
     mock_use_case.historico.return_value = HistoricoNodoUnifilarDTO(

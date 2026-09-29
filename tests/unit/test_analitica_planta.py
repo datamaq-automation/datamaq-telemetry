@@ -103,3 +103,25 @@ def test_dimensionador_fp_bajo_con_recomendacion():
     assert resultado.fp_promedio == 0.88
     assert resultado.banco_comercial_sugerido_kvar is not None  # Se recomienda
     assert resultado.razon_no_recomendacion is None  # Sin restricciones
+
+
+def test_banco_capacitores_respeta_q_reactiva_negativa():
+    """Valida que con Q <= 0 (régimen capacitivo), sobrecompensacion_sostenida=true y no se recomienda banco."""
+    mock_consultar = MagicMock()
+
+    # Simular histórico con Q negativa (capacitivo) o nula
+    puntos_capacitivos = [
+        _crear_punto_potencia_fake(fp=0.98, potencia_w=120000.0, q_var=-50000.0),  # Q negativa
+        _crear_punto_potencia_fake(fp=0.98, potencia_w=120000.0, q_var=-30000.0),
+        _crear_punto_potencia_fake(fp=0.99, potencia_w=120000.0, q_var=0.0),  # Q cero
+    ]
+
+    with patch("src.application.use_cases.consultar_analitica_planta.calcular_historico", return_value=puntos_capacitivos):
+        use_case = ConsultarAnaliticaPlantaUseCase(consultar_telemetria=mock_consultar)
+        resultado = use_case.obtener_banco_capacitores(planta_id="planta-capacitiva", periodo_dias=30)
+
+    # Validaciones: Q_max <= 0 → sobrecompensada, no instalar banco
+    assert resultado.potencia_reactiva_max_kvar == 0.0  # max([−50, −30, 0])
+    assert resultado.sobrecompensacion_sostenida is True
+    assert resultado.banco_comercial_sugerido_kvar is None
+    assert resultado.razon_no_recomendacion is not None
