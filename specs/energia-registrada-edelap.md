@@ -1,6 +1,7 @@
 # Spec: Energía registrada de las facturas de EDELAP
 
-> **Estado:** en implementación · **Fecha:** 2026-09-28
+> **Estado:** implementada, sin pushear · **Fecha:** 2026-09-28 · commits `f4bb89a`, `13d81b7`,
+> `bba3d18`; datamaq-data `20d1f54`, `10d7306`. Gauntlet en verde (1573 unitarios, cobertura 90,83 %).
 > **Origen:** bloque `## Repo: datamaq-telemetry` de `specs/energia-registrada-edelap.md` del repo
 > padre, copiado sin cambios (la sección 1 es del padre y no se edita acá).
 > **Decisiones aplicables:** `decisions/2026-09-28_energia-registrada-edelap.md` (D1–D6),
