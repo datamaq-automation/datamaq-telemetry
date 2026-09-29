@@ -32,7 +32,7 @@ case " $LOCAL_NAMES " in
         ;;
 esac
 
-HEALTH_URL="${DEPLOY_HEALTH_URL:-http://localhost:8000/health/ready}"
+HEALTH_URL="${DEPLOY_HEALTH_URL:-http://127.0.0.1:8885/health}"
 
 log() { echo "[$(date +"%Y-%m-%dT%H:%M:%S")] $1"; }
 
@@ -58,7 +58,9 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
 
     echo "==> Actualizando código (fast-forward only)..."
     if [ -n "$GITHUB_TOKEN" ] && [ -n "$GITHUB_REPOSITORY" ]; then
-        git pull --ff-only "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" main
+        AUTH=$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)
+        git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $AUTH" \
+            pull --ff-only "https://github.com/${GITHUB_REPOSITORY}.git" main
     else
         git pull --ff-only
     fi
