@@ -1,6 +1,6 @@
 # Spec: Deuda de CI/CD — Lockfile y protección de `main`
 
-> **Estado:** aprobada · **Fecha:** 2026-09-29 · **Dueño:** agustin
+> **Estado:** cerrada (2026-09-29) · **Fecha:** 2026-09-29 · **Dueño:** agustin
 > **Decisiones aplicables:** `decisions/2026-09-29_ci-cd-lockfile-deuda.md` (D1–D4, aprobadas)
 > **Repos afectados:** `datamaq-telemetry`
 
