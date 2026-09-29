@@ -56,10 +56,12 @@ Construido para despliegues ligeros y directos sin Docker (**Python 3 + venv + M
 ### 1. Clonar e inicializar el entorno virtual
 ```bash
 cd ~/proyectos_software/datamaq/datamaq-telemetry
-uv venv --python 3.12 venv          # o: python3.12 -m venv venv
-source venv/bin/activate
-pip install -r requirements.lock    # versiones exactas, las mismas que CI y producción
+uv venv --python 3.12 .venv
+uv pip sync --python .venv/bin/python requirements.lock   # versiones exactas, las mismas que CI y producción
 ```
+
+`scripts/pre-push.sh` (el hook de pre-push) exige que `.venv/` exista y sea Python 3.12, y avisa si
+lo instalado no coincide con `requirements.lock`.
 
 Python 3.12 es la versión de producción y de CI. `requirements.txt` declara los rangos aceptados;
 `requirements.lock` fija las versiones exactas que se instalan. Si cambiás `requirements.txt`,
@@ -68,6 +70,9 @@ regenerá el lock y commiteá los dos (CI falla si solo cambia el `.txt`):
 ```bash
 uvx --python 3.12 --from pip-tools pip-compile -o requirements.lock requirements.txt
 ```
+
+Después de cualquier cambio del lock (propio o traído con `git pull`), re-sincronizar el entorno:
+`uv pip sync --python .venv/bin/python requirements.lock`.
 
 ### 1.1. Clonar los datos maestros (repo independiente)
 `data/` (organizaciones, facturas de distribuidora) vive en un repositorio git
@@ -87,23 +92,23 @@ nano .env
 ### 3. Crear la base de datos y aplicar migraciones
 Ejecuta el script de inicialización (crea la BD y aplica `alembic upgrade head`):
 ```bash
-venv/bin/python scripts/init_db.py
+.venv/bin/python scripts/init_db.py
 ```
 
 ### 4. Migraciones de esquema (Alembic)
 El esquema se gestiona con **Alembic** (fuente de verdad: `src/infrastructure/sqlalchemy/models.py`).
 
-- **BD nueva:** `venv/bin/alembic upgrade head` (o `scripts/init_db.py`).
+- **BD nueva:** `.venv/bin/alembic upgrade head` (o `scripts/init_db.py`).
 - **BD legacy con drift** (tablas existentes sin `alembic_version`): marcar el baseline y reconciliar:
   ```bash
-  venv/bin/alembic stamp 209ce0774d59
-  venv/bin/alembic upgrade head
+  .venv/bin/alembic stamp 209ce0774d59
+  .venv/bin/alembic upgrade head
   ```
 - **Generar una migración nueva** (diff metadata↔BD contra una BD temporal):
   ```bash
-  DATABASE_URL=mysql+pymysql://usuario:pass@127.0.0.1:3306/db_temp venv/bin/alembic revision --autogenerate -m "descripcion"
+  DATABASE_URL=mysql+pymysql://usuario:pass@127.0.0.1:3306/db_temp .venv/bin/alembic revision --autogenerate -m "descripcion"
   ```
-- **Revertir la última revisión:** `venv/bin/alembic downgrade -1`
+- **Revertir la última revisión:** `.venv/bin/alembic downgrade -1`
 
 ---
 
@@ -115,7 +120,7 @@ El esquema se gestiona con **Alembic** (fuente de verdad: `src/infrastructure/sq
 ```bash
 ./run.sh
 ```
-*(El script activa `venv/`, exporta `PYTHONPATH=.` y ejecuta `uvicorn src.main:app --reload` en `:8000`)*
+*(El script activa `.venv/`, exporta `PYTHONPATH=.` y ejecuta `uvicorn src.main:app --reload` en `:8000`)*
 
 - **Documentación Swagger interactiva**: [http://localhost:8000/docs](http://localhost:8000/docs)
 - **Documentación ReDoc**: [http://localhost:8000/redoc](http://localhost:8000/redoc)
@@ -213,14 +218,14 @@ Verificación individual:
 
 ```bash
 # Tests unitarios e integración
-venv/bin/pytest
+.venv/bin/pytest
 
 # Verificación estricta de arquitectura Clean Architecture & DDD
-venv/bin/python scripts/verify_architecture.py
+.venv/bin/python scripts/verify_architecture.py
 
 # Linter y Formato
-venv/bin/ruff check .
-venv/bin/ruff format --check .
+.venv/bin/ruff check .
+.venv/bin/ruff format --check .
 ```
 
 ---
