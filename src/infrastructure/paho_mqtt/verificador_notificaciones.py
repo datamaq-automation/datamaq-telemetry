@@ -25,16 +25,21 @@ from src.infrastructure.yaml.repositories.organizaciones_repository import YamlO
 def construir_verificador_notificaciones(
     session_factory: sessionmaker,
     repo_organizaciones: RepositorioOrganizacionesPort | None = None,
+    billing_habilitado: bool = True,
 ) -> Callable[[str], bool]:
     """Cada llamada abre y cierra su propia sesión: se registra una sola vez a nivel proceso
     (`ProcesadorAlertasIngesta.configurar_notificador`) pero se invoca por mensaje MQTT desde
     varios threads del pool, así que no puede compartir estado ni sesión con nadie más.
 
-    `repo_organizaciones` es inyectable para tests; en producción es YAML (dato maestro)."""
+    `repo_organizaciones` es inyectable para tests; en producción es YAML (dato maestro).
+    Si `billing_habilitado=False`, todos reciben notificaciones (retorna siempre True)."""
 
     repo_org = repo_organizaciones or YamlOrganizacionesRepository()
 
     def _notificaciones_habilitadas_para(dispositivo_id: str) -> bool:
+        if not billing_habilitado:
+            return True
+
         db = session_factory()
         try:
             repo_disp = MySQLDispositivosRepository(db)

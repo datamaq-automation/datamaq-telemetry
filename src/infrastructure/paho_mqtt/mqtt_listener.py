@@ -90,7 +90,9 @@ class MQTTListener:
             app_env=self.settings.APP_ENV,
         )
         dests = [d.strip() for d in self.settings.ALERTAS_EMAIL_DESTINATARIOS.split(",") if d.strip()]
-        verificador_plan = construir_verificador_notificaciones(self.session_factory)
+        verificador_plan = construir_verificador_notificaciones(
+            self.session_factory, billing_habilitado=self.settings.BILLING_HABILITADO
+        )
         ProcesadorAlertasIngesta.configurar_notificador(notificador, dests, verificador_plan=verificador_plan)
 
     def _on_connect(self, client, userdata, flags, reason_code, properties=None):
