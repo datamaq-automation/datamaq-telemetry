@@ -70,7 +70,7 @@ class MonitorearPotenciaYAlarmaUseCase:
                     f"({resultado_eval['porcentaje_uso']:.1f}%)"
                 )
             else:
-                logger.error(f"Fallo al publicar comando de alarma")
+                logger.error("Fallo al publicar comando de alarma")
 
         return NotificadorEstadoDTO(
             alarmaActiva=self._estado_alarma_anterior,

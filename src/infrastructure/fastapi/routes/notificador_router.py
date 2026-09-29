@@ -1,6 +1,6 @@
 """src/infrastructure/fastapi/routes/notificador_router.py."""
 
-from typing import Any, Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
@@ -39,4 +39,4 @@ async def estado_alarma(
     try:
         return await use_case.ejecutar(planta_id)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al evaluar alarma: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al evaluar alarma: {e!s}") from e
