@@ -345,7 +345,14 @@ def test_resumen_nodo_unifilar_exitoso():
     response = client.get("/api/v1/plantas/planta-1/unifilar/nodos/mt/resumen?granularity=day&dias=7")
 
     assert response.status_code == 200
-    mock_use_case.resumen.assert_called_once_with("planta-1", "mt", "org-1", "day", "America/Argentina/Buenos_Aires", 7)
+    mock_use_case.resumen.assert_called_once_with(
+        planta_id="planta-1",
+        nodo_id="mt",
+        organizacion_id="org-1",
+        granularidad="day",
+        zona="America/Argentina/Buenos_Aires",
+        dias=7,
+    )
     data = response.json()
     assert data["es_virtual"] is True
     assert data["dispositivos_ids"] == ["dev-1", "dev-2"]
@@ -359,7 +366,7 @@ def test_resumen_nodo_unifilar_superadmin_sin_org():
     response = client.get("/api/v1/plantas/planta-1/unifilar/nodos/mt/resumen")
 
     assert response.status_code == 200
-    assert mock_use_case.resumen.call_args.args[2] is None
+    assert mock_use_case.resumen.call_args.kwargs["organizacion_id"] is None
 
 
 def test_resumen_nodo_unifilar_no_encontrado():
@@ -371,7 +378,7 @@ def test_resumen_nodo_unifilar_no_encontrado():
     assert response.status_code == 404
 
 
-def test_resumen_nodo_unifilar_default_dias_30():
+def test_resumen_nodo_unifilar_sin_dias_delega_default_al_use_case():
     client, mock_use_case = _cliente()
     mock_use_case.resumen.return_value = ResumenNodoUnifilarDTO(
         planta_id="planta-1",
@@ -384,9 +391,9 @@ def test_resumen_nodo_unifilar_default_dias_30():
     response = client.get("/api/v1/plantas/planta-1/unifilar/nodos/mt/resumen")
 
     assert response.status_code == 200
-    # Sin parámetro dias, debe usar default=30 (ISO 50001)
-    call_args = mock_use_case.resumen.call_args.args
-    assert call_args[4] == 30  # quinto argumento es dias
+    # Sin parámetro dias el router pasa None; el default de 30 días (ISO 50001) lo resuelve el
+    # use case y se verifica en test_consultar_nodo_unifilar.py.
+    assert mock_use_case.resumen.call_args.kwargs["dias"] is None
 
 
 def test_historico_nodo_unifilar_exitoso():
