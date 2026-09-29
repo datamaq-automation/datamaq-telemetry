@@ -66,7 +66,8 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
     fi
 
     echo "==> Instalando dependencias..."
-    ./.venv/bin/pip install -r requirements.txt
+    # Versiones exactas del lockfile (D1), las mismas que probó CI.
+    ./.venv/bin/pip install -r requirements.lock
 
     echo "==> Actualizando datos maestros (repo independiente datamaq-data)..."
     if [ -d "data/.git" ]; then
