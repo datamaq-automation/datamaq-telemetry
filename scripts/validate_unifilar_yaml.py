@@ -3,8 +3,8 @@
 Validador de estructura unifilar YAML — detecta ciclos, duplicados, huérfanos.
 
 Uso:
-  venv/bin/python scripts/validate_unifilar_yaml.py
-  venv/bin/python scripts/validate_unifilar_yaml.py --archivo data/custom.yml --planta-id durax
+  .venv/bin/python scripts/validate_unifilar_yaml.py
+  .venv/bin/python scripts/validate_unifilar_yaml.py --archivo data/custom.yml --planta-id durax
 """
 
 import argparse

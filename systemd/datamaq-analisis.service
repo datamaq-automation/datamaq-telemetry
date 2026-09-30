@@ -7,5 +7,5 @@ Type=oneshot
 User=agustin
 WorkingDirectory=/home/agustin/proyectos_software/datamaq-telemetry
 EnvironmentFile=/home/agustin/proyectos_software/datamaq-telemetry/.env
-ExecStart=/home/agustin/proyectos_software/datamaq-telemetry/venv/bin/python scripts/analizar_consumo.py --dias 2
+ExecStart=/home/agustin/proyectos_software/datamaq-telemetry/.venv/bin/python scripts/analizar_consumo.py --dias 2
 TimeoutStartSec=1800

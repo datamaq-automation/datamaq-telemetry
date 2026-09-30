@@ -9,10 +9,10 @@ Permite diagnosticar anomalías críticas de instalación en campo:
 
 Uso:
   # Modo Simulación / Comprobación rápida:
-  venv/bin/python scripts/diagnosticar_instalacion_ti.py --simular --ir 286.6 --is 286.5 --fpr 0.02 --fps 0.85 --fases R,S
+  .venv/bin/python scripts/diagnosticar_instalacion_ti.py --simular --ir 286.6 --is 286.5 --fpr 0.02 --fps 0.85 --fases R,S
 
   # Modo Conectado a Base de Datos (Inspección de últimas lecturas):
-  venv/bin/python scripts/diagnosticar_instalacion_ti.py --mac D48C49F035A8 --muestras 5
+  .venv/bin/python scripts/diagnosticar_instalacion_ti.py --mac D48C49F035A8 --muestras 5
 """
 
 from __future__ import annotations

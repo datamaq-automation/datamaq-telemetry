@@ -8,7 +8,7 @@ Los campos con valor por defecto del dominio (CONSUMO, R,S,T, T2, True) se marca
 `# default` porque probablemente nadie los cargó a mano.
 
 Uso:
-  venv/bin/python scripts/exportar_instalacion_medidores.py [--planta PLANTA_ID]
+  .venv/bin/python scripts/exportar_instalacion_medidores.py [--planta PLANTA_ID]
 """
 
 from __future__ import annotations

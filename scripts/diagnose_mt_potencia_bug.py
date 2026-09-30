@@ -8,7 +8,7 @@ Ejecuta queries de BD para verificar las 5 hipótesis del análisis:
   D4: Bifurcaciones inesperadas en MT
 
 Uso (desde datamaq-telemetry/):
-  venv/bin/python -m scripts.diagnose_mt_potencia_bug --planta-id durax --nodo-id acometida-13200v
+  .venv/bin/python -m scripts.diagnose_mt_potencia_bug --planta-id durax --nodo-id acometida-13200v
 """
 
 import argparse

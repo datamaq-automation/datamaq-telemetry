@@ -7,5 +7,5 @@ Type=oneshot
 User=agustin
 WorkingDirectory=/home/agustin/proyectos_software/datamaq-telemetry
 EnvironmentFile=/home/agustin/proyectos_software/datamaq-telemetry/.env
-ExecStart=/home/agustin/proyectos_software/datamaq-telemetry/venv/bin/python scripts/expirar_suscripciones.py
+ExecStart=/home/agustin/proyectos_software/datamaq-telemetry/.venv/bin/python scripts/expirar_suscripciones.py
 TimeoutStartSec=1800
