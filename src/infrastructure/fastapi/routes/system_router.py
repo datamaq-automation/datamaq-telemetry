@@ -1,5 +1,6 @@
 """src/infrastructure/fastapi/routes/system_router.py."""
 
+import os
 from datetime import datetime, timezone
 from typing import Annotated
 
@@ -17,8 +18,30 @@ from src.infrastructure.sqlalchemy.database import (
     verificar_conexion_db,
     verificar_estado_migraciones,
 )
+from src.infrastructure.yaml.loaders import cargar_organizaciones_completas
 
 router = APIRouter(tags=["Sistema"])
+
+
+def _validar_datamaq_data() -> dict:
+    """Valida que datamaq-data se cargó correctamente (≥1 org, ≥1 planta total)."""
+    try:
+        data_dir = os.path.join(os.path.dirname(__file__), "../../../../data")
+        if not os.path.isdir(data_dir):
+            return {"valido": False, "razon": "directorio_data_no_existe"}
+        organizaciones = cargar_organizaciones_completas(data_dir)
+        if not organizaciones:
+            return {"valido": False, "razon": "sin_organizaciones"}
+        total_plantas = sum(len(org.get("plantas", [])) for org in organizaciones)
+        if total_plantas == 0:
+            return {"valido": False, "razon": "sin_plantas"}
+        return {
+            "valido": True,
+            "organizaciones": len(organizaciones),
+            "plantas_totales": total_plantas,
+        }
+    except Exception as e:
+        return {"valido": False, "razon": f"excepcion: {e!s}"}
 
 
 @router.get("/favicon.ico", include_in_schema=False)
@@ -37,12 +60,13 @@ def liveness_check():
 
 @router.get("/health/ready")
 def readiness_check(response: Response):
-    """Sonda de readiness: valida que la BD esté conectada y en la versión correcta de migración."""
+    """Sonda de readiness: valida BD, migraciones y datamaq-data."""
     listener = get_mqtt_listener()
     db_ok = verificar_conexion_db()
     migraciones = verificar_estado_migraciones()
+    data_ok = _validar_datamaq_data()
 
-    esta_listo = db_ok and migraciones.get("sincronizado", False)
+    esta_listo = db_ok and migraciones.get("sincronizado", False) and data_ok.get("valido", False)
     if not esta_listo:
         response.status_code = 503
         return {
@@ -51,6 +75,7 @@ def readiness_check(response: Response):
             "database_conectada": db_ok,
             "migraciones": migraciones,
             "mqtt_conectado": listener.esta_conectado() if listener else False,
+            "datamaq_data": data_ok,
         }
 
     return {
@@ -59,6 +84,7 @@ def readiness_check(response: Response):
         "database_conectada": db_ok,
         "migraciones": migraciones,
         "mqtt_conectado": listener.esta_conectado() if listener else False,
+        "datamaq_data": data_ok,
     }
 
 
