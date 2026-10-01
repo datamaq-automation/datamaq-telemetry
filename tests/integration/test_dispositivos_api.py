@@ -6,6 +6,8 @@ from unittest.mock import MagicMock
 from fastapi.testclient import TestClient
 
 from src.application.dtos.dispositivo_dto import DispositivoResponseDTO
+from src.domain.telemetria.exceptions import PlantaNoEncontradaError
+from src.infrastructure.fastapi.auth_dependencies import get_acceso_plantas_use_case
 from src.infrastructure.fastapi.dependencies import (
     get_dispositivos_use_case,
     get_usuario_actual,
@@ -63,9 +65,12 @@ def test_listar_dispositivos_end_to_end():
 
     mock_use_case = MagicMock()
     mock_use_case.listar_dispositivos.return_value = [mock_dto]
+    mock_acceso = MagicMock()
+    mock_acceso.resolver_planta_permitida.return_value = None
 
     app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "user-test", "rol": "operador", "org": "org-test"}
     app.dependency_overrides[get_dispositivos_use_case] = lambda: mock_use_case
+    app.dependency_overrides[get_acceso_plantas_use_case] = lambda: mock_acceso
 
     client = TestClient(app)
     response = client.get("/api/v1/dispositivos")
@@ -75,6 +80,7 @@ def test_listar_dispositivos_end_to_end():
     data = response.json()
     assert len(data) == 1
     assert data[0]["device_uid"] == "PM-001"
+    mock_acceso.resolver_planta_permitida.assert_called_once_with("user-test", "operador", "org-test", None)
 
 
 def test_listar_dispositivos_rechaza_planta_ajena():
@@ -82,12 +88,17 @@ def test_listar_dispositivos_rechaza_planta_ajena():
     app = create_app()
 
     mock_use_case = MagicMock()
+    mock_acceso = MagicMock()
+    mock_acceso.resolver_planta_permitida.side_effect = PlantaNoEncontradaError(
+        "Planta con id 'foreign-planta-id' no encontrada."
+    )
     app.dependency_overrides[get_usuario_actual] = lambda: {
         "sub": "user-org-1",
         "rol": "operador",
         "org": "org-1",
     }
     app.dependency_overrides[get_dispositivos_use_case] = lambda: mock_use_case
+    app.dependency_overrides[get_acceso_plantas_use_case] = lambda: mock_acceso
 
     client = TestClient(app)
 
@@ -98,3 +109,6 @@ def test_listar_dispositivos_rechaza_planta_ajena():
 
     # El use_case nunca debe ser llamado para plantas ajenas
     mock_use_case.listar_dispositivos.assert_not_called()
+    mock_acceso.resolver_planta_permitida.assert_called_once_with(
+        "user-org-1", "operador", "org-1", "foreign-planta-id"
+    )
