@@ -146,3 +146,41 @@ class DimensionadorCompensacionService:
 
         recargo_ars = costo_base * factor_recargo
         return round(max(0.0, recargo_ars), 2)
+
+    @staticmethod
+    def es_sobrecompensacion_sostenida(q_max_kvar: float | None) -> bool:
+        """Determina si existe sobrecompensación reactiva sostenida (Q_max <= 0)."""
+        if q_max_kvar is None:
+            return False
+        return q_max_kvar <= 0.0
+
+    @classmethod
+    def evaluar_compensacion(
+        cls,
+        potencia_activa_kw: float | None,
+        fp_actual: float | None,
+        q_reactiva_kvar: float | None = None,
+        q_max_kvar: float | None = None,
+        fp_objetivo: float = 0.96,
+    ) -> tuple[float | None, float | None, list[float], bool]:
+        """Evalúa dimensionamiento y sobrecompensación sostenida.
+
+        Retorna:
+            (qc_kvar, banco_sugerido_kvar, escalones, sobrecompensacion_sostenida)
+        """
+        sobrecompensacion = cls.es_sobrecompensacion_sostenida(q_max_kvar)
+        if sobrecompensacion:
+            return 0.0, None, [], True
+
+        qc = cls.calcular_potencia_compensacion(
+            potencia_activa_kw=potencia_activa_kw,
+            fp_actual=fp_actual,
+            fp_objetivo=fp_objetivo,
+            q_reactiva_kvar=q_reactiva_kvar,
+        )
+        if qc is None or qc <= 0.0:
+            return qc, None, [], sobrecompensacion
+
+        banco = cls.sugerir_banco_comercial(qc)
+        escalones = cls.calcular_escalones_sugeridos(qc) if banco is not None else []
+        return qc, banco, escalones, False

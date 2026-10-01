@@ -7,6 +7,9 @@ from pydantic import BaseModel, Field
 class AnaliticaBancoCapacitoresPlantaDTO(BaseModel):
     planta_id: str = Field(..., description="Identificador único de la planta")
     periodo_dias: int = Field(default=30, description="Ventana de análisis en días (ISO 50001: mínimo 30)")
+    periodo_dias_analizado: int = Field(
+        default=30, description="Días analizados en la ventana histórica (ISO 50001: mínimo 30)"
+    )
     potencia_activa_promedio_kw: float | None = Field(..., description="Potencia activa promedio P (kW)")
     potencia_reactiva_promedio_kvar: float | None = Field(
         default=None, description="Potencia reactiva promedio Q (kVAr)"

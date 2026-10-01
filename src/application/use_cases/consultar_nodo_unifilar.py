@@ -108,7 +108,7 @@ class ConsultarNodoUnifilarUseCase:
         return arbol.obtener(nodo_id), arbol.nodos_medidores_frontera(nodo_id)
 
     def _calcular_compensacion_historica(
-        self, nodo: NodoUnifilar, dispositivos_ids: list[str], periodo_dias: int = 7
+        self, nodo: NodoUnifilar, dispositivos_ids: list[str], periodo_dias: int = 30
     ) -> CompensacionHistoricaDTO | None:
         es_acometida_mt = nodo.tipo == TipoNodoUnifilar.ACOMETIDA and nodo.tension_nominal_v >= 1000.0
         es_total_planta = nodo.device_id is None and nodo.parent_id is None
@@ -186,6 +186,7 @@ class ConsultarNodoUnifilarUseCase:
         granularidad: str = "day",
         zona: str = "America/Argentina/Buenos_Aires",
         dias: int | None = None,
+        periodo_dias: int | None = None,
     ) -> ResumenNodoUnifilarDTO:
         nodo, nodos_frontera = self._resolver_nodo(planta_id, nodo_id, organizacion_id)
         dispositivos_ids = [n.device_id for n in nodos_frontera if n.device_id]
@@ -223,8 +224,8 @@ class ConsultarNodoUnifilarUseCase:
             relacion.factor,
         )
 
-        # Usar dias del parámetro si se proporciona, sino default de 30 (ISO 50001)
-        periodo_dias_compensacion = dias if dias is not None else 30
+        # Usar periodo_dias si se especifica, sino dias, sino default de 30 (ISO 50001)
+        periodo_dias_compensacion = periodo_dias if periodo_dias is not None else (dias if dias is not None else 30)
         compensacion_hist = self._calcular_compensacion_historica(
             nodo, dispositivos_ids, periodo_dias=periodo_dias_compensacion
         )

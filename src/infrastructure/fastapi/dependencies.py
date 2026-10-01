@@ -229,9 +229,12 @@ def get_consultar_analitica_planta_use_case(
         ConsultarAnaliticaPlantaUseCase,
     )
 
-    # Reutilizar la misma sesión de telemetría
+    # Reutilizar la misma sesión de telemetría y el repositorio de organizaciones declarativo
     consultar_telemetria = get_telemetria_use_case(db, settings)
-    return ConsultarAnaliticaPlantaUseCase(consultar_telemetria=consultar_telemetria)
+    return ConsultarAnaliticaPlantaUseCase(
+        consultar_telemetria=consultar_telemetria,
+        repo_organizaciones=YamlOrganizacionesRepository(),
+    )
 
 
 def get_maquinas_use_case(

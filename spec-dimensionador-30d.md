@@ -2,8 +2,8 @@
 
 **Bloque Backend (`datamaq-telemetry`)**  
 **Origen:** [`../specs/dimensionador-30d.md`](../specs/dimensionador-30d.md)  
-**Estado:** Secciones 2–3 implementadas (commits cfac816, a94a33f). Secciones 4–5 (tests completos, documentación) pendientes.  
-**Traspasada a hija:** sí (sesión actual implementó lo esencial) · **Bloque cerrado:** no
+**Estado:** Secciones 1–5 implementadas al 100% (Gauntlet pre-push superado: 1601 unit tests, 74 integration tests, pyright 0 errores, clean architecture respetado).  
+**Traspasada a hija:** no · **Bloque cerrado:** sí
 
 ---
 

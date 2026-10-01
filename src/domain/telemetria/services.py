@@ -9,6 +9,9 @@ Los servicios han sido modularizados en submódulos especializados dentro del pa
 - `evaluador_alertas_calidad`: EvaluadorAlertasCalidadService
 """
 
+from src.domain.telemetria.analizador_reactiva import (
+    DimensionadorCompensacionService,
+)
 from src.domain.telemetria.servicios.aislamiento_broadcast import (
     debe_recibir_evento,
 )
@@ -64,6 +67,7 @@ __all__ = [
     "CalculadoraPotenciaService",
     "CooldownNotificacionesAlertasService",
     "DiagnosticoFasorialRed",
+    "DimensionadorCompensacionService",
     "EvaluacionRotacionFase",
     "EvaluadorAlertasCalidadService",
     "EvaluadorAnomaliasFasesService",

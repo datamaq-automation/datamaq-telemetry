@@ -836,6 +836,38 @@ def test_dimensionador_estimacion_penalizacion_ars():
     assert DimensionadorCompensacionService.estimar_penalizacion_mensual_ars(0.0, 0.80) is None
 
 
+def test_dimensionador_sobrecompensacion_y_evaluacion():
+    # es_sobrecompensacion_sostenida
+    assert DimensionadorCompensacionService.es_sobrecompensacion_sostenida(-5.0) is True
+    assert DimensionadorCompensacionService.es_sobrecompensacion_sostenida(0.0) is True
+    assert DimensionadorCompensacionService.es_sobrecompensacion_sostenida(0.1) is False
+    assert DimensionadorCompensacionService.es_sobrecompensacion_sostenida(None) is False
+
+    # evaluar_compensacion con sobrecompensacion sostenida (Q_max <= 0)
+    qc, banco, escalones, sobrecomp = DimensionadorCompensacionService.evaluar_compensacion(
+        potencia_activa_kw=100.0,
+        fp_actual=0.88,
+        q_reactiva_kvar=-10.0,
+        q_max_kvar=0.0,
+    )
+    assert sobrecomp is True
+    assert qc == 0.0
+    assert banco is None
+    assert escalones == []
+
+    # evaluar_compensacion con régimen inductivo normal
+    qc, banco, escalones, sobrecomp = DimensionadorCompensacionService.evaluar_compensacion(
+        potencia_activa_kw=100.0,
+        fp_actual=0.80,
+        q_reactiva_kvar=50.0,
+        q_max_kvar=60.0,
+    )
+    assert sobrecomp is False
+    assert qc is not None and qc > 0.0
+    assert banco is not None
+    assert len(escalones) > 0
+
+
 def test_calculo_desbalance_corriente():
     # Balanceado
     assert AnalizadorCalidadEnergiaService.calcular_desbalance_corriente(100.0, 100.0, 100.0) == 0.0

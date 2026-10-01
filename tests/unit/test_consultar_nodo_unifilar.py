@@ -326,3 +326,70 @@ def test_compensacion_historica_calcula_banco_recomendado_con_datos_reactivos(us
     # FP debería estar alrededor de 0.89 (cos φ de P/S)
     assert resumen.compensacion_historica.factor_potencia_promedio is not None
     assert 0.85 < (resumen.compensacion_historica.factor_potencia_promedio or 0) < 0.95
+    assert resumen.compensacion_historica.periodo_dias == 30
+    assert resumen.compensacion_historica.sobrecompensacion_sostenida is False
+
+
+def test_resumen_nodo_respeta_parametro_periodo_dias(use_case):
+    """Valida que use_case.resumen() acepta periodo_dias explícito y lo propaga."""
+    acometida_mt = _nodo("mt-13200v", TipoNodoUnifilar.ACOMETIDA)
+    acometida_mt.tension_nominal_v = 13200.0
+    use_case.repo_organizaciones.obtener_nodos_unifilar.return_value = [
+        acometida_mt,
+        _nodo("tgbt-1", TipoNodoUnifilar.TGBT, parent_id="mt-13200v", device_id=DEV_1),
+    ]
+
+    use_case.consultar_telemetria.listar_instantaneas.return_value = []
+    use_case.repo_telemetria.obtener_ultima_instantanea.return_value = _lectura(DEV_1, 100_000.0)
+
+    # 1. Sin especificar -> default 30 (ISO 50001)
+    res_default = use_case.resumen(PLANTA_ID, "mt-13200v", organizacion_id=ORG_ID)
+    assert res_default.compensacion_historica is not None
+    assert res_default.compensacion_historica.periodo_dias == 30
+
+    # 2. Con periodo_dias=14 explícito
+    res_14 = use_case.resumen(PLANTA_ID, "mt-13200v", organizacion_id=ORG_ID, periodo_dias=14)
+    assert res_14.compensacion_historica is not None
+    assert res_14.compensacion_historica.periodo_dias == 14
+
+    # 3. Con dias=7 y sin periodo_dias -> hereda dias=7
+    res_7 = use_case.resumen(PLANTA_ID, "mt-13200v", organizacion_id=ORG_ID, dias=7)
+    assert res_7.compensacion_historica is not None
+    assert res_7.compensacion_historica.periodo_dias == 7
+
+
+def test_compensacion_historica_sobrecompensacion_sostenida(use_case):
+    """Si Q_max <= 0, sobrecompensacion_sostenida=True y banco_recomendado=None."""
+    acometida_mt = _nodo("mt-13200v", TipoNodoUnifilar.ACOMETIDA)
+    acometida_mt.tension_nominal_v = 13200.0
+    use_case.repo_organizaciones.obtener_nodos_unifilar.return_value = [
+        acometida_mt,
+        _nodo("tgbt-1", TipoNodoUnifilar.TGBT, parent_id="mt-13200v", device_id=DEV_1),
+    ]
+
+    # Simular lecturas con reactiva capacitiva negativa: Q = -25 kVAr
+    puntos_historico = [
+        (
+            datetime(2026, 9, 12, hour=i, tzinfo=timezone.utc),
+            100_000.0,
+            -25_000.0,
+        )
+        for i in range(3)
+    ]
+
+    use_case.consultar_telemetria.listar_instantaneas.return_value = [
+        type(
+            "PuntoPotencia",
+            (),
+            {"registrado_en": p[0], "potencia_activa_total_W": p[1], "potencia_reactiva_total_VAR": p[2]},
+        )()
+        for p in puntos_historico
+    ]
+    use_case.repo_telemetria.obtener_ultima_instantanea.return_value = _lectura(DEV_1, 100_000.0, var=-25_000.0)
+
+    resumen = use_case.resumen(PLANTA_ID, "mt-13200v", organizacion_id=ORG_ID)
+
+    assert resumen.compensacion_historica is not None
+    assert resumen.compensacion_historica.sobrecompensacion_sostenida is True
+    assert resumen.compensacion_historica.banco_recomendado is None
+    assert resumen.compensacion_historica.potencia_reactiva_max_kvar == -25.0
