@@ -1,12 +1,13 @@
 """tests/unit/test_consultar_nodo_unifilar.py — Telemetría agregada por nodo del unifilar."""
 
 from datetime import date, datetime, timezone
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from src.application.dtos.telemetria_dto import EnergiaAgregadaDTO
 from src.application.use_cases.consultar_nodo_unifilar import ConsultarNodoUnifilarUseCase
+from src.domain.sge.entities import FacturaDistribuidora
 from src.domain.telemetria.entities import LecturaInstantanea, MedicionFase, NodoUnifilar, Planta
 from src.domain.telemetria.exceptions import NodoUnifilarNoEncontradoError, PlantaNoEncontradaError
 from src.domain.telemetria.value_objects import (
@@ -393,3 +394,98 @@ def test_compensacion_historica_sobrecompensacion_sostenida(use_case):
     assert resumen.compensacion_historica.sobrecompensacion_sostenida is True
     assert resumen.compensacion_historica.banco_recomendado is None
     assert resumen.compensacion_historica.potencia_reactiva_max_kvar == -25.0
+
+
+def test_resumen_nodo_acometida_expone_triada_de_demanda(use_case):
+    acometida = NodoUnifilar(
+        id="acometida-1",
+        planta_id=PLANTA_ID,
+        nombre="Acometida MT",
+        tipo=TipoNodoUnifilar.ACOMETIDA,
+        tension_nominal_v=13200.0,
+        potencia_contratada_punta_kw=800.0,
+        potencia_contratada_fuera_punta_kw=850.0,
+    )
+    trafo = _nodo("trafo-1", TipoNodoUnifilar.TRANSFORMADOR, parent_id="acometida-1", device_id=DEV_1)
+    use_case.repo_organizaciones.obtener_nodos_unifilar.return_value = [acometida, trafo]
+
+    factura = FacturaDistribuidora(
+        id="fact-1",
+        planta_id=PLANTA_ID,
+        periodo="2026-09",
+        proveedor="EDELAP",
+        tipo_dato="potencia",
+        numero_factura="123",
+        importe_total_ars=1000.0,
+        potencia_contratada_punta_kw=800.0,
+        potencia_contratada_fuera_punta_kw=850.0,
+        potencia_adquirida_punta_kw=1049.0,
+        potencia_adquirida_fuera_punta_kw=1082.0,
+    )
+    use_case.repo_organizaciones.obtener_facturas_planta.return_value = [factura]
+    use_case.repo_telemetria.obtener_ultima_instantanea.return_value = _lectura(DEV_1, 500_000.0)
+
+    from src.domain.telemetria.servicios.calculador_demanda_cuartohoraria import DemandaCuartohoraria
+
+    with patch(
+        "src.application.use_cases.consultar_nodo_unifilar.calcular_demanda_cuartohoraria",
+        return_value=DemandaCuartohoraria(
+            potencia_adquirida_punta_kw=720.0,
+            potencia_adquirida_fuera_punta_kw=680.0,
+        ),
+    ):
+        resumen = use_case.resumen(PLANTA_ID, "acometida-1", organizacion_id=ORG_ID)
+
+    assert resumen.potencia_contratada_punta_kw == 800.0
+    assert resumen.potencia_contratada_fuera_punta_kw == 850.0
+    assert resumen.ultima_potencia_adquirida_punta_kw == 1049.0
+    assert resumen.ultima_potencia_adquirida_fuera_punta_kw == 1082.0
+    assert resumen.potencia_adquirida_punta_en_curso_kw == 720.0
+    assert resumen.potencia_adquirida_fuera_punta_en_curso_kw == 680.0
+
+
+def test_resumen_nodo_acometida_fallback_factura_si_no_declarada_en_nodo(use_case):
+    # Acometida sin potencia_contratada declarada en YAML
+    acometida = NodoUnifilar(
+        id="acometida-sin-declarar",
+        planta_id=PLANTA_ID,
+        nombre="Acometida MT",
+        tipo=TipoNodoUnifilar.ACOMETIDA,
+        tension_nominal_v=13200.0,
+    )
+    trafo = _nodo("trafo-1", TipoNodoUnifilar.TRANSFORMADOR, parent_id="acometida-sin-declarar", device_id=DEV_1)
+    use_case.repo_organizaciones.obtener_nodos_unifilar.return_value = [acometida, trafo]
+
+    factura = FacturaDistribuidora(
+        id="fact-1",
+        planta_id=PLANTA_ID,
+        periodo="2026-09",
+        proveedor="EDELAP",
+        tipo_dato="potencia",
+        numero_factura="123",
+        importe_total_ars=1000.0,
+        potencia_contratada_punta_kw=750.0,
+        potencia_contratada_fuera_punta_kw=820.0,
+        potencia_adquirida_punta_kw=900.0,
+        potencia_adquirida_fuera_punta_kw=920.0,
+    )
+    use_case.repo_organizaciones.obtener_facturas_planta.return_value = [factura]
+    use_case.repo_telemetria.obtener_ultima_instantanea.return_value = _lectura(DEV_1, 500_000.0)
+
+    from src.domain.telemetria.servicios.calculador_demanda_cuartohoraria import DemandaCuartohoraria
+
+    with patch(
+        "src.application.use_cases.consultar_nodo_unifilar.calcular_demanda_cuartohoraria",
+        return_value=DemandaCuartohoraria(
+            potencia_adquirida_punta_kw=600.0,
+            potencia_adquirida_fuera_punta_kw=550.0,
+        ),
+    ):
+        resumen = use_case.resumen(PLANTA_ID, "acometida-sin-declarar", organizacion_id=ORG_ID)
+
+    assert resumen.potencia_contratada_punta_kw == 750.0
+    assert resumen.potencia_contratada_fuera_punta_kw == 820.0
+    assert resumen.ultima_potencia_adquirida_punta_kw == 900.0
+    assert resumen.ultima_potencia_adquirida_fuera_punta_kw == 920.0
+    assert resumen.potencia_adquirida_punta_en_curso_kw == 600.0
+    assert resumen.potencia_adquirida_fuera_punta_en_curso_kw == 550.0

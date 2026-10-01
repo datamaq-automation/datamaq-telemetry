@@ -31,6 +31,30 @@ def _factura_energia(periodo: str, valor_kwh_promedio: float) -> FacturaDistribu
     )
 
 
+def _factura_potencia(
+    periodo: str,
+    importe_potencia_ars: float,
+    contratada_punta: float = 800.0,
+    contratada_fp: float = 850.0,
+    adquirida_punta: float = 800.0,
+    adquirida_fp: float = 850.0,
+) -> FacturaDistribuidora:
+    return FacturaDistribuidora(
+        id=f"{PLANTA_ID}-{periodo}-potencia",
+        planta_id=PLANTA_ID,
+        periodo=periodo,
+        proveedor="EDELAP",
+        tipo_dato="potencia",
+        numero_factura="2",
+        importe_total_ars=importe_potencia_ars,
+        importe_potencia_ars=importe_potencia_ars,
+        potencia_contratada_punta_kw=contratada_punta,
+        potencia_contratada_fuera_punta_kw=contratada_fp,
+        potencia_adquirida_punta_kw=adquirida_punta,
+        potencia_adquirida_fuera_punta_kw=adquirida_fp,
+    )
+
+
 def _nodo_tgbt() -> NodoUnifilar:
     return NodoUnifilar(
         id="tgbt-1",
@@ -171,3 +195,85 @@ def test_periodo_actual_tiene_formato_anio_mes():
 
     assert len(resultado.periodo_actual) == 7
     assert resultado.periodo_actual[4] == "-"
+
+
+def test_costo_potencia_calculado_sin_exceso():
+    # 800 kW punta + 850 kW fuera punta = 1650 kW total. Importe = 1_650_000 -> tarifa = 1000 $/kW
+    f_pot = _factura_potencia("2026-08", importe_potencia_ars=1_650_000.0)
+    f_ene = _factura_energia("2026-08", valor_kwh_promedio=2.0)
+    use_case = _use_case([f_ene, f_pot], [_nodo_tgbt()])
+
+    from src.domain.telemetria.servicios.calculador_demanda_cuartohoraria import DemandaCuartohoraria
+
+    with (
+        patch(
+            "src.application.use_cases.consultar_costo_estimado.calcular_resumen",
+            return_value=_mockear_kwh_mes_actual(500.0),
+        ),
+        patch(
+            "src.application.use_cases.consultar_costo_estimado.calcular_demanda_cuartohoraria",
+            return_value=DemandaCuartohoraria(
+                potencia_adquirida_punta_kw=700.0,
+                potencia_adquirida_fuera_punta_kw=800.0,
+            ),
+        ),
+    ):
+        resultado = use_case.ejecutar(planta_id=PLANTA_ID)
+
+    assert resultado.costo_potencia_ars == 1_650_000.0
+    assert resultado.motivo_potencia_sin_dato is None
+
+
+def test_costo_potencia_calculado_con_exceso():
+    # Base: 800 kW punta + 850 kW fp = 1650 kW a 1000 $/kW -> cargo_base = 1_650_000
+    # Demanda medida: punta = 900 (exceso 100), fp = 950 (exceso 100) -> recargo exceso = 200 * 1000 = 200_000
+    # Total esperado = 1_850_000
+    f_pot = _factura_potencia("2026-08", importe_potencia_ars=1_650_000.0)
+    f_ene = _factura_energia("2026-08", valor_kwh_promedio=2.0)
+    use_case = _use_case([f_ene, f_pot], [_nodo_tgbt()])
+
+    from src.domain.telemetria.servicios.calculador_demanda_cuartohoraria import DemandaCuartohoraria
+
+    with (
+        patch(
+            "src.application.use_cases.consultar_costo_estimado.calcular_resumen",
+            return_value=_mockear_kwh_mes_actual(500.0),
+        ),
+        patch(
+            "src.application.use_cases.consultar_costo_estimado.calcular_demanda_cuartohoraria",
+            return_value=DemandaCuartohoraria(
+                potencia_adquirida_punta_kw=900.0,
+                potencia_adquirida_fuera_punta_kw=950.0,
+            ),
+        ),
+    ):
+        resultado = use_case.ejecutar(planta_id=PLANTA_ID)
+
+    assert resultado.costo_potencia_ars == 1_850_000.0
+    assert resultado.motivo_potencia_sin_dato is None
+
+
+def test_costo_potencia_sin_telemetria_queda_sin_dato():
+    f_pot = _factura_potencia("2026-08", importe_potencia_ars=1_650_000.0)
+    f_ene = _factura_energia("2026-08", valor_kwh_promedio=2.0)
+    use_case = _use_case([f_ene, f_pot], [_nodo_tgbt()])
+
+    from src.domain.telemetria.servicios.calculador_demanda_cuartohoraria import DemandaCuartohoraria
+
+    with (
+        patch(
+            "src.application.use_cases.consultar_costo_estimado.calcular_resumen",
+            return_value=_mockear_kwh_mes_actual(500.0),
+        ),
+        patch(
+            "src.application.use_cases.consultar_costo_estimado.calcular_demanda_cuartohoraria",
+            return_value=DemandaCuartohoraria(
+                potencia_adquirida_punta_kw=None,
+                potencia_adquirida_fuera_punta_kw=None,
+            ),
+        ),
+    ):
+        resultado = use_case.ejecutar(planta_id=PLANTA_ID)
+
+    assert resultado.costo_potencia_ars is None
+    assert resultado.motivo_potencia_sin_dato == "demanda_maxima_no_disponible"
