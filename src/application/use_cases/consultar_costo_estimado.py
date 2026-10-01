@@ -4,8 +4,12 @@ from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 from src.application.dtos.sge_dto import CostoEstimadoResponseDTO
-from src.application.use_cases.agregacion_dispositivos import calcular_resumen
+from src.application.use_cases.agregacion_dispositivos import (
+    calcular_demanda_cuartohoraria,
+    calcular_resumen,
+)
 from src.application.use_cases.consultar_telemetria import ConsultarTelemetriaUseCase
+from src.domain.sge.entities import FacturaDistribuidora
 from src.domain.telemetria.exceptions import PlantaNoEncontradaError
 from src.domain.telemetria.ports import RepositorioOrganizacionesPort, RepositorioTelemetriaPort
 from src.domain.telemetria.servicios.arbol_unifilar import ArbolUnifilarService
@@ -50,14 +54,19 @@ class ConsultarCostoEstimadoUseCase:
         dispositivos_ids = self._resolver_dispositivos_frontera(planta_id, nodo_id)
         kwh_consumido_ahora = self._kwh_periodo_en_curso(dispositivos_ids)
 
-        facturas_energia = [f for f in self._repo_org.obtener_facturas_planta(planta_id) if f.tipo_dato == "energia"]
-        factura = facturas_energia[0] if facturas_energia else None
-        valor_kwh = factura.valor_energia_ars_kwh_promedio if factura else None
+        facturas = self._repo_org.obtener_facturas_planta(planta_id)
+        facturas_energia = [f for f in facturas if f.tipo_dato == "energia"]
+        factura_energia = facturas_energia[0] if facturas_energia else None
+        valor_kwh = factura_energia.valor_energia_ars_kwh_promedio if factura_energia else None
 
         costo_energia_ars = (
             round(kwh_consumido_ahora * valor_kwh, 2)
             if kwh_consumido_ahora is not None and valor_kwh is not None
             else None
+        )
+
+        costo_potencia_ars, motivo_potencia = self._calcular_costo_potencia(
+            planta_id, nodo_id, dispositivos_ids, facturas
         )
 
         return CostoEstimadoResponseDTO(
@@ -66,11 +75,70 @@ class ConsultarCostoEstimadoUseCase:
             kwh_consumido_periodo_actual=kwh_consumido_ahora,
             valor_energia_ars_kwh_promedio=valor_kwh,
             costo_energia_ars=costo_energia_ars,
-            periodo_factura_origen=factura.periodo if factura else None,
-            aviso_tarifa_desactualizada=self._tarifa_desactualizada(factura.periodo if factura else None),
-            costo_potencia_ars=None,
-            motivo_potencia_sin_dato="demanda_maxima_no_disponible",
+            periodo_factura_origen=factura_energia.periodo if factura_energia else None,
+            aviso_tarifa_desactualizada=self._tarifa_desactualizada(
+                factura_energia.periodo if factura_energia else None
+            ),
+            costo_potencia_ars=costo_potencia_ars,
+            motivo_potencia_sin_dato=motivo_potencia,
         )
+
+    def _calcular_costo_potencia(
+        self,
+        planta_id: str,
+        nodo_id: str | None,
+        dispositivos_ids: list[str],
+        facturas: list[FacturaDistribuidora],
+    ) -> tuple[float | None, str | None]:
+        facturas_potencia = [f for f in facturas if f.tipo_dato == "potencia" or f.importe_potencia_ars is not None]
+        if not facturas_potencia:
+            return None, "demanda_maxima_no_disponible"
+
+        factura_potencia = facturas_potencia[0]
+        tarifa_potencia = factura_potencia.valor_potencia_ars_kw_promedio
+        if tarifa_potencia is None:
+            return None, "demanda_maxima_no_disponible"
+
+        if not dispositivos_ids:
+            return None, "demanda_maxima_no_disponible"
+
+        nodos = self._repo_org.obtener_nodos_unifilar(planta_id)
+        nodo_acometida = next((n for n in nodos if n.tipo == TipoNodoUnifilar.ACOMETIDA), None) or (
+            next((n for n in nodos if n.id == nodo_id), None) if nodo_id else None
+        )
+
+        pot_contratada_punta = (
+            (nodo_acometida.potencia_contratada_punta_kw if nodo_acometida else None)
+            or factura_potencia.potencia_contratada_punta_kw
+            or 0.0
+        )
+        pot_contratada_fp = (
+            (nodo_acometida.potencia_contratada_fuera_punta_kw if nodo_acometida else None)
+            or factura_potencia.potencia_contratada_fuera_punta_kw
+            or 0.0
+        )
+
+        demanda_curso = calcular_demanda_cuartohoraria(
+            dispositivos_ids=dispositivos_ids,
+            consultar_telemetria=self._consultar_telemetria,
+        )
+
+        if (
+            demanda_curso.potencia_adquirida_punta_kw is None
+            and demanda_curso.potencia_adquirida_fuera_punta_kw is None
+        ):
+            return None, "demanda_maxima_no_disponible"
+
+        adquirida_punta = demanda_curso.potencia_adquirida_punta_kw or 0.0
+        adquirida_fp = demanda_curso.potencia_adquirida_fuera_punta_kw or 0.0
+
+        cargo_base = (pot_contratada_punta + pot_contratada_fp) * tarifa_potencia
+        exceso_punta = max(0.0, adquirida_punta - pot_contratada_punta)
+        exceso_fp = max(0.0, adquirida_fp - pot_contratada_fp)
+        costo_exceso = (exceso_punta + exceso_fp) * tarifa_potencia
+
+        costo_potencia_total = round(cargo_base + costo_exceso, 2)
+        return costo_potencia_total, None
 
     def _resolver_dispositivos_frontera(self, planta_id: str, nodo_id: str | None) -> list[str]:
         nodos = self._repo_org.obtener_nodos_unifilar(planta_id)

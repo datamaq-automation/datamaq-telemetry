@@ -16,6 +16,7 @@ from src.application.dtos.planta_estructura_dto import (
 from src.application.dtos.telemetria_dto import EnergiaAgregadaDTO
 from src.application.use_cases.agregacion_dispositivos import (
     calcular_datos_desde,
+    calcular_demanda_cuartohoraria,
     calcular_historico,
     calcular_potencia_referencia,
     calcular_resumen,
@@ -230,6 +231,39 @@ class ConsultarNodoUnifilarUseCase:
             nodo, dispositivos_ids, periodo_dias=periodo_dias_compensacion
         )
 
+        # Tríada de potencia: contratada, adquirida en curso (15-min) y última factura
+        facturas = self.repo_organizaciones.obtener_facturas_planta(planta_id)
+        factura_reciente = facturas[0] if facturas else None
+
+        if nodo.potencia_contratada_punta_kw is not None or nodo.potencia_contratada_fuera_punta_kw is not None:
+            pot_contratada_punta = nodo.potencia_contratada_punta_kw
+            pot_contratada_fp = nodo.potencia_contratada_fuera_punta_kw
+        elif nodo.tipo == TipoNodoUnifilar.ACOMETIDA or nodo.parent_id is None:
+            pot_contratada_punta = factura_reciente.potencia_contratada_punta_kw if factura_reciente else None
+            pot_contratada_fp = factura_reciente.potencia_contratada_fuera_punta_kw if factura_reciente else None
+        else:
+            pot_contratada_punta = None
+            pot_contratada_fp = None
+
+        if nodo.tipo == TipoNodoUnifilar.ACOMETIDA or nodo.parent_id is None:
+            ultima_adquirida_punta = factura_reciente.potencia_adquirida_punta_kw if factura_reciente else None
+            ultima_adquirida_fp = factura_reciente.potencia_adquirida_fuera_punta_kw if factura_reciente else None
+        else:
+            ultima_adquirida_punta = None
+            ultima_adquirida_fp = None
+
+        if dispositivos_ids and (nodo.tipo == TipoNodoUnifilar.ACOMETIDA or nodo.parent_id is None):
+            demanda_curso = calcular_demanda_cuartohoraria(
+                dispositivos_ids,
+                self.consultar_telemetria,
+                zona=zona,
+            )
+            adquirida_curso_punta = demanda_curso.potencia_adquirida_punta_kw
+            adquirida_curso_fp = demanda_curso.potencia_adquirida_fuera_punta_kw
+        else:
+            adquirida_curso_punta = None
+            adquirida_curso_fp = None
+
         return ResumenNodoUnifilarDTO(
             planta_id=planta_id,
             nodo_id=nodo.id,
@@ -251,6 +285,12 @@ class ConsultarNodoUnifilarUseCase:
                 for e in energia_sumada
             ],
             compensacion_historica=compensacion_hist,
+            potencia_contratada_punta_kw=pot_contratada_punta,
+            potencia_contratada_fuera_punta_kw=pot_contratada_fp,
+            potencia_adquirida_punta_en_curso_kw=adquirida_curso_punta,
+            potencia_adquirida_fuera_punta_en_curso_kw=adquirida_curso_fp,
+            ultima_potencia_adquirida_punta_kw=ultima_adquirida_punta,
+            ultima_potencia_adquirida_fuera_punta_kw=ultima_adquirida_fp,
         )
 
     def historico(
