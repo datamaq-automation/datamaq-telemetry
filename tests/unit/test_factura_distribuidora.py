@@ -250,3 +250,22 @@ def test_dto_expone_la_energia_registrada_en_camel_case_sin_energia_facturada():
     assert datos["energiaReactivaValleKvarh"] == 23202.0
     assert datos["energiaFacturadaKwh"] is None
     assert datos["energiaActivaPuntaKwh"] is None
+
+
+def test_valor_potencia_ars_kw_promedio_con_y_sin_exceso():
+    # Factura con exceso: contratada 800+850=1650, adquirida 1049 (exc 249) y 1082 (exc 232) -> total 2131 kW
+    factura = _factura()
+    esperado = 7664856.62 / 2131.0
+    assert factura.valor_potencia_ars_kw_promedio == pytest.approx(esperado)
+
+    # Factura sin exceso: contratada 800+850=1650, adquirida 500 y 600 -> total 1650 kW
+    factura_sin_exceso = _factura(
+        potencia_adquirida_punta_kw=500.0,
+        potencia_adquirida_fuera_punta_kw=600.0,
+        importe_potencia_ars=3300000.0,
+    )
+    assert factura_sin_exceso.valor_potencia_ars_kw_promedio == pytest.approx(3300000.0 / 1650.0)
+
+    # Factura sin importe de potencia
+    factura_sin_importe = _factura(importe_potencia_ars=None)
+    assert factura_sin_importe.valor_potencia_ars_kw_promedio is None

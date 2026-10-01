@@ -135,6 +135,8 @@ class NodoUnifilar:
     # Contrato con la distribuidora: solo tiene sentido en la `acometida` (punto de
     # suministro). Los medidores aguas abajo lo heredan por el árbol.
     categoria_tarifaria: str | None = None
+    potencia_contratada_punta_kw: float | None = None
+    potencia_contratada_fuera_punta_kw: float | None = None
     penalizacion_reactiva_aplica: bool | None = None
     fuente_dato: str | None = None
     notas_metrologicas: str | None = None

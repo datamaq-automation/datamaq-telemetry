@@ -147,3 +147,22 @@ class FacturaDistribuidora:
         if energia is None or self.importe_energia_ars is None or energia == 0:
             return None
         return self.importe_energia_ars / energia
+
+    @property
+    def valor_potencia_ars_kw_promedio(self) -> float | None:
+        """Precio promedio por kW ($/kW) cobrado en la factura de potencia.
+
+        Se calcula como el importe total de potencia dividido la potencia total facturada
+        (contratada + excedida si hubo exceso, o contratada si no).
+        None si no hay importe de potencia o la potencia base es 0 / None.
+        """
+        if self.importe_potencia_ars is None:
+            return None
+        pot_punta = self.potencia_contratada_punta_kw or 0.0
+        pot_fp = self.potencia_contratada_fuera_punta_kw or 0.0
+        exc_punta = self.potencia_excedida_punta_kw or 0.0
+        exc_fp = self.potencia_excedida_fuera_punta_kw or 0.0
+        total_kw = pot_punta + pot_fp + exc_punta + exc_fp
+        if total_kw <= 0.0:
+            return None
+        return self.importe_potencia_ars / total_kw
