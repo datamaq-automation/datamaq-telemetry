@@ -156,6 +156,16 @@ def _parsear_nodo_unifilar(n: dict, planta_id: str) -> NodoUnifilar:
         variable_relevante=n.get("variable_relevante"),
         orden=int(n.get("orden", 0)),
         categoria_tarifaria=n.get("categoria_tarifaria"),
+        potencia_contratada_punta_kw=(
+            float(n["potencia_contratada_punta_kw"])
+            if n.get("potencia_contratada_punta_kw") is not None
+            else (float(n["potencia_contratada_kw"]) if n.get("potencia_contratada_kw") is not None else None)
+        ),
+        potencia_contratada_fuera_punta_kw=(
+            float(n["potencia_contratada_fuera_punta_kw"])
+            if n.get("potencia_contratada_fuera_punta_kw") is not None
+            else (float(n["potencia_contratada_kw"]) if n.get("potencia_contratada_kw") is not None else None)
+        ),
         penalizacion_reactiva_aplica=(
             bool(n["penalizacion_reactiva_aplica"]) if n.get("penalizacion_reactiva_aplica") is not None else None
         ),
