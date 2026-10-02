@@ -112,6 +112,14 @@ class FacturaDistribuidora:
     energia_reactiva_punta_kvarh: float | None = None
     energia_reactiva_resto_kvarh: float | None = None
     energia_reactiva_valle_kvarh: float | None = None
+    # Desglose regulatorio Mercado Eléctrico Mayorista (CAMMESA) — decisión 2026-10-01
+    potencia_adquirida_mem_kw: float | None = None
+    importe_potencia_mem_ars: float | None = None
+    importe_adicionales_mem_ars: float | None = None
+    importe_transporte_mem_ars: float | None = None
+    importe_otros_cargos_mem_ars: float | None = None
+    importe_neto_ars: float | None = None
+    importe_impuestos_ars: float | None = None
     fuente_archivo: str | None = None
     cargada_en: str | None = None
 
@@ -147,6 +155,14 @@ class FacturaDistribuidora:
         if energia is None or self.importe_energia_ars is None or energia == 0:
             return None
         return self.importe_energia_ars / energia
+
+    @property
+    def valor_energia_integral_ars_kwh(self) -> float | None:
+        """Tarifa integral neta del MEM ($/kWh) incluyendo potencia, adicionales y transporte."""
+        energia = self.energia_facturada_kwh
+        if energia is None or self.importe_neto_ars is None or energia <= 0:
+            return None
+        return self.importe_neto_ars / energia
 
     @property
     def valor_potencia_ars_kw_promedio(self) -> float | None:
