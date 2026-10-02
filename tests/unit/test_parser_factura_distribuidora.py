@@ -429,7 +429,14 @@ def test_edelap_factura_202411_extrae_campos_reales(tmp_path):
     # Pico + Fuera de Pico por Transporte + sus dos excesos; los cargos variables son de energía.
     assert factura.importe_potencia_ars == pytest.approx(5151803.74 + 4334605.73 + 2405080.17 + 1774760.73)
     assert factura.importe_energia_ars is None
+    assert factura.importe_neto_ars == pytest.approx(15419479.84)
+    assert factura.importe_impuestos_ars == pytest.approx(5612256.94)
     assert factura.importe_total_ars == pytest.approx(21031736.78)
+    assert (
+        factura.importe_neto_ars is not None
+        and factura.importe_impuestos_ars is not None
+        and factura.importe_neto_ars + factura.importe_impuestos_ars == pytest.approx(factura.importe_total_ars)
+    )
     assert factura.fuente_archivo == "edelap_202411.pdf"
 
 
@@ -452,7 +459,14 @@ def test_edelap_factura_202312_confirma_layout_estable_entre_periodos(tmp_path):
     assert factura.potencia_excedida_punta_kw == pytest.approx(269.0)
     assert factura.potencia_excedida_fuera_punta_kw == pytest.approx(212.0)
     assert factura.importe_potencia_ars == pytest.approx(1167805.19 + 1009978.80 + 589011.74 + 377850.89)
+    assert factura.importe_neto_ars == pytest.approx(3820806.65)
+    assert factura.importe_impuestos_ars == pytest.approx(1375528.61 + 12000.0)
     assert factura.importe_total_ars == pytest.approx(5208335.26)
+    assert (
+        factura.importe_neto_ars is not None
+        and factura.importe_impuestos_ars is not None
+        and factura.importe_neto_ars + factura.importe_impuestos_ars == pytest.approx(factura.importe_total_ars)
+    )
 
 
 def test_edelap_factura_202402_sin_exceso_usa_demanda_registrada(tmp_path):
@@ -475,7 +489,14 @@ def test_edelap_factura_202402_sin_exceso_usa_demanda_registrada(tmp_path):
     assert factura.potencia_excedida_fuera_punta_kw == pytest.approx(0.0)
     # Solo pico + fuera de pico por transporte: ni el interés por mora ni el CTT.
     assert factura.importe_potencia_ars == pytest.approx(1304243.38 + 1009978.80)
+    assert factura.importe_neto_ars == pytest.approx(3158192.35)
+    assert factura.importe_impuestos_ars == pytest.approx(1136980.82 + 30000.0)
     assert factura.importe_total_ars == pytest.approx(4325173.17)
+    assert (
+        factura.importe_neto_ars is not None
+        and factura.importe_impuestos_ars is not None
+        and factura.importe_neto_ars + factura.importe_impuestos_ars == pytest.approx(factura.importe_total_ars)
+    )
 
 
 def _registrada(factura) -> tuple:
@@ -778,4 +799,28 @@ def test_cammesa_12_facturas_reales_extraen_desglose_y_balancean():
         assert factura.valor_energia_integral_ars_kwh is not None
         assert factura.valor_energia_integral_ars_kwh == pytest.approx(
             factura.importe_neto_ars / factura.energia_activa_total_kwh
+        )
+
+
+def test_edelap_12_facturas_reales_extraen_desglose_y_balancean():
+    import glob
+
+    rutas = sorted(glob.glob("data/Papelera platense - EDELAP/*.pdf"))
+    if not rutas:
+        pytest.skip("Los PDFs reales no se encuentran presentes en el entorno")
+    assert len(rutas) == 12, "Deben existir exactamente 12 facturas reales de EDELAP"
+
+    parser = ParserFacturaPotenciaEdelap()
+    for ruta in rutas:
+        factura = parser.parsear(ruta, PLANTA_ID)
+        assert factura.proveedor == "EDELAP"
+        assert factura.tipo_dato == "potencia"
+        assert factura.importe_potencia_ars is not None and factura.importe_potencia_ars > 0
+        assert factura.importe_neto_ars is not None and factura.importe_neto_ars > 0
+        assert factura.importe_impuestos_ars is not None and factura.importe_impuestos_ars > 0
+        assert factura.importe_total_ars > 0
+
+        # Balanceo exacto: neto + impuestos suman el total
+        assert factura.importe_total_ars == pytest.approx(
+            factura.importe_neto_ars + factura.importe_impuestos_ars, abs=1.0
         )
