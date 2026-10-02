@@ -32,6 +32,13 @@ def _magnitudes_negativas(f: FacturaDistribuidora) -> list[str]:
         "energia_reactiva_punta_kvarh": f.energia_reactiva_punta_kvarh,
         "energia_reactiva_resto_kvarh": f.energia_reactiva_resto_kvarh,
         "energia_reactiva_valle_kvarh": f.energia_reactiva_valle_kvarh,
+        "potencia_adquirida_mem_kw": f.potencia_adquirida_mem_kw,
+        "importe_potencia_mem_ars": f.importe_potencia_mem_ars,
+        "importe_adicionales_mem_ars": f.importe_adicionales_mem_ars,
+        "importe_transporte_mem_ars": f.importe_transporte_mem_ars,
+        "importe_otros_cargos_mem_ars": f.importe_otros_cargos_mem_ars,
+        "importe_neto_ars": f.importe_neto_ars,
+        "importe_impuestos_ars": f.importe_impuestos_ars,
     }
     return [nombre for nombre, valor in campos.items() if valor is not None and valor < 0.0]
 
