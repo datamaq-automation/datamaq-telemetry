@@ -62,6 +62,13 @@ def _parsear_factura(f: dict) -> FacturaDistribuidora:
         energia_reactiva_punta_kvarh=_float_opt(f, "energia_reactiva_punta_kvarh"),
         energia_reactiva_resto_kvarh=_float_opt(f, "energia_reactiva_resto_kvarh"),
         energia_reactiva_valle_kvarh=_float_opt(f, "energia_reactiva_valle_kvarh"),
+        potencia_adquirida_mem_kw=_float_opt(f, "potencia_adquirida_mem_kw"),
+        importe_potencia_mem_ars=_float_opt(f, "importe_potencia_mem_ars"),
+        importe_adicionales_mem_ars=_float_opt(f, "importe_adicionales_mem_ars"),
+        importe_transporte_mem_ars=_float_opt(f, "importe_transporte_mem_ars"),
+        importe_otros_cargos_mem_ars=_float_opt(f, "importe_otros_cargos_mem_ars"),
+        importe_neto_ars=_float_opt(f, "importe_neto_ars"),
+        importe_impuestos_ars=_float_opt(f, "importe_impuestos_ars"),
         fuente_archivo=f.get("fuente_archivo"),
         cargada_en=f.get("cargada_en"),
     )

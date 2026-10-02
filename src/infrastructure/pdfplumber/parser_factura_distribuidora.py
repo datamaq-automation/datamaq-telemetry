@@ -231,28 +231,23 @@ class ParserFacturaPotenciaEdelap(ParserFacturaDistribuidoraPort):
 
 
 _RE_MONEDA_AR = re.compile(r"^[\d.]+(?:,\d{1,2})?$")
-_RE_CANTIDAD_MWH = re.compile(r"^\d+,\d{3}$")
+_RE_CANTIDAD_MWH = re.compile(r"^[\d.]+,\d{2,3}$")
+_RE_CANTIDAD_MW = re.compile(r"^[\d.]+,\d{2,3}$")
 _RE_NUMERO_FACTURA_CAMMESA = re.compile(r"^\d{4}-\d{8}$")
 
 
 class ParserFacturaEnergiaCammesa(ParserFacturaDistribuidoraPort):
-    """Extrae los campos de ENERGÍA de una factura de CAMMESA (mercado eléctrico mayorista).
+    """Extrae los campos de ENERGÍA y DESGLOSE REGULATORIO de una factura de CAMMESA (MEM).
 
-    CAMMESA no discrimina la energía por franja horaria (Punta/Resto/Valle) como sí hace EdeLAP:
-    factura "Energía Demandada" como un total único del período, que se guarda en
-    `energia_activa_total_kwh`. Los cargos de potencia, transporte y adicionales del MEM que
-    también trae esta factura no se modelan en esta iteración (ver `specs/factura-distribuidora.md`
-    §"Pendientes"): solo se captura el total de energía y el importe total de la factura.
-
-    Nota de diseño (sesión 2026-09-24, tercera pasada): a diferencia de EdeLAP, acá SÍ hace falta
-    `page.extract_words()` (coordenadas) en vez de `extract_text()` lineal. Se detectó con una
-    segunda factura real de CAMMESA (cliente distinto, EITAR) que el texto plano pega sin
-    separador el valor de "Energía Demandada" a un código de barras/referencia adyacente
-    ("0006849353,610 MWh"), de forma no reproducible con regex sobre texto lineal porque no hay
-    ningún separador entre ambos tokens. Verificado con las dos facturas reales (UPP y EITAR,
-    clientes y períodos distintos): con `extract_words()` el valor de energía es SIEMPRE una
-    palabra propia, separada del código, en la misma posición relativa de la tabla
-    (columna "Cantidad", fila "Energía Demandada"; ver `specs/factura-distribuidora.md`).
+    CAMMESA factura al Gran Usuario (GUMA / GUME) el abastecimiento de energía eléctrica mayorista:
+    - Energía demandada (MWh x 1000 -> kWh) y su subtotal monómico spot puro.
+    - Cargos de potencia MEM (MW x 1000 -> kW) y su subtotal.
+    - Cargos adicionales del MEM (reserva fría, generación forzada, servicios auxiliares).
+    - Subtotal cargos por transporte (SADI / troncal).
+    - Otros cargos (MATER Res. 281 E/17, actividad de mercado, mora).
+    - Subtotal neto de liquidación (base imponible).
+    - Impuestos (IVA 27%, IVA percepción 3%, FNEE Ley 24065).
+    - Importe total de la liquidación.
     """
 
     def parsear(self, ruta_pdf: str, planta_id: str) -> FacturaDistribuidora:
@@ -296,6 +291,102 @@ class ParserFacturaEnergiaCammesa(ParserFacturaDistribuidoraPort):
         periodo = f"{anio}-{mes}"
         energia_total_kwh = _numero_coma(cantidad_energia["text"]) * 1000
 
+        # Potencia MEM (cantidad MW -> kW y subtotal en ARS)
+        potencia_label = next(
+            (p for p in palabras if p["text"] == "Potencia" and any(q["text"] == "Cargos" for q in _fila(p["top"]))),
+            None,
+        )
+        potencia_adquirida_mem_kw: float | None = None
+        if potencia_label is not None:
+            cand_pot = next((p for p in _fila(potencia_label["top"]) if _RE_CANTIDAD_MW.match(p["text"])), None)
+            if cand_pot is not None:
+                potencia_adquirida_mem_kw = _numero_coma(cand_pot["text"]) * 1000
+
+        subtotal_potencia_label = next(
+            (p for p in palabras if p["text"] == "POTENCIA" and any(q["text"] == "SUBTOTAL" for q in _fila(p["top"]))),
+            None,
+        )
+        importe_potencia_mem_ars: float | None = None
+        if subtotal_potencia_label is not None:
+            cand_imp_pot = next(
+                (p for p in reversed(_fila(subtotal_potencia_label["top"])) if _RE_MONEDA_AR.match(p["text"])), None
+            )
+            if cand_imp_pot is not None:
+                importe_potencia_mem_ars = _numero_ar(cand_imp_pot["text"])
+
+        # Cargos Adicionales del MEM
+        adicionales_label = next(
+            (p for p in palabras if p["text"] == "MEM" and any(q["text"] == "ADICIONALES" for q in _fila(p["top"]))),
+            None,
+        )
+        importe_adicionales_mem_ars: float | None = None
+        if adicionales_label is not None:
+            cand_imp_adic = next(
+                (p for p in reversed(_fila(adicionales_label["top"])) if _RE_MONEDA_AR.match(p["text"])), None
+            )
+            if cand_imp_adic is not None:
+                importe_adicionales_mem_ars = _numero_ar(cand_imp_adic["text"])
+
+        # Cargos por Transporte
+        transporte_label = next(
+            (
+                p
+                for p in palabras
+                if p["text"] == "TRANSPORTE" and any(q["text"] == "SUBTOTAL" for q in _fila(p["top"]))
+            ),
+            None,
+        )
+        importe_transporte_mem_ars: float | None = None
+        if transporte_label is not None:
+            cand_imp_transp = next(
+                (p for p in reversed(_fila(transporte_label["top"])) if _RE_MONEDA_AR.match(p["text"])), None
+            )
+            if cand_imp_transp is not None:
+                importe_transporte_mem_ars = _numero_ar(cand_imp_transp["text"])
+
+        # Otros Cargos (filas intermedias entre adicionales y transporte que tengan importe en col Importe x0 > 450)
+        importe_otros_cargos_mem_ars: float | None = None
+        if adicionales_label is not None and transporte_label is not None:
+            intermedias = [p for p in palabras if adicionales_label["top"] < p["top"] < transporte_label["top"]]
+            filas_intermedias: dict[float, list[dict]] = {}
+            for p in intermedias:
+                top_k = next((k for k in filas_intermedias if abs(k - p["top"]) <= 2.0), None)
+                if top_k is None:
+                    filas_intermedias[p["top"]] = [p]
+                else:
+                    filas_intermedias[top_k].append(p)
+
+            total_otros = 0.0
+            hubo_otros = False
+            for k in sorted(filas_intermedias.keys()):
+                fila_k = sorted(filas_intermedias[k], key=lambda x: x["x0"])
+                cand_imp_otro = next(
+                    (p for p in reversed(fila_k) if p["x0"] > 450 and _RE_MONEDA_AR.match(p["text"])), None
+                )
+                if cand_imp_otro is not None:
+                    total_otros += _numero_ar(cand_imp_otro["text"])
+                    hubo_otros = True
+            if hubo_otros:
+                importe_otros_cargos_mem_ars = round(total_otros, 2)
+
+        # Subtotal Neto
+        subtotal_neto_label = next(
+            (
+                p
+                for p in palabras
+                if p["text"] == "SUBTOTAL" and (transporte_label is None or p["top"] > transporte_label["top"])
+            ),
+            None,
+        )
+        importe_neto_ars: float | None = None
+        if subtotal_neto_label is not None:
+            cand_neto = next(
+                (p for p in reversed(_fila(subtotal_neto_label["top"])) if _RE_MONEDA_AR.match(p["text"])), None
+            )
+            if cand_neto is not None:
+                importe_neto_ars = _numero_ar(cand_neto["text"])
+
+        # Importe Total
         importe_total = 0.0
         if total_label is not None:
             candidatos = [
@@ -304,9 +395,31 @@ class ParserFacturaEnergiaCammesa(ParserFacturaDistribuidoraPort):
                 if p["top"] >= total_label["top"] - 1
                 and p["top"] <= total_label["top"] + 3
                 and _RE_MONEDA_AR.match(p["text"])
+                and p["x0"] > total_label["x0"]
             ]
             if candidatos:
                 importe_total = _numero_ar(max(candidatos, key=lambda p: p["x0"])["text"])
+
+        # Impuestos (filas tributarias entre subtotal neto y total con x0 > 450)
+        importe_impuestos_ars: float | None = None
+        if subtotal_neto_label is not None and total_label is not None:
+            filas_imp: dict[float, dict] = {}
+            for p in palabras:
+                if (
+                    subtotal_neto_label["top"] + 2 < p["top"] < total_label["top"] - 2
+                    and p["x0"] > 450
+                    and _RE_MONEDA_AR.match(p["text"])
+                ):
+                    top_k = next((k for k in filas_imp if abs(k - p["top"]) <= 2.0), None)
+                    if top_k is None:
+                        filas_imp[p["top"]] = p
+                    else:
+                        if p["x0"] > filas_imp[top_k]["x0"]:
+                            filas_imp[top_k] = p
+            if filas_imp:
+                importe_impuestos_ars = round(sum(_numero_ar(p["text"]) for p in filas_imp.values()), 2)
+            elif importe_neto_ars is not None and importe_total > importe_neto_ars:
+                importe_impuestos_ars = round(importe_total - importe_neto_ars, 2)
 
         return FacturaDistribuidora(
             id=f"{planta_id}-{periodo}-energia",
@@ -318,5 +431,12 @@ class ParserFacturaEnergiaCammesa(ParserFacturaDistribuidoraPort):
             importe_total_ars=importe_total,
             energia_activa_total_kwh=energia_total_kwh,
             importe_energia_ars=_numero_ar(importe_energia["text"]),
+            potencia_adquirida_mem_kw=potencia_adquirida_mem_kw,
+            importe_potencia_mem_ars=importe_potencia_mem_ars,
+            importe_adicionales_mem_ars=importe_adicionales_mem_ars,
+            importe_transporte_mem_ars=importe_transporte_mem_ars,
+            importe_otros_cargos_mem_ars=importe_otros_cargos_mem_ars,
+            importe_neto_ars=importe_neto_ars,
+            importe_impuestos_ars=importe_impuestos_ars,
             fuente_archivo=ruta_pdf.rsplit("/", 1)[-1],
         )
