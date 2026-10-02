@@ -144,6 +144,29 @@ def _energia_registrada(texto: str, ruta_pdf: str) -> _EnergiaRegistrada:
     )
 
 
+def _extraer_importes_edelap(texto: str) -> tuple[float, float | None, float | None]:
+    """Extrae importe de potencia, subtotal neto e importe total de impuestos/tasas."""
+    importes_potencia = re.findall(
+        r"(?:Potencia (?:Fuera de )?Pico por Transporte|Exceso de Potencia (?:en|Fuera de) Pico Transporte)"
+        r"\s*\d+kW\s*\*[\d.,]+\s*\$/kW\s*([\d.]+,\d{2})",
+        texto,
+    )
+    importe_potencia = sum(_numero_ar(m) for m in importes_potencia)
+
+    subtotal_neto_m = re.search(r"SUBTOTAL POR SERVICIO ELECTRICO\s*([\d.]+,\d{2})", texto)
+    importe_neto = _numero_ar(subtotal_neto_m.group(1)) if subtotal_neto_m else None
+
+    subtotal_impuestos_m = re.search(r"SUBTOTAL IMPUESTOS\s*([\d.]+,\d{2})", texto)
+    cargos_exentos_m = re.search(r"SUBTOTAL CARGOS VARIOS EXENTOS\s*([\d.]+,\d{2})", texto)
+    importe_impuestos: float | None = None
+    if subtotal_impuestos_m:
+        imp = _numero_ar(subtotal_impuestos_m.group(1))
+        ex = _numero_ar(cargos_exentos_m.group(1)) if cargos_exentos_m else 0.0
+        importe_impuestos = imp + ex
+
+    return importe_potencia, importe_neto, importe_impuestos
+
+
 class ParserFacturaPotenciaEdelap(ParserFacturaDistribuidoraPort):
     """Extrae los campos de POTENCIA de una factura de EdeLAP (tarifa T5M12, Media Tensión).
 
@@ -187,14 +210,7 @@ class ParserFacturaPotenciaEdelap(ParserFacturaDistribuidoraPort):
         tarifa = re.search(r"Tipo de tarifa:\s*([A-Z0-9]+)", texto)
         dias = re.search(r"D[ií]as:\s*(\d+)", texto)
 
-        # Suma solo las líneas de potencia contratada y exceso (los excesos faltan en un mes sin
-        # exceso), no un tramo de texto: en ese tramo también caen intereses por mora y el CTT.
-        importes_potencia = re.findall(
-            r"(?:Potencia (?:Fuera de )?Pico por Transporte|Exceso de Potencia (?:en|Fuera de) Pico Transporte)"
-            r"\s*\d+kW\s*\*[\d.,]+\s*\$/kW\s*([\d.]+,\d{2})",
-            texto,
-        )
-        importe_potencia = sum(_numero_ar(m) for m in importes_potencia)
+        importe_potencia, importe_neto, importe_impuestos = _extraer_importes_edelap(texto)
 
         # El PDF real trae "Vencimientos Recargo\n1º 10/12/2024 21.031.736,78" (verificado con las
         # 11 facturas de UPP 2023-12..2024-11); se tolera también el "1º2º" pegado en la cabecera.
@@ -219,6 +235,8 @@ class ParserFacturaPotenciaEdelap(ParserFacturaDistribuidoraPort):
             potencia_adquirida_punta_kw=adquirida_punta,
             potencia_adquirida_fuera_punta_kw=adquirida_fp,
             importe_potencia_ars=importe_potencia,
+            importe_neto_ars=importe_neto,
+            importe_impuestos_ars=importe_impuestos,
             energia_registrada_punta_kwh=energia.punta_kwh,
             energia_registrada_resto_kwh=energia.resto_kwh,
             energia_registrada_valle_kwh=energia.valle_kwh,
