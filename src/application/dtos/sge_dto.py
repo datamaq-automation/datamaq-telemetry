@@ -233,6 +233,47 @@ class FacturaDistribuidoraResponseDTO(BaseModel):
         serialization_alias="energiaReactivaValleKvarh",
         description="Energía reactiva registrada en valle por el medidor de la distribuidora (kVArh).",
     )
+    # Desglose regulatorio Mercado Eléctrico Mayorista (CAMMESA) — decisión 2026-10-01
+    potencia_adquirida_mem_kw: float | None = Field(
+        default=None,
+        validation_alias="potenciaAdquiridaMemKw",
+        serialization_alias="potenciaAdquiridaMemKw",
+    )
+    importe_potencia_mem_ars: float | None = Field(
+        default=None,
+        validation_alias="importePotenciaMemArs",
+        serialization_alias="importePotenciaMemArs",
+    )
+    importe_adicionales_mem_ars: float | None = Field(
+        default=None,
+        validation_alias="importeAdicionalesMemArs",
+        serialization_alias="importeAdicionalesMemArs",
+    )
+    importe_transporte_mem_ars: float | None = Field(
+        default=None,
+        validation_alias="importeTransporteMemArs",
+        serialization_alias="importeTransporteMemArs",
+    )
+    importe_otros_cargos_mem_ars: float | None = Field(
+        default=None,
+        validation_alias="importeOtrosCargosMemArs",
+        serialization_alias="importeOtrosCargosMemArs",
+    )
+    importe_neto_ars: float | None = Field(
+        default=None,
+        validation_alias="importeNetoArs",
+        serialization_alias="importeNetoArs",
+    )
+    importe_impuestos_ars: float | None = Field(
+        default=None,
+        validation_alias="importeImpuestosArs",
+        serialization_alias="importeImpuestosArs",
+    )
+    valor_energia_integral_ars_kwh: float | None = Field(
+        default=None,
+        validation_alias="valorEnergiaIntegralArsKwh",
+        serialization_alias="valorEnergiaIntegralArsKwh",
+    )
 
     model_config = ConfigDict(
         populate_by_name=True,

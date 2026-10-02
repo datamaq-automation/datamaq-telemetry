@@ -334,3 +334,28 @@ def test_coexistencia_valor_monomico_e_integral():
     )
     assert factura.valor_energia_ars_kwh_promedio == pytest.approx(3117344.0 / 300960.0)
     assert factura.valor_energia_integral_ars_kwh == pytest.approx(22551140.0 / 300960.0)
+
+
+def test_dto_expone_desglose_cammesa_en_camel_case():
+    factura = _factura(
+        energia_activa_total_kwh=300960.0,
+        importe_neto_ars=22551140.0,
+        potencia_adquirida_mem_kw=1089.0,
+        importe_potencia_mem_ars=3079473.0,
+        importe_adicionales_mem_ars=14419642.0,
+        importe_transporte_mem_ars=1785216.0,
+        importe_otros_cargos_mem_ars=149465.0,
+        importe_impuestos_ars=6981130.32,
+        importe_total_ars=29532270.32,
+    )
+    dto = factura_to_dto(factura)
+    datos = dto.model_dump(by_alias=True)
+
+    assert datos["potenciaAdquiridaMemKw"] == 1089.0
+    assert datos["importePotenciaMemArs"] == 3079473.0
+    assert datos["importeAdicionalesMemArs"] == 14419642.0
+    assert datos["importeTransporteMemArs"] == 1785216.0
+    assert datos["importeOtrosCargosMemArs"] == 149465.0
+    assert datos["importeNetoArs"] == 22551140.0
+    assert datos["importeImpuestosArs"] == 6981130.32
+    assert datos["valorEnergiaIntegralArsKwh"] == pytest.approx(22551140.0 / 300960.0)

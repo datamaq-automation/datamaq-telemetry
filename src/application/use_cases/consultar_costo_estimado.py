@@ -57,7 +57,11 @@ class ConsultarCostoEstimadoUseCase:
         facturas = self._repo_org.obtener_facturas_planta(planta_id)
         facturas_energia = [f for f in facturas if f.tipo_dato == "energia"]
         factura_energia = facturas_energia[0] if facturas_energia else None
-        valor_kwh = factura_energia.valor_energia_ars_kwh_promedio if factura_energia else None
+        valor_kwh = (
+            factura_energia.valor_energia_integral_ars_kwh
+            if factura_energia and factura_energia.valor_energia_integral_ars_kwh is not None
+            else (factura_energia.valor_energia_ars_kwh_promedio if factura_energia else None)
+        )
 
         costo_energia_ars = (
             round(kwh_consumido_ahora * valor_kwh, 2)
