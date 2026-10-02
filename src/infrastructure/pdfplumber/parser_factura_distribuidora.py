@@ -236,6 +236,129 @@ _RE_CANTIDAD_MW = re.compile(r"^[\d.]+,\d{2,3}$")
 _RE_NUMERO_FACTURA_CAMMESA = re.compile(r"^\d{4}-\d{8}$")
 
 
+def _extraer_potencia_mem(palabras: list[dict], fila_fn) -> tuple[float | None, float | None]:
+    potencia_label = next(
+        (p for p in palabras if p["text"] == "Potencia" and any(q["text"] == "Cargos" for q in fila_fn(p["top"]))),
+        None,
+    )
+    pot_kw: float | None = None
+    if potencia_label is not None:
+        cand_pot = next((p for p in fila_fn(potencia_label["top"]) if _RE_CANTIDAD_MW.match(p["text"])), None)
+        if cand_pot is not None:
+            pot_kw = _numero_coma(cand_pot["text"]) * 1000
+
+    subtotal_pot_label = next(
+        (p for p in palabras if p["text"] == "POTENCIA" and any(q["text"] == "SUBTOTAL" for q in fila_fn(p["top"]))),
+        None,
+    )
+    imp_pot: float | None = None
+    if subtotal_pot_label is not None:
+        cand_imp = next(
+            (p for p in reversed(fila_fn(subtotal_pot_label["top"])) if _RE_MONEDA_AR.match(p["text"])), None
+        )
+        if cand_imp is not None:
+            imp_pot = _numero_ar(cand_imp["text"])
+    return pot_kw, imp_pot
+
+
+def _extraer_adicionales_transporte(
+    palabras: list[dict], fila_fn
+) -> tuple[dict | None, float | None, dict | None, float | None]:
+    adic_lbl = next(
+        (p for p in palabras if p["text"] == "MEM" and any(q["text"] == "ADICIONALES" for q in fila_fn(p["top"]))),
+        None,
+    )
+    imp_adic: float | None = None
+    if adic_lbl is not None:
+        cand_adic = next((p for p in reversed(fila_fn(adic_lbl["top"])) if _RE_MONEDA_AR.match(p["text"])), None)
+        if cand_adic is not None:
+            imp_adic = _numero_ar(cand_adic["text"])
+
+    transp_lbl = next(
+        (p for p in palabras if p["text"] == "TRANSPORTE" and any(q["text"] == "SUBTOTAL" for q in fila_fn(p["top"]))),
+        None,
+    )
+    imp_transp: float | None = None
+    if transp_lbl is not None:
+        cand_transp = next((p for p in reversed(fila_fn(transp_lbl["top"])) if _RE_MONEDA_AR.match(p["text"])), None)
+        if cand_transp is not None:
+            imp_transp = _numero_ar(cand_transp["text"])
+    return adic_lbl, imp_adic, transp_lbl, imp_transp
+
+
+def _extraer_otros_cargos_mem(palabras: list[dict], top_desde: float, top_hasta: float) -> float | None:
+    intermedias = [p for p in palabras if top_desde < p["top"] < top_hasta]
+    filas: dict[float, list[dict]] = {}
+    for p in intermedias:
+        top_k = next((k for k in filas if abs(k - p["top"]) <= 2.0), None)
+        if top_k is None:
+            filas[p["top"]] = [p]
+        else:
+            filas[top_k].append(p)
+
+    total_otros = 0.0
+    hubo_otros = False
+    for k in sorted(filas.keys()):
+        fila_k = sorted(filas[k], key=lambda x: x["x0"])
+        cand_imp = next((p for p in reversed(fila_k) if p["x0"] > 450 and _RE_MONEDA_AR.match(p["text"])), None)
+        if cand_imp is not None:
+            total_otros += _numero_ar(cand_imp["text"])
+            hubo_otros = True
+    return round(total_otros, 2) if hubo_otros else None
+
+
+def _extraer_neto_total_impuestos(
+    palabras: list[dict], fila_fn, top_transp: float | None
+) -> tuple[float | None, float, float | None]:
+    subtotal_neto_lbl = next(
+        (p for p in palabras if p["text"] == "SUBTOTAL" and (top_transp is None or p["top"] > top_transp)),
+        None,
+    )
+    imp_neto: float | None = None
+    if subtotal_neto_lbl is not None:
+        cand_neto = next(
+            (p for p in reversed(fila_fn(subtotal_neto_lbl["top"])) if _RE_MONEDA_AR.match(p["text"])), None
+        )
+        if cand_neto is not None:
+            imp_neto = _numero_ar(cand_neto["text"])
+
+    total_lbl = next((p for p in palabras if p["text"] == "TOTAL"), None)
+    imp_total = 0.0
+    if total_lbl is not None:
+        candidatos = [
+            p
+            for p in palabras
+            if p["top"] >= total_lbl["top"] - 1
+            and p["top"] <= total_lbl["top"] + 3
+            and _RE_MONEDA_AR.match(p["text"])
+            and p["x0"] > total_lbl["x0"]
+        ]
+        if candidatos:
+            imp_total = _numero_ar(max(candidatos, key=lambda p: p["x0"])["text"])
+
+    imp_impuestos: float | None = None
+    if subtotal_neto_lbl is not None and total_lbl is not None:
+        filas_imp: dict[float, dict] = {}
+        for p in palabras:
+            if (
+                subtotal_neto_lbl["top"] + 2 < p["top"] < total_lbl["top"] - 2
+                and p["x0"] > 450
+                and _RE_MONEDA_AR.match(p["text"])
+            ):
+                top_k = next((k for k in filas_imp if abs(k - p["top"]) <= 2.0), None)
+                if top_k is None:
+                    filas_imp[p["top"]] = p
+                else:
+                    if p["x0"] > filas_imp[top_k]["x0"]:
+                        filas_imp[top_k] = p
+        if filas_imp:
+            imp_impuestos = round(sum(_numero_ar(p["text"]) for p in filas_imp.values()), 2)
+        elif imp_neto is not None and imp_total > imp_neto:
+            imp_impuestos = round(imp_total - imp_neto, 2)
+
+    return imp_neto, imp_total, imp_impuestos
+
+
 class ParserFacturaEnergiaCammesa(ParserFacturaDistribuidoraPort):
     """Extrae los campos de ENERGÍA y DESGLOSE REGULATORIO de una factura de CAMMESA (MEM).
 
@@ -266,7 +389,6 @@ class ParserFacturaEnergiaCammesa(ParserFacturaDistribuidoraPort):
             (p for p in palabras if p["text"] == "DEMANDADA" and any(q["text"] == "SUBTOTAL" for q in _fila(p["top"]))),
             None,
         )
-        total_label = next((p for p in palabras if p["text"] == "TOTAL"), None)
 
         if periodo_label is None or energia_label is None or subtotal_energia_label is None:
             raise FacturaDistribuidoraIlegibleError(
@@ -291,135 +413,15 @@ class ParserFacturaEnergiaCammesa(ParserFacturaDistribuidoraPort):
         periodo = f"{anio}-{mes}"
         energia_total_kwh = _numero_coma(cantidad_energia["text"]) * 1000
 
-        # Potencia MEM (cantidad MW -> kW y subtotal en ARS)
-        potencia_label = next(
-            (p for p in palabras if p["text"] == "Potencia" and any(q["text"] == "Cargos" for q in _fila(p["top"]))),
-            None,
-        )
-        potencia_adquirida_mem_kw: float | None = None
-        if potencia_label is not None:
-            cand_pot = next((p for p in _fila(potencia_label["top"]) if _RE_CANTIDAD_MW.match(p["text"])), None)
-            if cand_pot is not None:
-                potencia_adquirida_mem_kw = _numero_coma(cand_pot["text"]) * 1000
+        pot_kw, imp_pot = _extraer_potencia_mem(palabras, _fila)
+        adic_lbl, imp_adic, transp_lbl, imp_transp = _extraer_adicionales_transporte(palabras, _fila)
 
-        subtotal_potencia_label = next(
-            (p for p in palabras if p["text"] == "POTENCIA" and any(q["text"] == "SUBTOTAL" for q in _fila(p["top"]))),
-            None,
-        )
-        importe_potencia_mem_ars: float | None = None
-        if subtotal_potencia_label is not None:
-            cand_imp_pot = next(
-                (p for p in reversed(_fila(subtotal_potencia_label["top"])) if _RE_MONEDA_AR.match(p["text"])), None
-            )
-            if cand_imp_pot is not None:
-                importe_potencia_mem_ars = _numero_ar(cand_imp_pot["text"])
+        imp_otros: float | None = None
+        if adic_lbl is not None and transp_lbl is not None:
+            imp_otros = _extraer_otros_cargos_mem(palabras, adic_lbl["top"], transp_lbl["top"])
 
-        # Cargos Adicionales del MEM
-        adicionales_label = next(
-            (p for p in palabras if p["text"] == "MEM" and any(q["text"] == "ADICIONALES" for q in _fila(p["top"]))),
-            None,
-        )
-        importe_adicionales_mem_ars: float | None = None
-        if adicionales_label is not None:
-            cand_imp_adic = next(
-                (p for p in reversed(_fila(adicionales_label["top"])) if _RE_MONEDA_AR.match(p["text"])), None
-            )
-            if cand_imp_adic is not None:
-                importe_adicionales_mem_ars = _numero_ar(cand_imp_adic["text"])
-
-        # Cargos por Transporte
-        transporte_label = next(
-            (
-                p
-                for p in palabras
-                if p["text"] == "TRANSPORTE" and any(q["text"] == "SUBTOTAL" for q in _fila(p["top"]))
-            ),
-            None,
-        )
-        importe_transporte_mem_ars: float | None = None
-        if transporte_label is not None:
-            cand_imp_transp = next(
-                (p for p in reversed(_fila(transporte_label["top"])) if _RE_MONEDA_AR.match(p["text"])), None
-            )
-            if cand_imp_transp is not None:
-                importe_transporte_mem_ars = _numero_ar(cand_imp_transp["text"])
-
-        # Otros Cargos (filas intermedias entre adicionales y transporte que tengan importe en col Importe x0 > 450)
-        importe_otros_cargos_mem_ars: float | None = None
-        if adicionales_label is not None and transporte_label is not None:
-            intermedias = [p for p in palabras if adicionales_label["top"] < p["top"] < transporte_label["top"]]
-            filas_intermedias: dict[float, list[dict]] = {}
-            for p in intermedias:
-                top_k = next((k for k in filas_intermedias if abs(k - p["top"]) <= 2.0), None)
-                if top_k is None:
-                    filas_intermedias[p["top"]] = [p]
-                else:
-                    filas_intermedias[top_k].append(p)
-
-            total_otros = 0.0
-            hubo_otros = False
-            for k in sorted(filas_intermedias.keys()):
-                fila_k = sorted(filas_intermedias[k], key=lambda x: x["x0"])
-                cand_imp_otro = next(
-                    (p for p in reversed(fila_k) if p["x0"] > 450 and _RE_MONEDA_AR.match(p["text"])), None
-                )
-                if cand_imp_otro is not None:
-                    total_otros += _numero_ar(cand_imp_otro["text"])
-                    hubo_otros = True
-            if hubo_otros:
-                importe_otros_cargos_mem_ars = round(total_otros, 2)
-
-        # Subtotal Neto
-        subtotal_neto_label = next(
-            (
-                p
-                for p in palabras
-                if p["text"] == "SUBTOTAL" and (transporte_label is None or p["top"] > transporte_label["top"])
-            ),
-            None,
-        )
-        importe_neto_ars: float | None = None
-        if subtotal_neto_label is not None:
-            cand_neto = next(
-                (p for p in reversed(_fila(subtotal_neto_label["top"])) if _RE_MONEDA_AR.match(p["text"])), None
-            )
-            if cand_neto is not None:
-                importe_neto_ars = _numero_ar(cand_neto["text"])
-
-        # Importe Total
-        importe_total = 0.0
-        if total_label is not None:
-            candidatos = [
-                p
-                for p in palabras
-                if p["top"] >= total_label["top"] - 1
-                and p["top"] <= total_label["top"] + 3
-                and _RE_MONEDA_AR.match(p["text"])
-                and p["x0"] > total_label["x0"]
-            ]
-            if candidatos:
-                importe_total = _numero_ar(max(candidatos, key=lambda p: p["x0"])["text"])
-
-        # Impuestos (filas tributarias entre subtotal neto y total con x0 > 450)
-        importe_impuestos_ars: float | None = None
-        if subtotal_neto_label is not None and total_label is not None:
-            filas_imp: dict[float, dict] = {}
-            for p in palabras:
-                if (
-                    subtotal_neto_label["top"] + 2 < p["top"] < total_label["top"] - 2
-                    and p["x0"] > 450
-                    and _RE_MONEDA_AR.match(p["text"])
-                ):
-                    top_k = next((k for k in filas_imp if abs(k - p["top"]) <= 2.0), None)
-                    if top_k is None:
-                        filas_imp[p["top"]] = p
-                    else:
-                        if p["x0"] > filas_imp[top_k]["x0"]:
-                            filas_imp[top_k] = p
-            if filas_imp:
-                importe_impuestos_ars = round(sum(_numero_ar(p["text"]) for p in filas_imp.values()), 2)
-            elif importe_neto_ars is not None and importe_total > importe_neto_ars:
-                importe_impuestos_ars = round(importe_total - importe_neto_ars, 2)
+        top_transp = transp_lbl["top"] if transp_lbl is not None else None
+        imp_neto, imp_total, imp_impuestos = _extraer_neto_total_impuestos(palabras, _fila, top_transp)
 
         return FacturaDistribuidora(
             id=f"{planta_id}-{periodo}-energia",
@@ -428,15 +430,15 @@ class ParserFacturaEnergiaCammesa(ParserFacturaDistribuidoraPort):
             proveedor="CAMMESA",
             tipo_dato="energia",
             numero_factura=numero_factura["text"] if numero_factura else "",
-            importe_total_ars=importe_total,
+            importe_total_ars=imp_total,
             energia_activa_total_kwh=energia_total_kwh,
             importe_energia_ars=_numero_ar(importe_energia["text"]),
-            potencia_adquirida_mem_kw=potencia_adquirida_mem_kw,
-            importe_potencia_mem_ars=importe_potencia_mem_ars,
-            importe_adicionales_mem_ars=importe_adicionales_mem_ars,
-            importe_transporte_mem_ars=importe_transporte_mem_ars,
-            importe_otros_cargos_mem_ars=importe_otros_cargos_mem_ars,
-            importe_neto_ars=importe_neto_ars,
-            importe_impuestos_ars=importe_impuestos_ars,
+            potencia_adquirida_mem_kw=pot_kw,
+            importe_potencia_mem_ars=imp_pot,
+            importe_adicionales_mem_ars=imp_adic,
+            importe_transporte_mem_ars=imp_transp,
+            importe_otros_cargos_mem_ars=imp_otros,
+            importe_neto_ars=imp_neto,
+            importe_impuestos_ars=imp_impuestos,
             fuente_archivo=ruta_pdf.rsplit("/", 1)[-1],
         )
