@@ -61,6 +61,16 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: ./scripts/deploy-server.sh
 
+      - name: "Setup Python para smoke tests"
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: "Install dependencies para smoke tests"
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install -r requirements.lock
+
       - name: "Smoke Test Post-Deploy"
         run: |
           echo "Ejecutando smoke tests..."
