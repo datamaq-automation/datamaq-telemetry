@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from src.application.use_cases.asistente.procesar_pregunta_asistente import ProcesarPreguntaAsistenteUseCase
 from src.application.use_cases.gestionar_alertas import GestionarAlertasUseCase
 from src.application.use_cases.gestionar_dispositivos import GestionarDispositivosUseCase
+from src.domain.asistente.entities import RespuestaAsistente
 from src.infrastructure.asistente.clasificador_reglas import ClasificadorIntencionReglasAdapter
 from src.infrastructure.fastapi.dependencies import get_procesar_pregunta_asistente_use_case, get_usuario_actual
 from src.infrastructure.fastapi.routes.asistente_router import router as asistente_router
@@ -93,7 +94,12 @@ def test_repositorio_de_alertas_filtra_por_organizacion(db: Session):
 
 def test_contexto_del_asistente_solo_tiene_datos_de_la_organizacion_del_usuario(db: Session):
     generador = GeneradorQueCaptura()
-    _use_case(db, generador).ejecutar("¿Qué alertas tengo activas?", organizacion_id="org-a", usuario_id="u-a")
+    _use_case(db, generador).ejecutar(
+        "¿Qué alertas tengo activas?",
+        organizacion_id="org-a",
+        usuario_id="u-a",
+        usuario_consiente_envio_groq=True,
+    )
 
     contexto = generador.contextos[0]
     assert "ALERTA_ORG_A" in contexto and "Medidor A" in contexto
@@ -134,7 +140,7 @@ def test_router_pasa_la_claim_org_al_caso_de_uso():
     app = create_app()
     app.include_router(asistente_router)
     use_case = MagicMock()
-    use_case.ejecutar.return_value = MagicMock(texto="ok", intencion="EXPLICAR_ALERTAS")
+    use_case.ejecutar.return_value = RespuestaAsistente(texto="ok", intencion="EXPLICAR_ALERTAS")
     app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "u-a", "rol": "operador", "org": "org-a"}
     app.dependency_overrides[get_procesar_pregunta_asistente_use_case] = lambda: use_case
 

@@ -8,6 +8,8 @@ from src.application.dtos.dispositivo_dto import DispositivoResponseDTO
 from src.application.use_cases.gestionar_alertas import GestionarAlertasUseCase
 from src.application.use_cases.gestionar_dispositivos import GestionarDispositivosUseCase
 from src.domain.asistente.entities import (
+    ConversacionAsistente,
+    IntencionClasificada,
     MensajeAsistente,
     RegistroClasificacionIntencion,
     RespuestaAsistente,
@@ -81,68 +83,49 @@ class ProcesarPreguntaAsistenteUseCase:
         )
         return [a.model_dump(mode="json") for a in alertas], [d.model_dump(mode="json") for d in dispositivos]
 
-    def ejecutar(
+    def _obtener_o_crear_conversacion(
         self,
-        pregunta: str,
+        conversacion_id: str | None,
         organizacion_id: str,
         usuario_id: str,
-        conversacion_id: str | None = None,
-        usuario_consiente_envio_groq: bool = False,
-    ) -> RespuestaAsistente:
-        # Sin organización los repositorios no filtran: nunca armar contexto de todas.
-        if not organizacion_id:
-            raise ValueError("El asistente requiere la organización del usuario.")
-
-        # 1. Obtener o crear conversación multi-tenant
+    ) -> ConversacionAsistente:
         if conversacion_id:
             conv = self._repo_conversaciones.obtener_conversacion(conversacion_id, organizacion_id)
-            if conv is None:
-                conv = self._repo_conversaciones.crear_conversacion(organizacion_id, usuario_id)
-        else:
-            conv = self._repo_conversaciones.crear_conversacion(organizacion_id, usuario_id)
+            if conv is not None:
+                return conv
+        return self._repo_conversaciones.crear_conversacion(organizacion_id, usuario_id)
 
-        # 2. Clasificar intención
-        clasificacion = self._clasificador.clasificar(pregunta)
-        intencion_enum = self._intencion_mapeo.get(clasificacion.nombre, IntencionUsuario.DESCONOCIDO)
-
-        # 3. Recopilar datos reales según la intención (Aislamiento Multi-tenant)
-        datos_alertas, datos_dispositivos = self._recopilar_datos(intencion_enum, organizacion_id)
-
-        # 4. Construir contexto y generar respuesta
-        contexto = ContextoPreguntaAsistente(
-            organizacion_id=organizacion_id,
-            pregunta=pregunta,
-            intencion=intencion_enum,
-            datos_alertas=datos_alertas,
-            datos_dispositivos=datos_dispositivos,
-        )
-
-        prompt = self._construir_prompt_contexto(contexto)
-
-        # Generar respuesta según consentimiento a Groq
-        consentimiento_requerido = False
-        enviado_a_groq = False
-        razon_sin_groq = None
-
+    def _generar_texto_respuesta(
+        self,
+        pregunta: str,
+        prompt: str,
+        datos_alertas: list[dict],
+        datos_dispositivos: list[dict],
+        usuario_consiente_envio_groq: bool,
+    ) -> tuple[str, bool, bool, str | None]:
         if usuario_consiente_envio_groq:
             iterador_respuesta = self._generador.generar(pregunta, prompt)
-            texto_respuesta = "".join(list(iterador_respuesta))
-            enviado_a_groq = True
-        else:
-            # Respuesta local degradada (sin Groq): información básica del contexto
-            texto_respuesta = (
-                f"Nota: Esta respuesta es local (sin IA remota). "
-                f"Tienes {len(datos_alertas)} alerta(s) abierta(s) "
-                f"y {len(datos_dispositivos)} dispositivo(s) conectado(s). "
-                f"Para una respuesta más completa, autoriza el uso de IA remota en tu perfil."
-            )
-            consentimiento_requerido = True
-            razon_sin_groq = "sin_consentimiento"
+            return "".join(list(iterador_respuesta)), False, True, None
 
-        # 5. Persistir mensajes y clasificación
+        texto_respuesta = (
+            f"Nota: Esta respuesta es local (sin IA remota). "
+            f"Tienes {len(datos_alertas)} alerta(s) abierta(s) "
+            f"y {len(datos_dispositivos)} dispositivo(s) conectado(s). "
+            f"Para una respuesta más completa, autoriza el uso de IA remota en tu perfil."
+        )
+        return texto_respuesta, True, False, "sin_consentimiento"
+
+    def _persistir_interaccion(
+        self,
+        conversacion_id: str,
+        organizacion_id: str,
+        pregunta: str,
+        texto_respuesta: str,
+        clasificacion: IntencionClasificada,
+    ) -> None:
         msg_user = MensajeAsistente(
             id=str(uuid.uuid4()),
-            conversacion_id=conv.id,
+            conversacion_id=conversacion_id,
             rol="usuario",
             texto=pregunta,
         )
@@ -150,7 +133,7 @@ class ProcesarPreguntaAsistenteUseCase:
 
         msg_bot = MensajeAsistente(
             id=str(uuid.uuid4()),
-            conversacion_id=conv.id,
+            conversacion_id=conversacion_id,
             rol="asistente",
             texto=texto_respuesta,
         )
@@ -163,10 +146,41 @@ class ProcesarPreguntaAsistenteUseCase:
         )
         self._repo_conversaciones.guardar_clasificacion(reg_clasif, organizacion_id)
 
+    def ejecutar(
+        self,
+        pregunta: str,
+        organizacion_id: str,
+        usuario_id: str,
+        conversacion_id: str | None = None,
+        usuario_consiente_envio_groq: bool = False,
+    ) -> RespuestaAsistente:
+        # Sin organización los repositorios no filtran: nunca armar contexto de todas.
+        if not organizacion_id:
+            raise ValueError("El asistente requiere la organización del usuario.")
+
+        conv = self._obtener_o_crear_conversacion(conversacion_id, organizacion_id, usuario_id)
+        clasificacion = self._clasificador.clasificar(pregunta)
+        intencion_enum = self._intencion_mapeo.get(clasificacion.nombre, IntencionUsuario.DESCONOCIDO)
+        datos_alertas, datos_dispositivos = self._recopilar_datos(intencion_enum, organizacion_id)
+
+        contexto = ContextoPreguntaAsistente(
+            organizacion_id=organizacion_id,
+            pregunta=pregunta,
+            intencion=intencion_enum,
+            datos_alertas=datos_alertas,
+            datos_dispositivos=datos_dispositivos,
+        )
+        prompt = self._construir_prompt_contexto(contexto)
+        texto_respuesta, consentimiento_req, enviado_groq, razon = self._generar_texto_respuesta(
+            pregunta, prompt, datos_alertas, datos_dispositivos, usuario_consiente_envio_groq
+        )
+
+        self._persistir_interaccion(conv.id, organizacion_id, pregunta, texto_respuesta, clasificacion)
+
         return RespuestaAsistente(
             texto=texto_respuesta,
             intencion=clasificacion.nombre,
-            consentimiento_requerido=consentimiento_requerido,
-            enviado_a_groq=enviado_a_groq,
-            razon_sin_groq=razon_sin_groq,
+            consentimiento_requerido=consentimiento_req,
+            enviado_a_groq=enviado_groq,
+            razon_sin_groq=razon,
         )
