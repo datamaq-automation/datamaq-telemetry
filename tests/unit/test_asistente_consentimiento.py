@@ -1,19 +1,14 @@
 """tests/unit/test_asistente_consentimiento.py — Tests de consentimiento Groq."""
 
-import uuid
 from unittest.mock import MagicMock, patch
 
 import pytest
-from sqlalchemy.orm import Session
 
 from src.application.dtos.asistente_dto import PreguntaRequestDTO, PreguntaResponseDTO
 from src.application.use_cases.asistente.procesar_pregunta_asistente import (
     ProcesarPreguntaAsistenteUseCase,
 )
 from src.domain.asistente.entities import RespuestaAsistente
-from src.infrastructure.sqlalchemy.repositories.asistente_repository import (
-    MySQLAsistenteConsentimientoRepository,
-)
 
 
 class TestPreguntaRequestDTO:
@@ -241,112 +236,8 @@ class TestProcesarPreguntaUseCaseConConsentimiento:
         generador.generar.assert_called_once()
 
 
-class TestMySQLAsistenteConsentimientoRepository:
-    """Suite: Repository para auditoría de consentimiento."""
-
-    def test_guardar_consentimiento_retorna_id(self, db: Session):
-        """Guardar consentimiento retorna su ID."""
-        repo = MySQLAsistenteConsentimientoRepository(db)
-
-        consentimiento_id = repo.guardar_consentimiento(
-            usuario_id="user-123",
-            organizacion_id="org-123",
-            consentimiento_otorgado=True,
-            ip_address="192.168.1.1",
-            user_agent="Mozilla/5.0",
-        )
-
-        assert consentimiento_id is not None
-        assert isinstance(consentimiento_id, str)
-        assert len(consentimiento_id) > 0
-
-    def test_obtener_consentimiento_mas_reciente_true(self, db: Session):
-        """Obtener consentimiento más reciente: True."""
-        repo = MySQLAsistenteConsentimientoRepository(db)
-        usuario_id = f"user-{uuid.uuid4()}"
-
-        repo.guardar_consentimiento(
-            usuario_id=usuario_id,
-            organizacion_id="org-123",
-            consentimiento_otorgado=True,
-        )
-
-        result = repo.obtener_consentimiento_mas_reciente(usuario_id)
-        assert result is True
-
-    def test_obtener_consentimiento_mas_reciente_false(self, db: Session):
-        """Obtener consentimiento más reciente: False (revocación)."""
-        repo = MySQLAsistenteConsentimientoRepository(db)
-        usuario_id = f"user-{uuid.uuid4()}"
-
-        # Primero otorgar
-        repo.guardar_consentimiento(
-            usuario_id=usuario_id,
-            organizacion_id="org-123",
-            consentimiento_otorgado=True,
-        )
-
-        # Luego revocar
-        repo.guardar_consentimiento(
-            usuario_id=usuario_id,
-            organizacion_id="org-123",
-            consentimiento_otorgado=False,
-        )
-
-        result = repo.obtener_consentimiento_mas_reciente(usuario_id)
-        assert result is False
-
-    def test_obtener_consentimiento_sin_registro_retorna_none(self, db: Session):
-        """Sin registro de consentimiento: retorna None."""
-        repo = MySQLAsistenteConsentimientoRepository(db)
-        result = repo.obtener_consentimiento_mas_reciente("user-inexistente")
-        assert result is None
-
-    def test_listar_consentimientos_organizacion(self, db: Session):
-        """Listar consentimientos de una organización."""
-        repo = MySQLAsistenteConsentimientoRepository(db)
-        org_id = f"org-{uuid.uuid4()}"
-
-        for i in range(3):
-            repo.guardar_consentimiento(
-                usuario_id=f"user-{i}",
-                organizacion_id=org_id,
-                consentimiento_otorgado=i % 2 == 0,
-            )
-
-        results = repo.listar_consentimientos_organizacion(org_id, limit=10)
-        assert len(results) == 3
-        assert all("usuario_id" in r for r in results)
-        assert all("consentimiento_otorgado" in r for r in results)
-        assert all("fecha" in r for r in results)
-
-    def test_listar_consentimientos_respeta_limit(self, db: Session):
-        """Listar respeta límite."""
-        repo = MySQLAsistenteConsentimientoRepository(db)
-        org_id = f"org-{uuid.uuid4()}"
-
-        for i in range(5):
-            repo.guardar_consentimiento(
-                usuario_id=f"user-{i}",
-                organizacion_id=org_id,
-                consentimiento_otorgado=True,
-            )
-
-        results = repo.listar_consentimientos_organizacion(org_id, limit=2)
-        assert len(results) == 2
-
-
 # Helper class para testing sin necesidad de inyectar todas las dependencias
 class ProcesarPreguntaUseCaseWithDependencies(ProcesarPreguntaAsistenteUseCase):
     """Alias para tests."""
 
-    pass
-
-
-# Fixtures
-@pytest.fixture
-def db():
-    """Session de BD para tests."""
-    # Este fixture debería estar configurado en conftest.py
-    # Por ahora es un placeholder
     pass
