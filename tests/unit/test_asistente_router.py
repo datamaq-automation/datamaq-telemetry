@@ -28,7 +28,14 @@ class _UseCaseFalso:
         self._excepcion = excepcion
         self.llamado_con: dict | None = None
 
-    def ejecutar(self, pregunta, organizacion_id, usuario_id, conversacion_id=None):
+    def ejecutar(
+        self,
+        pregunta,
+        organizacion_id,
+        usuario_id,
+        conversacion_id=None,
+        usuario_consiente_envio_groq=False,
+    ):
         self.llamado_con = {
             "pregunta": pregunta,
             "organizacion_id": organizacion_id,
