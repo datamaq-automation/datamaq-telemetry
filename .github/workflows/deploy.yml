@@ -61,6 +61,16 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: ./scripts/deploy-server.sh
 
+      - name: "Smoke Test Post-Deploy"
+        run: |
+          echo "Ejecutando smoke tests..."
+          python3 -m pytest tests/e2e/test_smoke_post_deploy.py -v --tb=short
+          if [ $? -ne 0 ]; then
+            echo "✗ Smoke test falló — rollback requerido"
+            exit 1
+          fi
+          echo "✓ Smoke tests pasaron — deploy válido"
+
       - name: "Alertar por Telegram si falló (D-3)"
         if: failure()
         env:

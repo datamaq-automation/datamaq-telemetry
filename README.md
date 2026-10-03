@@ -228,6 +228,22 @@ Verificación individual:
 .venv/bin/ruff format --check .
 ```
 
+### Post-Deploy Validation (Smoke Test)
+
+Después de cada despliegue, se ejecutan smoke tests automáticamente en CI para validar:
+- ✓ Conectividad a BD (status 200/503)
+- ✓ Migraciones sincronizadas
+- ✓ Datos maestros (datamaq-data) cargados
+- ✓ No hay logs CRITICAL en startup
+
+```bash
+# Ejecutar manualmente (local o post-deploy)
+.venv/bin/pytest tests/e2e/test_smoke_post_deploy.py -v
+
+# En CI/CD (deploy.yml)
+pytest tests/e2e/test_smoke_post_deploy.py -v
+```
+
 ---
 
 ## 📡 Cómo apuntar tu Powermeter a este servidor
