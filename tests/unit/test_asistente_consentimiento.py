@@ -103,8 +103,8 @@ class TestRespuestaAsistenteEntity:
     def test_entity_frozen(self):
         """Entity es frozen (inmutable)."""
         respuesta = RespuestaAsistente(texto="Test", intencion=None)
-        with pytest.raises((AttributeError, AttributeError)):
-            object.__setattr__(respuesta, "texto", "Modificado")
+        with pytest.raises(AttributeError, match="cannot assign"):
+            respuesta.texto = "Modificado"
 
 
 class TestProcesarPreguntaUseCaseSinConsentimiento:
