@@ -72,6 +72,8 @@ jobs:
           pip install -r requirements.lock
 
       - name: "Smoke Test Post-Deploy"
+        env:
+          APP_ENV: development
         run: |
           echo "Ejecutando smoke tests..."
           python3 -m pytest tests/e2e/test_smoke_post_deploy.py -v --tb=short
