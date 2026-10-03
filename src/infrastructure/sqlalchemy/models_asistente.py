@@ -7,7 +7,7 @@ que `alembic/env.py` tiene que importar este módulo para que la metadata los ve
 
 from datetime import datetime
 
-from sqlalchemy import Float, ForeignKey, Index, String, Text
+from sqlalchemy import Boolean, Float, ForeignKey, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.infrastructure.sqlalchemy.models import Base, ahora_utc, generate_uuid
@@ -57,3 +57,23 @@ class AssistantIntentClassificationModel(Base):
     intent_name: Mapped[str] = mapped_column(String(100), nullable=False)
     confidence: Mapped[float] = mapped_column(Float, nullable=False)
     classified_at: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
+
+
+class AuditAsistenteConsentimientoModel(Base):
+    """Auditoría de consentimiento para envío de datos a Groq."""
+
+    __tablename__ = "audit_asistente_consentimiento"
+    __table_args__ = (
+        Index("idx_audit_asistente_consentimiento_usuario_fecha", "usuario_id", "fecha"),
+        Index("idx_audit_asistente_consentimiento_org", "organizacion_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    usuario_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    organizacion_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+    )
+    consentimiento_otorgado: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    fecha: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
+    ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(Text, nullable=True)

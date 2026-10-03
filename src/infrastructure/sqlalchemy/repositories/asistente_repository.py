@@ -1,5 +1,7 @@
 """src/infrastructure/sqlalchemy/repositories/asistente_repository.py."""
 
+from datetime import datetime
+
 from sqlalchemy.orm import Session
 
 from src.domain.asistente.entities import (
@@ -13,6 +15,7 @@ from src.infrastructure.sqlalchemy.models_asistente import (
     AssistantConversationModel,
     AssistantIntentClassificationModel,
     AssistantMessageModel,
+    AuditAsistenteConsentimientoModel,
 )
 
 
@@ -124,3 +127,65 @@ class MySQLConversacionesAsistenteRepository(RepositorioConversacionesAsistenteP
         )
         self.db.add(model)
         self.db.commit()
+
+
+class MySQLAsistenteConsentimientoRepository:
+    """Repository para auditoría de consentimiento a envío de datos a Groq."""
+
+    def __init__(self, db: Session):
+        self.db = db
+
+    def guardar_consentimiento(
+        self,
+        usuario_id: str,
+        organizacion_id: str,
+        consentimiento_otorgado: bool,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
+    ) -> str:
+        """Guardar registro de consentimiento y retornar su ID."""
+        model = AuditAsistenteConsentimientoModel(
+            id=generate_uuid(),
+            usuario_id=usuario_id,
+            organizacion_id=organizacion_id,
+            consentimiento_otorgado=consentimiento_otorgado,
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+        self.db.add(model)
+        self.db.commit()
+        self.db.refresh(model)
+        return model.id
+
+    def obtener_consentimiento_mas_reciente(self, usuario_id: str) -> bool | None:
+        """Obtener el consentimiento más reciente de un usuario, o None si no hay registro."""
+        model = (
+            self.db.query(AuditAsistenteConsentimientoModel)
+            .filter(AuditAsistenteConsentimientoModel.usuario_id == usuario_id)
+            .order_by(AuditAsistenteConsentimientoModel.fecha.desc())
+            .first()
+        )
+        return model.consentimiento_otorgado if model else None
+
+    def listar_consentimientos_organizacion(
+        self, organizacion_id: str, limit: int = 100
+    ) -> list[dict[str, str | bool | datetime | None]]:
+        """Listar consentimientos de una organización para auditoría."""
+        models = (
+            self.db.query(AuditAsistenteConsentimientoModel)
+            .filter(AuditAsistenteConsentimientoModel.organizacion_id == organizacion_id)
+            .order_by(AuditAsistenteConsentimientoModel.fecha.desc())
+            .limit(limit)
+            .all()
+        )
+        return [
+            {
+                "id": m.id,
+                "usuario_id": m.usuario_id,
+                "consentimiento_otorgado": m.consentimiento_otorgado,
+                "fecha": m.fecha,
+                "ip_address": m.ip_address,
+                "user_agent": m.user_agent,
+            }
+            for m in models
+        ]
