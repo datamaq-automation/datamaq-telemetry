@@ -87,6 +87,7 @@ class ProcesarPreguntaAsistenteUseCase:
         organizacion_id: str,
         usuario_id: str,
         conversacion_id: str | None = None,
+        usuario_consiente_envio_groq: bool = False,
     ) -> RespuestaAsistente:
         # Sin organización los repositorios no filtran: nunca armar contexto de todas.
         if not organizacion_id:
@@ -117,8 +118,26 @@ class ProcesarPreguntaAsistenteUseCase:
         )
 
         prompt = self._construir_prompt_contexto(contexto)
-        iterador_respuesta = self._generador.generar(pregunta, prompt)
-        texto_respuesta = "".join(list(iterador_respuesta))
+
+        # Generar respuesta según consentimiento a Groq
+        consentimiento_requerido = False
+        enviado_a_groq = False
+        razon_sin_groq = None
+
+        if usuario_consiente_envio_groq:
+            iterador_respuesta = self._generador.generar(pregunta, prompt)
+            texto_respuesta = "".join(list(iterador_respuesta))
+            enviado_a_groq = True
+        else:
+            # Respuesta local degradada (sin Groq): información básica del contexto
+            texto_respuesta = (
+                f"Nota: Esta respuesta es local (sin IA remota). "
+                f"Tienes {len(datos_alertas)} alerta(s) abierta(s) "
+                f"y {len(datos_dispositivos)} dispositivo(s) conectado(s). "
+                f"Para una respuesta más completa, autoriza el uso de IA remota en tu perfil."
+            )
+            consentimiento_requerido = True
+            razon_sin_groq = "sin_consentimiento"
 
         # 5. Persistir mensajes y clasificación
         msg_user = MensajeAsistente(
@@ -147,4 +166,7 @@ class ProcesarPreguntaAsistenteUseCase:
         return RespuestaAsistente(
             texto=texto_respuesta,
             intencion=clasificacion.nombre,
+            consentimiento_requerido=consentimiento_requerido,
+            enviado_a_groq=enviado_a_groq,
+            razon_sin_groq=razon_sin_groq,
         )

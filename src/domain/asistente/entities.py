@@ -38,6 +38,9 @@ class RespuestaAsistente:
 
     texto: str
     intencion: str | None
+    consentimiento_requerido: bool = False
+    enviado_a_groq: bool = False
+    razon_sin_groq: str | None = None
 
 
 @dataclass
