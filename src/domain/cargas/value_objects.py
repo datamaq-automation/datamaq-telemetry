@@ -378,3 +378,15 @@ class AtribucionConsumo:
     items: list[ItemAtribucion]
     calidad_suficiente: bool
     advertencia: str | None = None
+
+
+@dataclass(frozen=True)
+class CargaCandidata:
+    """Carga que un descubridor externo encontró en la serie agregada (ya en W)."""
+
+    potencia_w: float
+    dispersion_w: float
+    encendidos: int
+    apagados: int
+    ciclos_por_dia: float | None
+    on_off: bool

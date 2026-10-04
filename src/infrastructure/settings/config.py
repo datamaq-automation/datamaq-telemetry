@@ -90,6 +90,10 @@ class Settings(BaseSettings):
     # Billing habilitado (D1-D5: 2026-09-24)
     BILLING_HABILITADO: bool = True
 
+    # Energy-ML (descubrimiento de cargas)
+    ENERGY_ML_URL: str = "http://127.0.0.1:8100"
+    ENERGY_ML_TIMEOUT_S: int = 120
+
     model_config = SettingsConfigDict(
         env_file=os.path.join(
             os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))), ".env"
