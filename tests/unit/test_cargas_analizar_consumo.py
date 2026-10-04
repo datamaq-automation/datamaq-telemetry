@@ -5,8 +5,8 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from src.application.use_cases.analizar_consumo import AnalizarConsumoUseCase
-from src.domain.cargas.ports import RepositorioSeriePotenciaPort
-from src.domain.cargas.value_objects import PatronOperacion
+from src.domain.maquinas.ports import RepositorioSeriePotenciaPort
+from src.domain.maquinas.value_objects import PatronOperacion
 from src.domain.telemetria.exceptions import ZonaHorariaInvalidaError
 from src.domain.telemetria.value_objects import LecturaPotenciaTemporal
 

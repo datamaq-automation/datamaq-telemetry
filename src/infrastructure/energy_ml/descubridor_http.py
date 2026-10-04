@@ -6,19 +6,19 @@ import urllib.parse
 import urllib.request
 from datetime import datetime
 
-from src.domain.cargas.exceptions import DescubridorNoDisponibleError
-from src.domain.cargas.ports import DescubridorCargasPort
-from src.domain.cargas.value_objects import CargaCandidata
+from src.domain.maquinas.exceptions import DescubridorNoDisponibleError
+from src.domain.maquinas.ports import DescubridorMáquinasPort
+from src.domain.maquinas.value_objects import MáquinaInferida
 
 
-class EnergyMlHttpDescubridor(DescubridorCargasPort):
+class EnergyMlHttpDescubridor(DescubridorMáquinasPort):
     """Descubridor que consulta energy-ml vía HTTP."""
 
     def __init__(self, base_url: str, timeout_s: int = 120):
         self.base_url = base_url
         self.timeout_s = timeout_s
 
-    def descubrir(self, medidor: str, desde: datetime, hasta: datetime) -> list[CargaCandidata]:
+    def descubrir(self, medidor: str, desde: datetime, hasta: datetime) -> list[MáquinaInferida]:
         """Descubre cargas consultando energy-ml.
 
         Args:
@@ -27,7 +27,7 @@ class EnergyMlHttpDescubridor(DescubridorCargasPort):
             hasta: fin del período en ISO
 
         Returns:
-            Lista de CargaCandidata (ya en W).
+            Lista de MáquinaInferida (ya en W).
 
         Raises:
             DescubridorNoDisponibleError si la respuesta no es válida.
@@ -56,7 +56,7 @@ class EnergyMlHttpDescubridor(DescubridorCargasPort):
                 potencia_w = item.get("potencia_kw", 0) * 1000
                 dispersion_w = item.get("dispersion_kw", 0.0) * 1000
 
-                candidata = CargaCandidata(
+                candidata = MáquinaInferida(
                     potencia_w=potencia_w,
                     dispersion_w=dispersion_w,
                     encendidos=item.get("encendidos", 0),

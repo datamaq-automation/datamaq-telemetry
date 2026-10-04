@@ -7,9 +7,9 @@ from sqlalchemy import asc, desc
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from src.domain.cargas.entities import CampanaCaracterizacion
-from src.domain.cargas.ports import RepositorioCampanasPort
-from src.domain.cargas.value_objects import (
+from src.domain.maquinas.entities import EnsayoCaracterizacion
+from src.domain.maquinas.ports import RepositorioEnsayosPort
+from src.domain.maquinas.value_objects import (
     EstadoCampana,
     MotivoDescarte,
     MuestraCampana,
@@ -29,12 +29,12 @@ def _a_decimal(valor: float | None) -> Decimal | None:
     return Decimal(str(valor)) if valor is not None else None
 
 
-class MySQLCampanasRepository(RepositorioCampanasPort):
+class MySQLCampanasRepository(RepositorioEnsayosPort):
     def __init__(self, db: Session):
         self.db = db
 
-    def _to_entity(self, model: CharacterizationCampaignModel) -> CampanaCaracterizacion:
-        return CampanaCaracterizacion(
+    def _to_entity(self, model: CharacterizationCampaignModel) -> EnsayoCaracterizacion:
+        return EnsayoCaracterizacion(
             id=model.id,
             dispositivo_id=model.device_id,
             carga_id=model.load_id,
@@ -52,13 +52,13 @@ class MySQLCampanasRepository(RepositorioCampanasPort):
             creado_en=model.created_at,
         )
 
-    def obtener_por_id(self, campana_id: str) -> CampanaCaracterizacion | None:
+    def obtener_por_id(self, campana_id: str) -> EnsayoCaracterizacion | None:
         model = (
             self.db.query(CharacterizationCampaignModel).filter(CharacterizationCampaignModel.id == campana_id).first()
         )
         return self._to_entity(model) if model else None
 
-    def obtener_en_curso_por_dispositivo(self, dispositivo_id: str) -> CampanaCaracterizacion | None:
+    def obtener_en_curso_por_dispositivo(self, dispositivo_id: str) -> EnsayoCaracterizacion | None:
         model = (
             self.db.query(CharacterizationCampaignModel)
             .filter(
@@ -70,7 +70,7 @@ class MySQLCampanasRepository(RepositorioCampanasPort):
         )
         return self._to_entity(model) if model else None
 
-    def listar_en_curso(self) -> list[CampanaCaracterizacion]:
+    def listar_en_curso(self) -> list[EnsayoCaracterizacion]:
         modelos = (
             self.db.query(CharacterizationCampaignModel)
             .filter(CharacterizationCampaignModel.state == EstadoCampana.EN_CURSO.value)
@@ -78,7 +78,7 @@ class MySQLCampanasRepository(RepositorioCampanasPort):
         )
         return [self._to_entity(m) for m in modelos]
 
-    def listar_por_carga(self, carga_id: str) -> list[CampanaCaracterizacion]:
+    def listar_por_carga(self, carga_id: str) -> list[EnsayoCaracterizacion]:
         modelos = (
             self.db.query(CharacterizationCampaignModel)
             .filter(CharacterizationCampaignModel.load_id == carga_id)
@@ -87,7 +87,7 @@ class MySQLCampanasRepository(RepositorioCampanasPort):
         )
         return [self._to_entity(m) for m in modelos]
 
-    def guardar(self, campana: CampanaCaracterizacion) -> CampanaCaracterizacion:
+    def guardar(self, campana: EnsayoCaracterizacion) -> EnsayoCaracterizacion:
         model = (
             self.db.query(CharacterizationCampaignModel).filter(CharacterizationCampaignModel.id == campana.id).first()
         )

@@ -4,18 +4,18 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from src.application.dtos.carga_dto import CorregirIntervaloRequestDTO
+from src.application.dtos.maquina_dto import CorregirIntervaloRequestDTO
 from src.application.use_cases.atribuir_consumo import AtribuirConsumoUseCase
-from src.domain.cargas.entities import Carga, IntervaloActividadCarga
-from src.domain.cargas.exceptions import (
-    CargaNoEncontradaError,
+from src.domain.maquinas.entities import Máquina, IntervaloActividadMáquina
+from src.domain.maquinas.exceptions import (
+    MáquinaNoEncontradaError,
     IntervaloActividadNoEncontradoError,
 )
-from src.domain.cargas.ports import (
+from src.domain.maquinas.ports import (
     RepositorioIntervalosActividadPort,
     RepositorioSeriePotenciaPort,
 )
-from src.domain.cargas.value_objects import (
+from src.domain.maquinas.value_objects import (
     FirmaCarga,
     NaturalezaElectrica,
     OrigenClasificacionCarga,
@@ -43,7 +43,7 @@ class MockSerieRepo(RepositorioSeriePotenciaPort):
 
 class MockIntervalosRepo(RepositorioIntervalosActividadPort):
     def __init__(self):
-        self.intervalos: list[IntervaloActividadCarga] = []
+        self.intervalos: list[IntervaloActividadMáquina] = []
         self._siguiente_id = 1
 
     def obtener_por_id(self, intervalo_id):
@@ -96,9 +96,9 @@ def _serie_con_termotanque(ciclos: int = 2) -> list[LecturaPotenciaTemporal]:
     ]
 
 
-def _termotanque() -> Carga:
-    return Carga(
-        id="carga-termo",
+def _termotanque() -> Máquina:
+    return Máquina(
+        id="maquina-termo",
         dispositivo_id=MEDIDOR,
         nombre="Termotanque",
         naturaleza_electrica=NaturalezaElectrica.RESISTIVA,
@@ -112,10 +112,10 @@ def _termotanque() -> Carga:
     )
 
 
-def _use_case(lecturas=None, cargas=None, energia=None):
+def _use_case(lecturas=None, maquinas=None, energia=None):
     repo_cargas = MockCargasRepo()
-    for carga in cargas or []:
-        repo_cargas.guardar(carga)
+    for maquina in maquinas or []:
+        repo_cargas.guardar(maquina)
     intervalos = MockIntervalosRepo()
     return (
         AtribuirConsumoUseCase(MockSerieRepo(lecturas, energia), repo_cargas, intervalos),
@@ -142,7 +142,7 @@ def test_el_batch_detecta_y_atribuye_los_episodios():
 
     assert resultado.episodios_detectados == 2
     assert resultado.atribuidos == 2
-    assert all(i.carga_id == "carga-termo" for i in intervalos.intervalos)
+    assert all(i.carga_id == "maquina-termo" for i in intervalos.intervalos)
 
 
 def test_re_correr_la_misma_ventana_no_duplica_intervalos():
@@ -160,7 +160,7 @@ def test_el_batch_no_pisa_una_correccion_humana():
     use_case, intervalos, _ = _use_case(_serie_con_termotanque(), [_termotanque()])
     use_case.analizar(MEDIDOR, desde=INICIO, hasta=HASTA)
     corregido = intervalos.intervalos[0]
-    corregido.corregir("carga-termo", usuario_id="u1", notas="confirmado a mano")
+    corregido.corregir("maquina-termo", usuario_id="u1", notas="confirmado a mano")
 
     use_case.analizar(MEDIDOR, desde=INICIO, hasta=HASTA)
 
@@ -201,7 +201,7 @@ def test_corregir_hacia_una_carga_inexistente_falla():
     use_case, intervalos, _ = _use_case(_serie_con_termotanque(), [_termotanque()])
     use_case.analizar(MEDIDOR, desde=INICIO, hasta=HASTA)
 
-    with pytest.raises(CargaNoEncontradaError):
+    with pytest.raises(MáquinaNoEncontradaError):
         use_case.corregir_intervalo(
             intervalos.intervalos[0].id, CorregirIntervaloRequestDTO(carga_id="no-existe"), "u1"
         )

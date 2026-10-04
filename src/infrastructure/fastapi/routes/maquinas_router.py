@@ -1,4 +1,4 @@
-"""src/infrastructure/fastapi/routes/cargas_router.py."""
+"""src/infrastructure/fastapi/routes/maquinas_router.py."""
 
 from datetime import datetime
 from typing import Annotated
@@ -6,7 +6,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 
-from src.application.dtos.carga_dto import (
+from src.application.dtos.maquina_dto import (
     AnalisisConsumoResponseDTO,
     AtribucionConsumoResponseDTO,
     CampanaCreateDTO,
@@ -19,13 +19,13 @@ from src.application.dtos.carga_dto import (
     IntervaloActividadResponseDTO,
     PerfilConsumoResponseDTO,
 )
-from src.application.mappers.carga_mapper import CargaMapper
+from src.application.mappers.maquina_mapper import MáquinaMapper
 from src.application.use_cases.analizar_consumo import ZONA_POR_DEFECTO, AnalizarConsumoUseCase
 from src.application.use_cases.atribuir_consumo import AtribuirConsumoUseCase
 from src.application.use_cases.caracterizar_carga import CaracterizarCargaUseCase
 from src.application.use_cases.exportar_cargas import ExportarCargasUseCase
 from src.application.use_cases.gestionar_cargas import GestionarCargasUseCase
-from src.domain.cargas.servicios.presets_cargas import CatalogoPresetsCargas
+from src.domain.maquinas.servicios.presets_cargas import CatalogoPresetsCargas
 from src.infrastructure.fastapi.dependencies import (
     get_analisis_consumo_use_case,
     get_atribucion_use_case,
@@ -131,7 +131,7 @@ def obtener_presets_catalogo():
     """Catálogo de presets estándar con firmas de fábrica de referencia."""
     try:
         presets = CatalogoPresetsCargas.obtener_todas("preset-catalogo")
-        return [CargaMapper.to_dto(p) for p in presets]
+        return [MáquinaMapper.to_dto(p) for p in presets]
     except Exception as e:
         manejar_error_http(e)
 
@@ -148,7 +148,7 @@ def inicializar_presets_catalogo(
     """Crea en el catálogo del medidor las 9 cargas precalibradas estándar que no existan."""
     try:
         cargas = use_case.inicializar_presets_catalogo(device_id)
-        return [CargaMapper.to_dto(c) for c in cargas]
+        return [MáquinaMapper.to_dto(c) for c in cargas]
     except Exception as e:
         manejar_error_http(e)
 

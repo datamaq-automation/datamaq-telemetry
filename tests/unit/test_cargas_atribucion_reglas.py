@@ -3,8 +3,8 @@
 from datetime import datetime, timedelta, timezone
 
 from src.application.use_cases.atribuir_consumo import AtribuirConsumoUseCase
-from src.domain.cargas.entities import Carga
-from src.domain.cargas.value_objects import OrigenClasificacionCarga
+from src.domain.maquinas.entities import Máquina
+from src.domain.maquinas.value_objects import OrigenClasificacionCarga
 from src.domain.telemetria.value_objects import LecturaPotenciaTemporal
 from tests.unit.test_cargas_batch_atribucion import MockIntervalosRepo, MockSerieRepo
 from tests.unit.test_cargas_catalogo import MockCargasRepo
@@ -39,8 +39,8 @@ def _serie_ciclo_heladera() -> list[LecturaPotenciaTemporal]:
 def test_atribucion_por_regla_imputa_a_carga_sin_firma_si_nombre_coincide():
     """Si el usuario tiene 'Pava eléctrica' sin firma calibrada, la regla física la reconoce y la imputa."""
     repo_cargas = MockCargasRepo()
-    carga_pava = Carga(
-        id="carga-pava-sin-firma",
+    carga_pava = Máquina(
+        id="maquina-pava-sin-firma",
         dispositivo_id=MEDIDOR,
         nombre="Pava eléctrica",
         potencia_nominal_w=1850.0,
@@ -58,7 +58,7 @@ def test_atribucion_por_regla_imputa_a_carga_sin_firma_si_nombre_coincide():
     assert res.atribuidos >= 1
 
     intervalos = repo_intervalos.listar_por_dispositivo(MEDIDOR, INICIO, INICIO + timedelta(hours=1))
-    int_pava = next((i for i in intervalos if i.carga_id == "carga-pava-sin-firma"), None)
+    int_pava = next((i for i in intervalos if i.carga_id == "maquina-pava-sin-firma"), None)
 
     assert int_pava is not None
     assert int_pava.origen == OrigenClasificacionCarga.REGLA
@@ -76,7 +76,7 @@ def test_atribucion_por_regla_registra_sugerencia_cuando_no_hay_carga_en_catalog
     res = uc.analizar(MEDIDOR, desde=INICIO, hasta=INICIO + timedelta(hours=2))
 
     assert res.episodios_detectados >= 1
-    assert res.atribuidos == 0  # No había carga en catálogo para imputar el ID
+    assert res.atribuidos == 0  # No había maquina en catálogo para imputar el ID
     assert res.no_atribuidos >= 1
 
     intervalos = repo_intervalos.listar_por_dispositivo(MEDIDOR, INICIO, INICIO + timedelta(hours=2))

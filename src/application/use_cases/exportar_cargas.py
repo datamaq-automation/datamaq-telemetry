@@ -4,8 +4,8 @@ from collections.abc import Generator
 from datetime import datetime, timedelta, timezone
 
 from src.application.mappers.csv_streaming_mapper import CsvStreamingMapper
-from src.domain.cargas.ports import (
-    RepositorioCargasPort,
+from src.domain.maquinas.ports import (
+    RepositorioMáquinasPort,
     RepositorioIntervalosActividadPort,
 )
 
@@ -15,7 +15,7 @@ class ExportarCargasUseCase:
 
     def __init__(
         self,
-        repo_cargas: RepositorioCargasPort,
+        repo_cargas: RepositorioMáquinasPort,
         repo_intervalos: RepositorioIntervalosActividadPort,
     ):
         self.repo_cargas = repo_cargas

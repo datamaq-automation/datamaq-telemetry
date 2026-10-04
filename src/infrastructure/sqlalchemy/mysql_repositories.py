@@ -15,7 +15,7 @@ from src.infrastructure.sqlalchemy.repositories.campanas_repository import (
     MySQLCampanasRepository,
 )
 from src.infrastructure.sqlalchemy.repositories.cargas_repository import (
-    MySQLCargasRepository,
+    MySQLMáquinasRepository,
     MySQLSeriePotenciaRepository,
 )
 from src.infrastructure.sqlalchemy.repositories.disponibilidad_repository import (
@@ -52,7 +52,7 @@ __all__ = [
     "MySQLAccesosPlantaRepository",
     "MySQLAuditoriaRepository",
     "MySQLCampanasRepository",
-    "MySQLCargasRepository",
+    "MySQLMáquinasRepository",
     "MySQLDispositivosConfiablesRepository",
     "MySQLDispositivosRepository",
     "MySQLEventosDisponibilidadRepository",

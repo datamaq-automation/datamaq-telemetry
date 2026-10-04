@@ -7,7 +7,7 @@ from src.application.mappers.csv_streaming_mapper import (
     CsvStreamingMapper,
     formatear_fila_csv,
 )
-from src.domain.cargas.entities import IntervaloActividadCarga
+from src.domain.maquinas.entities import IntervaloActividadMáquina
 from src.domain.disponibilidad.entities import EventoDisponibilidad
 from src.domain.disponibilidad.value_objects import EstadoMaquina, OrigenClasificacion, TipoParada
 from src.domain.telemetria.entities import LecturaInstantanea, MedicionFase
@@ -85,9 +85,9 @@ def test_generar_csv_cargas_atribuidas_y_no_atribuidas():
     ahora = datetime(2026, 9, 7, 10, 0, 0, tzinfo=timezone.utc)
     fin = datetime(2026, 9, 7, 10, 15, 0, tzinfo=timezone.utc)
 
-    inter1 = IntervaloActividadCarga(
+    inter1 = IntervaloActividadMáquina(
         id=101,
-        dispositivo_id="dev-cargas",
+        dispositivo_id="dev-maquinas",
         inicio_at=ahora,
         fin_at=fin,
         carga_id="c-compresor",
@@ -95,9 +95,9 @@ def test_generar_csv_cargas_atribuidas_y_no_atribuidas():
         energia_kwh=1.125,
         confianza=0.92,
     )
-    inter2 = IntervaloActividadCarga(
+    inter2 = IntervaloActividadMáquina(
         id=102,
-        dispositivo_id="dev-cargas",
+        dispositivo_id="dev-maquinas",
         inicio_at=fin,
         fin_at=datetime(2026, 9, 7, 10, 30, 0, tzinfo=timezone.utc),
         carga_id=None,
@@ -112,7 +112,7 @@ def test_generar_csv_cargas_atribuidas_y_no_atribuidas():
 
     assert chunks[0] == BOM_UTF8
     assert "intervalo_id,dispositivo_id,carga_nombre,categoria" in chunks[1]
-    assert "101,dev-cargas,Compresor Tornillo,COMPRESORES" in chunks[2]
+    assert "101,dev-maquinas,Compresor Tornillo,COMPRESORES" in chunks[2]
     assert "ATRIBUIDO" in chunks[2]
-    assert "102,dev-cargas,,," in chunks[3]
+    assert "102,dev-maquinas,,," in chunks[3]
     assert "NO_ATRIBUIDO" in chunks[3]

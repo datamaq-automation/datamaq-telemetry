@@ -298,7 +298,7 @@ def test_calcular_corriente_neutro_fasorial():
     assert in_eq is not None
     assert in_eq.amperios == 0.0
 
-    # 2. Carga puramente monofásica en Fase R (100A) -> I_N = 100A
+    # 2. Máquina puramente monofásica en Fase R (100A) -> I_N = 100A
     in_mono = AnalizadorCalidadEnergiaService.calcular_corriente_neutro(
         ir=100.0, is_=0.0, it=0.0, pr=22000.0, ps=0.0, pt=0.0, qr=0.0, qs=0.0, qt=0.0
     )
@@ -368,7 +368,7 @@ def test_evaluar_alerta_ti_invertido():
     assert "Fase S" in alertas_inv[0].mensaje
     assert alertas_inv[0].severidad == SeveridadAlerta.WARNING
 
-    # 3. Caso Ruido residual en fase sin carga (I=1.2A, P=-10W) -> No dispara falsa alarma (menor a 5A)
+    # 3. Caso Ruido residual en fase sin maquina (I=1.2A, P=-10W) -> No dispara falsa alarma (menor a 5A)
     lectura_ruido = LecturaInstantanea(
         id=None,
         dispositivo_id="dev-1",
@@ -554,7 +554,7 @@ def test_evaluar_alerta_factor_potencia():
 
     ahora = datetime.now(timezone.utc)
 
-    # 1. Carga baja (<500W) -> No dispara alarma para evitar falsos positivos
+    # 1. Máquina baja (<500W) -> No dispara alarma para evitar falsos positivos
     lectura_vacio = LecturaInstantanea(
         id=None,
         dispositivo_id="dev-1",
@@ -567,7 +567,7 @@ def test_evaluar_alerta_factor_potencia():
     )
     assert AnalizadorCalidadEnergiaService.evaluar_alerta_factor_potencia("dev-1", lectura_vacio) is None
 
-    # 2. Carga en servicio (P=5000W) con FP=0.88 (Warning ENRE < 0.95)
+    # 2. Máquina en servicio (P=5000W) con FP=0.88 (Warning ENRE < 0.95)
     lectura_warning = LecturaInstantanea(
         id=None,
         dispositivo_id="dev-1",
@@ -587,7 +587,7 @@ def test_evaluar_alerta_factor_potencia():
     assert alerta_w.valor_umbral == 0.95
     assert alerta_w.categoria == "FACTOR_POTENCIA"
 
-    # 3. Carga en servicio (P=5000W) con FP=0.75 (Critical < 0.85)
+    # 3. Máquina en servicio (P=5000W) con FP=0.75 (Critical < 0.85)
     lectura_critica = LecturaInstantanea(
         id=None,
         dispositivo_id="dev-1",
@@ -670,7 +670,7 @@ def test_evaluar_alertas_distorsion_armonica_corriente():
     )
     assert AnalizadorCalidadEnergiaService.evaluar_alertas_distorsion_armonica("dev-1", lectura_vacio) == []
 
-    # 2. THD_I alto (22.5%) con corriente en carga (35A >= 10A) en Fase T
+    # 2. THD_I alto (22.5%) con corriente en maquina (35A >= 10A) en Fase T
     lectura_carga = LecturaInstantanea(
         id=None,
         dispositivo_id="dev-1",
@@ -876,13 +876,13 @@ def test_calculo_desbalance_corriente():
     iur = AnalizadorCalidadEnergiaService.calcular_desbalance_corriente(110.0, 100.0, 90.0)
     assert iur == 10.0
 
-    # Sin carga el IUR no es "0% de desbalance", es no medible
+    # Sin maquina el IUR no es "0% de desbalance", es no medible
     assert AnalizadorCalidadEnergiaService.calcular_desbalance_corriente(0.0, 0.0, 0.0) is None
 
     # Incompleto
     assert AnalizadorCalidadEnergiaService.calcular_desbalance_corriente(100.0, None, 100.0) is None
 
-    # Carga despreciable: el indicador se satura con ruido y no describe nada.
+    # Máquina despreciable: el indicador se satura con ruido y no describe nada.
     # Caso real medido: R=0.9 A con S y T en miliamperes daba 170% de "desbalance".
     assert AnalizadorCalidadEnergiaService.calcular_desbalance_corriente(0.9, 0.05, 0.05) is None
 
@@ -978,7 +978,7 @@ def test_calculadora_potencia_aparente_es_v_por_i():
     calc = CalculadoraPotenciaService
     # Caso real medido en el SmartPlus: V=227.7, I=0.9
     assert calc.calcular_potencia_aparente(227.7, 0.9) == 204.93
-    # Cero es una medición válida de "sin carga", no un dato ausente
+    # Cero es una medición válida de "sin maquina", no un dato ausente
     assert calc.calcular_potencia_aparente(220.0, 0.0) == 0.0
     assert calc.calcular_potencia_aparente(None, 0.9) is None
     assert calc.calcular_potencia_aparente(227.7, None) is None

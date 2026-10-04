@@ -2,11 +2,11 @@
 
 from datetime import datetime, timedelta, timezone
 
-from src.domain.cargas.entities import Carga, IntervaloActividadCarga
-from src.domain.cargas.servicios.atribuidor_consumo import AtribuidorConsumoService
-from src.domain.cargas.servicios.detector_escalones import DetectorEscalonesService
-from src.domain.cargas.servicios.emparejador_firmas import EmparejadorFirmasService
-from src.domain.cargas.value_objects import (
+from src.domain.maquinas.entities import Máquina, IntervaloActividadMáquina
+from src.domain.maquinas.servicios.atribuidor_consumo import AtribuidorConsumoService
+from src.domain.maquinas.servicios.detector_escalones import DetectorEscalonesService
+from src.domain.maquinas.servicios.emparejador_firmas import EmparejadorFirmasService
+from src.domain.maquinas.value_objects import (
     EpisodioCarga,
     FirmaCarga,
     NaturalezaElectrica,
@@ -60,7 +60,7 @@ def test_el_umbral_se_calibra_del_ruido_de_la_propia_serie():
 
 
 def test_un_hueco_de_datos_no_se_lee_como_escalon():
-    """Tras una caída del medidor, la primera lectura no es una carga que entró."""
+    """Tras una caída del medidor, la primera lectura no es una maquina que entró."""
     antes = _serie(_plano(120.0, 90.0, 20))
     despues = [
         LecturaPotenciaTemporal(
@@ -117,7 +117,7 @@ def test_un_encendido_sin_apagado_no_se_aparea_con_el_de_otra_carga_horas_despue
     """Sin este tope, un apagado perdido genera episodios de días con potencia absurda."""
     serie = _serie(
         _plano(120.0, 90.0, 5)
-        + _plano(1970.0, 102.0, 5)  # entra una carga y su apagado se pierde bajo el umbral
+        + _plano(1970.0, 102.0, 5)  # entra una maquina y su apagado se pierde bajo el umbral
         + [(1970.0 - i * 3, 102.0) for i in range(120)]  # deriva lenta, sin escalón
         + _plano(120.0, 90.0, 5)
     )
@@ -128,7 +128,7 @@ def test_un_encendido_sin_apagado_no_se_aparea_con_el_de_otra_carga_horas_despue
 
 
 def test_ningun_episodio_tiene_potencia_media_negativa():
-    """Una carga no consume potencia negativa: ese par no describe un encendido real."""
+    """Una maquina no consume potencia negativa: ese par no describe un encendido real."""
     serie = _serie(
         _plano(3000.0, 120.0, 8)
         + _plano(4000.0, 130.0, 4)
@@ -146,9 +146,9 @@ def test_ningun_episodio_tiene_potencia_media_negativa():
 # ------------------------------------------------------- desambiguación de firmas
 
 
-def _carga(nombre: str, potencia: float, duracion: float, fp: float, natural: NaturalezaElectrica) -> Carga:
-    return Carga(
-        id=f"carga-{nombre}",
+def _carga(nombre: str, potencia: float, duracion: float, fp: float, natural: NaturalezaElectrica) -> Máquina:
+    return Máquina(
+        id=f"maquina-{nombre}",
         dispositivo_id=MEDIDOR,
         nombre=nombre,
         naturaleza_electrica=natural,
@@ -162,7 +162,7 @@ def _carga(nombre: str, potencia: float, duracion: float, fp: float, natural: Na
     )
 
 
-def _catalogo() -> list[Carga]:
+def _catalogo() -> list[Máquina]:
     """Los cuatro resistivos son casi iguales en potencia: solo los separa la duración."""
     return [
         _carga("Pava eléctrica", 1850.0, 180.0, 0.99, NaturalezaElectrica.RESISTIVA),
@@ -189,20 +189,20 @@ def test_la_duracion_separa_al_termotanque_del_horno():
     """Misma potencia, mismo factor de potencia: solo difieren en cuánto duran."""
     decision = EmparejadorFirmasService.decidir(_episodio(1820.0, 2400.0, 15.0), _catalogo())
 
-    assert decision.carga_id == "carga-Termotanque"
+    assert decision.carga_id == "maquina-Termotanque"
 
 
 def test_la_misma_potencia_con_otra_duracion_va_a_otra_carga():
     decision = EmparejadorFirmasService.decidir(_episodio(1850.0, 4500.0, 15.0), _catalogo())
 
-    assert decision.carga_id == "carga-Horno eléctrico"
+    assert decision.carga_id == "maquina-Horno eléctrico"
 
 
 def test_la_reactiva_separa_familias_enteras():
     """Una heladera y un resistivo de la misma potencia nunca deberían confundirse."""
     motor = EmparejadorFirmasService.decidir(_episodio(120.0, 1500.0, 115.0), _catalogo())
 
-    assert motor.carga_id == "carga-Heladera"
+    assert motor.carga_id == "maquina-Heladera"
 
 
 def test_un_episodio_que_no_se_parece_a_nada_queda_sin_atribuir():
@@ -227,7 +227,7 @@ def test_ante_dos_candidatos_igual_de_buenos_no_se_atribuye():
 
 
 def test_sin_firmas_calibradas_no_se_atribuye_nada():
-    sin_firma = [Carga(id="c1", dispositivo_id=MEDIDOR, nombre="Pava eléctrica", potencia_nominal_w=2000.0)]
+    sin_firma = [Máquina(id="c1", dispositivo_id=MEDIDOR, nombre="Pava eléctrica", potencia_nominal_w=2000.0)]
 
     decision = EmparejadorFirmasService.decidir(_episodio(1850.0, 180.0, 10.0), sin_firma)
 
@@ -241,7 +241,7 @@ def test_una_carga_dada_de_baja_no_recibe_atribuciones():
 
     decision = EmparejadorFirmasService.decidir(_episodio(1820.0, 2400.0, 15.0), catalogo)
 
-    assert decision.carga_id != "carga-Termotanque"
+    assert decision.carga_id != "maquina-Termotanque"
 
 
 def test_sin_reactiva_medida_el_factor_no_premia_ni_castiga():
@@ -257,7 +257,7 @@ def test_sin_reactiva_medida_el_factor_no_premia_ni_castiga():
 
 
 def _intervalo(carga_id: str | None, potencia: float, minutos: float, confianza: float = 0.8):
-    return IntervaloActividadCarga(
+    return IntervaloActividadMáquina(
         id=None,
         dispositivo_id=MEDIDOR,
         carga_id=carga_id,
@@ -270,7 +270,7 @@ def _intervalo(carga_id: str | None, potencia: float, minutos: float, confianza:
 
 
 def test_el_residual_es_la_diferencia_contra_el_contador_no_un_ajuste():
-    intervalos = [_intervalo("carga-Termotanque", 1800.0, 40), _intervalo("carga-Heladera", 120.0, 600)]
+    intervalos = [_intervalo("maquina-Termotanque", 1800.0, 40), _intervalo("maquina-Heladera", 120.0, 600)]
 
     atribucion = AtribuidorConsumoService.atribuir(
         INICIO, INICIO + timedelta(days=1), intervalos, _catalogo(), energia_total_kwh=5.0
@@ -284,7 +284,7 @@ def test_el_residual_es_la_diferencia_contra_el_contador_no_un_ajuste():
 def test_un_residual_alto_se_reporta_como_diagnostico_y_no_se_fuerza_el_cuadre():
     """A 5 min la pava y la iluminación caen ahí por diseño: es información, no un error."""
     atribucion = AtribuidorConsumoService.atribuir(
-        INICIO, INICIO + timedelta(days=1), [_intervalo("carga-Heladera", 120.0, 600)], _catalogo(), 10.0
+        INICIO, INICIO + timedelta(days=1), [_intervalo("maquina-Heladera", 120.0, 600)], _catalogo(), 10.0
     )
 
     assert atribucion.calidad_suficiente is False
@@ -295,7 +295,7 @@ def test_un_residual_alto_se_reporta_como_diagnostico_y_no_se_fuerza_el_cuadre()
 def test_atribuir_mas_que_el_total_medido_se_denuncia_en_vez_de_repartirse():
     """Un balance que siempre cierra no informa nada."""
     atribucion = AtribuidorConsumoService.atribuir(
-        INICIO, INICIO + timedelta(days=1), [_intervalo("carga-Termotanque", 1800.0, 600)], _catalogo(), 5.0
+        INICIO, INICIO + timedelta(days=1), [_intervalo("maquina-Termotanque", 1800.0, 600)], _catalogo(), 5.0
     )
 
     assert atribucion.residual_kwh is not None
@@ -306,7 +306,7 @@ def test_atribuir_mas_que_el_total_medido_se_denuncia_en_vez_de_repartirse():
 
 def test_sin_lecturas_del_contador_no_se_finge_un_total():
     atribucion = AtribuidorConsumoService.atribuir(
-        INICIO, INICIO + timedelta(days=1), [_intervalo("carga-Heladera", 120.0, 600)], _catalogo(), None
+        INICIO, INICIO + timedelta(days=1), [_intervalo("maquina-Heladera", 120.0, 600)], _catalogo(), None
     )
 
     assert atribucion.residual_kwh is None
@@ -316,7 +316,7 @@ def test_sin_lecturas_del_contador_no_se_finge_un_total():
 
 
 def test_los_intervalos_no_atribuidos_aparecen_con_nombre_propio():
-    intervalos = [_intervalo("carga-Heladera", 120.0, 600), _intervalo(None, 2000.0, 30)]
+    intervalos = [_intervalo("maquina-Heladera", 120.0, 600), _intervalo(None, 2000.0, 30)]
 
     atribucion = AtribuidorConsumoService.atribuir(INICIO, INICIO + timedelta(days=1), intervalos, _catalogo(), 3.0)
 
@@ -328,9 +328,9 @@ def test_los_intervalos_no_atribuidos_aparecen_con_nombre_propio():
 def test_una_correccion_humana_se_marca_y_lleva_confianza_plena():
     intervalo = _intervalo(None, 2000.0, 3)
 
-    intervalo.corregir("carga-Pava eléctrica", usuario_id="u1", notas="fui yo, herví agua")
+    intervalo.corregir("maquina-Pava eléctrica", usuario_id="u1", notas="fui yo, herví agua")
 
-    assert intervalo.carga_id == "carga-Pava eléctrica"
+    assert intervalo.carga_id == "maquina-Pava eléctrica"
     assert intervalo.origen == OrigenClasificacionCarga.CORRECCION_HUMANA
     assert intervalo.es_correccion_humana is True
     assert intervalo.confianza == 1.0
@@ -339,7 +339,7 @@ def test_una_correccion_humana_se_marca_y_lleva_confianza_plena():
 
 def test_el_reporte_tiene_una_sola_fila_de_no_atribuido():
     """El residual del balance y los episodios sin imputar son lo mismo para quien lee."""
-    intervalos = [_intervalo("carga-Heladera", 120.0, 600), _intervalo(None, 2000.0, 30)]
+    intervalos = [_intervalo("maquina-Heladera", 120.0, 600), _intervalo(None, 2000.0, 30)]
 
     atribucion = AtribuidorConsumoService.atribuir(INICIO, INICIO + timedelta(days=1), intervalos, _catalogo(), 5.0)
 
@@ -350,8 +350,8 @@ def test_el_reporte_tiene_una_sola_fila_de_no_atribuido():
 def test_los_porcentajes_suman_cien_contra_el_consumo_real():
     """Con denominadores distintos por item el reporte dejaba de ser interpretable."""
     intervalos = [
-        _intervalo("carga-Termotanque", 1800.0, 40),
-        _intervalo("carga-Heladera", 120.0, 600),
+        _intervalo("maquina-Termotanque", 1800.0, 40),
+        _intervalo("maquina-Heladera", 120.0, 600),
         _intervalo(None, 2000.0, 30),
     ]
 

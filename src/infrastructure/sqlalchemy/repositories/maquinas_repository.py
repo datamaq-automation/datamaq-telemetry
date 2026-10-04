@@ -6,9 +6,9 @@ from decimal import Decimal
 from sqlalchemy import asc, func
 from sqlalchemy.orm import Session
 
-from src.domain.cargas.entities import Carga
-from src.domain.cargas.ports import RepositorioCargasPort, RepositorioSeriePotenciaPort
-from src.domain.cargas.value_objects import (
+from src.domain.maquinas.entities import Carga
+from src.domain.maquinas.ports import RepositorioMáquinasPort, RepositorioSeriePotenciaPort
+from src.domain.maquinas.value_objects import (
     CategoriaCarga,
     FirmaCarga,
     NaturalezaElectrica,
@@ -31,7 +31,7 @@ def _a_decimal(valor: float | None) -> Decimal | None:
     return Decimal(str(valor)) if valor is not None else None
 
 
-class MySQLCargasRepository(RepositorioCargasPort):
+class MySQLMáquinasRepository(RepositorioMáquinasPort):
     """Persistencia del catálogo de cargas.
 
     La firma se guarda aplanada en columnas de `loads` en vez de en una tabla propia:

@@ -16,7 +16,7 @@ from src.domain.auth.exceptions import (
     UsuarioNoEncontradoError,
 )
 from src.domain.billing.exceptions import DominioBillingException
-from src.domain.cargas.exceptions import (
+from src.domain.maquinas.exceptions import (
     CampanaNoEncontradaError,
     CargaNoEncontradaError,
     DominioCargasException,

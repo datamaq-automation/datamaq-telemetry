@@ -1,4 +1,4 @@
-"""tests/unit/test_cargas_repositorio.py — Repositorio SQLAlchemy del catálogo de cargas, con SQLite en memoria."""
+"""tests/unit/test_cargas_repositorio.py — Repositorio SQLAlchemy del catálogo de maquinas, con SQLite en memoria."""
 
 from collections.abc import Iterator
 from datetime import datetime, timedelta, timezone
@@ -8,8 +8,8 @@ import pytest
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 
-from src.domain.cargas.entities import Carga, IntervaloActividadCarga
-from src.domain.cargas.value_objects import (
+from src.domain.maquinas.entities import Máquina, IntervaloActividadMáquina
+from src.domain.maquinas.value_objects import (
     CategoriaCarga,
     EstadoCampana,
     FirmaCarga,
@@ -27,7 +27,7 @@ from src.infrastructure.sqlalchemy.models_cargas import (
 )
 from src.infrastructure.sqlalchemy.repositories.campanas_repository import MySQLCampanasRepository
 from src.infrastructure.sqlalchemy.repositories.cargas_repository import (
-    MySQLCargasRepository,
+    MySQLMáquinasRepository,
     MySQLSeriePotenciaRepository,
 )
 from src.infrastructure.sqlalchemy.repositories.intervalos_repository import (
@@ -66,7 +66,7 @@ def db() -> Iterator[Session]:
         session.close()
 
 
-def _carga(carga_id: str = "carga-1", nombre: str = "Heladera", **kwargs) -> Carga:
+def _carga(carga_id: str = "maquina-1", nombre: str = "Heladera", **kwargs) -> Máquina:
     base: dict = dict(
         dispositivo_id=MEDIDOR_CASA,
         categoria=CategoriaCarga.REFRIGERACION,
@@ -74,7 +74,7 @@ def _carga(carga_id: str = "carga-1", nombre: str = "Heladera", **kwargs) -> Car
         potencia_nominal_w=120.0,
     )
     base.update(kwargs)
-    return Carga(id=carga_id, nombre=nombre, **base)
+    return Máquina(id=carga_id, nombre=nombre, **base)
 
 
 def _firma_completa() -> FirmaCarga:
@@ -94,10 +94,10 @@ def _firma_completa() -> FirmaCarga:
 
 
 def test_guardar_y_recuperar_carga_sin_firma(db: Session) -> None:
-    repo = MySQLCargasRepository(db)
+    repo = MySQLMáquinasRepository(db)
 
     repo.guardar(_carga())
-    obtenida = repo.obtener_por_id("carga-1")
+    obtenida = repo.obtener_por_id("maquina-1")
 
     assert obtenida is not None
     assert obtenida.nombre == "Heladera"
@@ -111,10 +111,10 @@ def test_guardar_y_recuperar_carga_sin_firma(db: Session) -> None:
 
 def test_la_firma_sobrevive_al_viaje_de_ida_y_vuelta(db: Session) -> None:
     """Numeric↔float no debe perder ninguno de los campos de la firma."""
-    repo = MySQLCargasRepository(db)
+    repo = MySQLMáquinasRepository(db)
 
     repo.guardar(_carga(firma=_firma_completa()))
-    firma = repo.obtener_por_id("carga-1").firma
+    firma = repo.obtener_por_id("maquina-1").firma
 
     assert firma is not None
     assert firma.potencia_w == 118.5
@@ -131,43 +131,43 @@ def test_la_firma_sobrevive_al_viaje_de_ida_y_vuelta(db: Session) -> None:
 
 
 def test_guardar_dos_veces_el_mismo_id_actualiza_en_lugar_de_duplicar(db: Session) -> None:
-    repo = MySQLCargasRepository(db)
+    repo = MySQLMáquinasRepository(db)
     repo.guardar(_carga())
 
-    carga = repo.obtener_por_id("carga-1")
-    carga.nombre = "Heladera de la cocina"
-    carga.patron_operacion = PatronOperacion.CICLICO_TERMOSTATICO
-    repo.guardar(carga)
+    maquina = repo.obtener_por_id("maquina-1")
+    maquina.nombre = "Heladera de la cocina"
+    maquina.patron_operacion = PatronOperacion.CICLICO_TERMOSTATICO
+    repo.guardar(maquina)
 
     assert len(repo.listar()) == 1
-    assert repo.obtener_por_id("carga-1").nombre == "Heladera de la cocina"
-    assert repo.obtener_por_id("carga-1").patron_operacion == PatronOperacion.CICLICO_TERMOSTATICO
+    assert repo.obtener_por_id("maquina-1").nombre == "Heladera de la cocina"
+    assert repo.obtener_por_id("maquina-1").patron_operacion == PatronOperacion.CICLICO_TERMOSTATICO
 
 
 def test_quitar_la_firma_limpia_todas_sus_columnas(db: Session) -> None:
     """Recalibrar desde cero no debe dejar restos de la firma anterior."""
-    repo = MySQLCargasRepository(db)
+    repo = MySQLMáquinasRepository(db)
     repo.guardar(_carga(firma=_firma_completa()))
 
-    carga = repo.obtener_por_id("carga-1")
-    carga.firma = None
-    repo.guardar(carga)
+    maquina = repo.obtener_por_id("maquina-1")
+    maquina.firma = None
+    repo.guardar(maquina)
 
-    assert repo.obtener_por_id("carga-1").firma is None
+    assert repo.obtener_por_id("maquina-1").firma is None
 
 
 def test_obtener_por_nombre_esta_acotado_al_medidor(db: Session) -> None:
-    repo = MySQLCargasRepository(db)
-    repo.guardar(_carga("carga-1", "Heladera"))
-    repo.guardar(_carga("carga-2", "Heladera", dispositivo_id=OTRO_MEDIDOR))
+    repo = MySQLMáquinasRepository(db)
+    repo.guardar(_carga("maquina-1", "Heladera"))
+    repo.guardar(_carga("maquina-2", "Heladera", dispositivo_id=OTRO_MEDIDOR))
 
-    assert repo.obtener_por_nombre(MEDIDOR_CASA, "Heladera").id == "carga-1"
-    assert repo.obtener_por_nombre(OTRO_MEDIDOR, "Heladera").id == "carga-2"
+    assert repo.obtener_por_nombre(MEDIDOR_CASA, "Heladera").id == "maquina-1"
+    assert repo.obtener_por_nombre(OTRO_MEDIDOR, "Heladera").id == "maquina-2"
     assert repo.obtener_por_nombre(MEDIDOR_CASA, "Freezer") is None
 
 
 def test_listar_por_dispositivo_ordena_por_nombre_y_filtra_inactivas(db: Session) -> None:
-    repo = MySQLCargasRepository(db)
+    repo = MySQLMáquinasRepository(db)
     repo.guardar(_carga("c1", "Termotanque"))
     repo.guardar(_carga("c2", "Anafe eléctrico", activa=False))
     repo.guardar(_carga("c3", "Heladera"))
@@ -181,7 +181,7 @@ def test_listar_por_dispositivo_ordena_por_nombre_y_filtra_inactivas(db: Session
 
 
 def test_obtener_carga_inexistente_devuelve_none(db: Session) -> None:
-    assert MySQLCargasRepository(db).obtener_por_id("no-existe") is None
+    assert MySQLMáquinasRepository(db).obtener_por_id("no-existe") is None
 
 
 def _instantanea(db: Session, segundos: int, p: float | None, q: float | None, fp: float | None) -> None:
@@ -203,7 +203,7 @@ def _instantanea(db: Session, segundos: int, p: float | None, q: float | None, f
 
 
 def test_la_serie_trae_potencia_reactiva_y_factor_de_potencia(db: Session) -> None:
-    """Q y FP son el eje que separa una carga resistiva de una con motor."""
+    """Q y FP son el eje que separa una maquina resistiva de una con motor."""
     _instantanea(db, 0, 1850.0, 12.0, 0.99)
 
     serie = MySQLSeriePotenciaRepository(db).listar_serie_potencia(
@@ -255,10 +255,10 @@ def test_la_serie_respeta_la_ventana_y_el_limite(db: Session) -> None:
 
 
 def _campana(db: Session, campana_id: str = "camp-1", tipo: TipoCampana = TipoCampana.ACTIVA):
-    from src.domain.cargas.entities import CampanaCaracterizacion
+    from src.domain.maquinas.entities import EnsayoCaracterizacion
 
     return MySQLCampanasRepository(db).guardar(
-        CampanaCaracterizacion(
+        EnsayoCaracterizacion(
             id=campana_id,
             dispositivo_id=MEDIDOR_CASA,
             carga_id=None,
@@ -333,8 +333,8 @@ def test_solo_se_lista_una_campana_en_curso_por_dispositivo(db: Session) -> None
 
 def _intervalo_ent(
     inicio_min: int, fin_min: int, carga_id: str | None = None, origen=OrigenClasificacionCarga.REGLA
-) -> IntervaloActividadCarga:
-    return IntervaloActividadCarga(
+) -> IntervaloActividadMáquina:
+    return IntervaloActividadMáquina(
         id=None,
         dispositivo_id=MEDIDOR_CASA,
         carga_id=carga_id,
@@ -361,7 +361,7 @@ def test_reemplazar_ventana_preserva_las_correcciones_humanas(db: Session) -> No
     """El batch no puede deshacer lo que una persona confirmó a mano."""
     repo = MySQLIntervalosActividadRepository(db)
     ventana = (MEDIDOR_CASA, MEDIDO_EN, MEDIDO_EN + timedelta(hours=6))
-    corregido = _intervalo_ent(0, 40, carga_id="carga-1", origen=OrigenClasificacionCarga.CORRECCION_HUMANA)
+    corregido = _intervalo_ent(0, 40, carga_id="maquina-1", origen=OrigenClasificacionCarga.CORRECCION_HUMANA)
     corregido.corregido_por_usuario_id = "u1"
     repo.reemplazar_ventana(*ventana, [corregido])
 
@@ -371,7 +371,7 @@ def test_reemplazar_ventana_preserva_las_correcciones_humanas(db: Session) -> No
     humano = next(i for i in sobrevivientes if i.es_correccion_humana)
     assert escritos == 1
     assert len(sobrevivientes) == 2
-    assert humano.carga_id == "carga-1"
+    assert humano.carga_id == "maquina-1"
     assert humano.corregido_por_usuario_id == "u1"
 
 

@@ -6,9 +6,9 @@ from decimal import Decimal
 from sqlalchemy import asc, desc
 from sqlalchemy.orm import Session
 
-from src.domain.cargas.entities import IntervaloActividadCarga
-from src.domain.cargas.ports import RepositorioIntervalosActividadPort
-from src.domain.cargas.value_objects import OrigenClasificacionCarga
+from src.domain.maquinas.entities import IntervaloActividadMáquina
+from src.domain.maquinas.ports import RepositorioIntervalosActividadPort
+from src.domain.maquinas.value_objects import OrigenClasificacionCarga
 from src.infrastructure.sqlalchemy.models_cargas import LoadActivityIntervalModel
 
 
@@ -24,8 +24,8 @@ class MySQLIntervalosActividadRepository(RepositorioIntervalosActividadPort):
     def __init__(self, db: Session):
         self.db = db
 
-    def _to_entity(self, model: LoadActivityIntervalModel) -> IntervaloActividadCarga:
-        return IntervaloActividadCarga(
+    def _to_entity(self, model: LoadActivityIntervalModel) -> IntervaloActividadMáquina:
+        return IntervaloActividadMáquina(
             id=model.id,
             dispositivo_id=model.device_id,
             carga_id=model.load_id,
@@ -41,7 +41,7 @@ class MySQLIntervalosActividadRepository(RepositorioIntervalosActividadPort):
             notas=model.notes,
         )
 
-    def _aplicar(self, model: LoadActivityIntervalModel, intervalo: IntervaloActividadCarga) -> None:
+    def _aplicar(self, model: LoadActivityIntervalModel, intervalo: IntervaloActividadMáquina) -> None:
         model.load_id = intervalo.carga_id
         model.avg_power_w = _a_decimal(intervalo.potencia_media_w)
         model.delta_reactive_var = _a_decimal(intervalo.delta_reactiva_var)
@@ -52,13 +52,13 @@ class MySQLIntervalosActividadRepository(RepositorioIntervalosActividadPort):
         model.corrected_at = intervalo.corregido_at
         model.notes = intervalo.notas
 
-    def obtener_por_id(self, intervalo_id: int) -> IntervaloActividadCarga | None:
+    def obtener_por_id(self, intervalo_id: int) -> IntervaloActividadMáquina | None:
         model = self.db.query(LoadActivityIntervalModel).filter(LoadActivityIntervalModel.id == intervalo_id).first()
         return self._to_entity(model) if model else None
 
     def listar_por_dispositivo(
         self, dispositivo_id: str, desde: datetime, hasta: datetime
-    ) -> list[IntervaloActividadCarga]:
+    ) -> list[IntervaloActividadMáquina]:
         modelos = (
             self.db.query(LoadActivityIntervalModel)
             .filter(
@@ -71,7 +71,7 @@ class MySQLIntervalosActividadRepository(RepositorioIntervalosActividadPort):
         )
         return [self._to_entity(m) for m in modelos]
 
-    def listar_por_carga(self, carga_id: str, limite: int = 100) -> list[IntervaloActividadCarga]:
+    def listar_por_carga(self, carga_id: str, limite: int = 100) -> list[IntervaloActividadMáquina]:
         modelos = (
             self.db.query(LoadActivityIntervalModel)
             .filter(LoadActivityIntervalModel.load_id == carga_id)
@@ -81,7 +81,7 @@ class MySQLIntervalosActividadRepository(RepositorioIntervalosActividadPort):
         )
         return [self._to_entity(m) for m in modelos]
 
-    def guardar(self, intervalo: IntervaloActividadCarga) -> IntervaloActividadCarga:
+    def guardar(self, intervalo: IntervaloActividadMáquina) -> IntervaloActividadMáquina:
         model = None
         if intervalo.id is not None:
             model = (
@@ -105,7 +105,7 @@ class MySQLIntervalosActividadRepository(RepositorioIntervalosActividadPort):
         dispositivo_id: str,
         desde: datetime,
         hasta: datetime,
-        intervalos: list[IntervaloActividadCarga],
+        intervalos: list[IntervaloActividadMáquina],
     ) -> int:
         """Reescribe la ventana preservando lo que corrigió una persona.
 

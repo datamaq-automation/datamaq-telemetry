@@ -1,21 +1,21 @@
-"""tests/unit/test_cargas_catalogo.py — Catálogo de cargas: alta, edición, unicidad por medidor y firma manual."""
+"""tests/unit/test_cargas_catalogo.py — Catálogo de maquinas: alta, edición, unicidad por medidor y firma manual."""
 
 import pytest
 
-from src.application.dtos.carga_dto import (
+from src.application.dtos.maquina_dto import (
     CargaCreateDTO,
     CargaUpdateDTO,
     FirmaManualRequestDTO,
 )
 from src.application.use_cases.gestionar_cargas import GestionarCargasUseCase
-from src.domain.cargas.entities import Carga
-from src.domain.cargas.exceptions import (
-    CargaDuplicadaError,
-    CargaNoEncontradaError,
-    FirmaCargaInvalidaError,
+from src.domain.maquinas.entities import Máquina
+from src.domain.maquinas.exceptions import (
+    MáquinaDuplicadaError,
+    MáquinaNoEncontradaError,
+    FirmaMáquinaInvalidaError,
 )
-from src.domain.cargas.ports import RepositorioCargasPort
-from src.domain.cargas.value_objects import (
+from src.domain.maquinas.ports import RepositorioMáquinasPort
+from src.domain.maquinas.value_objects import (
     CategoriaCarga,
     FirmaCarga,
     NaturalezaElectrica,
@@ -27,31 +27,31 @@ MEDIDOR_CASA = "d48c49f0-3564-4000-8000-000000000001"
 OTRO_MEDIDOR = "d48c49f0-3564-4000-8000-000000000002"
 
 
-class MockCargasRepo(RepositorioCargasPort):
+class MockCargasRepo(RepositorioMáquinasPort):
     def __init__(self):
-        self.cargas: dict[str, Carga] = {}
+        self.maquinas: dict[str, Máquina] = {}
 
-    def obtener_por_id(self, carga_id: str) -> Carga | None:
-        return self.cargas.get(carga_id)
+    def obtener_por_id(self, carga_id: str) -> Máquina | None:
+        return self.maquinas.get(carga_id)
 
-    def obtener_por_nombre(self, dispositivo_id: str, nombre: str) -> Carga | None:
+    def obtener_por_nombre(self, dispositivo_id: str, nombre: str) -> Máquina | None:
         return next(
-            (c for c in self.cargas.values() if c.dispositivo_id == dispositivo_id and c.nombre == nombre),
+            (c for c in self.maquinas.values() if c.dispositivo_id == dispositivo_id and c.nombre == nombre),
             None,
         )
 
-    def listar_por_dispositivo(self, dispositivo_id: str, solo_activas: bool = False) -> list[Carga]:
-        cargas = [c for c in self.cargas.values() if c.dispositivo_id == dispositivo_id]
+    def listar_por_dispositivo(self, dispositivo_id: str, solo_activas: bool = False) -> list[Máquina]:
+        maquinas = [c for c in self.maquinas.values() if c.dispositivo_id == dispositivo_id]
         if solo_activas:
-            cargas = [c for c in cargas if c.activa]
-        return sorted(cargas, key=lambda c: c.nombre)
+            maquinas = [c for c in maquinas if c.activa]
+        return sorted(maquinas, key=lambda c: c.nombre)
 
-    def listar(self) -> list[Carga]:
-        return sorted(self.cargas.values(), key=lambda c: c.nombre)
+    def listar(self) -> list[Máquina]:
+        return sorted(self.maquinas.values(), key=lambda c: c.nombre)
 
-    def guardar(self, carga: Carga) -> Carga:
-        self.cargas[carga.id] = carga
-        return carga
+    def guardar(self, maquina: Máquina) -> Máquina:
+        self.maquinas[maquina.id] = maquina
+        return maquina
 
 
 @pytest.fixture
@@ -93,7 +93,7 @@ def test_un_medidor_agregado_admite_muchas_cargas(use_case):
 def test_no_se_admiten_dos_cargas_con_el_mismo_nombre_en_el_mismo_medidor(use_case):
     _crear(use_case, "Heladera")
 
-    with pytest.raises(CargaDuplicadaError):
+    with pytest.raises(MáquinaDuplicadaError):
         _crear(use_case, "Heladera")
 
 
@@ -109,7 +109,7 @@ def test_renombrar_hacia_un_nombre_ya_usado_en_el_medidor_falla(use_case):
     _crear(use_case, "Heladera")
     freezer = _crear(use_case, "Freezer")
 
-    with pytest.raises(CargaDuplicadaError):
+    with pytest.raises(MáquinaDuplicadaError):
         use_case.actualizar_carga(freezer.id, CargaUpdateDTO(nombre="Heladera"))
 
 
@@ -122,7 +122,7 @@ def test_renombrar_una_carga_a_su_propio_nombre_no_es_colision(use_case):
 
 
 def test_actualizar_carga_inexistente_falla(use_case):
-    with pytest.raises(CargaNoEncontradaError):
+    with pytest.raises(MáquinaNoEncontradaError):
         use_case.actualizar_carga("no-existe", CargaUpdateDTO(nombre="X"))
 
 
@@ -171,10 +171,10 @@ def test_la_firma_medida_le_gana_a_la_potencia_de_chapa(use_case):
 
 
 def test_una_firma_con_dispersion_mayor_que_la_potencia_es_rechazada(use_case):
-    """Describiría una carga que se apaga y prende sola: no es una carga física."""
+    """Describiría una maquina que se apaga y prende sola: no es una maquina física."""
     pava = _crear(use_case, "Pava eléctrica")
 
-    with pytest.raises(FirmaCargaInvalidaError):
+    with pytest.raises(FirmaMáquinaInvalidaError):
         use_case.fijar_firma_manual(pava.id, FirmaManualRequestDTO(potencia_w=1800.0, dispersion_w=2000.0))
 
 

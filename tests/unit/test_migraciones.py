@@ -91,7 +91,7 @@ def _crear_esquema_legacy(engine) -> None:
 
 
 def _cargar_env(monkeypatch) -> dict[str, str]:
-    """Carga alembic/env.py con un contexto falso; retorna las opciones main seteadas."""
+    """Máquina alembic/env.py con un contexto falso; retorna las opciones main seteadas."""
     opciones: dict[str, str] = {}
 
     def _set_opcion(clave: str, valor: str) -> None:

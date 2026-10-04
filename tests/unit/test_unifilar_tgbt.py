@@ -39,7 +39,7 @@ def _repo_org(nodos: list[NodoUnifilar]) -> MagicMock:
 
 
 def test_dto_acepta_solo_tipos_del_vocabulario():
-    for tipo in ("acometida", "transformador", "tgbt", "seccional", "carga"):
+    for tipo in ("acometida", "transformador", "tgbt", "seccional", "maquina"):
         assert NodoUnifilarDTO(id="n", nombre="n", tipo=tipo, tension_nominal_V=380.0).tipo == tipo
     with pytest.raises(ValidationError):
         NodoUnifilarDTO(id="n", nombre="n", tipo="alimentador", tension_nominal_V=380.0)
