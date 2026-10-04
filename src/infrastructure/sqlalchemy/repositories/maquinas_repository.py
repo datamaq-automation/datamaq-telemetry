@@ -6,7 +6,7 @@ from decimal import Decimal
 from sqlalchemy import asc, func
 from sqlalchemy.orm import Session
 
-from src.domain.maquinas.entities import Carga
+from src.domain.maquinas.entities import Máquina
 from src.domain.maquinas.ports import RepositorioMáquinasPort, RepositorioSeriePotenciaPort
 from src.domain.maquinas.value_objects import (
     CategoriaCarga,
@@ -20,7 +20,7 @@ from src.infrastructure.sqlalchemy.models import (
     TelemetryEnergyModel,
     TelemetryInstantaneousModel,
 )
-from src.infrastructure.sqlalchemy.models_cargas import LoadModel
+from src.infrastructure.sqlalchemy.models_maquinas import LoadModel
 
 
 def _a_float(valor: Decimal | None) -> float | None:
@@ -74,7 +74,7 @@ class MySQLMáquinasRepository(RepositorioMáquinasPort):
             actualizado_en=model.updated_at,
         )
 
-    def _aplicar(self, model: LoadModel, carga: Carga) -> None:
+    def _aplicar(self, model: LoadModel, carga: Máquina) -> None:
         model.name = carga.nombre
         model.category = carga.categoria.value
         model.electrical_nature = carga.naturaleza_electrica.value
@@ -112,7 +112,7 @@ class MySQLMáquinasRepository(RepositorioMáquinasPort):
     def listar(self) -> list[Carga]:
         return [self._to_entity(m) for m in self.db.query(LoadModel).order_by(LoadModel.name).all()]
 
-    def guardar(self, carga: Carga) -> Carga:
+    def guardar(self, carga: Máquina) -> Carga:
         model = self.db.query(LoadModel).filter(LoadModel.id == carga.id).first()
         if not model:
             model = LoadModel(id=carga.id, device_id=carga.dispositivo_id)

@@ -21,12 +21,12 @@ from src.domain.maquinas.value_objects import (
     TipoCampana,
 )
 from src.infrastructure.sqlalchemy.models import Base, TelemetryInstantaneousModel
-from src.infrastructure.sqlalchemy.models_cargas import (
+from src.infrastructure.sqlalchemy.models_maquinas import (
     CampaignSampleModel,
     LoadActivityIntervalModel,
 )
-from src.infrastructure.sqlalchemy.repositories.campanas_repository import MySQLCampanasRepository
-from src.infrastructure.sqlalchemy.repositories.cargas_repository import (
+from src.infrastructure.sqlalchemy.repositories.ensayos_repository import MySQLEnsayosRepository
+from src.infrastructure.sqlalchemy.repositories.maquinas_repository import (
     MySQLMáquinasRepository,
     MySQLSeriePotenciaRepository,
 )
@@ -257,7 +257,7 @@ def test_la_serie_respeta_la_ventana_y_el_limite(db: Session) -> None:
 def _campana(db: Session, campana_id: str = "camp-1", tipo: TipoCampana = TipoCampana.ACTIVA):
     from src.domain.maquinas.entities import EnsayoCaracterizacion
 
-    return MySQLCampanasRepository(db).guardar(
+    return MySQLEnsayosRepository(db).guardar(
         EnsayoCaracterizacion(
             id=campana_id,
             dispositivo_id=MEDIDOR_CASA,
@@ -270,7 +270,7 @@ def _campana(db: Session, campana_id: str = "camp-1", tipo: TipoCampana = TipoCa
 
 
 def test_la_campana_sobrevive_al_viaje_de_ida_y_vuelta(db: Session) -> None:
-    repo = MySQLCampanasRepository(db)
+    repo = MySQLEnsayosRepository(db)
     _campana(db)
 
     campana = repo.obtener_por_id("camp-1")
@@ -284,7 +284,7 @@ def test_la_campana_sobrevive_al_viaje_de_ida_y_vuelta(db: Session) -> None:
 
 def test_agregar_muestra_es_idempotente_ante_el_redelivery_de_qos_1(db: Session) -> None:
     """La unicidad la garantiza la restricción de la tabla, no un SELECT previo."""
-    repo = MySQLCampanasRepository(db)
+    repo = MySQLEnsayosRepository(db)
     _campana(db)
     muestra = MuestraCampana(momento=MEDIDO_EN, potencia_w=1850.0, potencia_reactiva_var=12.0)
 
@@ -297,7 +297,7 @@ def test_agregar_muestra_es_idempotente_ante_el_redelivery_de_qos_1(db: Session)
 
 
 def test_las_muestras_vuelven_ordenadas_y_completas(db: Session) -> None:
-    repo = MySQLCampanasRepository(db)
+    repo = MySQLEnsayosRepository(db)
     _campana(db)
     for segundos in (2, 0, 1):
         repo.agregar_muestra(
@@ -320,7 +320,7 @@ def test_las_muestras_vuelven_ordenadas_y_completas(db: Session) -> None:
 
 
 def test_solo_se_lista_una_campana_en_curso_por_dispositivo(db: Session) -> None:
-    repo = MySQLCampanasRepository(db)
+    repo = MySQLEnsayosRepository(db)
     campana = _campana(db)
     assert repo.obtener_en_curso_por_dispositivo(MEDIDOR_CASA) is not None
 

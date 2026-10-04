@@ -15,7 +15,7 @@ from src.domain.maquinas.value_objects import (
     MuestraCampana,
     TipoCampana,
 )
-from src.infrastructure.sqlalchemy.models_cargas import (
+from src.infrastructure.sqlalchemy.models_maquinas import (
     CampaignSampleModel,
     CharacterizationCampaignModel,
 )

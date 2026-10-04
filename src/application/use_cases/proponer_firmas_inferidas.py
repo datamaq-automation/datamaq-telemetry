@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 
 from src.application.dtos.carga_dto import ResumenPropuestaDTO
-from src.domain.maquinas.entities import Carga, ahora_utc
+from src.domain.maquinas.entities import Máquina, ahora_utc
 from src.domain.maquinas.ports import DescubridorMáquinasPort, RepositorioMáquinasPort
 from src.domain.maquinas.servicios.emparejador_candidatas import emparejar
 from src.domain.maquinas.value_objects import CargaCandidata, FirmaCarga, OrigenFirma
@@ -31,7 +31,7 @@ class ProponerFirmasInferidasUseCase:
         )
 
     def _procesar_candidata_emparejada(
-        self, carga: Carga, candidata: CargaCandidata, hasta: datetime, actualizadas: list[str], protegidas: list[str]
+        self, carga: Máquina, candidata: CargaCandidata, hasta: datetime, actualizadas: list[str], protegidas: list[str]
     ) -> None:
         if carga.firma and carga.firma.origen == OrigenFirma.CAMPANA:
             protegidas.append(carga.nombre)

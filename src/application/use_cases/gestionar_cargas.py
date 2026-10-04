@@ -10,7 +10,7 @@ from src.application.dtos.carga_dto import (
     FirmaManualRequestDTO,
 )
 from src.application.mappers.maquina_mapper import MáquinaMapper
-from src.domain.maquinas.entities import Carga
+from src.domain.maquinas.entities import Máquina
 from src.domain.maquinas.exceptions import (
     CargaDuplicadaError,
     CargaNoEncontradaError,

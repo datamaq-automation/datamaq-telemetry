@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from src.domain.maquinas.entities import IntervaloActividadMáquina
 from src.domain.maquinas.ports import RepositorioIntervalosActividadPort
 from src.domain.maquinas.value_objects import OrigenClasificacionCarga
-from src.infrastructure.sqlalchemy.models_cargas import LoadActivityIntervalModel
+from src.infrastructure.sqlalchemy.models_maquinas import LoadActivityIntervalModel
 
 
 def _a_float(valor: Decimal | None) -> float | None:

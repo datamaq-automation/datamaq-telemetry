@@ -11,7 +11,7 @@ from src.application.dtos.carga_dto import (
     ItemAtribucionDTO,
 )
 from src.application.mappers.maquina_mapper import IntervaloActividadMapper
-from src.domain.maquinas.entities import Carga, IntervaloActividadCarga
+from src.domain.maquinas.entities import Máquina, IntervaloActividadCarga
 from src.domain.maquinas.exceptions import (
     CargaNoEncontradaError,
     IntervaloActividadNoEncontradoError,
