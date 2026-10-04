@@ -4,17 +4,17 @@ import uuid
 from datetime import datetime
 
 from src.application.dtos.carga_dto import ResumenPropuestaDTO
-from src.domain.maquinas.entities import Máquina, ahora_utc
-from src.domain.maquinas.ports import DescubridorMáquinasPort, RepositorioMáquinasPort
-from src.domain.maquinas.servicios.emparejador_candidatas import emparejar
-from src.domain.maquinas.value_objects import CargaCandidata, FirmaCarga, OrigenFirma
+from src.domain.cargas.entities import Carga, ahora_utc
+from src.domain.cargas.ports import DescubridorCargasPort, RepositorioCargasPort
+from src.domain.cargas.servicios.emparejador_candidatas import emparejar
+from src.domain.cargas.value_objects import CargaCandidata, FirmaCarga, OrigenFirma
 
 
 class ProponerFirmasInferidasUseCase:
     """Propone firmas INFERIDA para cargas del dispositivo basado en descubrimiento externo."""
 
     def __init__(
-        self, cargas: RepositorioMáquinasPort, descubridor: DescubridorMáquinasPort, tolerancia_relativa: float = 0.15
+        self, cargas: RepositorioCargasPort, descubridor: DescubridorCargasPort, tolerancia_relativa: float = 0.15
     ) -> None:
         self.cargas = cargas
         self.descubridor = descubridor
@@ -31,7 +31,7 @@ class ProponerFirmasInferidasUseCase:
         )
 
     def _procesar_candidata_emparejada(
-        self, carga: Máquina, candidata: CargaCandidata, hasta: datetime, actualizadas: list[str], protegidas: list[str]
+        self, carga: Carga, candidata: CargaCandidata, hasta: datetime, actualizadas: list[str], protegidas: list[str]
     ) -> None:
         if carga.firma and carga.firma.origen == OrigenFirma.CAMPANA:
             protegidas.append(carga.nombre)

@@ -1,9 +1,9 @@
-"""src/domain/maquinas/entities.py."""
+"""src/domain/cargas/entities.py."""
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
-from src.domain.maquinas.value_objects import (
+from src.domain.cargas.value_objects import (
     CategoriaCarga,
     EstadoCampana,
     FirmaCarga,
@@ -20,16 +20,16 @@ def ahora_utc() -> datetime:
 
 
 @dataclass
-class Máquina:
+class Carga:
     """Un consumo individual detrás de un medidor agregado.
 
-    Deliberadamente genérica: acá una máquina es una heladera o una pava, pero en una
+    Deliberadamente genérica: acá una carga es una heladera o una pava, pero en una
     planta es un compresor o una línea de producción. Lo único que el motor necesita
     saber de ella es su firma eléctrica y su patrón temporal, que son los mismos
     conceptos en los dos casos.
 
-    A diferencia de `Disponibilidad` (del dominio de producción), la relación con el dispositivo es
-    N:1 — el medidor agregado ve muchas máquinas a la vez, que es justamente el problema
+    A diferencia de `Maquina` (disponibilidad), la relación con el dispositivo es
+    N:1 — el medidor agregado ve muchas cargas a la vez, que es justamente el problema
     de desagregación.
     """
 
@@ -48,7 +48,7 @@ class Máquina:
 
     @property
     def esta_caracterizada(self) -> bool:
-        """Sin firma el motor no puede atribuirle nada; la máquina existe pero no juega."""
+        """Sin firma el motor no puede atribuirle nada; la carga existe pero no juega."""
         return self.firma is not None
 
     @property
@@ -60,16 +60,16 @@ class Máquina:
 
 
 @dataclass
-class EnsayoCaracterizacion:
+class CampanaCaracterizacion:
     """Una ventana acotada de medición a alta resolución sobre un medidor.
 
     Existe porque a la cadencia permanente de 5 minutos no se puede medir la firma de
     casi nada: un evento más corto que el intervalo de muestreo simplemente no fue
-    medido, y ningún algoritmo puede recuperarlo. El ensayo resuelve eso por
+    medido, y ningún algoritmo puede recuperarlo. La campaña resuelve eso por
     instrumentación y no por matemática, poniendo el medidor en ráfaga durante una
     ventana corta y guardando todo lo que llega.
 
-    `maquina_id` es opcional: un ensayo pasivo puede observar el conjunto de máquinas
+    `carga_id` es opcional: una campaña pasiva puede observar el conjunto de cargas
     autónomas de la casa sin apuntar a una sola.
     """
 
@@ -78,7 +78,7 @@ class EnsayoCaracterizacion:
     tipo: TipoCampana
     inicio_at: datetime
     fin_planificado_at: datetime
-    maquina_id: str | None = None
+    carga_id: str | None = None
     estado: EstadoCampana = EstadoCampana.EN_CURSO
     fin_at: datetime | None = None
     linea_base_w: float | None = None
@@ -100,7 +100,7 @@ class EnsayoCaracterizacion:
     def esta_vencida(self, ahora: datetime | None = None) -> bool:
         """Vencida = pasó su fin planificado sin que nadie la cerrara.
 
-        El cierre automático no es un detalle: un ensayo olvidado dejaría al medidor
+        El cierre automático no es un detalle: una campaña olvidada dejaría al medidor
         publicando en ráfaga y escribiendo muestras indefinidamente.
         """
         return self.esta_en_curso and (ahora or ahora_utc()) >= self.fin_planificado_at
@@ -120,10 +120,10 @@ class EnsayoCaracterizacion:
 
 
 @dataclass
-class IntervaloActividadMáquina:
-    """Un tramo en que se cree que una máquina estuvo funcionando.
+class IntervaloActividadCarga:
+    """Un tramo en que se cree que una carga estuvo funcionando.
 
-    `maquina_id is None` significa `NO_ATRIBUIDO`: se detectó actividad real pero no se
+    `carga_id is None` significa `NO_ATRIBUIDO`: se detectó actividad real pero no se
     pudo decir de quién. Es información, no un hueco — el residual honesto es lo que
     permite saber cuánto del consumo queda sin explicar.
 
@@ -136,7 +136,7 @@ class IntervaloActividadMáquina:
     dispositivo_id: str
     inicio_at: datetime
     fin_at: datetime
-    maquina_id: str | None = None
+    carga_id: str | None = None
     potencia_media_w: float | None = None
     delta_reactiva_var: float | None = None
     energia_kwh: float | None = None
@@ -148,7 +148,7 @@ class IntervaloActividadMáquina:
 
     @property
     def esta_atribuido(self) -> bool:
-        return self.maquina_id is not None
+        return self.carga_id is not None
 
     @property
     def es_correccion_humana(self) -> bool:
@@ -160,13 +160,13 @@ class IntervaloActividadMáquina:
 
     def corregir(
         self,
-        maquina_id: str | None,
+        carga_id: str | None,
         usuario_id: str,
         notas: str | None = None,
         ahora: datetime | None = None,
     ) -> None:
         """Reimputa el intervalo a mano. Queda marcado para que el batch no lo revierta."""
-        self.maquina_id = maquina_id
+        self.carga_id = carga_id
         self.origen = OrigenClasificacionCarga.CORRECCION_HUMANA
         self.confianza = 1.0
         self.corregido_por_usuario_id = usuario_id

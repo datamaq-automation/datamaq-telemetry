@@ -12,11 +12,11 @@ from src.application.use_cases.exportar_disponibilidad import (
 from src.application.use_cases.exportar_telemetria import (
     ExportarTelemetriaUseCase,
 )
+from src.domain.cargas.entities import Carga, IntervaloActividadCarga
+from src.domain.cargas.value_objects import CategoriaCarga
 from src.domain.disponibilidad.entities import EventoDisponibilidad, Maquina
 from src.domain.disponibilidad.exceptions import MaquinaNoEncontradaError
 from src.domain.disponibilidad.value_objects import EstadoMaquina, TipoParada
-from src.domain.maquinas.entities import IntervaloActividadMáquina, Máquina
-from src.domain.maquinas.value_objects import CategoriaCarga
 from src.domain.telemetria.entities import LecturaInstantanea, MedicionFase
 from src.domain.telemetria.value_objects import PotenciaActiva
 
@@ -87,24 +87,24 @@ def test_exportar_disponibilidad_use_case_ejecutar():
 def test_exportar_cargas_use_case_ejecutar():
     repo_cargas = MagicMock()
     repo_cargas.listar_por_dispositivo.return_value = [
-        Máquina(id="c-1", dispositivo_id="dev-1", nombre="Bomba 1", categoria=CategoriaCarga.FUERZA_MOTRIZ)
+        Carga(id="c-1", dispositivo_id="dev-1", nombre="Bomba 1", categoria=CategoriaCarga.FUERZA_MOTRIZ)
     ]
     repo_intervalos = MagicMock()
-    inter1 = IntervaloActividadMáquina(
+    inter1 = IntervaloActividadCarga(
         id=1,
         dispositivo_id="dev-1",
         inicio_at=datetime(2026, 9, 7, 8, 0, 0, tzinfo=timezone.utc),
         fin_at=datetime(2026, 9, 7, 8, 15, 0, tzinfo=timezone.utc),
-        maquina_id="c-1",
+        carga_id="c-1",
         potencia_media_w=1500.0,
         energia_kwh=0.375,
     )
-    inter2 = IntervaloActividadMáquina(
+    inter2 = IntervaloActividadCarga(
         id=2,
         dispositivo_id="dev-1",
         inicio_at=datetime(2026, 9, 7, 8, 15, 0, tzinfo=timezone.utc),
         fin_at=datetime(2026, 9, 7, 8, 30, 0, tzinfo=timezone.utc),
-        maquina_id=None,
+        carga_id=None,
         potencia_media_w=500.0,
         energia_kwh=0.125,
     )

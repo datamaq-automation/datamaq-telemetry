@@ -1,8 +1,8 @@
-"""src/domain/maquinas/servicios/desagregador_asistido.py — Desagregación de potencia en TGBT asistida por sensórica inductiva."""
+"""src/domain/cargas/servicios/desagregador_asistido.py — Desagregación de potencia en TGBT asistida por sensórica inductiva."""
 
 from dataclasses import dataclass
 
-from src.domain.maquinas.servicios.modelo_motor_industrial import (
+from src.domain.cargas.servicios.modelo_motor_industrial import (
     ModeloMotorFisicoService,
     RegimenMotorIndustrial,
 )

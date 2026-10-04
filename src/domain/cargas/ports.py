@@ -1,44 +1,44 @@
-"""src/domain/maquinas/ports.py."""
+"""src/domain/cargas/ports.py."""
 
 from abc import ABC, abstractmethod
 from datetime import datetime
 
-from src.domain.maquinas.entities import (
-    EnsayoCaracterizacion,
-    IntervaloActividadMáquina,
-    Máquina,
+from src.domain.cargas.entities import (
+    CampanaCaracterizacion,
+    Carga,
+    IntervaloActividadCarga,
 )
-from src.domain.maquinas.value_objects import MuestraCampana
+from src.domain.cargas.value_objects import MuestraCampana
 from src.domain.telemetria.value_objects import LecturaPotenciaTemporal
 
 
-class RepositorioMáquinasPort(ABC):
+class RepositorioCargasPort(ABC):
     @abstractmethod
-    def obtener_por_id(self, maquina_id: str) -> Máquina | None:
+    def obtener_por_id(self, carga_id: str) -> Carga | None:
         pass
 
     @abstractmethod
-    def obtener_por_nombre(self, dispositivo_id: str, nombre: str) -> Máquina | None:
+    def obtener_por_nombre(self, dispositivo_id: str, nombre: str) -> Carga | None:
         pass
 
     @abstractmethod
-    def listar_por_dispositivo(self, dispositivo_id: str, solo_activas: bool = False) -> list[Máquina]:
+    def listar_por_dispositivo(self, dispositivo_id: str, solo_activas: bool = False) -> list[Carga]:
         pass
 
     @abstractmethod
-    def listar(self) -> list[Máquina]:
+    def listar(self) -> list[Carga]:
         pass
 
     @abstractmethod
-    def guardar(self, maquina: Máquina) -> Máquina:
+    def guardar(self, carga: Carga) -> Carga:
         pass
 
 
 class RepositorioSeriePotenciaPort(ABC):
-    """Lectura proyectada de la serie de potencia para análisis de máquinas.
+    """Lectura proyectada de la serie de potencia para análisis de cargas.
 
     Es un read model propio del contexto y no un método más del repositorio de
-    telemetría: acá se leen P **y Q** (el eje que separa máquinas resistivas de motores),
+    telemetría: acá se leen P **y Q** (el eje que separa cargas resistivas de motores),
     se recorren ventanas potencialmente largas, y solo interesan cuatro columnas de una
     tabla de decenas. Materializar `LecturaInstantanea` completas sería caro e inútil.
     """
@@ -64,8 +64,8 @@ class RepositorioSeriePotenciaPort(ABC):
         pass
 
 
-class RepositorioEnsayosPort(ABC):
-    """Ensayos de caracterización y sus muestras de alta resolución.
+class RepositorioCampanasPort(ABC):
+    """Campañas y sus muestras de alta resolución.
 
     `agregar_muestra` se llama desde el camino de ingesta MQTT, una vez por lectura y a
     caudal de ráfaga: tiene que ser idempotente ante el redelivery de QoS 1 y devolver
@@ -73,31 +73,31 @@ class RepositorioEnsayosPort(ABC):
     """
 
     @abstractmethod
-    def obtener_por_id(self, ensayo_id: str) -> EnsayoCaracterizacion | None:
+    def obtener_por_id(self, campana_id: str) -> CampanaCaracterizacion | None:
         pass
 
     @abstractmethod
-    def obtener_en_curso_por_dispositivo(self, dispositivo_id: str) -> EnsayoCaracterizacion | None:
+    def obtener_en_curso_por_dispositivo(self, dispositivo_id: str) -> CampanaCaracterizacion | None:
         pass
 
     @abstractmethod
-    def listar_en_curso(self) -> list[EnsayoCaracterizacion]:
+    def listar_en_curso(self) -> list[CampanaCaracterizacion]:
         pass
 
     @abstractmethod
-    def listar_por_maquina(self, maquina_id: str) -> list[EnsayoCaracterizacion]:
+    def listar_por_carga(self, carga_id: str) -> list[CampanaCaracterizacion]:
         pass
 
     @abstractmethod
-    def guardar(self, ensayo: EnsayoCaracterizacion) -> EnsayoCaracterizacion:
+    def guardar(self, campana: CampanaCaracterizacion) -> CampanaCaracterizacion:
         pass
 
     @abstractmethod
-    def agregar_muestra(self, ensayo_id: str, muestra: MuestraCampana) -> bool:
+    def agregar_muestra(self, campana_id: str, muestra: MuestraCampana) -> bool:
         pass
 
     @abstractmethod
-    def listar_muestras(self, ensayo_id: str) -> list[MuestraCampana]:
+    def listar_muestras(self, campana_id: str) -> list[MuestraCampana]:
         pass
 
 
@@ -107,7 +107,7 @@ class ComandoRafagaPort(ABC):
     Existe como puerto y no como una llamada directa al listener MQTT porque el caso de
     uso vive en `application/` y no puede conocer `infrastructure/`. El adaptador lo
     implementa sobre `realtime_sync_mode`, cuyo `time_s` es la **duración** de la
-    ráfaga: hay que renovarla periódicamente mientras dure el ensayo.
+    ráfaga: hay que renovarla periódicamente mientras dure la campaña.
     """
 
     @abstractmethod
@@ -119,26 +119,26 @@ class RepositorioIntervalosActividadPort(ABC):
     """Intervalos de actividad atribuidos, con su historial de correcciones humanas."""
 
     @abstractmethod
-    def obtener_por_id(self, intervalo_id: int) -> IntervaloActividadMáquina | None:
+    def obtener_por_id(self, intervalo_id: int) -> IntervaloActividadCarga | None:
         pass
 
     @abstractmethod
     def listar_por_dispositivo(
         self, dispositivo_id: str, desde: datetime, hasta: datetime
-    ) -> list[IntervaloActividadMáquina]:
+    ) -> list[IntervaloActividadCarga]:
         pass
 
     @abstractmethod
-    def listar_por_maquina(self, maquina_id: str, limite: int = 100) -> list[IntervaloActividadMáquina]:
+    def listar_por_carga(self, carga_id: str, limite: int = 100) -> list[IntervaloActividadCarga]:
         pass
 
     @abstractmethod
-    def guardar(self, intervalo: IntervaloActividadMáquina) -> IntervaloActividadMáquina:
+    def guardar(self, intervalo: IntervaloActividadCarga) -> IntervaloActividadCarga:
         pass
 
     @abstractmethod
     def reemplazar_ventana(
-        self, dispositivo_id: str, desde: datetime, hasta: datetime, intervalos: list[IntervaloActividadMáquina]
+        self, dispositivo_id: str, desde: datetime, hasta: datetime, intervalos: list[IntervaloActividadCarga]
     ) -> int:
         """Deja la ventana con exactamente estos intervalos, **sin tocar las correcciones humanas**.
 
@@ -149,12 +149,12 @@ class RepositorioIntervalosActividadPort(ABC):
         pass
 
 
-class DescubridorMáquinasPort(ABC):
-    """Puerto para descubrir máquinas en una serie agregada mediante un servicio externo."""
+class DescubridorCargasPort(ABC):
+    """Puerto para descubrir cargas en una serie agregada mediante un servicio externo."""
 
     @abstractmethod
     def descubrir(self, medidor: str, desde: datetime, hasta: datetime) -> list:
-        """Descubre candidatas de máquinas en el rango temporal.
+        """Descubre candidatas de cargas en el rango temporal.
 
         Lanza DescubridorNoDisponibleError si el servicio no responde o responde != 200.
         """

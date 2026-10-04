@@ -1,7 +1,7 @@
-"""src/domain/maquinas/servicios/presets_cargas.py — Catálogo de presets de cargas típicas y firmas estándar de fábrica."""
+"""src/domain/cargas/servicios/presets_cargas.py — Catálogo de presets de cargas típicas y firmas estándar de fábrica."""
 
-from src.domain.maquinas.entities import Máquina
-from src.domain.maquinas.value_objects import (
+from src.domain.cargas.entities import Carga
+from src.domain.cargas.value_objects import (
     CategoriaCarga,
     FirmaCarga,
     NaturalezaElectrica,
@@ -11,12 +11,12 @@ from src.domain.maquinas.value_objects import (
 
 
 class CatalogoPresetsCargas:
-    """Genera instancias de Máquina con firmas precalibradas según física típica."""
+    """Genera instancias de Carga con firmas precalibradas según física típica."""
 
     @classmethod
-    def crear_heladera(cls, dispositivo_id: str, maquina_id: str = "carga-heladera") -> Máquina:
-        return Máquina(
-            id=maquina_id,
+    def crear_heladera(cls, dispositivo_id: str, carga_id: str = "carga-heladera") -> Carga:
+        return Carga(
+            id=carga_id,
             dispositivo_id=dispositivo_id,
             nombre="Heladera",
             categoria=CategoriaCarga.REFRIGERACION,
@@ -35,9 +35,9 @@ class CatalogoPresetsCargas:
         )
 
     @classmethod
-    def crear_freezer(cls, dispositivo_id: str, maquina_id: str = "carga-freezer") -> Máquina:
-        return Máquina(
-            id=maquina_id,
+    def crear_freezer(cls, dispositivo_id: str, carga_id: str = "carga-freezer") -> Carga:
+        return Carga(
+            id=carga_id,
             dispositivo_id=dispositivo_id,
             nombre="Freezer",
             categoria=CategoriaCarga.REFRIGERACION,
@@ -56,9 +56,9 @@ class CatalogoPresetsCargas:
         )
 
     @classmethod
-    def crear_pava_electrica(cls, dispositivo_id: str, maquina_id: str = "carga-pava") -> Máquina:
-        return Máquina(
-            id=maquina_id,
+    def crear_pava_electrica(cls, dispositivo_id: str, carga_id: str = "carga-pava") -> Carga:
+        return Carga(
+            id=carga_id,
             dispositivo_id=dispositivo_id,
             nombre="Pava eléctrica",
             categoria=CategoriaCarga.COCCION,
@@ -76,9 +76,9 @@ class CatalogoPresetsCargas:
         )
 
     @classmethod
-    def crear_termotanque(cls, dispositivo_id: str, maquina_id: str = "carga-termotanque") -> Máquina:
-        return Máquina(
-            id=maquina_id,
+    def crear_termotanque(cls, dispositivo_id: str, carga_id: str = "carga-termotanque") -> Carga:
+        return Carga(
+            id=carga_id,
             dispositivo_id=dispositivo_id,
             nombre="Termotanque eléctrico",
             categoria=CategoriaCarga.CALENTAMIENTO_AGUA,
@@ -96,9 +96,9 @@ class CatalogoPresetsCargas:
         )
 
     @classmethod
-    def crear_anafe_electrico(cls, dispositivo_id: str, maquina_id: str = "carga-anafe") -> Máquina:
-        return Máquina(
-            id=maquina_id,
+    def crear_anafe_electrico(cls, dispositivo_id: str, carga_id: str = "carga-anafe") -> Carga:
+        return Carga(
+            id=carga_id,
             dispositivo_id=dispositivo_id,
             nombre="Anafe eléctrico",
             categoria=CategoriaCarga.COCCION,
@@ -116,9 +116,9 @@ class CatalogoPresetsCargas:
         )
 
     @classmethod
-    def crear_horno_electrico(cls, dispositivo_id: str, maquina_id: str = "carga-horno") -> Máquina:
-        return Máquina(
-            id=maquina_id,
+    def crear_horno_electrico(cls, dispositivo_id: str, carga_id: str = "carga-horno") -> Carga:
+        return Carga(
+            id=carga_id,
             dispositivo_id=dispositivo_id,
             nombre="Horno eléctrico",
             categoria=CategoriaCarga.COCCION,
@@ -136,9 +136,9 @@ class CatalogoPresetsCargas:
         )
 
     @classmethod
-    def crear_caloventor(cls, dispositivo_id: str, maquina_id: str = "carga-caloventor") -> Máquina:
-        return Máquina(
-            id=maquina_id,
+    def crear_caloventor(cls, dispositivo_id: str, carga_id: str = "carga-caloventor") -> Carga:
+        return Carga(
+            id=carga_id,
             dispositivo_id=dispositivo_id,
             nombre="Caloventor",
             categoria=CategoriaCarga.CLIMATIZACION,
@@ -156,9 +156,9 @@ class CatalogoPresetsCargas:
         )
 
     @classmethod
-    def crear_pc_escritorio(cls, dispositivo_id: str, maquina_id: str = "carga-pc") -> Máquina:
-        return Máquina(
-            id=maquina_id,
+    def crear_pc_escritorio(cls, dispositivo_id: str, carga_id: str = "carga-pc") -> Carga:
+        return Carga(
+            id=carga_id,
             dispositivo_id=dispositivo_id,
             nombre="Computadora / PC",
             categoria=CategoriaCarga.OTROS,
@@ -176,9 +176,9 @@ class CatalogoPresetsCargas:
         )
 
     @classmethod
-    def crear_iluminacion(cls, dispositivo_id: str, maquina_id: str = "carga-iluminacion") -> Máquina:
-        return Máquina(
-            id=maquina_id,
+    def crear_iluminacion(cls, dispositivo_id: str, carga_id: str = "carga-iluminacion") -> Carga:
+        return Carga(
+            id=carga_id,
             dispositivo_id=dispositivo_id,
             nombre="Iluminación",
             categoria=CategoriaCarga.ILUMINACION,
@@ -196,7 +196,7 @@ class CatalogoPresetsCargas:
         )
 
     @classmethod
-    def obtener_todas(cls, dispositivo_id: str) -> list[Máquina]:
+    def obtener_todas(cls, dispositivo_id: str) -> list[Carga]:
         return [
             cls.crear_heladera(dispositivo_id),
             cls.crear_freezer(dispositivo_id),

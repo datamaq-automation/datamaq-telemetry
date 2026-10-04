@@ -25,7 +25,7 @@ def test_balance_energia_normal_con_perdidas_tecnicas():
 
 
 def test_balance_energia_con_desbalance_critico_alerta_fuga():
-    """Si el residual supera el 10%, se denuncia desbalance crítico (maquina no medida o fuga)."""
+    """Si el residual supera el 10%, se denuncia desbalance crítico (carga no medida o fuga)."""
     e_padre = 1000.0
     e_hijos = [400.0, 300.0, 150.0]  # Suma = 850 kWh -> 15% residual
 

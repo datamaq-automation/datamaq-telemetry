@@ -55,12 +55,12 @@ from src.infrastructure.settings.logger import get_logger
 from src.infrastructure.sqlalchemy.database import get_db_session
 from src.infrastructure.sqlalchemy.mysql_repositories import (
     MySQLAuditoriaRepository,
+    MySQLCampanasRepository,
+    MySQLCargasRepository,
     MySQLDispositivosRepository,
-    MySQLEnsayosRepository,
     MySQLEventosDisponibilidadRepository,
     MySQLIntervalosActividadRepository,
     MySQLMaquinasRepository,
-    MySQLMáquinasRepository,
     MySQLParadasProgramadasRepository,
     MySQLPlanesRepository,
     MySQLSeriePotenciaRepository,
@@ -161,7 +161,7 @@ def get_exportar_cargas_use_case(
     db: Annotated[Session, Depends(get_db_session)],
 ) -> ExportarCargasUseCase:
     return ExportarCargasUseCase(
-        repo_cargas=MySQLMáquinasRepository(db),
+        repo_cargas=MySQLCargasRepository(db),
         repo_intervalos=MySQLIntervalosActividadRepository(db),
     )
 
@@ -251,15 +251,15 @@ def get_maquinas_use_case(
 def get_cargas_use_case(
     db: Annotated[Session, Depends(get_db_session)],
 ) -> GestionarCargasUseCase:
-    return GestionarCargasUseCase(MySQLMáquinasRepository(db))
+    return GestionarCargasUseCase(MySQLCargasRepository(db))
 
 
 def get_caracterizacion_use_case(
     db: Annotated[Session, Depends(get_db_session)],
 ) -> CaracterizarCargaUseCase:
     return CaracterizarCargaUseCase(
-        repo_campanas=MySQLEnsayosRepository(db),
-        repo_cargas=MySQLMáquinasRepository(db),
+        repo_campanas=MySQLCampanasRepository(db),
+        repo_cargas=MySQLCargasRepository(db),
         repo_dispositivos=repo_dispositivos_resuelto(db),
         registro=registro_campanas_activas,
         comando_rafaga=MqttComandoRafagaGateway(get_mqtt_listener()),
@@ -271,7 +271,7 @@ def get_atribucion_use_case(
 ) -> AtribuirConsumoUseCase:
     return AtribuirConsumoUseCase(
         repo_serie=MySQLSeriePotenciaRepository(db),
-        repo_cargas=MySQLMáquinasRepository(db),
+        repo_cargas=MySQLCargasRepository(db),
         repo_intervalos=MySQLIntervalosActividadRepository(db),
     )
 

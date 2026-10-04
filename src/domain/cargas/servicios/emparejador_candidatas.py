@@ -1,13 +1,13 @@
-"""src/domain/maquinas/servicios/emparejador_candidatas.py — Emparejador puro de candidatas."""
+"""src/domain/cargas/servicios/emparejador_candidatas.py — Emparejador puro de candidatas."""
 
-from src.domain.maquinas.entities import Máquina
-from src.domain.maquinas.value_objects import MáquinaInferida
+from src.domain.cargas.entities import Carga
+from src.domain.cargas.value_objects import CargaCandidata
 
 
-def emparejar(candidata: MáquinaInferida, cargas: list[Máquina], tolerancia_relativa: float = 0.15) -> Máquina | None:
+def emparejar(candidata: CargaCandidata, cargas: list[Carga], tolerancia_relativa: float = 0.15) -> Carga | None:
     """Empareja candidata con la carga del catálogo de potencia más cercana.
 
-    Máquina válida: potencia_esperada_w no None.
+    Carga válida: potencia_esperada_w no None.
     Tolerancia: max(tolerancia_relativa * candidata.potencia_w, 2 * candidata.dispersion_w).
     Empate: la de menor diferencia, luego menor id.
 
@@ -17,7 +17,7 @@ def emparejar(candidata: MáquinaInferida, cargas: list[Máquina], tolerancia_re
         tolerancia_relativa: factor relativo de tolerancia (default 0.15 = 15%)
 
     Returns:
-        Máquina emparejada o None si no hay candidata dentro de tolerancia.
+        Carga emparejada o None si no hay candidata dentro de tolerancia.
     """
     # Filtrar cargas con potencia esperada definida
     cargas_validas = [c for c in cargas if c.potencia_esperada_w is not None]
@@ -31,7 +31,7 @@ def emparejar(candidata: MáquinaInferida, cargas: list[Máquina], tolerancia_re
     tolerancia = max(tolerancia_relativa_w, tolerancia_dispersion_w)
 
     # Encontrar la más cercana
-    mejores: list[tuple[float, str, Máquina]] = []
+    mejores: list[tuple[float, str, Carga]] = []
     for carga in cargas_validas:
         potencia_esperada = carga.potencia_esperada_w
         assert potencia_esperada is not None

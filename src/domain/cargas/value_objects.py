@@ -1,4 +1,4 @@
-"""src/domain/maquinas/value_objects.py."""
+"""src/domain/cargas/value_objects.py."""
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -326,7 +326,7 @@ class DiagnosticoReglasCarga:
 class CandidatoAtribucion:
     """Una carga que podría explicar un episodio, con su puntaje y por qué."""
 
-    maquina_id: str
+    carga_id: str
     nombre: str
     score: float
     factor_potencia_score: float
@@ -339,12 +339,12 @@ class CandidatoAtribucion:
 class DecisionAtribucion:
     """A qué carga se le imputa un episodio, o por qué a ninguna.
 
-    `maquina_id is None` es un resultado de primera clase y no un fallo: a esta cadencia
+    `carga_id is None` es un resultado de primera clase y no un fallo: a esta cadencia
     hay cargas que el hardware nunca midió, y una atribución equivocada envenena el
     dataset etiquetado que después alimenta cualquier modelo.
     """
 
-    maquina_id: str | None
+    carga_id: str | None
     confianza: float
     motivo: str
     candidatos: list[CandidatoAtribucion]
@@ -352,7 +352,7 @@ class DecisionAtribucion:
 
 @dataclass(frozen=True)
 class ItemAtribucion:
-    maquina_id: str | None
+    carga_id: str | None
     nombre: str
     energia_kwh: float
     porcentaje: float
@@ -381,8 +381,8 @@ class AtribucionConsumo:
 
 
 @dataclass(frozen=True)
-class MáquinaInferida:
-    """Máquina que un descubridor externo encontró en la serie agregada (ya en W)."""
+class CargaCandidata:
+    """Carga que un descubridor externo encontró en la serie agregada (ya en W)."""
 
     potencia_w: float
     dispersion_w: float

@@ -10,23 +10,23 @@ from src.application.dtos.carga_dto import (
     IntervaloActividadResponseDTO,
     ItemAtribucionDTO,
 )
-from src.application.mappers.maquina_mapper import IntervaloActividadMapper
-from src.domain.maquinas.entities import IntervaloActividadCarga
-from src.domain.maquinas.exceptions import (
+from src.application.mappers.carga_mapper import IntervaloActividadMapper
+from src.domain.cargas.entities import Carga, IntervaloActividadCarga
+from src.domain.cargas.exceptions import (
     CargaNoEncontradaError,
     IntervaloActividadNoEncontradoError,
 )
-from src.domain.maquinas.ports import (
+from src.domain.cargas.ports import (
+    RepositorioCargasPort,
     RepositorioIntervalosActividadPort,
-    RepositorioMáquinasPort,
     RepositorioSeriePotenciaPort,
 )
-from src.domain.maquinas.servicios.atribuidor_consumo import AtribuidorConsumoService
-from src.domain.maquinas.servicios.clasificador_reglas import ClasificadorCargasReglasService
-from src.domain.maquinas.servicios.detector_escalones import DetectorEscalonesService
-from src.domain.maquinas.servicios.emparejador_firmas import EmparejadorFirmasService
-from src.domain.maquinas.servicios.presets_cargas import CatalogoPresetsCargas
-from src.domain.maquinas.value_objects import (
+from src.domain.cargas.servicios.atribuidor_consumo import AtribuidorConsumoService
+from src.domain.cargas.servicios.clasificador_reglas import ClasificadorCargasReglasService
+from src.domain.cargas.servicios.detector_escalones import DetectorEscalonesService
+from src.domain.cargas.servicios.emparejador_firmas import EmparejadorFirmasService
+from src.domain.cargas.servicios.presets_cargas import CatalogoPresetsCargas
+from src.domain.cargas.value_objects import (
     AtribucionConsumo,
     EpisodioCarga,
 )
@@ -59,7 +59,7 @@ class AtribuirConsumoUseCase:
     def __init__(
         self,
         repo_serie: RepositorioSeriePotenciaPort,
-        repo_cargas: RepositorioMáquinasPort,
+        repo_cargas: RepositorioCargasPort,
         repo_intervalos: RepositorioIntervalosActividadPort,
         repo_organizaciones: RepositorioOrganizacionesPort | None = None,
     ):

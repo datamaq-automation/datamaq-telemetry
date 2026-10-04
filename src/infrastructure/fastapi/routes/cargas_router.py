@@ -1,4 +1,4 @@
-"""src/infrastructure/fastapi/routes/maquinas_router.py."""
+"""src/infrastructure/fastapi/routes/cargas_router.py."""
 
 from datetime import datetime
 from typing import Annotated
@@ -6,26 +6,26 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 
-from src.application.dtos.maquina_dto import (
+from src.application.dtos.carga_dto import (
     AnalisisConsumoResponseDTO,
     AtribucionConsumoResponseDTO,
+    CampanaCreateDTO,
+    CampanaResponseDTO,
+    CargaCreateDTO,
+    CargaResponseDTO,
+    CargaUpdateDTO,
     CorregirIntervaloRequestDTO,
-    EnsayoCreateDTO,
-    EnsayoResponseDTO,
     FirmaManualRequestDTO,
     IntervaloActividadResponseDTO,
-    MáquinaCreateDTO,
-    MáquinaResponseDTO,
-    MáquinaUpdateDTO,
     PerfilConsumoResponseDTO,
 )
-from src.application.mappers.maquina_mapper import MáquinaMapper
+from src.application.mappers.carga_mapper import CargaMapper
 from src.application.use_cases.analizar_consumo import ZONA_POR_DEFECTO, AnalizarConsumoUseCase
 from src.application.use_cases.atribuir_consumo import AtribuirConsumoUseCase
 from src.application.use_cases.caracterizar_carga import CaracterizarCargaUseCase
 from src.application.use_cases.exportar_cargas import ExportarCargasUseCase
 from src.application.use_cases.gestionar_cargas import GestionarCargasUseCase
-from src.domain.maquinas.servicios.presets_cargas import CatalogoPresetsCargas
+from src.domain.cargas.servicios.presets_cargas import CatalogoPresetsCargas
 from src.infrastructure.fastapi.dependencies import (
     get_analisis_consumo_use_case,
     get_atribucion_use_case,
@@ -44,7 +44,7 @@ router = APIRouter(
 )
 
 
-@router.get("", response_model=list[MáquinaResponseDTO])
+@router.get("", response_model=list[CargaResponseDTO])
 def listar_cargas(
     use_case: Annotated[GestionarCargasUseCase, Depends(get_cargas_use_case)],
     device_id: Annotated[str | None, Query(description="Filtrar por dispositivo (UUID o MAC).")] = None,
@@ -126,19 +126,19 @@ def corregir_intervalo(
         manejar_error_http(e)
 
 
-@router.get("/presets", response_model=list[MáquinaResponseDTO])
+@router.get("/presets", response_model=list[CargaResponseDTO])
 def obtener_presets_catalogo():
     """Catálogo de presets estándar con firmas de fábrica de referencia."""
     try:
         presets = CatalogoPresetsCargas.obtener_todas("preset-catalogo")
-        return [MáquinaMapper.to_dto(p) for p in presets]
+        return [CargaMapper.to_dto(p) for p in presets]
     except Exception as e:
         manejar_error_http(e)
 
 
 @router.post(
     "/presets/inicializar",
-    response_model=list[MáquinaResponseDTO],
+    response_model=list[CargaResponseDTO],
     dependencies=[Depends(requiere_rol_escritura)],
 )
 def inicializar_presets_catalogo(
@@ -148,7 +148,7 @@ def inicializar_presets_catalogo(
     """Crea en el catálogo del medidor las 9 cargas precalibradas estándar que no existan."""
     try:
         cargas = use_case.inicializar_presets_catalogo(device_id)
-        return [MáquinaMapper.to_dto(c) for c in cargas]
+        return [CargaMapper.to_dto(c) for c in cargas]
     except Exception as e:
         manejar_error_http(e)
 
@@ -177,7 +177,7 @@ def listar_intervalos(
         manejar_error_http(e)
 
 
-@router.get("/{carga_id}", response_model=MáquinaResponseDTO)
+@router.get("/{carga_id}", response_model=CargaResponseDTO)
 def obtener_carga(
     carga_id: str,
     use_case: Annotated[GestionarCargasUseCase, Depends(get_cargas_use_case)],
@@ -188,9 +188,9 @@ def obtener_carga(
         manejar_error_http(e)
 
 
-@router.post("", response_model=MáquinaResponseDTO, dependencies=[Depends(requiere_rol_escritura)])
+@router.post("", response_model=CargaResponseDTO, dependencies=[Depends(requiere_rol_escritura)])
 def registrar_carga(
-    dto: MáquinaCreateDTO,
+    dto: CargaCreateDTO,
     use_case: Annotated[GestionarCargasUseCase, Depends(get_cargas_use_case)],
 ):
     try:
@@ -199,10 +199,10 @@ def registrar_carga(
         manejar_error_http(e)
 
 
-@router.patch("/{carga_id}", response_model=MáquinaResponseDTO, dependencies=[Depends(requiere_rol_escritura)])
+@router.patch("/{carga_id}", response_model=CargaResponseDTO, dependencies=[Depends(requiere_rol_escritura)])
 def actualizar_carga(
     carga_id: str,
-    dto: MáquinaUpdateDTO,
+    dto: CargaUpdateDTO,
     use_case: Annotated[GestionarCargasUseCase, Depends(get_cargas_use_case)],
 ):
     try:
@@ -211,7 +211,7 @@ def actualizar_carga(
         manejar_error_http(e)
 
 
-@router.put("/{carga_id}/firma", response_model=MáquinaResponseDTO, dependencies=[Depends(requiere_rol_escritura)])
+@router.put("/{carga_id}/firma", response_model=CargaResponseDTO, dependencies=[Depends(requiere_rol_escritura)])
 def fijar_firma_manual(
     carga_id: str,
     dto: FirmaManualRequestDTO,
@@ -226,11 +226,11 @@ def fijar_firma_manual(
 
 @router.post(
     "/campanas/activas",
-    response_model=EnsayoResponseDTO,
+    response_model=CampanaResponseDTO,
     dependencies=[Depends(requiere_rol_escritura)],
 )
 def iniciar_campana_activa(
-    dto: EnsayoCreateDTO,
+    dto: CampanaCreateDTO,
     use_case: Annotated[CaracterizarCargaUseCase, Depends(get_caracterizacion_use_case)],
     usuario: Annotated[dict, Depends(get_usuario_actual)],
 ):
@@ -247,11 +247,11 @@ def iniciar_campana_activa(
 
 @router.post(
     "/campanas/pasivas",
-    response_model=EnsayoResponseDTO,
+    response_model=CampanaResponseDTO,
     dependencies=[Depends(requiere_rol_escritura)],
 )
 def iniciar_campana_pasiva(
-    dto: EnsayoCreateDTO,
+    dto: CampanaCreateDTO,
     use_case: Annotated[CaracterizarCargaUseCase, Depends(get_caracterizacion_use_case)],
     usuario: Annotated[dict, Depends(get_usuario_actual)],
 ):
@@ -263,7 +263,7 @@ def iniciar_campana_pasiva(
         manejar_error_http(e)
 
 
-@router.get("/campanas/{campana_id}", response_model=EnsayoResponseDTO)
+@router.get("/campanas/{campana_id}", response_model=CampanaResponseDTO)
 def obtener_campana(
     campana_id: str,
     use_case: Annotated[CaracterizarCargaUseCase, Depends(get_caracterizacion_use_case)],
@@ -276,7 +276,7 @@ def obtener_campana(
 
 @router.patch(
     "/campanas/{campana_id}/finalizar",
-    response_model=EnsayoResponseDTO,
+    response_model=CampanaResponseDTO,
     dependencies=[Depends(requiere_rol_escritura)],
 )
 def finalizar_campana(
@@ -293,7 +293,7 @@ def finalizar_campana(
 
 @router.patch(
     "/campanas/{campana_id}/descartar",
-    response_model=EnsayoResponseDTO,
+    response_model=CampanaResponseDTO,
     dependencies=[Depends(requiere_rol_escritura)],
 )
 def descartar_campana(
@@ -307,7 +307,7 @@ def descartar_campana(
         manejar_error_http(e)
 
 
-@router.get("/{carga_id}/campanas", response_model=list[EnsayoResponseDTO])
+@router.get("/{carga_id}/campanas", response_model=list[CampanaResponseDTO])
 def listar_campanas_de_carga(
     carga_id: str,
     use_case: Annotated[CaracterizarCargaUseCase, Depends(get_caracterizacion_use_case)],

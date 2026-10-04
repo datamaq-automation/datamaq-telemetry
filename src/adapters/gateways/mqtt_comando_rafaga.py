@@ -2,7 +2,7 @@
 
 from typing import Protocol
 
-from src.domain.maquinas.ports import ComandoRafagaPort
+from src.domain.cargas.ports import ComandoRafagaPort
 
 
 class EmisorRafaga(Protocol):

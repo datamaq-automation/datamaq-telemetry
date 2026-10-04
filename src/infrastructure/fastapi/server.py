@@ -38,9 +38,9 @@ from src.infrastructure.fastapi.routes.asistente_router import router as asisten
 from src.infrastructure.fastapi.routes.audit_router import router as audit_router
 from src.infrastructure.fastapi.routes.auth_router import router as auth_router
 from src.infrastructure.fastapi.routes.billing_router import router as billing_router
+from src.infrastructure.fastapi.routes.cargas_router import router as cargas_router
 from src.infrastructure.fastapi.routes.disponibilidad_router import router as disponibilidad_router
 from src.infrastructure.fastapi.routes.dispositivos_router import router as dispositivos_router
-from src.infrastructure.fastapi.routes.maquinas_router import router as maquinas_router
 from src.infrastructure.fastapi.routes.notificador_router import router as notificador_router
 from src.infrastructure.fastapi.routes.organizaciones_router import router as organizaciones_router
 from src.infrastructure.fastapi.routes.planes_router import router as planes_router
@@ -60,9 +60,9 @@ from src.infrastructure.sqlalchemy.database import (
     verificar_estado_migraciones,
 )
 from src.infrastructure.sqlalchemy.mysql_repositories import (
+    MySQLCampanasRepository,
+    MySQLCargasRepository,
     MySQLDispositivosRepository,
-    MySQLEnsayosRepository,
-    MySQLMáquinasRepository,
 )
 from src.infrastructure.yaml.repositories.organizaciones_repository import YamlOrganizacionesRepository
 
@@ -260,8 +260,8 @@ def _sostener_campanas() -> tuple[int, int]:
     db = session_factory()
     try:
         use_case = CaracterizarCargaUseCase(
-            repo_campanas=MySQLEnsayosRepository(db),
-            repo_cargas=MySQLMáquinasRepository(db),
+            repo_campanas=MySQLCampanasRepository(db),
+            repo_cargas=MySQLCargasRepository(db),
             repo_dispositivos=MySQLDispositivosRepository(db),
             registro=registro_campanas_activas,
             comando_rafaga=MqttComandoRafagaGateway(get_mqtt_listener()),
@@ -477,7 +477,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_exception_handler(StarletteHTTPException, manejar_404)
 
     # Register Routers (asistente aislado según decisions/2026-09-24_bot-conversacional-aislamiento.md)
-    routers = (system_router, disponibilidad_router, maquinas_router, telemetria_router, dispositivos_router, organizaciones_router, planta_estructura_router, planes_router, alertas_router, auth_router, audit_router, sge_router, usuarios_router, analitica_router, billing_router, produccion_router, notificador_router, asistente_router)  # fmt: skip
+    routers = (system_router, disponibilidad_router, cargas_router, telemetria_router, dispositivos_router, organizaciones_router, planta_estructura_router, planes_router, alertas_router, auth_router, audit_router, sge_router, usuarios_router, analitica_router, billing_router, produccion_router, notificador_router, asistente_router)  # fmt: skip
     for r in routers:
         app.include_router(r)
 

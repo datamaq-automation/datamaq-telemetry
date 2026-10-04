@@ -11,8 +11,11 @@ from src.infrastructure.sqlalchemy.repositories.accesos_planta_repository import
 from src.infrastructure.sqlalchemy.repositories.auditoria_repository import (
     MySQLAuditoriaRepository,
 )
+from src.infrastructure.sqlalchemy.repositories.campanas_repository import (
+    MySQLCampanasRepository,
+)
 from src.infrastructure.sqlalchemy.repositories.cargas_repository import (
-    MySQLMáquinasRepository,
+    MySQLCargasRepository,
     MySQLSeriePotenciaRepository,
 )
 from src.infrastructure.sqlalchemy.repositories.disponibilidad_repository import (
@@ -25,9 +28,6 @@ from src.infrastructure.sqlalchemy.repositories.dispositivos_confiables_reposito
 )
 from src.infrastructure.sqlalchemy.repositories.dispositivos_repository import (
     MySQLDispositivosRepository,
-)
-from src.infrastructure.sqlalchemy.repositories.ensayos_repository import (
-    MySQLEnsayosRepository,
 )
 from src.infrastructure.sqlalchemy.repositories.intervalos_repository import (
     MySQLIntervalosActividadRepository,
@@ -51,13 +51,13 @@ from src.infrastructure.sqlalchemy.repositories.webhook_events_repository import
 __all__ = [
     "MySQLAccesosPlantaRepository",
     "MySQLAuditoriaRepository",
+    "MySQLCampanasRepository",
+    "MySQLCargasRepository",
     "MySQLDispositivosConfiablesRepository",
     "MySQLDispositivosRepository",
-    "MySQLEnsayosRepository",
     "MySQLEventosDisponibilidadRepository",
     "MySQLIntervalosActividadRepository",
     "MySQLMaquinasRepository",
-    "MySQLMáquinasRepository",
     "MySQLParadasProgramadasRepository",
     "MySQLPlanesRepository",
     "MySQLRegistroEventosWebhook",

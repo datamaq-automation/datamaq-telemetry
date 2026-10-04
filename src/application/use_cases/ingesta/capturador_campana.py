@@ -1,8 +1,8 @@
 """src/application/use_cases/ingesta/capturador_campana.py — Sumidero paralelo que persiste lecturas a caudal completo durante una campaña."""
 
 from src.application.use_cases.ingesta.registro_campanas import RegistroCampanasActivas
-from src.domain.maquinas.ports import RepositorioEnsayosPort
-from src.domain.maquinas.value_objects import MuestraCampana
+from src.domain.cargas.ports import RepositorioCampanasPort
+from src.domain.cargas.value_objects import MuestraCampana
 from src.domain.telemetria.entities import LecturaInstantanea
 from src.domain.telemetria.ports import LoggerPort
 
@@ -26,7 +26,7 @@ class CapturadorCampanaIngesta:
 
     def __init__(
         self,
-        repo_campanas: RepositorioEnsayosPort,
+        repo_campanas: RepositorioCampanasPort,
         registro: RegistroCampanasActivas,
         logger: LoggerPort | None = None,
     ):

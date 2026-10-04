@@ -1,15 +1,15 @@
-"""src/domain/maquinas/servicios/analizador_ciclos.py — Ciclado de una carga: cuánto tiempo prende, cuánto descansa y con qué regularidad."""
+"""src/domain/cargas/servicios/analizador_ciclos.py — Ciclado de una carga: cuánto tiempo prende, cuánto descansa y con qué regularidad."""
 
 from dataclasses import replace
 from datetime import datetime
 
-from src.domain.maquinas.servicios.estadistica import (
+from src.domain.cargas.servicios.estadistica import (
     cadencia_mediana_segundos,
     desviacion_absoluta_mediana,
     dispersion_relativa,
     mediana,
 )
-from src.domain.maquinas.value_objects import (
+from src.domain.cargas.value_objects import (
     CicloOperacion,
     EstadisticaCiclos,
     PatronOperacion,

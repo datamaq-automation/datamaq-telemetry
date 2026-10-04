@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from src.domain.maquinas.servicios.desagregador_asistido import (
+from src.domain.cargas.servicios.desagregador_asistido import (
     DesagregadorAsistidoService,
 )
 

@@ -189,7 +189,7 @@ class TestAgregadorDispositivosService:
     def test_sumar_potencia_en_el_tiempo_promedia_lecturas_del_mismo_dispositivo_en_un_bucket(self):
         """Varias lecturas de un mismo medidor en un bucket (p. ej. las crudas del buffer en vivo que
         ``listar_instantaneas`` antepone al histórico agregado) son muestras de UNA potencia media, no
-        maquinas distintas: sumarlas multiplicaba el último bucket del nodo MT (pico de 72 a 92 MW)."""
+        cargas distintas: sumarlas multiplicaba el último bucket del nodo MT (pico de 72 a 92 MW)."""
 
         base = datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc)
         lecturas = {

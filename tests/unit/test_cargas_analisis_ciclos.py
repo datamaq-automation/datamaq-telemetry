@@ -2,8 +2,8 @@
 
 from datetime import datetime, timedelta, timezone
 
-from src.domain.maquinas.servicios.analizador_ciclos import AnalizadorCiclosService
-from src.domain.maquinas.value_objects import PatronOperacion
+from src.domain.cargas.servicios.analizador_ciclos import AnalizadorCiclosService
+from src.domain.cargas.value_objects import PatronOperacion
 from src.domain.telemetria.value_objects import LecturaPotenciaTemporal
 
 INICIO = datetime(2026, 9, 1, 0, 0, tzinfo=timezone.utc)
@@ -104,10 +104,10 @@ def test_un_hueco_de_datos_corta_el_ciclo_en_lugar_de_prolongarlo():
 
 
 def test_la_histeresis_rescata_una_carga_que_oscila_en_la_frontera_del_umbral():
-    """Sin histéresis, una maquina que roza el umbral se fragmenta y desaparece.
+    """Sin histéresis, una carga que roza el umbral se fragmenta y desaparece.
 
     Cada tramo queda de una sola muestra, y una sola muestra se descarta por espuria:
-    el resultado es que la maquina no se detecta en absoluto. Con un umbral de apagado
+    el resultado es que la carga no se detecta en absoluto. Con un umbral de apagado
     más bajo, el mismo encendido se lee como el único ciclo que realmente fue.
     """
     potencias = [20.0] * 4 + [125.0, 118.0, 124.0, 117.0, 126.0, 119.0, 123.0] + [20.0] * 10

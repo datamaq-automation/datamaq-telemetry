@@ -2,8 +2,8 @@
 
 from datetime import datetime, timedelta, timezone
 
-from src.domain.maquinas.servicios.calibrador_firma import CalibradorFirmaService
-from src.domain.maquinas.value_objects import (
+from src.domain.cargas.servicios.calibrador_firma import CalibradorFirmaService
+from src.domain.cargas.value_objects import (
     EstadoCampana,
     MotivoDescarte,
     MuestraCampana,
@@ -122,7 +122,7 @@ def test_un_escalon_ajeno_pequeno_pero_neto_tambien_contamina():
     assert resultado.estado == EstadoCampana.CONTAMINADA
     assert resultado.motivo == MotivoDescarte.ESCALON_AJENO
     assert resultado.detalle is not None
-    assert "otra maquina" in resultado.detalle
+    assert "otra carga" in resultado.detalle
 
 
 def test_campana_pasiva_de_heladera_mide_potencia_y_ambos_periodos():

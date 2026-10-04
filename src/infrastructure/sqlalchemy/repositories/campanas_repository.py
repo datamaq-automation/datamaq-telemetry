@@ -1,4 +1,4 @@
-"""src/infrastructure/sqlalchemy/repositories/ensayos_repository.py."""
+"""src/infrastructure/sqlalchemy/repositories/campanas_repository.py."""
 
 from datetime import datetime
 from decimal import Decimal
@@ -7,15 +7,15 @@ from sqlalchemy import asc, desc
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from src.domain.maquinas.entities import EnsayoCaracterizacion
-from src.domain.maquinas.ports import RepositorioEnsayosPort
-from src.domain.maquinas.value_objects import (
+from src.domain.cargas.entities import CampanaCaracterizacion
+from src.domain.cargas.ports import RepositorioCampanasPort
+from src.domain.cargas.value_objects import (
     EstadoCampana,
     MotivoDescarte,
     MuestraCampana,
     TipoCampana,
 )
-from src.infrastructure.sqlalchemy.models_maquinas import (
+from src.infrastructure.sqlalchemy.models_cargas import (
     CampaignSampleModel,
     CharacterizationCampaignModel,
 )
@@ -29,15 +29,15 @@ def _a_decimal(valor: float | None) -> Decimal | None:
     return Decimal(str(valor)) if valor is not None else None
 
 
-class MySQLEnsayosRepository(RepositorioEnsayosPort):
+class MySQLCampanasRepository(RepositorioCampanasPort):
     def __init__(self, db: Session):
         self.db = db
 
-    def _to_entity(self, model: CharacterizationCampaignModel) -> EnsayoCaracterizacion:
-        return EnsayoCaracterizacion(
+    def _to_entity(self, model: CharacterizationCampaignModel) -> CampanaCaracterizacion:
+        return CampanaCaracterizacion(
             id=model.id,
             dispositivo_id=model.device_id,
-            maquina_id=model.load_id,
+            carga_id=model.load_id,
             tipo=TipoCampana(model.campaign_type),
             estado=EstadoCampana(model.state),
             inicio_at=model.start_at,
@@ -52,13 +52,13 @@ class MySQLEnsayosRepository(RepositorioEnsayosPort):
             creado_en=model.created_at,
         )
 
-    def obtener_por_id(self, campana_id: str) -> EnsayoCaracterizacion | None:
+    def obtener_por_id(self, campana_id: str) -> CampanaCaracterizacion | None:
         model = (
             self.db.query(CharacterizationCampaignModel).filter(CharacterizationCampaignModel.id == campana_id).first()
         )
         return self._to_entity(model) if model else None
 
-    def obtener_en_curso_por_dispositivo(self, dispositivo_id: str) -> EnsayoCaracterizacion | None:
+    def obtener_en_curso_por_dispositivo(self, dispositivo_id: str) -> CampanaCaracterizacion | None:
         model = (
             self.db.query(CharacterizationCampaignModel)
             .filter(
@@ -70,7 +70,7 @@ class MySQLEnsayosRepository(RepositorioEnsayosPort):
         )
         return self._to_entity(model) if model else None
 
-    def listar_en_curso(self) -> list[EnsayoCaracterizacion]:
+    def listar_en_curso(self) -> list[CampanaCaracterizacion]:
         modelos = (
             self.db.query(CharacterizationCampaignModel)
             .filter(CharacterizationCampaignModel.state == EstadoCampana.EN_CURSO.value)
@@ -78,16 +78,16 @@ class MySQLEnsayosRepository(RepositorioEnsayosPort):
         )
         return [self._to_entity(m) for m in modelos]
 
-    def listar_por_maquina(self, maquina_id: str) -> list[EnsayoCaracterizacion]:
+    def listar_por_carga(self, carga_id: str) -> list[CampanaCaracterizacion]:
         modelos = (
             self.db.query(CharacterizationCampaignModel)
-            .filter(CharacterizationCampaignModel.load_id == maquina_id)
+            .filter(CharacterizationCampaignModel.load_id == carga_id)
             .order_by(desc(CharacterizationCampaignModel.start_at))
             .all()
         )
         return [self._to_entity(m) for m in modelos]
 
-    def guardar(self, campana: EnsayoCaracterizacion) -> EnsayoCaracterizacion:
+    def guardar(self, campana: CampanaCaracterizacion) -> CampanaCaracterizacion:
         model = (
             self.db.query(CharacterizationCampaignModel).filter(CharacterizationCampaignModel.id == campana.id).first()
         )
@@ -95,7 +95,7 @@ class MySQLEnsayosRepository(RepositorioEnsayosPort):
             model = CharacterizationCampaignModel(
                 id=campana.id,
                 device_id=campana.dispositivo_id,
-                load_id=campana.maquina_id,
+                load_id=campana.carga_id,
                 campaign_type=campana.tipo.value,
                 start_at=campana.inicio_at,
                 planned_end_at=campana.fin_planificado_at,

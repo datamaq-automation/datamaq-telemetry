@@ -292,7 +292,7 @@ def test_ingestar_telemetria_compacta_inst():
     assert inst.voltage_linea_V is not None
     assert inst.voltage_linea_V > 0
     assert inst.tension_neutro_estimada is not None
-    # Sin maquina: S = V·I = 0, y con S en cero el FP queda indefinido
+    # Sin carga: S = V·I = 0, y con S en cero el FP queda indefinido
     assert inst.fase_r.potencia_aparente is not None and inst.fase_r.potencia_aparente.va == 0.0
     assert inst.fase_r.factor_potencia is None
 

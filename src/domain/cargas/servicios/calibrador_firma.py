@@ -1,16 +1,16 @@
-"""src/domain/maquinas/servicios/calibrador_firma.py — Cálculo de la firma de una carga a partir de las muestras de una campaña."""
+"""src/domain/cargas/servicios/calibrador_firma.py — Cálculo de la firma de una carga a partir de las muestras de una campaña."""
 
 import itertools
 import math
 
-from src.domain.maquinas.servicios.analizador_ciclos import AnalizadorCiclosService
-from src.domain.maquinas.servicios.estadistica import (
+from src.domain.cargas.servicios.analizador_ciclos import AnalizadorCiclosService
+from src.domain.cargas.servicios.estadistica import (
     cadencia_mediana_segundos,
     desviacion_absoluta_mediana,
     mediana,
     percentil,
 )
-from src.domain.maquinas.value_objects import (
+from src.domain.cargas.value_objects import (
     EstadoCampana,
     FirmaCarga,
     MotivoDescarte,

@@ -1,4 +1,4 @@
-"""src/infrastructure/sqlalchemy/models_maquinas.py — Modelos del contexto de desagregación de cargas (NILM).
+"""src/infrastructure/sqlalchemy/models_cargas.py — Modelos del contexto de desagregación de cargas (NILM).
 
 Viven aparte de `models.py` para no empujar ese archivo contra el límite de 500 líneas
 de `scripts/verify_code_size.py`. Comparten la misma `Base`, así que `alembic/env.py`

@@ -1,10 +1,10 @@
-"""src/domain/maquinas/servicios/atribuidor_consumo.py — Reparto del consumo de un período entre las cargas conocidas, con residual explícito."""
+"""src/domain/cargas/servicios/atribuidor_consumo.py — Reparto del consumo de un período entre las cargas conocidas, con residual explícito."""
 
 from collections import defaultdict
 from datetime import datetime
 
-from src.domain.maquinas.entities import IntervaloActividadMáquina, Máquina
-from src.domain.maquinas.value_objects import AtribucionConsumo, ItemAtribucion
+from src.domain.cargas.entities import Carga, IntervaloActividadCarga
+from src.domain.cargas.value_objects import AtribucionConsumo, ItemAtribucion
 
 NO_ATRIBUIDO = "No atribuido"
 
@@ -38,7 +38,7 @@ class AtribuidorConsumoService:
     RESIDUAL_MAXIMO_ACEPTABLE = 0.40
 
     @staticmethod
-    def _energia_de(intervalo: IntervaloActividadMáquina) -> float:
+    def _energia_de(intervalo: IntervaloActividadCarga) -> float:
         if intervalo.energia_kwh is not None:
             return intervalo.energia_kwh
         if intervalo.potencia_media_w is None:
@@ -48,7 +48,7 @@ class AtribuidorConsumoService:
     @classmethod
     def _agrupar(
         cls,
-        intervalos: list[IntervaloActividadMáquina],
+        intervalos: list[IntervaloActividadCarga],
         nombres: dict[str, str],
         residual_kwh: float,
         denominador_kwh: float,
@@ -68,7 +68,7 @@ class AtribuidorConsumoService:
         confianzas: dict[str | None, list[float]] = defaultdict(list)
 
         for intervalo in intervalos:
-            clave = intervalo.maquina_id
+            clave = intervalo.carga_id
             energias[clave] += cls._energia_de(intervalo)
             conteos[clave] += 1
             if intervalo.confianza is not None:
@@ -82,7 +82,7 @@ class AtribuidorConsumoService:
         base = denominador_kwh if denominador_kwh > 0 else atribuida
         items = [
             ItemAtribucion(
-                maquina_id=clave,
+                carga_id=clave,
                 nombre=nombres.get(clave, NO_ATRIBUIDO) if clave else NO_ATRIBUIDO,
                 energia_kwh=round(energia, 4),
                 porcentaje=round(energia / base, 4) if base > 0 else 0.0,
@@ -100,8 +100,8 @@ class AtribuidorConsumoService:
         cls,
         desde: datetime,
         hasta: datetime,
-        intervalos: list[IntervaloActividadMáquina],
-        cargas: list[Máquina],
+        intervalos: list[IntervaloActividadCarga],
+        cargas: list[Carga],
         energia_total_kwh: float | None,
     ) -> AtribucionConsumo:
         """Punto de entrada del servicio."""
