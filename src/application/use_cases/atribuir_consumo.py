@@ -11,7 +11,7 @@ from src.application.dtos.carga_dto import (
     ItemAtribucionDTO,
 )
 from src.application.mappers.maquina_mapper import IntervaloActividadMapper
-from src.domain.maquinas.entities import IntervaloActividadCarga
+from src.domain.maquinas.entities import IntervaloActividadCarga, Máquina
 from src.domain.maquinas.exceptions import (
     CargaNoEncontradaError,
     IntervaloActividadNoEncontradoError,
@@ -103,9 +103,9 @@ class AtribuirConsumoUseCase:
         self,
         dispositivo_id: str,
         episodio: EpisodioCarga,
-        cargas: list[Carga],
+        cargas: list[Máquina],
         zona: ZoneInfo,
-        todas_las_cargas: list[Carga] | None = None,
+        todas_las_cargas: list[Máquina] | None = None,
         es_industrial: bool = False,
     ) -> IntervaloActividadCarga:
         decision = EmparejadorFirmasService.decidir(episodio, cargas, zona)
@@ -271,11 +271,11 @@ class AtribuirConsumoUseCase:
         intervalo.corregir(dto.carga_id, usuario_id=usuario_id, notas=dto.notas)
         return IntervaloActividadMapper.to_dto(self.repo_intervalos.guardar(intervalo))
 
-    def inicializar_presets_catalogo(self, dispositivo_id: str) -> list[Carga]:
+    def inicializar_presets_catalogo(self, dispositivo_id: str) -> list[Máquina]:
         """Inicializa en el repositorio las cargas con firmas estándar de catálogo que no existan."""
         existentes = {c.nombre.strip().lower(): c for c in self.repo_cargas.listar_por_dispositivo(dispositivo_id)}
         presets = CatalogoPresetsCargas.obtener_todas(dispositivo_id)
-        resultado: list[Carga] = []
+        resultado: list[Máquina] = []
         for preset in presets:
             clave = preset.nombre.strip().lower()
             if clave in existentes:

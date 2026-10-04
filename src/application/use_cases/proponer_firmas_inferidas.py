@@ -57,7 +57,7 @@ class ProponerFirmasInferidasUseCase:
             self.cargas.guardar(existente)
             actualizadas.append(nombre)
         else:
-            nueva_carga = Carga(
+            nueva_carga = Máquina(
                 id=str(uuid.uuid4()),
                 dispositivo_id=dispositivo_id,
                 nombre=nombre,
