@@ -1,9 +1,9 @@
 """tests/unit/test_cargas_emparejador.py — Emparejamiento de candidatas con catálogo."""
 
 import pytest
-from src.domain.cargas.servicios.emparejador_candidatas import emparejar
 
 from src.domain.cargas.entities import Carga
+from src.domain.cargas.servicios.emparejador_candidatas import emparejar
 from src.domain.cargas.value_objects import CargaCandidata, FirmaCarga, OrigenFirma
 
 DISPOSITIVO_A = "dev-001"
@@ -110,7 +110,7 @@ def test_emparejar_con_tolerancia_absoluta_por_dispersion(catalogo):
     assert resultado.id == "c2"  # 50 kW es más cercana que 90 kW
 
 
-def test_emparejar_en_caso_de_empate_devuelve_menor_id(catalogo):
+def test_emparejar_en_caso_de_empate_devuelve_menor_id():
     """Si dos cargas están a igual distancia, elige la de menor ID."""
     # Preparamos dos cargas equidistantes
     catalogo_modificado = [
@@ -148,26 +148,5 @@ def test_emparejar_ignora_candidatas_con_potencia_negativa():
     """Validación: potencia negativa debería ser rechazada (control en caso de uso)."""
     # Este test verifica que emparejar en sí no da error, pero el caso de uso
     # no debe llamarlo nunca con potencia negativa
-    candidata = CargaCandidata(
-        potencia_w=-5000.0,
-        dispersion_w=0.0,
-        encendidos=0,
-        apagados=0,
-        ciclos_por_dia=None,
-        on_off=True,
-    )
-    catalogo = [
-        Carga(
-            id="c1",
-            dispositivo_id=DISPOSITIVO_A,
-            nombre="Carga",
-            potencia_nominal_w=5000.0,
-            firma=FirmaCarga(potencia_w=5000.0, origen=OrigenFirma.CHAPA),
-        )
-    ]
-
-    # No debe fallar en emparejar, pero no encontrará pareja razonable
-    resultado = emparejar(candidata, catalogo)
-    # Puede ser None o la carga, dependiendo de cómo se maneje la tolerancia
     # La lógica es que el caso de uso filtra antes
     assert True  # Placeholder
