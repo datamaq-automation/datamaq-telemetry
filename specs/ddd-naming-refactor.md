@@ -2,9 +2,38 @@
 
 **Sesión Hija:** Copiar como `datamaq-telemetry/specs/ddd-naming-refactor.md`
 
-> **Estado:** aprobada · **Fecha:** 2026-10-04 · **Dueño:** Agustín\
-> **Decisión padre:** `decisions/2026-10-04_ddd-naming-telemetry.md` (D1 ✅ Sí, D2 ❌ No, D3 ✅ Sí)\
+> **Estado:** ❌ revertida (2026-10-04, commit `1fba1dd`) · **Fecha:** 2026-10-04 · **Dueño:** Agustín\
+> **Decisión padre:** `decisions/2026-10-04_ddd-naming-telemetry.md` (D1 ✅ Sí, D2 ❌ No, D3 ✅ Sí): D1 y D3 quedan sin efecto, ver "Revisión"\
 > **Estimado:** 1–2 horas TDD + refactor
+
+---
+
+## Revisión 2026-10-04: rename revertido
+
+**Qué pasó.** El rename `Carga` → `Máquina` (commits `a799055`..`8325519`) chocó con un concepto que ya
+existía en otro bounded context: `Maquina` de **disponibilidad/OEE** (`src/domain/disponibilidad/`),
+una máquina con medidor propio cuya marcha/parada se infiere con `umbral_marcha_w` y
+`ventana_persistencia_*`. Los DTOs y el mapper de `Carga` se escribieron encima de `maquina_dto.py` y
+`maquina_mapper.py` y borraron los de disponibilidad. Resultado: 48 errores de pyright y CI rojo desde
+`61e1213`. Completar el rename como proponía el plan de seguimiento (`MaquinaCreateDTO` →
+`MáquinaCreateDTO`) habría conectado los endpoints `/disponibilidad/maquinas` al DTO de NILM sin dar
+ningún error de tipos.
+
+**Decisión del dueño.** La entidad de desagregación vuelve a llamarse `Carga`:
+
+- "Carga" es el término IEC 60050 para un receptor que absorbe potencia de la red (una heladera, un
+  circuito de iluminación, un motor). Es exactamente lo que el NILM infiere sobre un medidor agregado.
+  Una máquina es solo un caso posible.
+- `Maquina` queda para disponibilidad/OEE, donde **sí** es una máquina con medidor dedicado. Son dos
+  conceptos distintos y conviene que tengan dos nombres distintos.
+- Identificadores en ASCII (convención del repo: `Campana`, no `Campaña`). Que dos clases se
+  distingan solo por una tilde (`Maquina` vs `Máquina`) es una trampa.
+
+**Qué se conserva.** El rename `Campana` → `Ensayo` de caracterización (nomenclatura interna, sin
+tocar rutas ni campos JSON) se hace en un commit aparte.
+
+**Pendiente en el repo padre.** Registrar una decisión que reemplace D1/D3 de
+`decisions/2026-10-04_ddd-naming-telemetry.md` y actualizar `TODO.md`.
 
 ---
 
