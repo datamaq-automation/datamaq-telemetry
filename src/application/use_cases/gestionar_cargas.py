@@ -10,7 +10,6 @@ from src.application.dtos.carga_dto import (
     MáquinaUpdateDTO,
 )
 from src.application.mappers.maquina_mapper import MáquinaMapper
-from src.domain.maquinas.entities import Máquina
 from src.domain.maquinas.exceptions import (
     CargaDuplicadaError,
     CargaNoEncontradaError,
@@ -32,7 +31,7 @@ class GestionarCargasUseCase:
     def __init__(self, repo_cargas: RepositorioMáquinasPort):
         self.repo_cargas = repo_cargas
 
-    def _obtener_o_fallar(self, carga_id: str) -> Máquina:
+    def _obtener_o_fallar(self, carga_id: str) -> Carga:
         carga = self.repo_cargas.obtener_por_id(carga_id)
         if not carga:
             raise CargaNoEncontradaError(f"Carga '{carga_id}' no encontrada.")
