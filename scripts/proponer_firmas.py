@@ -14,8 +14,11 @@ from datetime import datetime, timedelta, timezone
 # Add root directory to python path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.application.use_cases.proponer_firmas_inferidas import ProponerFirmasInferidasUseCase
 from src.domain.cargas.exceptions import DescubridorNoDisponibleError
+
+from src.application.use_cases.proponer_firmas_inferidas import (
+    ProponerFirmasInferidasUseCase,
+)
 from src.infrastructure.energy_ml.descubridor_http import EnergyMlHttpDescubridor
 from src.infrastructure.settings.config import get_settings
 from src.infrastructure.settings.logger import get_logger
