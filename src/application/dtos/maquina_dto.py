@@ -2,8 +2,8 @@
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from src.application.dtos.maquina_dto import RegimenOperacionDTO
 from src.application.dtos.tipos import FechaHoraUTC
+from src.domain.disponibilidad.value_objects import NaturalezaRegimen
 from src.domain.maquinas.value_objects import (
     CategoriaCarga,
     EstadoCampana,
@@ -14,6 +14,56 @@ from src.domain.maquinas.value_objects import (
     PatronOperacion,
     TipoCampana,
 )
+
+
+class RegimenOperacionDTO(BaseModel):
+    """Segmentación modal de potencia: banda de operación en régimen estacionario."""
+
+    indice: int
+    potencia_tipica_w: float
+    limite_inferior_w: float
+    limite_superior_w: float
+    masa: int
+    mediana_w: float
+    mad_w: float
+    persistencia: float
+    variacion_mediana_w_s: float
+    naturaleza: NaturalezaRegimen
+
+
+class DiagnosticoConfianzaModalDTO(BaseModel):
+    """Diagnóstico de confianza en la segmentación modal."""
+
+    num_modas_estable: int
+    fraccion_ventanas_consistentes: float
+    es_multimodal_confiable: bool
+
+
+class DiagnosticoEstacionariedadDTO(BaseModel):
+    """Diagnóstico de estacionariedad de la serie."""
+
+    num_subventanas: int
+    desplazamiento_maximo_w: float
+    desplazamiento_maximo_relativo: float
+    es_estacionario: bool
+
+
+class HistogramaPotenciaResponseDTO(BaseModel):
+    """Histograma de frecuencias de potencia con diagnósticos modales."""
+
+    dispositivo_id: str
+    dias_analizados: int
+    cantidad_lecturas: int
+    bordes_bins_w: list[float]
+    frecuencias: list[int]
+    umbral_sugerido_w: float | None = None
+    escala: str = "lineal"
+    epsilon_w: float = 0.0
+    lecturas_truncadas: bool = False
+    lecturas_descartadas: int = 0
+    regimenes: list[RegimenOperacionDTO] = Field(default_factory=list)
+    diagnostico_modal: DiagnosticoConfianzaModalDTO | None = None
+    diagnostico_estacionariedad: DiagnosticoEstacionariedadDTO | None = None
 
 
 class FirmaMáquinaDTO(BaseModel):
