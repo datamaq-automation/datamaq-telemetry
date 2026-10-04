@@ -95,7 +95,7 @@ def test_exportar_cargas_use_case_ejecutar():
         dispositivo_id="dev-1",
         inicio_at=datetime(2026, 9, 7, 8, 0, 0, tzinfo=timezone.utc),
         fin_at=datetime(2026, 9, 7, 8, 15, 0, tzinfo=timezone.utc),
-        carga_id="c-1",
+        maquina_id="c-1",
         potencia_media_w=1500.0,
         energia_kwh=0.375,
     )
@@ -104,7 +104,7 @@ def test_exportar_cargas_use_case_ejecutar():
         dispositivo_id="dev-1",
         inicio_at=datetime(2026, 9, 7, 8, 15, 0, tzinfo=timezone.utc),
         fin_at=datetime(2026, 9, 7, 8, 30, 0, tzinfo=timezone.utc),
-        carga_id=None,
+        maquina_id=None,
         potencia_media_w=500.0,
         energia_kwh=0.125,
     )

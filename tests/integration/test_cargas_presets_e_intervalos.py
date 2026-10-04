@@ -87,7 +87,7 @@ def test_listar_intervalos_permite_filtrar_por_no_atribuidos():
     intervalo_dto = IntervaloActividadResponseDTO(
         id=101,
         dispositivo_id=MEDIDOR_PRUEBA,
-        carga_id=None,
+        maquina_id=None,
         nombre_carga=None,
         inicio_at=AHORA,
         fin_at=AHORA,

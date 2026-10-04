@@ -7,8 +7,8 @@ from fastapi.testclient import TestClient
 from src.application.dtos.maquina_dto import (
     AnalisisConsumoResponseDTO,
     AtribucionConsumoResponseDTO,
-    CampanaResponseDTO,
-    CargaResponseDTO,
+    EnsayoResponseDTO,
+    MáquinaResponseDTO,
     EstadisticaCiclosDTO,
     IntervaloActividadResponseDTO,
     PerfilConsumoResponseDTO,
@@ -37,7 +37,7 @@ MEDIDOR_ID = "d48c49f0-3564-4000-8000-000000000001"
 AHORA = datetime(2026, 9, 4, 12, 0, tzinfo=timezone.utc)
 
 
-def _carga_response_dto(**kwargs) -> CargaResponseDTO:
+def _carga_response_dto(**kwargs) -> MáquinaResponseDTO:
     base = dict(
         id="maquina-1",
         dispositivo_id=MEDIDOR_ID,
@@ -54,14 +54,14 @@ def _carga_response_dto(**kwargs) -> CargaResponseDTO:
         actualizado_en=AHORA,
     )
     base.update(kwargs)
-    return CargaResponseDTO(**base)
+    return MáquinaResponseDTO(**base)
 
 
-def _campana_response_dto(**kwargs) -> CampanaResponseDTO:
+def _campana_response_dto(**kwargs) -> EnsayoResponseDTO:
     base = dict(
         id="camp-1",
         dispositivo_id=MEDIDOR_ID,
-        carga_id="maquina-1",
+        maquina_id="maquina-1",
         tipo=TipoCampana.ACTIVA,
         estado=EstadoCampana.EN_CURSO,
         inicio_at=AHORA,
@@ -76,7 +76,7 @@ def _campana_response_dto(**kwargs) -> CampanaResponseDTO:
         resultado=None,
     )
     base.update(kwargs)
-    return CampanaResponseDTO(**base)
+    return EnsayoResponseDTO(**base)
 
 
 def _cliente(rol: str = "admin") -> tuple[TestClient, dict[str, MagicMock]]:
@@ -187,7 +187,7 @@ def test_corregir_intervalo_endpoint():
     intervalo = IntervaloActividadMáquina(
         id=1,
         dispositivo_id=MEDIDOR_ID,
-        carga_id="maquina-1",
+        maquina_id="maquina-1",
         inicio_at=AHORA,
         fin_at=AHORA,
         potencia_media_w=15000.0,

@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from src.application.dtos.carga_dto import CampanaCreateDTO, CampanaResponseDTO
+from src.application.dtos.carga_dto import EnsayoCreateDTO, EnsayoResponseDTO
 from src.application.mappers.maquina_mapper import CampanaMapper
 from src.application.use_cases.ingesta.registro_campanas import RegistroCampanasActivas
 from src.domain.maquinas.entities import CampanaCaracterizacion
@@ -67,7 +67,7 @@ class CaracterizarCargaUseCase:
             return False
         return self.comando_rafaga.activar_rafaga(device_uid, self.SEGUNDOS_RAFAGA)
 
-    def _iniciar(self, dto: CampanaCreateDTO, tipo: TipoCampana, usuario_id: str | None) -> CampanaResponseDTO:
+    def _iniciar(self, dto: EnsayoCreateDTO, tipo: TipoCampana, usuario_id: str | None) -> EnsayoResponseDTO:
         device_uid = self._uid_de(dto.dispositivo_id)
 
         if dto.carga_id is not None and self.repo_cargas.obtener_por_id(dto.carga_id) is None:
@@ -95,11 +95,11 @@ class CaracterizarCargaUseCase:
         self.registro.activar(guardada.dispositivo_id, guardada.id, guardada.fin_planificado_at)
         return CampanaMapper.to_dto(guardada, rafaga_solicitada=self._pedir_rafaga(device_uid))
 
-    def iniciar_activa(self, dto: CampanaCreateDTO, usuario_id: str | None = None) -> CampanaResponseDTO:
+    def iniciar_activa(self, dto: EnsayoCreateDTO, usuario_id: str | None = None) -> EnsayoResponseDTO:
         """Para lo que se puede prender a voluntad: pava, horno, lavarropas, iluminación."""
         return self._iniciar(dto, TipoCampana.ACTIVA, usuario_id)
 
-    def iniciar_pasiva(self, dto: CampanaCreateDTO, usuario_id: str | None = None) -> CampanaResponseDTO:
+    def iniciar_pasiva(self, dto: EnsayoCreateDTO, usuario_id: str | None = None) -> EnsayoResponseDTO:
         """Para lo que cicla solo: heladera, freezer, termotanque.
 
         No se declara un encendido; se declara que el resto de la casa está apagado y
@@ -113,13 +113,13 @@ class CaracterizarCargaUseCase:
             raise CampanaNoEncontradaError(f"Campaña '{campana_id}' no encontrada.")
         return campana
 
-    def obtener(self, campana_id: str) -> CampanaResponseDTO:
+    def obtener(self, campana_id: str) -> EnsayoResponseDTO:
         return CampanaMapper.to_dto(self._obtener_o_fallar(campana_id))
 
-    def listar_por_carga(self, carga_id: str) -> list[CampanaResponseDTO]:
+    def listar_por_carga(self, carga_id: str) -> list[EnsayoResponseDTO]:
         return [CampanaMapper.to_dto(c) for c in self.repo_campanas.listar_por_carga(carga_id)]
 
-    def finalizar(self, campana_id: str) -> CampanaResponseDTO:
+    def finalizar(self, campana_id: str) -> EnsayoResponseDTO:
         """Cierra la campaña, calibra la firma y —solo si salió limpia— la fija en la carga."""
         campana = self._obtener_o_fallar(campana_id)
         if not campana.esta_en_curso:
@@ -143,7 +143,7 @@ class CaracterizarCargaUseCase:
 
         return CampanaMapper.to_dto(guardada, resultado=resultado)
 
-    def descartar(self, campana_id: str, motivo: str | None = None) -> CampanaResponseDTO:
+    def descartar(self, campana_id: str, motivo: str | None = None) -> EnsayoResponseDTO:
         campana = self._obtener_o_fallar(campana_id)
         if not campana.esta_en_curso:
             raise CampanaYaCerradaError(f"La campaña '{campana_id}' ya está en estado {campana.estado.value}.")

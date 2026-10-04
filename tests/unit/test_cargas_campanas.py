@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from src.application.dtos.maquina_dto import CampanaCreateDTO
+from src.application.dtos.maquina_dto import EnsayoCreateDTO
 from src.application.use_cases.caracterizar_carga import CaracterizarCargaUseCase
 from src.application.use_cases.ingesta.registro_campanas import RegistroCampanasActivas
 from src.domain.maquinas.entities import EnsayoCaracterizacion, Máquina
@@ -54,7 +54,7 @@ class MockCampanasRepo(RepositorioEnsayosPort):
         return [c for c in self.campanas.values() if c.estado == EstadoCampana.EN_CURSO]
 
     def listar_por_carga(self, carga_id):
-        return [c for c in self.campanas.values() if c.carga_id == carga_id]
+        return [c for c in self.campanas.values() if c.maquina_id == carga_id]
 
     def guardar(self, campana):
         self.campanas[campana.id] = campana
@@ -129,8 +129,8 @@ def contexto():
     return use_case, campanas, maquinas, registro, rafaga
 
 
-def _dto(duracion: int = 300, carga_id: str | None = "maquina-pava") -> CampanaCreateDTO:
-    return CampanaCreateDTO(dispositivo_id=MEDIDOR_CASA, duracion_segundos=duracion, carga_id=carga_id)
+def _dto(duracion: int = 300, carga_id: str | None = "maquina-pava") -> EnsayoCreateDTO:
+    return EnsayoCreateDTO(dispositivo_id=MEDIDOR_CASA, duracion_segundos=duracion, maquina_id=carga_id)
 
 
 def test_iniciar_una_campana_pide_la_rafaga_al_medidor(contexto):
@@ -165,7 +165,7 @@ def test_una_campana_sobre_una_carga_inexistente_falla(contexto):
     use_case, _, _, _, _ = contexto
 
     with pytest.raises(MáquinaNoEncontradaError):
-        use_case.iniciar_activa(_dto(carga_id="no-existe"))
+        use_case.iniciar_activa(_dto(maquina_id="no-existe"))
 
 
 def test_una_campana_sobre_un_dispositivo_inexistente_falla(contexto):

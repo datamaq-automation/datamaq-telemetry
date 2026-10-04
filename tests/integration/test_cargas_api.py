@@ -8,10 +8,10 @@ from fastapi.testclient import TestClient
 from src.application.dtos.maquina_dto import (
     AnalisisConsumoResponseDTO,
     AtribucionConsumoResponseDTO,
-    CampanaResponseDTO,
-    CargaResponseDTO,
+    EnsayoResponseDTO,
+    MáquinaResponseDTO,
     EstadisticaCiclosDTO,
-    FirmaCargaDTO,
+    FirmaMáquinaDTO,
     IntervaloActividadResponseDTO,
     ItemAtribucionDTO,
     PerfilConsumoResponseDTO,
@@ -69,7 +69,7 @@ def _rutas_cargas(app) -> dict[str, set[str]]:
     return {k: v for k, v in rutas.items() if k.startswith("/api/v1/maquinas")}
 
 
-def _carga_dto(**kwargs) -> CargaResponseDTO:
+def _carga_dto(**kwargs) -> MáquinaResponseDTO:
     base = dict(
         id="maquina-1",
         dispositivo_id=MEDIDOR_CASA,
@@ -86,7 +86,7 @@ def _carga_dto(**kwargs) -> CargaResponseDTO:
         actualizado_en=AHORA,
     )
     base.update(kwargs)
-    return CargaResponseDTO(**base)
+    return MáquinaResponseDTO(**base)
 
 
 def _perfil_dto() -> PerfilConsumoResponseDTO:
@@ -200,7 +200,7 @@ def test_fijar_firma_manual_expone_origen_y_completitud():
     use_case.fijar_firma_manual.return_value = _carga_dto(
         esta_caracterizada=True,
         potencia_esperada_w=1850.0,
-        firma=FirmaCargaDTO(
+        firma=FirmaMáquinaDTO(
             potencia_w=1850.0,
             dispersion_w=90.0,
             factor_potencia=0.99,
@@ -286,11 +286,11 @@ def test_el_invitado_puede_leer_el_perfil():
     assert TestClient(app).get(f"/api/v1/maquinas/perfil?device_id={MEDIDOR_CASA}").status_code == 200
 
 
-def _campana_dto(**kwargs) -> CampanaResponseDTO:
+def _campana_dto(**kwargs) -> EnsayoResponseDTO:
     base = dict(
         id="camp-1",
         dispositivo_id=MEDIDOR_CASA,
-        carga_id="maquina-1",
+        maquina_id="maquina-1",
         tipo=TipoCampanaVO.ACTIVA,
         estado=EstadoCampanaVO.EN_CURSO,
         inicio_at=AHORA,
@@ -299,7 +299,7 @@ def _campana_dto(**kwargs) -> CampanaResponseDTO:
         rafaga_solicitada=True,
     )
     base.update(kwargs)
-    return CampanaResponseDTO(**base)
+    return EnsayoResponseDTO(**base)
 
 
 def _cliente_campanas(use_case: MagicMock, rol: str = "admin") -> TestClient:
@@ -439,8 +439,8 @@ def test_la_atribucion_expone_el_residual_como_dato_de_primera_clase():
         residual_kwh=52.0,
         residual_porcentaje=0.4333,
         items=[
-            ItemAtribucionDTO(carga_id="c1", nombre="Termotanque", energia_kwh=48.0, porcentaje=0.4, intervalos=30),
-            ItemAtribucionDTO(carga_id=None, nombre="No atribuido", energia_kwh=52.0, porcentaje=0.43, intervalos=0),
+            ItemAtribucionDTO(maquina_id="c1", nombre="Termotanque", energia_kwh=48.0, porcentaje=0.4, intervalos=30),
+            ItemAtribucionDTO(maquina_id=None, nombre="No atribuido", energia_kwh=52.0, porcentaje=0.43, intervalos=0),
         ],
         calidad_suficiente=False,
         advertencia="Queda sin atribuir el 43% del consumo.",
@@ -480,7 +480,7 @@ def test_corregir_un_intervalo_registra_al_usuario():
     use_case.corregir_intervalo.return_value = IntervaloActividadResponseDTO(
         id=7,
         dispositivo_id=MEDIDOR_CASA,
-        carga_id="c1",
+        maquina_id="c1",
         inicio_at=AHORA,
         fin_at=AHORA,
         duracion_segundos=2400.0,

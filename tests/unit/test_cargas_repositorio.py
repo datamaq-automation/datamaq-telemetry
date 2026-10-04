@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 
-from src.domain.maquinas.entities import Máquina, IntervaloActividadMáquina
+from src.domain.maquinas.entities import IntervaloActividadMáquina, Máquina
 from src.domain.maquinas.value_objects import (
     CategoriaCarga,
     EstadoCampana,
@@ -26,12 +26,12 @@ from src.infrastructure.sqlalchemy.models_maquinas import (
     LoadActivityIntervalModel,
 )
 from src.infrastructure.sqlalchemy.repositories.ensayos_repository import MySQLEnsayosRepository
+from src.infrastructure.sqlalchemy.repositories.intervalos_repository import (
+    MySQLIntervalosActividadRepository,
+)
 from src.infrastructure.sqlalchemy.repositories.maquinas_repository import (
     MySQLMáquinasRepository,
     MySQLSeriePotenciaRepository,
-)
-from src.infrastructure.sqlalchemy.repositories.intervalos_repository import (
-    MySQLIntervalosActividadRepository,
 )
 
 MEDIDOR_CASA = "dev-casa"
@@ -261,7 +261,7 @@ def _campana(db: Session, campana_id: str = "camp-1", tipo: TipoCampana = TipoCa
         EnsayoCaracterizacion(
             id=campana_id,
             dispositivo_id=MEDIDOR_CASA,
-            carga_id=None,
+            maquina_id=None,
             tipo=tipo,
             inicio_at=MEDIDO_EN,
             fin_planificado_at=MEDIDO_EN + timedelta(minutes=5),
@@ -332,12 +332,12 @@ def test_solo_se_lista_una_campana_en_curso_por_dispositivo(db: Session) -> None
 
 
 def _intervalo_ent(
-    inicio_min: int, fin_min: int, carga_id: str | None = None, origen=OrigenClasificacionCarga.REGLA
+    inicio_min: int, fin_min: int, maquina_id: str | None = None, origen=OrigenClasificacionCarga.REGLA
 ) -> IntervaloActividadMáquina:
     return IntervaloActividadMáquina(
         id=None,
         dispositivo_id=MEDIDOR_CASA,
-        carga_id=carga_id,
+        maquina_id=maquina_id,
         inicio_at=MEDIDO_EN + timedelta(minutes=inicio_min),
         fin_at=MEDIDO_EN + timedelta(minutes=fin_min),
         potencia_media_w=1800.0,
@@ -361,17 +361,17 @@ def test_reemplazar_ventana_preserva_las_correcciones_humanas(db: Session) -> No
     """El batch no puede deshacer lo que una persona confirmó a mano."""
     repo = MySQLIntervalosActividadRepository(db)
     ventana = (MEDIDOR_CASA, MEDIDO_EN, MEDIDO_EN + timedelta(hours=6))
-    corregido = _intervalo_ent(0, 40, carga_id="maquina-1", origen=OrigenClasificacionCarga.CORRECCION_HUMANA)
+    corregido = _intervalo_ent(0, 40, maquina_id="maquina-1", origen=OrigenClasificacionCarga.CORRECCION_HUMANA)
     corregido.corregido_por_usuario_id = "u1"
     repo.reemplazar_ventana(*ventana, [corregido])
 
-    escritos = repo.reemplazar_ventana(*ventana, [_intervalo_ent(0, 40, carga_id=None), _intervalo_ent(60, 100)])
+    escritos = repo.reemplazar_ventana(*ventana, [_intervalo_ent(0, 40, maquina_id=None), _intervalo_ent(60, 100)])
 
     sobrevivientes = repo.listar_por_dispositivo(*ventana)
     humano = next(i for i in sobrevivientes if i.es_correccion_humana)
     assert escritos == 1
     assert len(sobrevivientes) == 2
-    assert humano.carga_id == "maquina-1"
+    assert humano.maquina_id == "maquina-1"
     assert humano.corregido_por_usuario_id == "u1"
 
 
@@ -379,7 +379,7 @@ def test_un_intervalo_sin_carga_es_no_atribuido_y_se_guarda_igual(db: Session) -
     """El residual honesto es lo que permite saber cuánto del consumo queda sin explicar."""
     repo = MySQLIntervalosActividadRepository(db)
 
-    guardado = repo.guardar(_intervalo_ent(0, 40, carga_id=None))
+    guardado = repo.guardar(_intervalo_ent(0, 40, maquina_id=None))
 
     assert guardado.id is not None
     assert guardado.esta_atribuido is False

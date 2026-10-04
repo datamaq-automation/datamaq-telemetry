@@ -9,7 +9,7 @@ from src.domain.maquinas.value_objects import CategoriaCarga, NaturalezaElectric
 def test_catalogo_crea_motor_11kw_con_parametros_industriales():
     maquina = CatalogoPresetsIndustriales.crear_motor_trifasico_11kw(
         dispositivo_id="dev-1",
-        carga_id="motor-principal",
+        maquina_id="motor-principal",
     )
 
     assert maquina.potencia_nominal_w == 11000.0
@@ -26,7 +26,7 @@ def test_catalogo_crea_motor_11kw_con_parametros_industriales():
 def test_catalogo_crea_horno_resistivo_industrial():
     maquina = CatalogoPresetsIndustriales.crear_horno_resistivo_50kw(
         dispositivo_id="dev-1",
-        carga_id="horno-tratamiento",
+        maquina_id="horno-tratamiento",
     )
 
     assert maquina.potencia_nominal_w == 50000.0

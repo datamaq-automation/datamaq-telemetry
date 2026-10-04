@@ -53,7 +53,7 @@ class MockIntervalosRepo(RepositorioIntervalosActividadPort):
         return [i for i in self.intervalos if i.dispositivo_id == dispositivo_id and desde <= i.inicio_at <= hasta]
 
     def listar_por_carga(self, carga_id, limite=100):
-        return [i for i in self.intervalos if i.carga_id == carga_id][:limite]
+        return [i for i in self.intervalos if i.maquina_id == carga_id][:limite]
 
     def guardar(self, intervalo):
         if intervalo.id is None:
@@ -142,7 +142,7 @@ def test_el_batch_detecta_y_atribuye_los_episodios():
 
     assert resultado.episodios_detectados == 2
     assert resultado.atribuidos == 2
-    assert all(i.carga_id == "maquina-termo" for i in intervalos.intervalos)
+    assert all(i.maquina_id == "maquina-termo" for i in intervalos.intervalos)
 
 
 def test_re_correr_la_misma_ventana_no_duplica_intervalos():
@@ -189,10 +189,10 @@ def test_corregir_un_intervalo_lo_reimputa_y_lo_marca():
     intervalo_id = intervalos.intervalos[0].id
 
     dto = use_case.corregir_intervalo(
-        intervalo_id, CorregirIntervaloRequestDTO(carga_id=None, notas="no fue el termotanque"), "u1"
+        intervalo_id, CorregirIntervaloRequestDTO(maquina_id=None, notas="no fue el termotanque"), "u1"
     )
 
-    assert dto.carga_id is None
+    assert dto.maquina_id is None
     assert dto.origen == OrigenClasificacionCarga.CORRECCION_HUMANA
     assert dto.corregido_por_usuario_id == "u1"
 
@@ -203,7 +203,7 @@ def test_corregir_hacia_una_carga_inexistente_falla():
 
     with pytest.raises(MáquinaNoEncontradaError):
         use_case.corregir_intervalo(
-            intervalos.intervalos[0].id, CorregirIntervaloRequestDTO(carga_id="no-existe"), "u1"
+            intervalos.intervalos[0].id, CorregirIntervaloRequestDTO(maquina_id="no-existe"), "u1"
         )
 
 
@@ -211,7 +211,7 @@ def test_corregir_un_intervalo_inexistente_falla():
     use_case, _, _ = _use_case()
 
     with pytest.raises(IntervaloActividadNoEncontradoError):
-        use_case.corregir_intervalo(999, CorregirIntervaloRequestDTO(carga_id=None), "u1")
+        use_case.corregir_intervalo(999, CorregirIntervaloRequestDTO(maquina_id=None), "u1")
 
 
 def test_sin_datos_el_batch_no_falla_ni_escribe():

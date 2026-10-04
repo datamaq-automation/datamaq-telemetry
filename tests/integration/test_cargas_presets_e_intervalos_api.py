@@ -75,7 +75,7 @@ def test_listar_intervalos_dispositivo_delega_filtros():
         IntervaloActividadResponseDTO(
             id=101,
             dispositivo_id=MEDIDOR_TEST,
-            carga_id=None,
+            maquina_id=None,
             inicio_at=AHORA,
             fin_at=AHORA,
             duracion_segundos=1200.0,

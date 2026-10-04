@@ -3,8 +3,8 @@
 import pytest
 
 from src.application.dtos.maquina_dto import (
-    CargaCreateDTO,
-    CargaUpdateDTO,
+    MáquinaCreateDTO,
+    MáquinaUpdateDTO,
     FirmaManualRequestDTO,
 )
 from src.application.use_cases.gestionar_cargas import GestionarCargasUseCase
@@ -61,7 +61,7 @@ def use_case() -> GestionarCargasUseCase:
 
 def _crear(use_case: GestionarCargasUseCase, nombre: str, **kwargs):
     return use_case.registrar_carga(
-        CargaCreateDTO(nombre=nombre, dispositivo_id=kwargs.pop("dispositivo_id", MEDIDOR_CASA), **kwargs)
+        MáquinaCreateDTO(nombre=nombre, dispositivo_id=kwargs.pop("dispositivo_id", MEDIDOR_CASA), **kwargs)
     )
 
 
@@ -110,26 +110,26 @@ def test_renombrar_hacia_un_nombre_ya_usado_en_el_medidor_falla(use_case):
     freezer = _crear(use_case, "Freezer")
 
     with pytest.raises(MáquinaDuplicadaError):
-        use_case.actualizar_carga(freezer.id, CargaUpdateDTO(nombre="Heladera"))
+        use_case.actualizar_carga(freezer.id, MáquinaUpdateDTO(nombre="Heladera"))
 
 
 def test_renombrar_una_carga_a_su_propio_nombre_no_es_colision(use_case):
     heladera = _crear(use_case, "Heladera")
 
-    actualizada = use_case.actualizar_carga(heladera.id, CargaUpdateDTO(nombre="Heladera"))
+    actualizada = use_case.actualizar_carga(heladera.id, MáquinaUpdateDTO(nombre="Heladera"))
 
     assert actualizada.nombre == "Heladera"
 
 
 def test_actualizar_carga_inexistente_falla(use_case):
     with pytest.raises(MáquinaNoEncontradaError):
-        use_case.actualizar_carga("no-existe", CargaUpdateDTO(nombre="X"))
+        use_case.actualizar_carga("no-existe", MáquinaUpdateDTO(nombre="X"))
 
 
 def test_listar_solo_activas_excluye_las_dadas_de_baja(use_case):
     _crear(use_case, "Heladera")
     anafe = _crear(use_case, "Anafe eléctrico")
-    use_case.actualizar_carga(anafe.id, CargaUpdateDTO(activa=False))
+    use_case.actualizar_carga(anafe.id, MáquinaUpdateDTO(activa=False))
 
     activas = use_case.listar_cargas(dispositivo_id=MEDIDOR_CASA, solo_activas=True)
 

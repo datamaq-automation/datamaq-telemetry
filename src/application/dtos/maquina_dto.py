@@ -1,4 +1,4 @@
-"""src/application/dtos/carga_dto.py."""
+"""src/application/dtos/maquina_dto.py."""
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -16,8 +16,8 @@ from src.domain.maquinas.value_objects import (
 )
 
 
-class FirmaCargaDTO(BaseModel):
-    """Qué buscar en la serie agregada para reconocer esta carga."""
+class FirmaMáquinaDTO(BaseModel):
+    """Qué buscar en la serie agregada para reconocer esta máquina."""
 
     potencia_w: float
     dispersion_w: float = 0.0
@@ -34,18 +34,18 @@ class FirmaCargaDTO(BaseModel):
     esta_completa: bool = False
 
 
-class CargaBaseDTO(BaseModel):
+class MáquinaBaseDTO(BaseModel):
     nombre: str = Field(..., min_length=1, max_length=120)
     dispositivo_id: str
 
 
-class CargaCreateDTO(CargaBaseDTO):
+class MáquinaCreateDTO(MáquinaBaseDTO):
     categoria: CategoriaCarga = CategoriaCarga.OTROS
     naturaleza_electrica: NaturalezaElectrica = NaturalezaElectrica.MIXTA
     potencia_nominal_w: float | None = Field(None, gt=0.0)
 
 
-class CargaUpdateDTO(BaseModel):
+class MáquinaUpdateDTO(BaseModel):
     nombre: str | None = Field(None, min_length=1, max_length=120)
     categoria: CategoriaCarga | None = None
     naturaleza_electrica: NaturalezaElectrica | None = None
@@ -65,14 +65,14 @@ class FirmaManualRequestDTO(BaseModel):
     duracion_apagado_s: float | None = Field(None, gt=0.0)
 
 
-class CargaResponseDTO(CargaBaseDTO):
+class MáquinaResponseDTO(MáquinaBaseDTO):
     id: str
     categoria: CategoriaCarga
     naturaleza_electrica: NaturalezaElectrica
     patron_operacion: PatronOperacion
     potencia_nominal_w: float | None = None
     potencia_esperada_w: float | None = None
-    firma: FirmaCargaDTO | None = None
+    firma: FirmaMáquinaDTO | None = None
     esta_caracterizada: bool
     activa: bool
     creado_en: FechaHoraUTC
@@ -130,7 +130,7 @@ class PerfilConsumoResponseDTO(BaseModel):
     advertencia_cadencia: str | None = None
 
 
-class CampanaCreateDTO(BaseModel):
+class EnsayoCreateDTO(BaseModel):
     """Apertura de una campaña de caracterización sobre un medidor."""
 
     dispositivo_id: str
@@ -149,10 +149,10 @@ class ResultadoCalibracionDTO(BaseModel):
     muestras_en_regimen: int = 0
     dispersion_relativa: float | None = None
     cadencia_mediana_s: float | None = None
-    firma: FirmaCargaDTO | None = None
+    firma: FirmaMáquinaDTO | None = None
 
 
-class CampanaResponseDTO(BaseModel):
+class EnsayoResponseDTO(BaseModel):
     id: str
     dispositivo_id: str
     carga_id: str | None = None

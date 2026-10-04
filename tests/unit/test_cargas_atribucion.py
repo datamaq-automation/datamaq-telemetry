@@ -189,26 +189,26 @@ def test_la_duracion_separa_al_termotanque_del_horno():
     """Misma potencia, mismo factor de potencia: solo difieren en cuánto duran."""
     decision = EmparejadorFirmasService.decidir(_episodio(1820.0, 2400.0, 15.0), _catalogo())
 
-    assert decision.carga_id == "maquina-Termotanque"
+    assert decision.maquina_id == "maquina-Termotanque"
 
 
 def test_la_misma_potencia_con_otra_duracion_va_a_otra_carga():
     decision = EmparejadorFirmasService.decidir(_episodio(1850.0, 4500.0, 15.0), _catalogo())
 
-    assert decision.carga_id == "maquina-Horno eléctrico"
+    assert decision.maquina_id == "maquina-Horno eléctrico"
 
 
 def test_la_reactiva_separa_familias_enteras():
     """Una heladera y un resistivo de la misma potencia nunca deberían confundirse."""
     motor = EmparejadorFirmasService.decidir(_episodio(120.0, 1500.0, 115.0), _catalogo())
 
-    assert motor.carga_id == "maquina-Heladera"
+    assert motor.maquina_id == "maquina-Heladera"
 
 
 def test_un_episodio_que_no_se_parece_a_nada_queda_sin_atribuir():
     decision = EmparejadorFirmasService.decidir(_episodio(8000.0, 600.0, 20.0), _catalogo())
 
-    assert decision.carga_id is None
+    assert decision.maquina_id is None
     assert "no alcanza el mínimo" in decision.motivo
 
 
@@ -221,7 +221,7 @@ def test_ante_dos_candidatos_igual_de_buenos_no_se_atribuye():
 
     decision = EmparejadorFirmasService.decidir(_episodio(1800.0, 2400.0, 10.0), catalogo)
 
-    assert decision.carga_id is None
+    assert decision.maquina_id is None
     assert "Ambiguo" in decision.motivo
     assert len(decision.candidatos) == 2
 
@@ -231,7 +231,7 @@ def test_sin_firmas_calibradas_no_se_atribuye_nada():
 
     decision = EmparejadorFirmasService.decidir(_episodio(1850.0, 180.0, 10.0), sin_firma)
 
-    assert decision.carga_id is None
+    assert decision.maquina_id is None
     assert "firma calibrada" in decision.motivo
 
 
@@ -241,7 +241,7 @@ def test_una_carga_dada_de_baja_no_recibe_atribuciones():
 
     decision = EmparejadorFirmasService.decidir(_episodio(1820.0, 2400.0, 15.0), catalogo)
 
-    assert decision.carga_id != "maquina-Termotanque"
+    assert decision.maquina_id != "maquina-Termotanque"
 
 
 def test_sin_reactiva_medida_el_factor_no_premia_ni_castiga():
@@ -249,7 +249,7 @@ def test_sin_reactiva_medida_el_factor_no_premia_ni_castiga():
     con_q = EmparejadorFirmasService.puntuar(_episodio(1820.0, 2400.0, 10.0), _catalogo())
     sin_q = EmparejadorFirmasService.puntuar(_episodio(1820.0, 2400.0, None), _catalogo())
 
-    assert con_q[0].carga_id == sin_q[0].carga_id
+    assert con_q[0].maquina_id == sin_q[0].maquina_id
     assert sin_q[0].factor_reactiva_score == 1.0
 
 
@@ -260,7 +260,7 @@ def _intervalo(carga_id: str | None, potencia: float, minutos: float, confianza:
     return IntervaloActividadMáquina(
         id=None,
         dispositivo_id=MEDIDOR,
-        carga_id=carga_id,
+        maquina_id=carga_id,
         inicio_at=INICIO,
         fin_at=INICIO + timedelta(minutes=minutos),
         potencia_media_w=potencia,
@@ -320,7 +320,7 @@ def test_los_intervalos_no_atribuidos_aparecen_con_nombre_propio():
 
     atribucion = AtribuidorConsumoService.atribuir(INICIO, INICIO + timedelta(days=1), intervalos, _catalogo(), 3.0)
 
-    no_atribuido = [i for i in atribucion.items if i.carga_id is None]
+    no_atribuido = [i for i in atribucion.items if i.maquina_id is None]
     assert no_atribuido
     assert all(i.nombre == "No atribuido" for i in no_atribuido)
 
@@ -330,7 +330,7 @@ def test_una_correccion_humana_se_marca_y_lleva_confianza_plena():
 
     intervalo.corregir("maquina-Pava eléctrica", usuario_id="u1", notas="fui yo, herví agua")
 
-    assert intervalo.carga_id == "maquina-Pava eléctrica"
+    assert intervalo.maquina_id == "maquina-Pava eléctrica"
     assert intervalo.origen == OrigenClasificacionCarga.CORRECCION_HUMANA
     assert intervalo.es_correccion_humana is True
     assert intervalo.confianza == 1.0
@@ -343,7 +343,7 @@ def test_el_reporte_tiene_una_sola_fila_de_no_atribuido():
 
     atribucion = AtribuidorConsumoService.atribuir(INICIO, INICIO + timedelta(days=1), intervalos, _catalogo(), 5.0)
 
-    filas_sin_atribuir = [i for i in atribucion.items if i.carga_id is None]
+    filas_sin_atribuir = [i for i in atribucion.items if i.maquina_id is None]
     assert len(filas_sin_atribuir) == 1
 
 
@@ -365,6 +365,6 @@ def test_el_residual_se_suma_a_los_episodios_sin_imputar_no_los_reemplaza():
 
     atribucion = AtribuidorConsumoService.atribuir(INICIO, INICIO + timedelta(days=1), intervalos, _catalogo(), 5.0)
 
-    sin_atribuir = next(i for i in atribucion.items if i.carga_id is None)
+    sin_atribuir = next(i for i in atribucion.items if i.maquina_id is None)
     assert sin_atribuir.energia_kwh == 5.0
     assert sin_atribuir.intervalos == 1

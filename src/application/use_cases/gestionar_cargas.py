@@ -4,9 +4,9 @@ import uuid
 from datetime import datetime, timezone
 
 from src.application.dtos.carga_dto import (
-    CargaCreateDTO,
-    CargaResponseDTO,
-    CargaUpdateDTO,
+    MáquinaCreateDTO,
+    MáquinaResponseDTO,
+    MáquinaUpdateDTO,
     FirmaManualRequestDTO,
 )
 from src.application.mappers.maquina_mapper import MáquinaMapper
@@ -38,7 +38,7 @@ class GestionarCargasUseCase:
             raise CargaNoEncontradaError(f"Carga '{carga_id}' no encontrada.")
         return carga
 
-    def listar_cargas(self, dispositivo_id: str | None = None, solo_activas: bool = False) -> list[CargaResponseDTO]:
+    def listar_cargas(self, dispositivo_id: str | None = None, solo_activas: bool = False) -> list[MáquinaResponseDTO]:
         if dispositivo_id is None:
             cargas = self.repo_cargas.listar()
             if solo_activas:
@@ -47,10 +47,10 @@ class GestionarCargasUseCase:
             cargas = self.repo_cargas.listar_por_dispositivo(dispositivo_id, solo_activas=solo_activas)
         return [MáquinaMapper.to_dto(c) for c in cargas]
 
-    def obtener_carga(self, carga_id: str) -> CargaResponseDTO:
+    def obtener_carga(self, carga_id: str) -> MáquinaResponseDTO:
         return MáquinaMapper.to_dto(self._obtener_o_fallar(carga_id))
 
-    def registrar_carga(self, dto: CargaCreateDTO) -> CargaResponseDTO:
+    def registrar_carga(self, dto: MáquinaCreateDTO) -> MáquinaResponseDTO:
         existente = self.repo_cargas.obtener_por_nombre(dto.dispositivo_id, dto.nombre)
         if existente:
             raise CargaDuplicadaError(
@@ -59,7 +59,7 @@ class GestionarCargasUseCase:
         entity = MáquinaMapper.create_dto_to_entity(dto, str(uuid.uuid4()))
         return MáquinaMapper.to_dto(self.repo_cargas.guardar(entity))
 
-    def actualizar_carga(self, carga_id: str, dto: CargaUpdateDTO) -> CargaResponseDTO:
+    def actualizar_carga(self, carga_id: str, dto: MáquinaUpdateDTO) -> MáquinaResponseDTO:
         carga = self._obtener_o_fallar(carga_id)
 
         if dto.nombre is not None and dto.nombre != carga.nombre:
@@ -82,7 +82,7 @@ class GestionarCargasUseCase:
 
         return MáquinaMapper.to_dto(self.repo_cargas.guardar(carga))
 
-    def fijar_firma_manual(self, carga_id: str, dto: FirmaManualRequestDTO) -> CargaResponseDTO:
+    def fijar_firma_manual(self, carga_id: str, dto: FirmaManualRequestDTO) -> MáquinaResponseDTO:
         """Calibración manual, el escape para cuando no hay campaña posible.
 
         La firma queda marcada `CHAPA` a propósito: no fue medida sobre el equipo, así

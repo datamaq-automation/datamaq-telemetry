@@ -28,7 +28,7 @@ class MySQLIntervalosActividadRepository(RepositorioIntervalosActividadPort):
         return IntervaloActividadMáquina(
             id=model.id,
             dispositivo_id=model.device_id,
-            carga_id=model.load_id,
+            maquina_id=model.load_id,
             inicio_at=model.start_at,
             fin_at=model.end_at,
             potencia_media_w=_a_float(model.avg_power_w),
@@ -42,7 +42,7 @@ class MySQLIntervalosActividadRepository(RepositorioIntervalosActividadPort):
         )
 
     def _aplicar(self, model: LoadActivityIntervalModel, intervalo: IntervaloActividadMáquina) -> None:
-        model.load_id = intervalo.carga_id
+        model.load_id = intervalo.maquina_id
         model.avg_power_w = _a_decimal(intervalo.potencia_media_w)
         model.delta_reactive_var = _a_decimal(intervalo.delta_reactiva_var)
         model.energy_kwh = _a_decimal(intervalo.energia_kwh)
@@ -71,10 +71,10 @@ class MySQLIntervalosActividadRepository(RepositorioIntervalosActividadPort):
         )
         return [self._to_entity(m) for m in modelos]
 
-    def listar_por_carga(self, carga_id: str, limite: int = 100) -> list[IntervaloActividadMáquina]:
+    def listar_por_maquina(self, maquina_id: str, limite: int = 100) -> list[IntervaloActividadMáquina]:
         modelos = (
             self.db.query(LoadActivityIntervalModel)
-            .filter(LoadActivityIntervalModel.load_id == carga_id)
+            .filter(LoadActivityIntervalModel.load_id == maquina_id)
             .order_by(desc(LoadActivityIntervalModel.start_at))
             .limit(limite)
             .all()

@@ -37,7 +37,7 @@ class MySQLEnsayosRepository(RepositorioEnsayosPort):
         return EnsayoCaracterizacion(
             id=model.id,
             dispositivo_id=model.device_id,
-            carga_id=model.load_id,
+            maquina_id=model.load_id,
             tipo=TipoCampana(model.campaign_type),
             estado=EstadoCampana(model.state),
             inicio_at=model.start_at,
@@ -78,10 +78,10 @@ class MySQLEnsayosRepository(RepositorioEnsayosPort):
         )
         return [self._to_entity(m) for m in modelos]
 
-    def listar_por_carga(self, carga_id: str) -> list[EnsayoCaracterizacion]:
+    def listar_por_maquina(self, maquina_id: str) -> list[EnsayoCaracterizacion]:
         modelos = (
             self.db.query(CharacterizationCampaignModel)
-            .filter(CharacterizationCampaignModel.load_id == carga_id)
+            .filter(CharacterizationCampaignModel.load_id == maquina_id)
             .order_by(desc(CharacterizationCampaignModel.start_at))
             .all()
         )
@@ -95,7 +95,7 @@ class MySQLEnsayosRepository(RepositorioEnsayosPort):
             model = CharacterizationCampaignModel(
                 id=campana.id,
                 device_id=campana.dispositivo_id,
-                load_id=campana.carga_id,
+                load_id=campana.maquina_id,
                 campaign_type=campana.tipo.value,
                 start_at=campana.inicio_at,
                 planned_end_at=campana.fin_planificado_at,

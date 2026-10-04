@@ -58,7 +58,7 @@ def test_atribucion_por_regla_imputa_a_carga_sin_firma_si_nombre_coincide():
     assert res.atribuidos >= 1
 
     intervalos = repo_intervalos.listar_por_dispositivo(MEDIDOR, INICIO, INICIO + timedelta(hours=1))
-    int_pava = next((i for i in intervalos if i.carga_id == "maquina-pava-sin-firma"), None)
+    int_pava = next((i for i in intervalos if i.maquina_id == "maquina-pava-sin-firma"), None)
 
     assert int_pava is not None
     assert int_pava.origen == OrigenClasificacionCarga.REGLA
@@ -82,7 +82,7 @@ def test_atribucion_por_regla_registra_sugerencia_cuando_no_hay_carga_en_catalog
     intervalos = repo_intervalos.listar_por_dispositivo(MEDIDOR, INICIO, INICIO + timedelta(hours=2))
     int_heladera = intervalos[0]
 
-    assert int_heladera.carga_id is None
+    assert int_heladera.maquina_id is None
     assert int_heladera.confianza is not None and int_heladera.confianza >= 0.80
     assert "Sugerido por regla: Heladera" in (int_heladera.notas or "")
 
