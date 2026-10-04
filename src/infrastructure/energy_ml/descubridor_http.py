@@ -69,8 +69,8 @@ class EnergyMlHttpDescubridor(DescubridorMáquinasPort):
             return candidatas
 
         except (json.JSONDecodeError, ValueError) as e:
-            raise DescubridorNoDisponibleError(f"JSON inválido de energy-ml: {e}")
+            raise DescubridorNoDisponibleError(f"JSON inválido de energy-ml: {e}") from e
         except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError) as e:
-            raise DescubridorNoDisponibleError(f"Error conectando a energy-ml: {e}")
+            raise DescubridorNoDisponibleError(f"Error conectando a energy-ml: {e}") from e
         except Exception as e:
-            raise DescubridorNoDisponibleError(f"Error inesperado en descubridor: {e}")
+            raise DescubridorNoDisponibleError(f"Error inesperado en descubridor: {e}") from e

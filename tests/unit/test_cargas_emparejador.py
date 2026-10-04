@@ -167,7 +167,7 @@ def test_emparejar_ignora_candidatas_con_potencia_negativa():
     ]
 
     # No debe fallar en emparejar, pero no encontrará pareja razonable
-    resultado = emparejar(candidata, catalogo)
+    emparejar(candidata, catalogo)
     # Puede ser None o la maquina, dependiendo de cómo se maneje la tolerancia
     # La lógica es que el caso de uso filtra antes
     assert True  # Placeholder

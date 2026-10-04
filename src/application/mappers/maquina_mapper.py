@@ -1,6 +1,6 @@
-"""src/application/mappers/carga_mapper.py."""
+"""src/application/mappers/maquina_mapper.py."""
 
-from src.application.dtos.carga_dto import (
+from src.application.dtos.maquina_dto import (
     EnsayoResponseDTO,
     FirmaMáquinaDTO,
     IntervaloActividadResponseDTO,
@@ -10,8 +10,8 @@ from src.application.dtos.carga_dto import (
 )
 from src.domain.maquinas.entities import (
     CampanaCaracterizacion,
-    Carga,
-    IntervaloActividadCarga,
+    IntervaloActividadMáquina,
+    Máquina,
 )
 from src.domain.maquinas.value_objects import FirmaCarga, ResultadoCalibracion
 
@@ -38,7 +38,7 @@ class MáquinaMapper:
         )
 
     @staticmethod
-    def to_dto(entity: Carga) -> MáquinaResponseDTO:
+    def to_dto(entity: Máquina) -> MáquinaResponseDTO:
         return MáquinaResponseDTO(
             id=entity.id,
             dispositivo_id=entity.dispositivo_id,
@@ -56,8 +56,8 @@ class MáquinaMapper:
         )
 
     @staticmethod
-    def create_dto_to_entity(dto: MáquinaCreateDTO, id_str: str) -> Carga:
-        return Carga(
+    def create_dto_to_entity(dto: MáquinaCreateDTO, id_str: str) -> Máquina:
+        return Máquina(
             id=id_str,
             dispositivo_id=dto.dispositivo_id,
             nombre=dto.nombre,
@@ -113,7 +113,7 @@ class CampanaMapper:
 
 class IntervaloActividadMapper:
     @staticmethod
-    def to_dto(entity: IntervaloActividadCarga) -> IntervaloActividadResponseDTO:
+    def to_dto(entity: IntervaloActividadMáquina) -> IntervaloActividadResponseDTO:
         return IntervaloActividadResponseDTO(
             id=entity.id,
             dispositivo_id=entity.dispositivo_id,
