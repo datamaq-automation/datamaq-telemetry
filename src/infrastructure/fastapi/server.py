@@ -60,7 +60,7 @@ from src.infrastructure.sqlalchemy.database import (
     verificar_estado_migraciones,
 )
 from src.infrastructure.sqlalchemy.mysql_repositories import (
-    MySQLCampanasRepository,
+    MySQLEnsayosRepository,
     MySQLMáquinasRepository,
     MySQLDispositivosRepository,
 )
@@ -260,7 +260,7 @@ def _sostener_campanas() -> tuple[int, int]:
     db = session_factory()
     try:
         use_case = CaracterizarCargaUseCase(
-            repo_campanas=MySQLCampanasRepository(db),
+            repo_campanas=MySQLEnsayosRepository(db),
             repo_cargas=MySQLMáquinasRepository(db),
             repo_dispositivos=MySQLDispositivosRepository(db),
             registro=registro_campanas_activas,

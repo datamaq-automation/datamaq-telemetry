@@ -1,4 +1,4 @@
-"""src/infrastructure/sqlalchemy/repositories/campanas_repository.py."""
+"""src/infrastructure/sqlalchemy/repositories/ensayos_repository.py."""
 
 from datetime import datetime
 from decimal import Decimal
@@ -29,7 +29,7 @@ def _a_decimal(valor: float | None) -> Decimal | None:
     return Decimal(str(valor)) if valor is not None else None
 
 
-class MySQLCampanasRepository(RepositorioEnsayosPort):
+class MySQLEnsayosRepository(RepositorioEnsayosPort):
     def __init__(self, db: Session):
         self.db = db
 

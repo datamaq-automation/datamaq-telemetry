@@ -12,7 +12,7 @@ from src.infrastructure.sqlalchemy.repositories.auditoria_repository import (
     MySQLAuditoriaRepository,
 )
 from src.infrastructure.sqlalchemy.repositories.ensayos_repository import (
-    MySQLCampanasRepository,
+    MySQLEnsayosRepository,
 )
 from src.infrastructure.sqlalchemy.repositories.cargas_repository import (
     MySQLMáquinasRepository,
@@ -51,7 +51,7 @@ from src.infrastructure.sqlalchemy.repositories.webhook_events_repository import
 __all__ = [
     "MySQLAccesosPlantaRepository",
     "MySQLAuditoriaRepository",
-    "MySQLCampanasRepository",
+    "MySQLEnsayosRepository",
     "MySQLMáquinasRepository",
     "MySQLDispositivosConfiablesRepository",
     "MySQLDispositivosRepository",

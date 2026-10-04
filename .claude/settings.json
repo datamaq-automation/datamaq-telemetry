@@ -1,19 +1,10 @@
 {
   "permissions": {
-    "allow": [
-      "Bash(ruff check *)",
-      "Bash(ruff format *)",
-      "Bash(.venv/bin/python -m ruff check *)",
-      "Bash(.venv/bin/python -m ruff format *)",
-      "Bash(pytest *)",
-      "Bash(python -m pytest *)",
-      "Bash(python3 -m pytest *)",
-      "Bash(.venv/bin/python -m pytest *)",
-      "Bash(python3 -m json.tool *)",
-      "Bash(gh run watch *)",
-      "Bash(systemctl is-active *)",
-      "Bash(systemctl status *)",
-      "Bash(systemctl --failed)"
-    ]
+    "bash": {
+      "allow": ["git", "find", "sed", "grep", "ls", "python3", "pytest", ".venv/bin/python", "mv", "rm", "cp", "mkdir", "cat", "head", "tail", "wc", "cut", "sort", "uniq", "cd"]
+    },
+    "edit": {
+      "allow": ["src/**/*.py", "tests/**/*.py", "specs/**/*.md"]
+    }
   }
 }

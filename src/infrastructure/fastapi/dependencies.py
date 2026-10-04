@@ -55,7 +55,7 @@ from src.infrastructure.settings.logger import get_logger
 from src.infrastructure.sqlalchemy.database import get_db_session
 from src.infrastructure.sqlalchemy.mysql_repositories import (
     MySQLAuditoriaRepository,
-    MySQLCampanasRepository,
+    MySQLEnsayosRepository,
     MySQLMáquinasRepository,
     MySQLDispositivosRepository,
     MySQLEventosDisponibilidadRepository,
@@ -258,7 +258,7 @@ def get_caracterizacion_use_case(
     db: Annotated[Session, Depends(get_db_session)],
 ) -> CaracterizarCargaUseCase:
     return CaracterizarCargaUseCase(
-        repo_campanas=MySQLCampanasRepository(db),
+        repo_campanas=MySQLEnsayosRepository(db),
         repo_cargas=MySQLMáquinasRepository(db),
         repo_dispositivos=repo_dispositivos_resuelto(db),
         registro=registro_campanas_activas,

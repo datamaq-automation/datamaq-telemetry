@@ -3,7 +3,7 @@
 from collections import defaultdict
 from datetime import datetime
 
-from src.domain.maquinas.entities import Máquina, IntervaloActividadMáquina
+from src.domain.maquinas.entities import IntervaloActividadMáquina, Máquina
 from src.domain.maquinas.value_objects import AtribucionConsumo, ItemAtribucion
 
 NO_ATRIBUIDO = "No atribuido"
