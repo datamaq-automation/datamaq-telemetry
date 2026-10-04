@@ -3,16 +3,16 @@
 import pytest
 
 from src.application.dtos.maquina_dto import (
+    FirmaManualRequestDTO,
     MáquinaCreateDTO,
     MáquinaUpdateDTO,
-    FirmaManualRequestDTO,
 )
 from src.application.use_cases.gestionar_cargas import GestionarCargasUseCase
 from src.domain.maquinas.entities import Máquina
 from src.domain.maquinas.exceptions import (
+    FirmaMáquinaInvalidaError,
     MáquinaDuplicadaError,
     MáquinaNoEncontradaError,
-    FirmaMáquinaInvalidaError,
 )
 from src.domain.maquinas.ports import RepositorioMáquinasPort
 from src.domain.maquinas.value_objects import (

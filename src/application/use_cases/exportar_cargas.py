@@ -5,8 +5,8 @@ from datetime import datetime, timedelta, timezone
 
 from src.application.mappers.csv_streaming_mapper import CsvStreamingMapper
 from src.domain.maquinas.ports import (
-    RepositorioMáquinasPort,
     RepositorioIntervalosActividadPort,
+    RepositorioMáquinasPort,
 )
 
 

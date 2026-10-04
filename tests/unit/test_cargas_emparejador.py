@@ -1,10 +1,10 @@
 """tests/unit/test_cargas_emparejador.py — Emparejamiento de candidatas con catálogo."""
 
 import pytest
-from src.domain.maquinas.servicios.emparejador_candidatas import emparejar
 
 from src.domain.maquinas.entities import Máquina
-from src.domain.maquinas.value_objects import MáquinaInferida, FirmaCarga, OrigenFirma
+from src.domain.maquinas.servicios.emparejador_candidatas import emparejar
+from src.domain.maquinas.value_objects import FirmaCarga, MáquinaInferida, OrigenFirma
 
 DISPOSITIVO_A = "dev-001"
 

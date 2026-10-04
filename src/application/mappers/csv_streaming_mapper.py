@@ -5,8 +5,8 @@ import io
 from collections.abc import Generator, Iterator, Sequence
 from typing import Any
 
-from src.domain.maquinas.entities import IntervaloActividadCarga
 from src.domain.disponibilidad.entities import EventoDisponibilidad
+from src.domain.maquinas.entities import IntervaloActividadCarga
 from src.domain.telemetria.entities import LecturaInstantanea
 
 BOM_UTF8 = "\ufeff"

@@ -6,10 +6,10 @@ import pytest
 
 from src.application.dtos.maquina_dto import CorregirIntervaloRequestDTO
 from src.application.use_cases.atribuir_consumo import AtribuirConsumoUseCase
-from src.domain.maquinas.entities import Máquina, IntervaloActividadMáquina
+from src.domain.maquinas.entities import IntervaloActividadMáquina, Máquina
 from src.domain.maquinas.exceptions import (
-    MáquinaNoEncontradaError,
     IntervaloActividadNoEncontradoError,
+    MáquinaNoEncontradaError,
 )
 from src.domain.maquinas.ports import (
     RepositorioIntervalosActividadPort,

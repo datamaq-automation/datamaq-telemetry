@@ -5,9 +5,9 @@ from datetime import datetime, timezone
 from unittest.mock import Mock, patch
 
 import pytest
-from src.infrastructure.energy_ml.descubridor_http import EnergyMlHttpDescubridor
 
 from src.domain.maquinas.exceptions import DescubridorNoDisponibleError
+from src.infrastructure.energy_ml.descubridor_http import EnergyMlHttpDescubridor
 
 MEDIDOR_NAME = "Trafo arriba"
 

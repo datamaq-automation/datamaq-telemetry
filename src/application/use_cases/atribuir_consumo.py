@@ -11,14 +11,14 @@ from src.application.dtos.carga_dto import (
     ItemAtribucionDTO,
 )
 from src.application.mappers.maquina_mapper import IntervaloActividadMapper
-from src.domain.maquinas.entities import Máquina, IntervaloActividadCarga
+from src.domain.maquinas.entities import IntervaloActividadCarga
 from src.domain.maquinas.exceptions import (
     CargaNoEncontradaError,
     IntervaloActividadNoEncontradoError,
 )
 from src.domain.maquinas.ports import (
-    RepositorioMáquinasPort,
     RepositorioIntervalosActividadPort,
+    RepositorioMáquinasPort,
     RepositorioSeriePotenciaPort,
 )
 from src.domain.maquinas.servicios.atribuidor_consumo import AtribuidorConsumoService

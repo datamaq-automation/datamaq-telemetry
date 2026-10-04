@@ -9,14 +9,14 @@ from fastapi.responses import StreamingResponse
 from src.application.dtos.maquina_dto import (
     AnalisisConsumoResponseDTO,
     AtribucionConsumoResponseDTO,
+    CorregirIntervaloRequestDTO,
     EnsayoCreateDTO,
     EnsayoResponseDTO,
+    FirmaManualRequestDTO,
+    IntervaloActividadResponseDTO,
     MáquinaCreateDTO,
     MáquinaResponseDTO,
     MáquinaUpdateDTO,
-    CorregirIntervaloRequestDTO,
-    FirmaManualRequestDTO,
-    IntervaloActividadResponseDTO,
     PerfilConsumoResponseDTO,
 )
 from src.application.mappers.maquina_mapper import MáquinaMapper

@@ -9,7 +9,7 @@ from src.application.use_cases.proponer_firmas_inferidas import ProponerFirmasIn
 from src.domain.maquinas.entities import Máquina
 from src.domain.maquinas.exceptions import DescubridorNoDisponibleError
 from src.domain.maquinas.ports import DescubridorMáquinasPort, RepositorioMáquinasPort
-from src.domain.maquinas.value_objects import MáquinaInferida, FirmaCarga, OrigenFirma
+from src.domain.maquinas.value_objects import FirmaCarga, MáquinaInferida, OrigenFirma
 
 DISPOSITIVO_A = "dev-001"
 MEDIDOR_NAME = "Trafo arriba"

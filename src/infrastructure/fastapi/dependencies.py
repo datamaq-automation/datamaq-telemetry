@@ -55,12 +55,12 @@ from src.infrastructure.settings.logger import get_logger
 from src.infrastructure.sqlalchemy.database import get_db_session
 from src.infrastructure.sqlalchemy.mysql_repositories import (
     MySQLAuditoriaRepository,
-    MySQLEnsayosRepository,
-    MySQLMáquinasRepository,
     MySQLDispositivosRepository,
+    MySQLEnsayosRepository,
     MySQLEventosDisponibilidadRepository,
     MySQLIntervalosActividadRepository,
     MySQLMaquinasRepository,
+    MySQLMáquinasRepository,
     MySQLParadasProgramadasRepository,
     MySQLPlanesRepository,
     MySQLSeriePotenciaRepository,

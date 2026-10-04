@@ -2,7 +2,7 @@
 
 from datetime import datetime, timedelta, timezone
 
-from src.domain.maquinas.entities import Máquina, IntervaloActividadMáquina
+from src.domain.maquinas.entities import IntervaloActividadMáquina, Máquina
 from src.domain.maquinas.servicios.atribuidor_consumo import AtribuidorConsumoService
 from src.domain.maquinas.servicios.detector_escalones import DetectorEscalonesService
 from src.domain.maquinas.servicios.emparejador_firmas import EmparejadorFirmasService

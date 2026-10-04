@@ -8,9 +8,9 @@ from src.application.dtos.maquina_dto import (
     AnalisisConsumoResponseDTO,
     AtribucionConsumoResponseDTO,
     EnsayoResponseDTO,
-    MáquinaResponseDTO,
     EstadisticaCiclosDTO,
     IntervaloActividadResponseDTO,
+    MáquinaResponseDTO,
     PerfilConsumoResponseDTO,
     PerfilLineaBaseDTO,
 )

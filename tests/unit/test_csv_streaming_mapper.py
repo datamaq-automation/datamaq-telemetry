@@ -7,9 +7,9 @@ from src.application.mappers.csv_streaming_mapper import (
     CsvStreamingMapper,
     formatear_fila_csv,
 )
-from src.domain.maquinas.entities import IntervaloActividadMáquina
 from src.domain.disponibilidad.entities import EventoDisponibilidad
 from src.domain.disponibilidad.value_objects import EstadoMaquina, OrigenClasificacion, TipoParada
+from src.domain.maquinas.entities import IntervaloActividadMáquina
 from src.domain.telemetria.entities import LecturaInstantanea, MedicionFase
 from src.domain.telemetria.value_objects import (
     Corriente,

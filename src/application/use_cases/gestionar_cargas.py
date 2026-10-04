@@ -4,13 +4,12 @@ import uuid
 from datetime import datetime, timezone
 
 from src.application.dtos.carga_dto import (
+    FirmaManualRequestDTO,
     MáquinaCreateDTO,
     MáquinaResponseDTO,
     MáquinaUpdateDTO,
-    FirmaManualRequestDTO,
 )
 from src.application.mappers.maquina_mapper import MáquinaMapper
-from src.domain.maquinas.entities import Máquina
 from src.domain.maquinas.exceptions import (
     CargaDuplicadaError,
     CargaNoEncontradaError,

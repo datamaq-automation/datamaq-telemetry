@@ -9,11 +9,11 @@ from src.application.dtos.carga_dto import (
     PerfilLineaBaseDTO,
 )
 from src.application.dtos.maquina_dto import RegimenOperacionDTO
+from src.domain.disponibilidad.services import SegmentadorRegimenesService
 from src.domain.maquinas.ports import RepositorioSeriePotenciaPort
 from src.domain.maquinas.servicios.analizador_ciclos import AnalizadorCiclosService
 from src.domain.maquinas.servicios.perfilador_linea_base import PerfiladorLineaBaseService
 from src.domain.maquinas.value_objects import EstadisticaCiclos, PerfilLineaBase
-from src.domain.disponibilidad.services import SegmentadorRegimenesService
 from src.domain.telemetria.exceptions import ZonaHorariaInvalidaError
 from src.domain.telemetria.value_objects import LecturaPotenciaTemporal
 

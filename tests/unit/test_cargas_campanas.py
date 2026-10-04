@@ -170,7 +170,9 @@ def test_una_campana_sobre_una_carga_inexistente_falla(contexto):
 
 def test_una_campana_sobre_un_dispositivo_inexistente_falla(contexto):
     _, campanas, maquinas, registro, rafaga = contexto
-    use_case = CaracterizarCargaUseCase(campanas, maquinas, MockDispositivosRepo(con_dispositivo=False), registro, rafaga)
+    use_case = CaracterizarCargaUseCase(
+        campanas, maquinas, MockDispositivosRepo(con_dispositivo=False), registro, rafaga
+    )
 
     with pytest.raises(DispositivoNoEncontradoError):
         use_case.iniciar_activa(_dto())

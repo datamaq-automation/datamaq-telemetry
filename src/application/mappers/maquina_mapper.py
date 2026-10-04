@@ -2,10 +2,10 @@
 
 from src.application.dtos.carga_dto import (
     EnsayoResponseDTO,
-    MáquinaCreateDTO,
-    MáquinaResponseDTO,
     FirmaMáquinaDTO,
     IntervaloActividadResponseDTO,
+    MáquinaCreateDTO,
+    MáquinaResponseDTO,
     ResultadoCalibracionDTO,
 )
 from src.domain.maquinas.entities import (

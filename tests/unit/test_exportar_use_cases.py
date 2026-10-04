@@ -12,11 +12,11 @@ from src.application.use_cases.exportar_disponibilidad import (
 from src.application.use_cases.exportar_telemetria import (
     ExportarTelemetriaUseCase,
 )
-from src.domain.maquinas.entities import Máquina, IntervaloActividadMáquina
-from src.domain.maquinas.value_objects import CategoriaCarga
 from src.domain.disponibilidad.entities import EventoDisponibilidad, Maquina
 from src.domain.disponibilidad.exceptions import MaquinaNoEncontradaError
 from src.domain.disponibilidad.value_objects import EstadoMaquina, TipoParada
+from src.domain.maquinas.entities import IntervaloActividadMáquina, Máquina
+from src.domain.maquinas.value_objects import CategoriaCarga
 from src.domain.telemetria.entities import LecturaInstantanea, MedicionFase
 from src.domain.telemetria.value_objects import PotenciaActiva
 

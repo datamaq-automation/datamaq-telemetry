@@ -38,9 +38,9 @@ from src.infrastructure.fastapi.routes.asistente_router import router as asisten
 from src.infrastructure.fastapi.routes.audit_router import router as audit_router
 from src.infrastructure.fastapi.routes.auth_router import router as auth_router
 from src.infrastructure.fastapi.routes.billing_router import router as billing_router
-from src.infrastructure.fastapi.routes.maquinas_router import router as maquinas_router
 from src.infrastructure.fastapi.routes.disponibilidad_router import router as disponibilidad_router
 from src.infrastructure.fastapi.routes.dispositivos_router import router as dispositivos_router
+from src.infrastructure.fastapi.routes.maquinas_router import router as maquinas_router
 from src.infrastructure.fastapi.routes.notificador_router import router as notificador_router
 from src.infrastructure.fastapi.routes.organizaciones_router import router as organizaciones_router
 from src.infrastructure.fastapi.routes.planes_router import router as planes_router
@@ -60,9 +60,9 @@ from src.infrastructure.sqlalchemy.database import (
     verificar_estado_migraciones,
 )
 from src.infrastructure.sqlalchemy.mysql_repositories import (
+    MySQLDispositivosRepository,
     MySQLEnsayosRepository,
     MySQLMáquinasRepository,
-    MySQLDispositivosRepository,
 )
 from src.infrastructure.yaml.repositories.organizaciones_repository import YamlOrganizacionesRepository
 
