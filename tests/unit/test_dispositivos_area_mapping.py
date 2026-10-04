@@ -34,8 +34,8 @@ def test_dispositivo_area_id_and_nodo_unifilar_id_mapping():
     dtos = use_case.listar_dispositivos(planta_id="c64fd625-0037-4caa-b68a-800e8e0ee548")
 
     assert len(dtos) == 2
-    assert dtos[0].area_id == "area-durax-trafo-1"
-    assert dtos[0].nodo_unifilar_id == "nodo-durax-tgbt-usina"
+    assert dtos[0].area_id == "zone-durax-principal-sala-trafo-1"
+    assert dtos[0].nodo_unifilar_id == "node-durax-principal-tgbt-4"
 
-    assert dtos[1].area_id == "area-durax-trafo-2"
-    assert dtos[1].nodo_unifilar_id == "nodo-durax-tgbt-horno"
+    assert dtos[1].area_id == "zone-durax-principal-sala-trafo-2"
+    assert dtos[1].nodo_unifilar_id == "node-durax-principal-tgbt-5"

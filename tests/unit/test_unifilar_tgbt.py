@@ -214,7 +214,7 @@ def test_yaml_durax_incluye_metadatos_placa_y_layout():
     nodos = repo.obtener_nodos_unifilar("c64fd625-0037-4caa-b68a-800e8e0ee548")
     por_id = {n.id: n for n in nodos}
 
-    acometida = por_id["nodo-durax-acometida-mt"]
+    acometida = por_id["node-durax-principal-acometida-1"]
     assert acometida.coordenadas is not None
     assert acometida.coordenadas.orientacion == "horizontal"
     assert acometida.metadatos_placa is not None
@@ -222,13 +222,13 @@ def test_yaml_durax_incluye_metadatos_placa_y_layout():
     assert acometida.interruptor_cabecera is not None
     assert acometida.interruptor_cabecera.tag == "QM-01"
 
-    trafo_usina = por_id["nodo-durax-trifasico-1"]
+    trafo_usina = por_id["node-durax-principal-transformacin-2"]
     assert trafo_usina.es_pasante is True
     assert trafo_usina.metadatos_placa is not None
     assert trafo_usina.metadatos_placa.potencia_nominal_kva == 1000.0
     assert trafo_usina.metadatos_placa.grupo_conexion == "Dyn11"
 
-    tgbt_usina = por_id["nodo-durax-tgbt-usina"]
+    tgbt_usina = por_id["node-durax-principal-tgbt-4"]
     assert tgbt_usina.es_pasante is False
     assert tgbt_usina.metadatos_placa is not None
     assert tgbt_usina.metadatos_placa.trafo_asociado_kva == 1000.0
@@ -242,8 +242,8 @@ def test_obtener_unifilar_marca_trafos_pasantes():
     unifilar = use_case.obtener_unifilar("c64fd625-0037-4caa-b68a-800e8e0ee548")
     por_id = {n.id: n for n in unifilar.nodos}
 
-    assert por_id["nodo-durax-acometida-mt"].es_pasante is False
-    assert por_id["nodo-durax-trifasico-1"].es_pasante is True
-    assert por_id["nodo-durax-powermeter-bf2c"].es_pasante is True
-    assert por_id["nodo-durax-tgbt-usina"].es_pasante is False
-    assert por_id["nodo-durax-tgbt-horno"].es_pasante is False
+    assert por_id["node-durax-principal-acometida-1"].es_pasante is False
+    assert por_id["node-durax-principal-transformacin-2"].es_pasante is True
+    assert por_id["node-durax-principal-transformacin-3"].es_pasante is True
+    assert por_id["node-durax-principal-tgbt-4"].es_pasante is False
+    assert por_id["node-durax-principal-tgbt-5"].es_pasante is False
