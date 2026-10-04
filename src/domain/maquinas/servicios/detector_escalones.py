@@ -1,13 +1,13 @@
-"""src/domain/cargas/servicios/detector_escalones.py — Detección de escalones de potencia y su emparejado en episodios."""
+"""src/domain/maquinas/servicios/detector_escalones.py — Detección de escalones de potencia y su emparejado en episodios."""
 
 import itertools
 
-from src.domain.cargas.servicios.estadistica import (
+from src.domain.maquinas.servicios.estadistica import (
     cadencia_mediana_segundos,
     desviacion_absoluta_mediana,
     percentil,
 )
-from src.domain.cargas.value_objects import EpisodioCarga, EscalonPotencia
+from src.domain.maquinas.value_objects import EpisodioCarga, EscalonPotencia
 from src.domain.telemetria.value_objects import LecturaPotenciaTemporal
 
 

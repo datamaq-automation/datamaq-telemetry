@@ -131,7 +131,7 @@ def test_tipo_nodo_unifilar_enum():
     assert TipoNodoUnifilar.TRANSFORMADOR.value == "transformador"
     assert TipoNodoUnifilar.TGBT.value == "tgbt"
     assert TipoNodoUnifilar.SECCIONAL.value == "seccional"
-    assert TipoNodoUnifilar.CARGA.value == "carga"
+    assert TipoNodoUnifilar.CARGA.value == "maquina"
 
 
 # --- 2. Tests de Mappers ---

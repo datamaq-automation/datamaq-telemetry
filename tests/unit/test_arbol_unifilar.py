@@ -44,7 +44,7 @@ class TestMedidoresFrontera:
             [
                 _nodo("mt"),
                 _nodo("trafo", parent_id="mt", device_id="dev-trafo"),
-                _nodo("carga", parent_id="trafo", device_id="dev-carga"),
+                _nodo("maquina", parent_id="trafo", device_id="dev-maquina"),
             ]
         )
         assert arbol.medidores_frontera("mt") == ["dev-trafo"]
@@ -54,10 +54,10 @@ class TestMedidoresFrontera:
             [
                 _nodo("mt"),
                 _nodo("tgbt", parent_id="mt"),
-                _nodo("carga", parent_id="tgbt", device_id="dev-carga"),
+                _nodo("maquina", parent_id="tgbt", device_id="dev-maquina"),
             ]
         )
-        assert arbol.medidores_frontera("mt") == ["dev-carga"]
+        assert arbol.medidores_frontera("mt") == ["dev-maquina"]
 
     def test_nodo_virtual_sin_medidores_devuelve_lista_vacia(self):
         arbol = ArbolUnifilarService([_nodo("mt"), _nodo("tgbt", parent_id="mt")])

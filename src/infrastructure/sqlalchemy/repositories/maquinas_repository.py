@@ -6,9 +6,9 @@ from decimal import Decimal
 from sqlalchemy import asc, func
 from sqlalchemy.orm import Session
 
-from src.domain.cargas.entities import Carga
-from src.domain.cargas.ports import RepositorioCargasPort, RepositorioSeriePotenciaPort
-from src.domain.cargas.value_objects import (
+from src.domain.maquinas.entities import Máquina
+from src.domain.maquinas.ports import RepositorioMáquinasPort, RepositorioSeriePotenciaPort
+from src.domain.maquinas.value_objects import (
     CategoriaCarga,
     FirmaCarga,
     NaturalezaElectrica,
@@ -20,7 +20,7 @@ from src.infrastructure.sqlalchemy.models import (
     TelemetryEnergyModel,
     TelemetryInstantaneousModel,
 )
-from src.infrastructure.sqlalchemy.models_cargas import LoadModel
+from src.infrastructure.sqlalchemy.models_maquinas import LoadModel
 
 
 def _a_float(valor: Decimal | None) -> float | None:
@@ -31,7 +31,7 @@ def _a_decimal(valor: float | None) -> Decimal | None:
     return Decimal(str(valor)) if valor is not None else None
 
 
-class MySQLCargasRepository(RepositorioCargasPort):
+class MySQLMáquinasRepository(RepositorioMáquinasPort):
     """Persistencia del catálogo de cargas.
 
     La firma se guarda aplanada en columnas de `loads` en vez de en una tabla propia:
@@ -59,8 +59,8 @@ class MySQLCargasRepository(RepositorioCargasPort):
             medida_en=model.signature_measured_at,
         )
 
-    def _to_entity(self, model: LoadModel) -> Carga:
-        return Carga(
+    def _to_entity(self, model: LoadModel) -> Máquina:
+        return Máquina(
             id=model.id,
             dispositivo_id=model.device_id,
             nombre=model.name,
@@ -74,15 +74,15 @@ class MySQLCargasRepository(RepositorioCargasPort):
             actualizado_en=model.updated_at,
         )
 
-    def _aplicar(self, model: LoadModel, carga: Carga) -> None:
-        model.name = carga.nombre
-        model.category = carga.categoria.value
-        model.electrical_nature = carga.naturaleza_electrica.value
-        model.operation_pattern = carga.patron_operacion.value
-        model.nameplate_power_w = _a_decimal(carga.potencia_nominal_w)
-        model.is_active = carga.activa
+    def _aplicar(self, model: LoadModel, maquina: Máquina) -> None:
+        model.name = maquina.nombre
+        model.category = maquina.categoria.value
+        model.electrical_nature = maquina.naturaleza_electrica.value
+        model.operation_pattern = maquina.patron_operacion.value
+        model.nameplate_power_w = _a_decimal(maquina.potencia_nominal_w)
+        model.is_active = maquina.activa
 
-        firma = carga.firma
+        firma = maquina.firma
         model.signature_power_w = _a_decimal(firma.potencia_w) if firma else None
         model.signature_dispersion_w = _a_decimal(firma.dispersion_w) if firma else None
         model.signature_reactive_var = _a_decimal(firma.potencia_reactiva_var) if firma else None
@@ -95,24 +95,24 @@ class MySQLCargasRepository(RepositorioCargasPort):
         model.signature_samples = firma.muestras if firma else None
         model.signature_measured_at = firma.medida_en if firma else None
 
-    def obtener_por_id(self, carga_id: str) -> Carga | None:
-        model = self.db.query(LoadModel).filter(LoadModel.id == carga_id).first()
+    def obtener_por_id(self, maquina_id: str) -> Máquina | None:
+        model = self.db.query(LoadModel).filter(LoadModel.id == maquina_id).first()
         return self._to_entity(model) if model else None
 
-    def obtener_por_nombre(self, dispositivo_id: str, nombre: str) -> Carga | None:
+    def obtener_por_nombre(self, dispositivo_id: str, nombre: str) -> Máquina | None:
         model = self.db.query(LoadModel).filter(LoadModel.device_id == dispositivo_id, LoadModel.name == nombre).first()
         return self._to_entity(model) if model else None
 
-    def listar_por_dispositivo(self, dispositivo_id: str, solo_activas: bool = False) -> list[Carga]:
+    def listar_por_dispositivo(self, dispositivo_id: str, solo_activas: bool = False) -> list[Máquina]:
         q = self.db.query(LoadModel).filter(LoadModel.device_id == dispositivo_id)
         if solo_activas:
             q = q.filter(LoadModel.is_active.is_(True))
         return [self._to_entity(m) for m in q.order_by(LoadModel.name).all()]
 
-    def listar(self) -> list[Carga]:
+    def listar(self) -> list[Máquina]:
         return [self._to_entity(m) for m in self.db.query(LoadModel).order_by(LoadModel.name).all()]
 
-    def guardar(self, carga: Carga) -> Carga:
+    def guardar(self, carga: Máquina) -> Máquina:
         model = self.db.query(LoadModel).filter(LoadModel.id == carga.id).first()
         if not model:
             model = LoadModel(id=carga.id, device_id=carga.dispositivo_id)

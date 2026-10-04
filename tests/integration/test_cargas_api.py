@@ -1,11 +1,11 @@
-"""tests/integration/test_cargas_api.py — Pruebas de integración de la API de cargas: registro de rutas, contrato y códigos de error."""
+"""tests/integration/test_cargas_api.py — Pruebas de integración de la API de maquinas: registro de rutas, contrato y códigos de error."""
 
 from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient
 
-from src.application.dtos.carga_dto import (
+from src.application.dtos.maquina_dto import (
     AnalisisConsumoResponseDTO,
     AtribucionConsumoResponseDTO,
     CampanaResponseDTO,
@@ -18,30 +18,30 @@ from src.application.dtos.carga_dto import (
     PerfilLineaBaseDTO,
     ResultadoCalibracionDTO,
 )
-from src.domain.cargas.exceptions import (
-    CampanaEnCursoError,
-    CargaDuplicadaError,
-    CargaNoEncontradaError,
+from src.domain.maquinas.exceptions import (
+    EnsayoEnCursoError,
+    MáquinaDuplicadaError,
+    MáquinaNoEncontradaError,
 )
-from src.domain.cargas.value_objects import (
+from src.domain.maquinas.value_objects import (
     CategoriaCarga,
     NaturalezaElectrica,
     OrigenFirma,
     PatronOperacion,
 )
-from src.domain.cargas.value_objects import (
+from src.domain.maquinas.value_objects import (
     EstadoCampana as EstadoCampanaVO,
 )
-from src.domain.cargas.value_objects import (
+from src.domain.maquinas.value_objects import (
     MotivoDescarte as MotivoDescarteVO,
 )
-from src.domain.cargas.value_objects import (
+from src.domain.maquinas.value_objects import (
     OrigenClasificacionCarga as OrigenClasificacionCargaVO,
 )
-from src.domain.cargas.value_objects import (
+from src.domain.maquinas.value_objects import (
     PatronOperacion as PatronOperacionVO,
 )
-from src.domain.cargas.value_objects import (
+from src.domain.maquinas.value_objects import (
     TipoCampana as TipoCampanaVO,
 )
 from src.infrastructure.fastapi.dependencies import (
@@ -66,12 +66,12 @@ def _rutas_cargas(app) -> dict[str, set[str]]:
             for subruta in ruta.original_router.routes:
                 if hasattr(subruta, "methods") and hasattr(subruta, "path"):
                     rutas.setdefault(subruta.path, set()).update(subruta.methods or set())
-    return {k: v for k, v in rutas.items() if k.startswith("/api/v1/cargas")}
+    return {k: v for k, v in rutas.items() if k.startswith("/api/v1/maquinas")}
 
 
 def _carga_dto(**kwargs) -> CargaResponseDTO:
     base = dict(
-        id="carga-1",
+        id="maquina-1",
         dispositivo_id=MEDIDOR_CASA,
         nombre="Pava eléctrica",
         categoria=CategoriaCarga.COCCION,
@@ -123,18 +123,18 @@ def _cliente(use_case: MagicMock, rol: str = "admin") -> TestClient:
 def test_create_app_registra_rutas_de_cargas():
     rutas = _rutas_cargas(create_app())
 
-    assert "GET" in rutas["/api/v1/cargas"]
-    assert "POST" in rutas["/api/v1/cargas"]
-    assert "GET" in rutas["/api/v1/cargas/{carga_id}"]
-    assert "PATCH" in rutas["/api/v1/cargas/{carga_id}"]
-    assert "PUT" in rutas["/api/v1/cargas/{carga_id}/firma"]
+    assert "GET" in rutas["/api/v1/maquinas"]
+    assert "POST" in rutas["/api/v1/maquinas"]
+    assert "GET" in rutas["/api/v1/maquinas/{carga_id}"]
+    assert "PATCH" in rutas["/api/v1/maquinas/{carga_id}"]
+    assert "PUT" in rutas["/api/v1/maquinas/{carga_id}/firma"]
 
 
 def test_listar_cargas_filtra_por_dispositivo():
     use_case = MagicMock()
     use_case.listar_cargas.return_value = [_carga_dto()]
 
-    resp = _cliente(use_case).get(f"/api/v1/cargas?device_id={MEDIDOR_CASA}&solo_activas=true")
+    resp = _cliente(use_case).get(f"/api/v1/maquinas?device_id={MEDIDOR_CASA}&solo_activas=true")
 
     assert resp.status_code == 200
     assert resp.json()[0]["nombre"] == "Pava eléctrica"
@@ -146,7 +146,7 @@ def test_registrar_carga_devuelve_el_contrato_completo():
     use_case.registrar_carga.return_value = _carga_dto()
 
     resp = _cliente(use_case).post(
-        "/api/v1/cargas",
+        "/api/v1/maquinas",
         json={
             "nombre": "Pava eléctrica",
             "dispositivo_id": MEDIDOR_CASA,
@@ -166,9 +166,9 @@ def test_registrar_carga_devuelve_el_contrato_completo():
 
 def test_carga_inexistente_devuelve_404():
     use_case = MagicMock()
-    use_case.obtener_carga.side_effect = CargaNoEncontradaError("Carga 'x' no encontrada.")
+    use_case.obtener_carga.side_effect = MáquinaNoEncontradaError("Máquina 'x' no encontrada.")
 
-    resp = _cliente(use_case).get("/api/v1/cargas/x")
+    resp = _cliente(use_case).get("/api/v1/maquinas/x")
 
     assert resp.status_code == 404
     assert "no encontrada" in resp.json()["detail"]
@@ -176,9 +176,9 @@ def test_carga_inexistente_devuelve_404():
 
 def test_carga_duplicada_devuelve_422():
     use_case = MagicMock()
-    use_case.registrar_carga.side_effect = CargaDuplicadaError("ya existe")
+    use_case.registrar_carga.side_effect = MáquinaDuplicadaError("ya existe")
 
-    resp = _cliente(use_case).post("/api/v1/cargas", json={"nombre": "Heladera", "dispositivo_id": MEDIDOR_CASA})
+    resp = _cliente(use_case).post("/api/v1/maquinas", json={"nombre": "Heladera", "dispositivo_id": MEDIDOR_CASA})
 
     assert resp.status_code == 422
     assert resp.json()["detail"] == "ya existe"
@@ -188,7 +188,7 @@ def test_el_invitado_no_puede_registrar_cargas():
     use_case = MagicMock()
 
     resp = _cliente(use_case, rol="invitado").post(
-        "/api/v1/cargas", json={"nombre": "Heladera", "dispositivo_id": MEDIDOR_CASA}
+        "/api/v1/maquinas", json={"nombre": "Heladera", "dispositivo_id": MEDIDOR_CASA}
     )
 
     assert resp.status_code == 403
@@ -212,7 +212,7 @@ def test_fijar_firma_manual_expone_origen_y_completitud():
     )
 
     resp = _cliente(use_case).put(
-        "/api/v1/cargas/carga-1/firma",
+        "/api/v1/maquinas/maquina-1/firma",
         json={"potencia_w": 1850.0, "dispersion_w": 90.0, "factor_potencia": 0.99, "duracion_encendido_s": 180.0},
     )
 
@@ -226,7 +226,7 @@ def test_potencia_nominal_no_positiva_es_rechazada_por_el_contrato():
     use_case = MagicMock()
 
     resp = _cliente(use_case).post(
-        "/api/v1/cargas",
+        "/api/v1/maquinas",
         json={"nombre": "Heladera", "dispositivo_id": MEDIDOR_CASA, "potencia_nominal_w": 0},
     )
 
@@ -237,24 +237,24 @@ def test_potencia_nominal_no_positiva_es_rechazada_por_el_contrato():
 def test_create_app_registra_la_ruta_de_perfil():
     rutas = _rutas_cargas(create_app())
 
-    assert "GET" in rutas["/api/v1/cargas/perfil"]
+    assert "GET" in rutas["/api/v1/maquinas/perfil"]
 
 
 def test_perfil_no_se_confunde_con_el_id_de_una_carga():
     """`/perfil` está declarada antes que `/{carga_id}`: no debe caer en el CRUD."""
-    cargas = MagicMock()
+    maquinas = MagicMock()
     analisis = MagicMock()
     analisis.perfilar.return_value = _perfil_dto()
 
     app = create_app()
-    app.dependency_overrides[get_cargas_use_case] = lambda: cargas
+    app.dependency_overrides[get_cargas_use_case] = lambda: maquinas
     app.dependency_overrides[get_analisis_consumo_use_case] = lambda: analisis
     app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "u1", "rol": "admin"}
 
-    resp = TestClient(app).get(f"/api/v1/cargas/perfil?device_id={MEDIDOR_CASA}&dias=7")
+    resp = TestClient(app).get(f"/api/v1/maquinas/perfil?device_id={MEDIDOR_CASA}&dias=7")
 
     assert resp.status_code == 200
-    cargas.obtener_carga.assert_not_called()
+    maquinas.obtener_carga.assert_not_called()
     analisis.perfilar.assert_called_once_with(MEDIDOR_CASA, dias=7, zona="America/Argentina/Buenos_Aires")
 
 
@@ -266,7 +266,7 @@ def test_el_perfil_expone_linea_base_ciclos_y_advertencia_de_cadencia():
     app.dependency_overrides[get_analisis_consumo_use_case] = lambda: analisis
     app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "u1", "rol": "admin"}
 
-    cuerpo = TestClient(app).get(f"/api/v1/cargas/perfil?device_id={MEDIDOR_CASA}").json()
+    cuerpo = TestClient(app).get(f"/api/v1/maquinas/perfil?device_id={MEDIDOR_CASA}").json()
 
     assert cuerpo["linea_base"]["linea_base_nocturna_W"] == 110.0
     assert cuerpo["ciclos_sobre_linea_base"]["patron"] == "CICLICO_TERMOSTATICO"
@@ -283,14 +283,14 @@ def test_el_invitado_puede_leer_el_perfil():
     app.dependency_overrides[get_analisis_consumo_use_case] = lambda: analisis
     app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "u1", "rol": "invitado"}
 
-    assert TestClient(app).get(f"/api/v1/cargas/perfil?device_id={MEDIDOR_CASA}").status_code == 200
+    assert TestClient(app).get(f"/api/v1/maquinas/perfil?device_id={MEDIDOR_CASA}").status_code == 200
 
 
 def _campana_dto(**kwargs) -> CampanaResponseDTO:
     base = dict(
         id="camp-1",
         dispositivo_id=MEDIDOR_CASA,
-        carga_id="carga-1",
+        carga_id="maquina-1",
         tipo=TipoCampanaVO.ACTIVA,
         estado=EstadoCampanaVO.EN_CURSO,
         inicio_at=AHORA,
@@ -312,12 +312,12 @@ def _cliente_campanas(use_case: MagicMock, rol: str = "admin") -> TestClient:
 def test_create_app_registra_las_rutas_de_campana():
     rutas = _rutas_cargas(create_app())
 
-    assert "POST" in rutas["/api/v1/cargas/campanas/activas"]
-    assert "POST" in rutas["/api/v1/cargas/campanas/pasivas"]
-    assert "GET" in rutas["/api/v1/cargas/campanas/{campana_id}"]
-    assert "PATCH" in rutas["/api/v1/cargas/campanas/{campana_id}/finalizar"]
-    assert "PATCH" in rutas["/api/v1/cargas/campanas/{campana_id}/descartar"]
-    assert "GET" in rutas["/api/v1/cargas/{carga_id}/campanas"]
+    assert "POST" in rutas["/api/v1/maquinas/campanas/activas"]
+    assert "POST" in rutas["/api/v1/maquinas/campanas/pasivas"]
+    assert "GET" in rutas["/api/v1/maquinas/campanas/{campana_id}"]
+    assert "PATCH" in rutas["/api/v1/maquinas/campanas/{campana_id}/finalizar"]
+    assert "PATCH" in rutas["/api/v1/maquinas/campanas/{campana_id}/descartar"]
+    assert "GET" in rutas["/api/v1/maquinas/{carga_id}/campanas"]
 
 
 def test_iniciar_campana_activa_informa_si_la_rafaga_se_pidio():
@@ -325,8 +325,8 @@ def test_iniciar_campana_activa_informa_si_la_rafaga_se_pidio():
     use_case.iniciar_activa.return_value = _campana_dto()
 
     resp = _cliente_campanas(use_case).post(
-        "/api/v1/cargas/campanas/activas",
-        json={"dispositivo_id": MEDIDOR_CASA, "duracion_segundos": 300, "carga_id": "carga-1"},
+        "/api/v1/maquinas/campanas/activas",
+        json={"dispositivo_id": MEDIDOR_CASA, "duracion_segundos": 300, "carga_id": "maquina-1"},
     )
 
     assert resp.status_code == 200
@@ -336,21 +336,21 @@ def test_iniciar_campana_activa_informa_si_la_rafaga_se_pidio():
 
 def test_la_ruta_de_campana_no_colisiona_con_la_de_una_carga():
     """`/campanas/{id}` y `/{carga_id}/campanas` tienen la misma forma: importa el orden."""
-    cargas, campanas = MagicMock(), MagicMock()
+    maquinas, campanas = MagicMock(), MagicMock()
     campanas.obtener.return_value = _campana_dto()
     campanas.listar_por_carga.return_value = [_campana_dto()]
 
     app = create_app()
-    app.dependency_overrides[get_cargas_use_case] = lambda: cargas
+    app.dependency_overrides[get_cargas_use_case] = lambda: maquinas
     app.dependency_overrides[get_caracterizacion_use_case] = lambda: campanas
     app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "u1", "rol": "admin"}
     cliente = TestClient(app)
 
-    assert cliente.get("/api/v1/cargas/campanas/camp-1").status_code == 200
-    assert cliente.get("/api/v1/cargas/carga-1/campanas").status_code == 200
+    assert cliente.get("/api/v1/maquinas/campanas/camp-1").status_code == 200
+    assert cliente.get("/api/v1/maquinas/maquina-1/campanas").status_code == 200
     campanas.obtener.assert_called_once_with("camp-1")
-    campanas.listar_por_carga.assert_called_once_with("carga-1")
-    cargas.obtener_carga.assert_not_called()
+    campanas.listar_por_carga.assert_called_once_with("maquina-1")
+    maquinas.obtener_carga.assert_not_called()
 
 
 def test_finalizar_una_campana_contaminada_devuelve_200_con_el_motivo():
@@ -359,15 +359,15 @@ def test_finalizar_una_campana_contaminada_devuelve_200_con_el_motivo():
     use_case.finalizar.return_value = _campana_dto(
         estado=EstadoCampanaVO.CONTAMINADA,
         motivo_descarte=MotivoDescarteVO.ESCALON_AJENO,
-        notas="Apareció un escalón de 2000 W dentro de la ventana: otra carga entró.",
+        notas="Apareció un escalón de 2000 W dentro de la ventana: otra maquina entró.",
         resultado=ResultadoCalibracionDTO(
             estado=EstadoCampanaVO.CONTAMINADA,
             motivo=MotivoDescarteVO.ESCALON_AJENO,
-            detalle="otra carga entró en medio de la medición",
+            detalle="otra maquina entró en medio de la medición",
         ),
     )
 
-    cuerpo = _cliente_campanas(use_case).patch("/api/v1/cargas/campanas/camp-1/finalizar").json()
+    cuerpo = _cliente_campanas(use_case).patch("/api/v1/maquinas/campanas/camp-1/finalizar").json()
 
     assert cuerpo["estado"] == "CONTAMINADA"
     assert cuerpo["motivo_descarte"] == "ESCALON_AJENO"
@@ -376,10 +376,10 @@ def test_finalizar_una_campana_contaminada_devuelve_200_con_el_motivo():
 
 def test_no_se_puede_abrir_una_segunda_campana_sobre_el_mismo_medidor():
     use_case = MagicMock()
-    use_case.iniciar_activa.side_effect = CampanaEnCursoError("ya hay una campaña en curso")
+    use_case.iniciar_activa.side_effect = EnsayoEnCursoError("ya hay una campaña en curso")
 
     resp = _cliente_campanas(use_case).post(
-        "/api/v1/cargas/campanas/activas",
+        "/api/v1/maquinas/campanas/activas",
         json={"dispositivo_id": MEDIDOR_CASA, "duracion_segundos": 300},
     )
 
@@ -391,7 +391,7 @@ def test_una_duracion_desmedida_es_rechazada_por_el_contrato():
     use_case = MagicMock()
 
     resp = _cliente_campanas(use_case).post(
-        "/api/v1/cargas/campanas/pasivas",
+        "/api/v1/maquinas/campanas/pasivas",
         json={"dispositivo_id": MEDIDOR_CASA, "duracion_segundos": 90_000},
     )
 
@@ -403,7 +403,7 @@ def test_el_invitado_no_puede_abrir_campanas():
     use_case = MagicMock()
 
     resp = _cliente_campanas(use_case, rol="invitado").post(
-        "/api/v1/cargas/campanas/activas",
+        "/api/v1/maquinas/campanas/activas",
         json={"dispositivo_id": MEDIDOR_CASA, "duracion_segundos": 300},
     )
 
@@ -421,10 +421,10 @@ def _cliente_atribucion(use_case: MagicMock, rol: str = "admin") -> TestClient:
 def test_create_app_registra_las_rutas_de_atribucion():
     rutas = _rutas_cargas(create_app())
 
-    assert "GET" in rutas["/api/v1/cargas/atribucion"]
-    assert "POST" in rutas["/api/v1/cargas/analisis"]
-    assert "PATCH" in rutas["/api/v1/cargas/intervalos/{intervalo_id}/corregir"]
-    assert "GET" in rutas["/api/v1/cargas/{carga_id}/intervalos"]
+    assert "GET" in rutas["/api/v1/maquinas/atribucion"]
+    assert "POST" in rutas["/api/v1/maquinas/analisis"]
+    assert "PATCH" in rutas["/api/v1/maquinas/intervalos/{intervalo_id}/corregir"]
+    assert "GET" in rutas["/api/v1/maquinas/{carga_id}/intervalos"]
 
 
 def test_la_atribucion_expone_el_residual_como_dato_de_primera_clase():
@@ -446,7 +446,7 @@ def test_la_atribucion_expone_el_residual_como_dato_de_primera_clase():
         advertencia="Queda sin atribuir el 43% del consumo.",
     )
 
-    cuerpo = _cliente_atribucion(use_case).get(f"/api/v1/cargas/atribucion?device_id={MEDIDOR_CASA}").json()
+    cuerpo = _cliente_atribucion(use_case).get(f"/api/v1/maquinas/atribucion?device_id={MEDIDOR_CASA}").json()
 
     assert cuerpo["residual_kwh"] == 52.0
     assert cuerpo["calidad_suficiente"] is False
@@ -468,7 +468,7 @@ def test_disparar_el_analisis_devuelve_el_recuento_de_atribuidos():
         cargas_con_firma=5,
     )
 
-    cuerpo = _cliente_atribucion(use_case).post(f"/api/v1/cargas/analisis?device_id={MEDIDOR_CASA}&dias=7").json()
+    cuerpo = _cliente_atribucion(use_case).post(f"/api/v1/maquinas/analisis?device_id={MEDIDOR_CASA}&dias=7").json()
 
     assert cuerpo["atribuidos"] == 31
     assert cuerpo["no_atribuidos"] == 11
@@ -490,7 +490,7 @@ def test_corregir_un_intervalo_registra_al_usuario():
     )
 
     resp = _cliente_atribucion(use_case).patch(
-        "/api/v1/cargas/intervalos/7/corregir", json={"carga_id": "c1", "notas": "fui yo"}
+        "/api/v1/maquinas/intervalos/7/corregir", json={"carga_id": "c1", "notas": "fui yo"}
     )
 
     assert resp.status_code == 200
@@ -502,8 +502,8 @@ def test_el_invitado_no_puede_corregir_ni_disparar_el_analisis():
     use_case = MagicMock()
     cliente = _cliente_atribucion(use_case, rol="invitado")
 
-    assert cliente.post(f"/api/v1/cargas/analisis?device_id={MEDIDOR_CASA}").status_code == 403
-    assert cliente.patch("/api/v1/cargas/intervalos/7/corregir", json={"carga_id": None}).status_code == 403
+    assert cliente.post(f"/api/v1/maquinas/analisis?device_id={MEDIDOR_CASA}").status_code == 403
+    assert cliente.patch("/api/v1/maquinas/intervalos/7/corregir", json={"carga_id": None}).status_code == 403
     use_case.analizar.assert_not_called()
     use_case.corregir_intervalo.assert_not_called()
 
@@ -514,6 +514,6 @@ def test_el_invitado_si_puede_leer_la_atribucion():
         dispositivo_id=MEDIDOR_CASA, desde=AHORA, hasta=AHORA
     )
 
-    resp = _cliente_atribucion(use_case, rol="invitado").get(f"/api/v1/cargas/atribucion?device_id={MEDIDOR_CASA}")
+    resp = _cliente_atribucion(use_case, rol="invitado").get(f"/api/v1/maquinas/atribucion?device_id={MEDIDOR_CASA}")
 
     assert resp.status_code == 200

@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient
 
-from src.application.dtos.carga_dto import (
+from src.application.dtos.maquina_dto import (
     AnalisisConsumoResponseDTO,
     AtribucionConsumoResponseDTO,
     CampanaResponseDTO,
@@ -14,8 +14,8 @@ from src.application.dtos.carga_dto import (
     PerfilConsumoResponseDTO,
     PerfilLineaBaseDTO,
 )
-from src.domain.cargas.entities import IntervaloActividadCarga
-from src.domain.cargas.value_objects import (
+from src.domain.maquinas.entities import IntervaloActividadMáquina
+from src.domain.maquinas.value_objects import (
     CategoriaCarga,
     EstadoCampana,
     NaturalezaElectrica,
@@ -39,7 +39,7 @@ AHORA = datetime(2026, 9, 4, 12, 0, tzinfo=timezone.utc)
 
 def _carga_response_dto(**kwargs) -> CargaResponseDTO:
     base = dict(
-        id="carga-1",
+        id="maquina-1",
         dispositivo_id=MEDIDOR_ID,
         nombre="Compresor Principal",
         categoria=CategoriaCarga.OTROS,
@@ -61,7 +61,7 @@ def _campana_response_dto(**kwargs) -> CampanaResponseDTO:
     base = dict(
         id="camp-1",
         dispositivo_id=MEDIDOR_ID,
-        carga_id="carga-1",
+        carga_id="maquina-1",
         tipo=TipoCampana.ACTIVA,
         estado=EstadoCampana.EN_CURSO,
         inicio_at=AHORA,
@@ -82,13 +82,13 @@ def _campana_response_dto(**kwargs) -> CampanaResponseDTO:
 def _cliente(rol: str = "admin") -> tuple[TestClient, dict[str, MagicMock]]:
     app = create_app()
     mocks = {
-        "cargas": MagicMock(),
+        "maquinas": MagicMock(),
         "analisis": MagicMock(),
         "atribucion": MagicMock(),
         "caracterizacion": MagicMock(),
         "exportar": MagicMock(),
     }
-    app.dependency_overrides[get_cargas_use_case] = lambda: mocks["cargas"]
+    app.dependency_overrides[get_cargas_use_case] = lambda: mocks["maquinas"]
     app.dependency_overrides[get_analisis_consumo_use_case] = lambda: mocks["analisis"]
     app.dependency_overrides[get_atribucion_use_case] = lambda: mocks["atribucion"]
     app.dependency_overrides[get_caracterizacion_use_case] = lambda: mocks["caracterizacion"]
@@ -99,13 +99,13 @@ def _cliente(rol: str = "admin") -> tuple[TestClient, dict[str, MagicMock]]:
 
 def test_listar_cargas_endpoint():
     client, mocks = _cliente()
-    mocks["cargas"].listar_cargas.return_value = [_carga_response_dto()]
+    mocks["maquinas"].listar_cargas.return_value = [_carga_response_dto()]
 
-    response = client.get(f"/api/v1/cargas?device_id={MEDIDOR_ID}")
+    response = client.get(f"/api/v1/maquinas?device_id={MEDIDOR_ID}")
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 1
-    assert data[0]["id"] == "carga-1"
+    assert data[0]["id"] == "maquina-1"
     assert data[0]["nombre"] == "Compresor Principal"
 
 
@@ -136,7 +136,7 @@ def test_perfilar_consumo_endpoint():
         advertencia_cadencia=None,
     )
 
-    response = client.get(f"/api/v1/cargas/perfil?device_id={MEDIDOR_ID}&dias=14")
+    response = client.get(f"/api/v1/maquinas/perfil?device_id={MEDIDOR_ID}&dias=14")
     assert response.status_code == 200
     data = response.json()
     assert data["dispositivo_id"] == MEDIDOR_ID
@@ -157,7 +157,7 @@ def test_obtener_atribucion_endpoint():
         calidad_suficiente=True,
     )
 
-    response = client.get(f"/api/v1/cargas/atribucion?device_id={MEDIDOR_ID}&dias=30")
+    response = client.get(f"/api/v1/maquinas/atribucion?device_id={MEDIDOR_ID}&dias=30")
     assert response.status_code == 200
     data = response.json()
     assert data["energia_atribuida_kwh"] == 3800.0
@@ -176,7 +176,7 @@ def test_disparar_analisis_endpoint():
         no_atribuidos=2,
     )
 
-    response = client.post(f"/api/v1/cargas/analisis?device_id={MEDIDOR_ID}&dias=7")
+    response = client.post(f"/api/v1/maquinas/analisis?device_id={MEDIDOR_ID}&dias=7")
     assert response.status_code == 200
     data = response.json()
     assert data["episodios_detectados"] == 15
@@ -184,10 +184,10 @@ def test_disparar_analisis_endpoint():
 
 def test_corregir_intervalo_endpoint():
     client, mocks = _cliente()
-    intervalo = IntervaloActividadCarga(
+    intervalo = IntervaloActividadMáquina(
         id=1,
         dispositivo_id=MEDIDOR_ID,
-        carga_id="carga-1",
+        carga_id="maquina-1",
         inicio_at=AHORA,
         fin_at=AHORA,
         potencia_media_w=15000.0,
@@ -198,8 +198,8 @@ def test_corregir_intervalo_endpoint():
     )
     mocks["atribucion"].corregir_intervalo.return_value = IntervaloActividadResponseDTO.model_validate(intervalo)
 
-    payload = {"carga_id": "carga-1", "notas": "Corrección manual"}
-    response = client.patch("/api/v1/cargas/intervalos/1/corregir", json=payload)
+    payload = {"carga_id": "maquina-1", "notas": "Corrección manual"}
+    response = client.patch("/api/v1/maquinas/intervalos/1/corregir", json=payload)
     assert response.status_code == 200
     data = response.json()
     assert data["origen"] == "CORRECCION_HUMANA"
@@ -207,7 +207,7 @@ def test_corregir_intervalo_endpoint():
 
 def test_obtener_presets_catalogo_endpoint():
     client, _ = _cliente()
-    response = client.get("/api/v1/cargas/presets")
+    response = client.get("/api/v1/maquinas/presets")
     assert response.status_code == 200
     data = response.json()
     assert isinstance(data, list)
@@ -220,10 +220,10 @@ def test_iniciar_campana_activa_endpoint():
 
     payload = {
         "dispositivo_id": MEDIDOR_ID,
-        "carga_id": "carga-1",
+        "carga_id": "maquina-1",
         "duracion_segundos": 300,
     }
-    response = client.post("/api/v1/cargas/campanas/activas", json=payload)
+    response = client.post("/api/v1/maquinas/campanas/activas", json=payload)
     assert response.status_code == 200
     data = response.json()
     assert data["id"] == "camp-1"
@@ -235,7 +235,7 @@ def test_finalizar_campana_endpoint():
         estado=EstadoCampana.COMPLETADA, fin_at=AHORA
     )
 
-    response = client.patch("/api/v1/cargas/campanas/camp-1/finalizar")
+    response = client.patch("/api/v1/maquinas/campanas/camp-1/finalizar")
     assert response.status_code == 200
     data = response.json()
     assert data["estado"] == "COMPLETADA"
@@ -245,6 +245,6 @@ def test_exportar_cargas_csv_endpoint():
     client, mocks = _cliente()
     mocks["exportar"].exportar_csv.return_value = iter([b"col1,col2\nval1,val2\n"])
 
-    response = client.get(f"/api/v1/cargas/exportar/csv?dispositivo_id={MEDIDOR_ID}&dias=30")
+    response = client.get(f"/api/v1/maquinas/exportar/csv?dispositivo_id={MEDIDOR_ID}&dias=30")
     assert response.status_code == 200
     assert "text/csv" in response.headers["content-type"]

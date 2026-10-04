@@ -639,7 +639,7 @@ def test_evaluar_alerta_ti_desconectado():
     )
     assert len(alertas_bifasico) == 0
 
-    # Si todas las fases estan apagadas o carga < 10A, no debe alertar desconexion de TI
+    # Si todas las fases estan apagadas o maquina < 10A, no debe alertar desconexion de TI
     lectura_apagada = LecturaInstantanea(
         id=None,
         dispositivo_id="dev-constituyentes",

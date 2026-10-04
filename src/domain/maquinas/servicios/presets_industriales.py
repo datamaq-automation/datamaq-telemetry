@@ -1,8 +1,8 @@
-"""src/domain/cargas/servicios/presets_industriales.py — Catálogo de maquinaria y cargas industriales normalizadas."""
+"""src/domain/maquinas/servicios/presets_industriales.py — Catálogo de maquinaria y cargas industriales normalizadas."""
 
-from src.domain.cargas.entities import Carga
-from src.domain.cargas.servicios.modelo_motor_industrial import ModeloMotorFisicoService
-from src.domain.cargas.value_objects import (
+from src.domain.maquinas.entities import Máquina
+from src.domain.maquinas.servicios.modelo_motor_industrial import ModeloMotorFisicoService
+from src.domain.maquinas.value_objects import (
     CategoriaCarga,
     FirmaCarga,
     NaturalezaElectrica,
@@ -12,16 +12,16 @@ from src.domain.cargas.value_objects import (
 
 
 class CatalogoPresetsIndustriales:
-    """Genera instancias de Carga para maquinaria industrial a partir de potencias de chapa estándar."""
+    """Genera instancias de Máquina para maquinaria industrial a partir de potencias de chapa estándar."""
 
     @classmethod
-    def crear_motor_trifasico_5_5kw(cls, dispositivo_id: str, carga_id: str = "motor-5-5kw") -> Carga:
+    def crear_motor_trifasico_5_5kw(cls, dispositivo_id: str, maquina_id: str = "motor-5-5kw") -> Máquina:
         p_nom = 5500.0
         firma = ModeloMotorFisicoService.generar_firma_desde_chapa(
             p_nom, factor_carga_esperado=0.75, cos_phi_esperado=0.82
         )
-        return Carga(
-            id=carga_id,
+        return Máquina(
+            id=maquina_id,
             dispositivo_id=dispositivo_id,
             nombre="Motor Trifásico 5.5 kW (7.5 HP)",
             categoria=CategoriaCarga.FUERZA_MOTRIZ,
@@ -32,13 +32,13 @@ class CatalogoPresetsIndustriales:
         )
 
     @classmethod
-    def crear_motor_trifasico_11kw(cls, dispositivo_id: str, carga_id: str = "motor-11kw") -> Carga:
+    def crear_motor_trifasico_11kw(cls, dispositivo_id: str, maquina_id: str = "motor-11kw") -> Máquina:
         p_nom = 11000.0
         firma = ModeloMotorFisicoService.generar_firma_desde_chapa(
             p_nom, factor_carga_esperado=0.75, cos_phi_esperado=0.84
         )
-        return Carga(
-            id=carga_id,
+        return Máquina(
+            id=maquina_id,
             dispositivo_id=dispositivo_id,
             nombre="Motor Trifásico 11 kW (15 HP)",
             categoria=CategoriaCarga.FUERZA_MOTRIZ,
@@ -49,13 +49,13 @@ class CatalogoPresetsIndustriales:
         )
 
     @classmethod
-    def crear_motor_trifasico_22kw(cls, dispositivo_id: str, carga_id: str = "motor-22kw") -> Carga:
+    def crear_motor_trifasico_22kw(cls, dispositivo_id: str, maquina_id: str = "motor-22kw") -> Máquina:
         p_nom = 22000.0
         firma = ModeloMotorFisicoService.generar_firma_desde_chapa(
             p_nom, factor_carga_esperado=0.75, cos_phi_esperado=0.86
         )
-        return Carga(
-            id=carga_id,
+        return Máquina(
+            id=maquina_id,
             dispositivo_id=dispositivo_id,
             nombre="Motor Trifásico 22 kW (30 HP)",
             categoria=CategoriaCarga.FUERZA_MOTRIZ,
@@ -66,13 +66,13 @@ class CatalogoPresetsIndustriales:
         )
 
     @classmethod
-    def crear_motor_trifasico_45kw(cls, dispositivo_id: str, carga_id: str = "motor-45kw") -> Carga:
+    def crear_motor_trifasico_45kw(cls, dispositivo_id: str, maquina_id: str = "motor-45kw") -> Máquina:
         p_nom = 45000.0
         firma = ModeloMotorFisicoService.generar_firma_desde_chapa(
             p_nom, factor_carga_esperado=0.80, cos_phi_esperado=0.88
         )
-        return Carga(
-            id=carga_id,
+        return Máquina(
+            id=maquina_id,
             dispositivo_id=dispositivo_id,
             nombre="Motor Trifásico 45 kW (60 HP)",
             categoria=CategoriaCarga.FUERZA_MOTRIZ,
@@ -83,13 +83,13 @@ class CatalogoPresetsIndustriales:
         )
 
     @classmethod
-    def crear_compresor_tornillo_37kw(cls, dispositivo_id: str, carga_id: str = "compresor-37kw") -> Carga:
+    def crear_compresor_tornillo_37kw(cls, dispositivo_id: str, maquina_id: str = "compresor-37kw") -> Máquina:
         p_nom = 37000.0
         firma = ModeloMotorFisicoService.generar_firma_desde_chapa(
             p_nom, factor_carga_esperado=0.85, cos_phi_esperado=0.87
         )
-        return Carga(
-            id=carga_id,
+        return Máquina(
+            id=maquina_id,
             dispositivo_id=dispositivo_id,
             nombre="Compresor de Tornillo 37 kW (50 HP)",
             categoria=CategoriaCarga.FUERZA_MOTRIZ,
@@ -100,10 +100,10 @@ class CatalogoPresetsIndustriales:
         )
 
     @classmethod
-    def crear_horno_resistivo_50kw(cls, dispositivo_id: str, carga_id: str = "horno-50kw") -> Carga:
+    def crear_horno_resistivo_50kw(cls, dispositivo_id: str, maquina_id: str = "horno-50kw") -> Máquina:
         p_nom = 50000.0
-        return Carga(
-            id=carga_id,
+        return Máquina(
+            id=maquina_id,
             dispositivo_id=dispositivo_id,
             nombre="Horno Industrial Resistivo 50 kW",
             categoria=CategoriaCarga.OTROS,

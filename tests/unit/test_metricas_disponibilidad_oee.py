@@ -45,7 +45,7 @@ def test_calculo_oee_con_paradas_programadas_y_no_programadas():
     #
     # Tiempo total: 8h = 28800s
     # Tiempo parada programada: 1h = 3600s
-    # Tiempo planificado de carga: 8h - 1h = 7h = 25200s
+    # Tiempo planificado de maquina: 8h - 1h = 7h = 25200s
     # Tiempo marcha: 2h + 3h + 1h = 6h = 21600s
     # Tiempo parada no programada: 1h = 3600s
     #

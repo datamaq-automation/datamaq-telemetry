@@ -88,7 +88,7 @@ def test_exportar_cargas_csv_streaming_end_to_end():
     app.dependency_overrides[get_exportar_cargas_use_case] = lambda: mock_use_case
 
     client = TestClient(app)
-    response = client.get("/api/v1/cargas/exportar/csv?dispositivo_id=dev-test-1")
+    response = client.get("/api/v1/maquinas/exportar/csv?dispositivo_id=dev-test-1")
 
     assert response.status_code == 200
     assert "text/csv" in response.headers["content-type"]

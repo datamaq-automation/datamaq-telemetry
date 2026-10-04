@@ -5,11 +5,11 @@ from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient
 
-from src.application.dtos.carga_dto import (
+from src.application.dtos.maquina_dto import (
     IntervaloActividadResponseDTO,
 )
-from src.domain.cargas.entities import Carga
-from src.domain.cargas.value_objects import (
+from src.domain.maquinas.entities import Máquina
+from src.domain.maquinas.value_objects import (
     CategoriaCarga,
     NaturalezaElectrica,
     PatronOperacion,
@@ -39,7 +39,7 @@ def test_obtener_presets_catalogo_devuelve_los_9_presets():
     use_case = MagicMock()
     cliente = _cliente_atribucion(use_case, rol="invitado")
 
-    respuesta = cliente.get("/api/v1/cargas/presets")
+    respuesta = cliente.get("/api/v1/maquinas/presets")
 
     assert respuesta.status_code == 200
     presets = respuesta.json()
@@ -53,8 +53,8 @@ def test_obtener_presets_catalogo_devuelve_los_9_presets():
 
 def test_inicializar_presets_requiere_escritura_y_device_id():
     use_case = MagicMock()
-    carga_falsa = Carga(
-        id="carga-1",
+    carga_falsa = Máquina(
+        id="maquina-1",
         dispositivo_id=MEDIDOR_PRUEBA,
         nombre="Heladera",
         categoria=CategoriaCarga.REFRIGERACION,
@@ -65,20 +65,20 @@ def test_inicializar_presets_requiere_escritura_y_device_id():
 
     # 1. Con usuario invitado -> 403 Forbidden
     cliente_invitado = _cliente_atribucion(use_case, rol="invitado")
-    resp_inv = cliente_invitado.post(f"/api/v1/cargas/presets/inicializar?device_id={MEDIDOR_PRUEBA}")
+    resp_inv = cliente_invitado.post(f"/api/v1/maquinas/presets/inicializar?device_id={MEDIDOR_PRUEBA}")
     assert resp_inv.status_code == 403
 
     # 2. Con admin pero sin device_id -> 422 Unprocessable Entity
     cliente_admin = _cliente_atribucion(use_case, rol="admin")
-    resp_sin_device = cliente_admin.post("/api/v1/cargas/presets/inicializar")
+    resp_sin_device = cliente_admin.post("/api/v1/maquinas/presets/inicializar")
     assert resp_sin_device.status_code == 422
 
     # 3. Con admin y device_id -> 200 OK
-    resp_ok = cliente_admin.post(f"/api/v1/cargas/presets/inicializar?device_id={MEDIDOR_PRUEBA}")
+    resp_ok = cliente_admin.post(f"/api/v1/maquinas/presets/inicializar?device_id={MEDIDOR_PRUEBA}")
     assert resp_ok.status_code == 200
-    cargas = resp_ok.json()
-    assert len(cargas) == 1
-    assert cargas[0]["nombre"] == "Heladera"
+    maquinas = resp_ok.json()
+    assert len(maquinas) == 1
+    assert maquinas[0]["nombre"] == "Heladera"
     use_case.inicializar_presets_catalogo.assert_called_once_with(MEDIDOR_PRUEBA)
 
 
@@ -103,7 +103,7 @@ def test_listar_intervalos_permite_filtrar_por_no_atribuidos():
     cliente = _cliente_atribucion(use_case, rol="invitado")
 
     # 1. Consulta sin filtros
-    resp = cliente.get(f"/api/v1/cargas/intervalos?device_id={MEDIDOR_PRUEBA}&solo_no_atribuidos=true&limite=50")
+    resp = cliente.get(f"/api/v1/maquinas/intervalos?device_id={MEDIDOR_PRUEBA}&solo_no_atribuidos=true&limite=50")
 
     assert resp.status_code == 200
     intervalos = resp.json()

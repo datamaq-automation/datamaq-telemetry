@@ -41,9 +41,9 @@ def test_parsear_nodo_unifilar_con_potencia_contratada_kw_unica_replica_en_ambas
 
 def test_parsear_nodo_unifilar_sin_potencia_contratada():
     nodo_dict = {
-        "id": "nodo-carga-1",
+        "id": "nodo-maquina-1",
         "nombre": "Motor 1",
-        "tipo": "carga",
+        "tipo": "maquina",
         "tension_nominal_v": 380.0,
     }
 

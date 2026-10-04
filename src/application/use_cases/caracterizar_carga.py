@@ -4,22 +4,22 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from src.application.dtos.carga_dto import CampanaCreateDTO, CampanaResponseDTO
-from src.application.mappers.carga_mapper import CampanaMapper
+from src.application.mappers.maquina_mapper import CampanaMapper
 from src.application.use_cases.ingesta.registro_campanas import RegistroCampanasActivas
-from src.domain.cargas.entities import CampanaCaracterizacion
-from src.domain.cargas.exceptions import (
+from src.domain.maquinas.entities import CampanaCaracterizacion
+from src.domain.maquinas.exceptions import (
     CampanaEnCursoError,
     CampanaNoEncontradaError,
     CampanaYaCerradaError,
     CargaNoEncontradaError,
 )
-from src.domain.cargas.ports import (
+from src.domain.maquinas.ports import (
     ComandoRafagaPort,
-    RepositorioCampanasPort,
-    RepositorioCargasPort,
+    RepositorioEnsayosPort,
+    RepositorioMáquinasPort,
 )
-from src.domain.cargas.servicios.calibrador_firma import CalibradorFirmaService
-from src.domain.cargas.value_objects import EstadoCampana, TipoCampana
+from src.domain.maquinas.servicios.calibrador_firma import CalibradorFirmaService
+from src.domain.maquinas.value_objects import EstadoCampana, TipoCampana
 from src.domain.telemetria.exceptions import DispositivoNoEncontradoError
 from src.domain.telemetria.ports import RepositorioDispositivosPort
 
@@ -44,8 +44,8 @@ class CaracterizarCargaUseCase:
 
     def __init__(
         self,
-        repo_campanas: RepositorioCampanasPort,
-        repo_cargas: RepositorioCargasPort,
+        repo_campanas: RepositorioEnsayosPort,
+        repo_cargas: RepositorioMáquinasPort,
         repo_dispositivos: RepositorioDispositivosPort,
         registro: RegistroCampanasActivas,
         comando_rafaga: ComandoRafagaPort | None = None,

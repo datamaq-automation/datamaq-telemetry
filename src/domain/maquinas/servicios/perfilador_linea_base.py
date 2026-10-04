@@ -1,14 +1,14 @@
-"""src/domain/cargas/servicios/perfilador_linea_base.py — Línea de base de un medidor agregado: cuánto se consume cuando nadie hace nada."""
+"""src/domain/maquinas/servicios/perfilador_linea_base.py — Línea de base de un medidor agregado: cuánto se consume cuando nadie hace nada."""
 
 from collections import defaultdict
 from datetime import tzinfo
 
-from src.domain.cargas.servicios.estadistica import (
+from src.domain.maquinas.servicios.estadistica import (
     cadencia_mediana_segundos,
     mediana,
     percentil,
 )
-from src.domain.cargas.value_objects import PerfilLineaBase
+from src.domain.maquinas.value_objects import PerfilLineaBase
 from src.domain.telemetria.value_objects import LecturaPotenciaTemporal
 
 

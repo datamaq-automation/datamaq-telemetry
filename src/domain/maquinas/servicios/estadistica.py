@@ -1,4 +1,4 @@
-"""src/domain/cargas/servicios/estadistica.py — Estadística robusta compartida por los servicios de desagregación de cargas.
+"""src/domain/maquinas/servicios/estadistica.py — Estadística robusta compartida por los servicios de desagregación de cargas.
 
 Robusta y no clásica a propósito: una serie de potencia doméstica está llena de
 excursiones únicas (un arranque de motor, una puerta de heladera abierta) que

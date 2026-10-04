@@ -7,7 +7,7 @@ from unittest.mock import Mock, patch
 import pytest
 from src.infrastructure.energy_ml.descubridor_http import EnergyMlHttpDescubridor
 
-from src.domain.cargas.exceptions import DescubridorNoDisponibleError
+from src.domain.maquinas.exceptions import DescubridorNoDisponibleError
 
 MEDIDOR_NAME = "Trafo arriba"
 
@@ -18,10 +18,10 @@ def descubridor():
 
 
 def test_descubridor_convierte_kw_a_w_y_ausencia_de_dispersion_a_cero(descubridor):
-    """JSON de energy-ml (kW) → CargaCandidata (W); sin dispersion_kw → 0.0."""
+    """JSON de energy-ml (kW) → MáquinaInferida (W); sin dispersion_kw → 0.0."""
     response_json = {
         "medidor": MEDIDOR_NAME,
-        "cargas": [
+        "maquinas": [
             {
                 "potencia_kw": 92.0,
                 "dispersion_kw": 5.0,
@@ -100,8 +100,8 @@ def test_descubridor_timeout_lanza_excepcion(descubridor):
 
 
 def test_descubridor_medidor_desconocido_devuelve_cargas_vacia(descubridor):
-    """energy-ml devuelve cargas=[] para medidor desconocido."""
-    response_json = {"medidor": "Medidor desconocido", "cargas": []}
+    """energy-ml devuelve maquinas=[] para medidor desconocido."""
+    response_json = {"medidor": "Medidor desconocido", "maquinas": []}
 
     with patch("urllib.request.urlopen") as mock_urlopen:
         mock_response = Mock()
@@ -119,7 +119,7 @@ def test_descubridor_medidor_desconocido_devuelve_cargas_vacia(descubridor):
 
 def test_descubridor_construye_url_correcta(descubridor):
     """Verifica que la URL se construya con los parámetros correctos."""
-    response_json = {"medidor": MEDIDOR_NAME, "cargas": []}
+    response_json = {"medidor": MEDIDOR_NAME, "maquinas": []}
 
     with patch("urllib.request.urlopen") as mock_urlopen:
         mock_response = Mock()

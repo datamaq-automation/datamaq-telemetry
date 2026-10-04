@@ -1,6 +1,6 @@
 """src/infrastructure/sqlalchemy/models_asistente.py — Modelos del bounded context asistente.
 
-Viven aparte de `models.py` por la misma razón que `models_cargas.py`: no empujar ese
+Viven aparte de `models.py` por la misma razón que `models_maquinas.py`: no empujar ese
 archivo contra el límite de `scripts/verify_code_size.py`. Comparten la misma `Base`, así
 que `alembic/env.py` tiene que importar este módulo para que la metadata los vea.
 """

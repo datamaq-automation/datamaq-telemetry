@@ -3,7 +3,7 @@
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
-from src.domain.cargas.servicios.perfilador_linea_base import PerfiladorLineaBaseService
+from src.domain.maquinas.servicios.perfilador_linea_base import PerfiladorLineaBaseService
 from src.domain.telemetria.value_objects import LecturaPotenciaTemporal
 
 BUENOS_AIRES = ZoneInfo("America/Argentina/Buenos_Aires")

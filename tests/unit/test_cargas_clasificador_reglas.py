@@ -1,12 +1,12 @@
-"""tests/unit/test_cargas_clasificador_reglas.py — Tests unitarios para el motor de reglas de clasificación y catálogo de presets de cargas."""
+"""tests/unit/test_cargas_clasificador_reglas.py — Tests unitarios para el motor de reglas de clasificación y catálogo de presets de maquinas."""
 
 from datetime import datetime, timedelta, timezone
 
-from src.domain.cargas.servicios.clasificador_reglas import (
+from src.domain.maquinas.servicios.clasificador_reglas import (
     ClasificadorCargasReglasService,
 )
-from src.domain.cargas.servicios.presets_cargas import CatalogoPresetsCargas
-from src.domain.cargas.value_objects import (
+from src.domain.maquinas.servicios.presets_cargas import CatalogoPresetsCargas
+from src.domain.maquinas.value_objects import (
     CategoriaCarga,
     EpisodioCarga,
     NaturalezaElectrica,
@@ -157,9 +157,9 @@ def test_clasificar_iluminacion_baja_potencia():
 
 
 def test_catalogo_presets_cargas_domesticas():
-    """El catálogo de presets genera todas las cargas tipificadas con firmas válidas."""
-    cargas = CatalogoPresetsCargas.obtener_todas("dev-test-1")
-    nombres = {c.nombre for c in cargas}
+    """El catálogo de presets genera todas las maquinas tipificadas con firmas válidas."""
+    maquinas = CatalogoPresetsCargas.obtener_todas("dev-test-1")
+    nombres = {c.nombre for c in maquinas}
 
     assert "Heladera" in nombres
     assert "Freezer" in nombres
@@ -171,11 +171,11 @@ def test_catalogo_presets_cargas_domesticas():
     assert "Computadora / PC" in nombres
     assert "Iluminación" in nombres
 
-    for carga in cargas:
-        assert carga.firma is not None
-        assert carga.firma.potencia_w > 0
-        assert carga.firma.duracion_encendido_s is not None
-        assert carga.firma.esta_completa is True
+    for maquina in maquinas:
+        assert maquina.firma is not None
+        assert maquina.firma.potencia_w > 0
+        assert maquina.firma.duracion_encendido_s is not None
+        assert maquina.firma.esta_completa is True
 
 
 def test_clasificar_motor_industrial_alta_potencia():
@@ -215,12 +215,12 @@ def test_clasificar_omite_heuristicas_domesticas_en_contexto_industrial():
     diag_ind_resistivo = ClasificadorCargasReglasService.clasificar_episodio(episodio_caloventor, es_industrial=True)
 
     assert diag_ind_resistivo.categoria == CategoriaCarga.OTROS
-    assert diag_ind_resistivo.aparato_sugerido == "Carga de proceso no clasificada"
+    assert diag_ind_resistivo.aparato_sugerido == "Máquina de proceso no clasificada"
     assert "Caloventor" not in diag_ind_resistivo.aparato_sugerido
 
     # 3. Consumo electrónico con fluctuaciones (en hogar sería PC)
     episodio_pc = _episodio(delta_w=220.0, duracion_s=7200.0, delta_q=45.0, dispersion_w=25.0)
     diag_ind_pc = ClasificadorCargasReglasService.clasificar_episodio(episodio_pc, es_industrial=True)
 
-    assert diag_ind_pc.aparato_sugerido == "Carga de proceso no clasificada"
+    assert diag_ind_pc.aparato_sugerido == "Máquina de proceso no clasificada"
     assert "Computadora" not in diag_ind_pc.aparato_sugerido

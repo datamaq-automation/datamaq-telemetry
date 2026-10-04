@@ -4,18 +4,18 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from src.application.dtos.carga_dto import CampanaCreateDTO
+from src.application.dtos.maquina_dto import CampanaCreateDTO
 from src.application.use_cases.caracterizar_carga import CaracterizarCargaUseCase
 from src.application.use_cases.ingesta.registro_campanas import RegistroCampanasActivas
-from src.domain.cargas.entities import CampanaCaracterizacion, Carga
-from src.domain.cargas.exceptions import (
-    CampanaEnCursoError,
-    CampanaNoEncontradaError,
-    CampanaYaCerradaError,
-    CargaNoEncontradaError,
+from src.domain.maquinas.entities import EnsayoCaracterizacion, Máquina
+from src.domain.maquinas.exceptions import (
+    EnsayoEnCursoError,
+    EnsayoNoEncontradoError,
+    EnsayoYaCerradoError,
+    MáquinaNoEncontradaError,
 )
-from src.domain.cargas.ports import ComandoRafagaPort, RepositorioCampanasPort
-from src.domain.cargas.value_objects import (
+from src.domain.maquinas.ports import ComandoRafagaPort, RepositorioEnsayosPort
+from src.domain.maquinas.value_objects import (
     EstadoCampana,
     MotivoDescarte,
     MuestraCampana,
@@ -32,9 +32,9 @@ UID = "D48C49F03564"
 AHORA = datetime(2026, 9, 4, 15, 0, tzinfo=timezone.utc)
 
 
-class MockCampanasRepo(RepositorioCampanasPort):
+class MockCampanasRepo(RepositorioEnsayosPort):
     def __init__(self):
-        self.campanas: dict[str, CampanaCaracterizacion] = {}
+        self.campanas: dict[str, EnsayoCaracterizacion] = {}
         self.muestras: dict[str, list[MuestraCampana]] = {}
 
     def obtener_por_id(self, campana_id):
@@ -122,14 +122,14 @@ class MockRafaga(ComandoRafagaPort):
 
 @pytest.fixture
 def contexto():
-    campanas, cargas = MockCampanasRepo(), MockCargasRepo()
-    cargas.guardar(Carga(id="carga-pava", dispositivo_id=MEDIDOR_CASA, nombre="Pava eléctrica"))
+    campanas, maquinas = MockCampanasRepo(), MockCargasRepo()
+    maquinas.guardar(Máquina(id="maquina-pava", dispositivo_id=MEDIDOR_CASA, nombre="Pava eléctrica"))
     registro, rafaga = RegistroCampanasActivas(), MockRafaga()
-    use_case = CaracterizarCargaUseCase(campanas, cargas, MockDispositivosRepo(), registro, rafaga)
-    return use_case, campanas, cargas, registro, rafaga
+    use_case = CaracterizarCargaUseCase(campanas, maquinas, MockDispositivosRepo(), registro, rafaga)
+    return use_case, campanas, maquinas, registro, rafaga
 
 
-def _dto(duracion: int = 300, carga_id: str | None = "carga-pava") -> CampanaCreateDTO:
+def _dto(duracion: int = 300, carga_id: str | None = "maquina-pava") -> CampanaCreateDTO:
     return CampanaCreateDTO(dispositivo_id=MEDIDOR_CASA, duracion_segundos=duracion, carga_id=carga_id)
 
 
@@ -157,20 +157,20 @@ def test_no_se_pueden_abrir_dos_campanas_sobre_el_mismo_medidor(contexto):
     use_case, _, _, _, _ = contexto
     use_case.iniciar_activa(_dto())
 
-    with pytest.raises(CampanaEnCursoError):
+    with pytest.raises(EnsayoEnCursoError):
         use_case.iniciar_activa(_dto())
 
 
 def test_una_campana_sobre_una_carga_inexistente_falla(contexto):
     use_case, _, _, _, _ = contexto
 
-    with pytest.raises(CargaNoEncontradaError):
+    with pytest.raises(MáquinaNoEncontradaError):
         use_case.iniciar_activa(_dto(carga_id="no-existe"))
 
 
 def test_una_campana_sobre_un_dispositivo_inexistente_falla(contexto):
-    _, campanas, cargas, registro, rafaga = contexto
-    use_case = CaracterizarCargaUseCase(campanas, cargas, MockDispositivosRepo(con_dispositivo=False), registro, rafaga)
+    _, campanas, maquinas, registro, rafaga = contexto
+    use_case = CaracterizarCargaUseCase(campanas, maquinas, MockDispositivosRepo(con_dispositivo=False), registro, rafaga)
 
     with pytest.raises(DispositivoNoEncontradoError):
         use_case.iniciar_activa(_dto())
@@ -178,8 +178,8 @@ def test_una_campana_sobre_un_dispositivo_inexistente_falla(contexto):
 
 def test_la_campana_se_abre_igual_si_el_broker_no_responde(contexto):
     """Con un cliente WebSocket conectado el medidor ya está en ráfaga por otro camino."""
-    _, campanas, cargas, registro, _ = contexto
-    use_case = CaracterizarCargaUseCase(campanas, cargas, MockDispositivosRepo(), registro, MockRafaga(ok=False))
+    _, campanas, maquinas, registro, _ = contexto
+    use_case = CaracterizarCargaUseCase(campanas, maquinas, MockDispositivosRepo(), registro, MockRafaga(ok=False))
 
     dto = use_case.iniciar_activa(_dto())
 
@@ -195,7 +195,7 @@ def _cargar_muestras(campanas: MockCampanasRepo, campana_id: str, potencias: lis
 
 
 def test_finalizar_una_campana_limpia_fija_la_firma_en_la_carga(contexto):
-    use_case, campanas, cargas, registro, _ = contexto
+    use_case, campanas, maquinas, registro, _ = contexto
     campana = use_case.iniciar_activa(_dto())
     _cargar_muestras(campanas, campana.id, [140.0] * 70 + [1990.0] * 180)
 
@@ -204,7 +204,7 @@ def test_finalizar_una_campana_limpia_fija_la_firma_en_la_carga(contexto):
     assert resultado.estado == EstadoCampana.COMPLETADA
     assert resultado.resultado is not None
     assert resultado.resultado.firma is not None
-    firma = cargas.obtener_por_id("carga-pava").firma
+    firma = maquinas.obtener_por_id("maquina-pava").firma
     assert firma is not None
     assert firma.potencia_w == 1850.0
     assert firma.origen == OrigenFirma.CAMPANA
@@ -213,7 +213,7 @@ def test_finalizar_una_campana_limpia_fija_la_firma_en_la_carga(contexto):
 
 def test_una_campana_contaminada_no_fija_ninguna_firma(contexto):
     """La firma se usaría a ciegas durante meses; repetir la campaña cuesta diez minutos."""
-    use_case, campanas, cargas, _, _ = contexto
+    use_case, campanas, maquinas, _, _ = contexto
     campana = use_case.iniciar_activa(_dto())
     _cargar_muestras(campanas, campana.id, [140.0] * 70 + [1990.0] * 90 + [3990.0] * 90)
 
@@ -221,7 +221,7 @@ def test_una_campana_contaminada_no_fija_ninguna_firma(contexto):
 
     assert resultado.estado == EstadoCampana.CONTAMINADA
     assert resultado.motivo_descarte is not None
-    assert cargas.obtener_por_id("carga-pava").firma is None
+    assert maquinas.obtener_por_id("maquina-pava").firma is None
 
 
 def test_una_campana_sin_muestras_avisa_que_no_hubo_rafaga(contexto):
@@ -240,12 +240,12 @@ def test_no_se_puede_finalizar_dos_veces(contexto):
     campana = use_case.iniciar_activa(_dto())
     use_case.finalizar(campana.id)
 
-    with pytest.raises(CampanaYaCerradaError):
+    with pytest.raises(EnsayoYaCerradoError):
         use_case.finalizar(campana.id)
 
 
 def test_descartar_libera_el_medidor_sin_calibrar_nada(contexto):
-    use_case, _, cargas, registro, _ = contexto
+    use_case, _, maquinas, registro, _ = contexto
     campana = use_case.iniciar_activa(_dto())
 
     resultado = use_case.descartar(campana.id, motivo="me equivoqué de aparato")
@@ -253,13 +253,13 @@ def test_descartar_libera_el_medidor_sin_calibrar_nada(contexto):
     assert resultado.estado == EstadoCampana.DESCARTADA
     assert resultado.notas == "me equivoqué de aparato"
     assert registro.campana_de(MEDIDOR_CASA) is None
-    assert cargas.obtener_por_id("carga-pava").firma is None
+    assert maquinas.obtener_por_id("maquina-pava").firma is None
 
 
 def test_campana_inexistente_falla(contexto):
     use_case, _, _, _, _ = contexto
 
-    with pytest.raises(CampanaNoEncontradaError):
+    with pytest.raises(EnsayoNoEncontradoError):
         use_case.obtener("no-existe")
 
 

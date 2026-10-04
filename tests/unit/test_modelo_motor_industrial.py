@@ -2,11 +2,11 @@
 
 import pytest
 
-from src.domain.cargas.servicios.modelo_motor_industrial import (
+from src.domain.maquinas.servicios.modelo_motor_industrial import (
     ModeloMotorFisicoService,
     RegimenMotorIndustrial,
 )
-from src.domain.cargas.value_objects import OrigenFirma
+from src.domain.maquinas.value_objects import OrigenFirma
 
 
 def test_motor_en_vacio_detecta_baja_activa_y_alta_reactiva():
@@ -29,7 +29,7 @@ def test_motor_en_vacio_detecta_baja_activa_y_alta_reactiva():
 
 
 def test_motor_a_carga_parcial_valida_factor_de_carga_y_cos_phi():
-    """Un motor de 30 kW operando a 18 kW (60% de carga) tiene cos phi ~0.78."""
+    """Un motor de 30 kW operando a 18 kW (60% de maquina) tiene cos phi ~0.78."""
     p_nom = 30000.0
     p_medida = 18000.0  # 60%
     q_medida = 14000.0
@@ -48,7 +48,7 @@ def test_motor_a_carga_parcial_valida_factor_de_carga_y_cos_phi():
 
 
 def test_motor_a_plena_carga_o_nominal():
-    """Un motor de 15 kW operando a 14.5 kW está en régimen de plena carga con alto factor de potencia."""
+    """Un motor de 15 kW operando a 14.5 kW está en régimen de plena maquina con alto factor de potencia."""
     p_nom = 15000.0
     p_medida = 14500.0
     q_medida = 8000.0

@@ -1,6 +1,6 @@
-"""src/domain/cargas/servicios/clasificador_reglas.py — Clasificador heurístico basado en reglas físicas deterministas (NILM por reglas)."""
+"""src/domain/maquinas/servicios/clasificador_reglas.py — Clasificador heurístico basado en reglas físicas deterministas (NILM por reglas)."""
 
-from src.domain.cargas.value_objects import (
+from src.domain.maquinas.value_objects import (
     CategoriaCarga,
     DiagnosticoReglasCarga,
     EpisodioCarga,
@@ -182,7 +182,7 @@ class ClasificadorCargasReglasService:
             )
 
         if p > 3500.0:
-            reglas.append(f"Carga puramente resistiva de alta potencia industrial ({p:.0f} W, {t / 60:.0f} min)")
+            reglas.append(f"Máquina puramente resistiva de alta potencia industrial ({p:.0f} W, {t / 60:.0f} min)")
             return DiagnosticoReglasCarga(
                 aparato_sugerido="Horno / Calefactor Resistivo Industrial",
                 categoria=CategoriaCarga.OTROS,
@@ -246,7 +246,7 @@ class ClasificadorCargasReglasService:
             naturaleza == NaturalezaElectrica.RESISTIVA
             or (ratio_q is not None and ratio_q <= cls.RATIO_RESISTIVO_MAXIMO)
         ):
-            reglas.append(f"Carga resistiva industrial de alta potencia ({p:.0f} W) con FP unitario")
+            reglas.append(f"Máquina resistiva industrial de alta potencia ({p:.0f} W) con FP unitario")
             return DiagnosticoReglasCarga(
                 aparato_sugerido="Horno / Calefactor Resistivo Industrial",
                 categoria=CategoriaCarga.OTROS,
@@ -256,7 +256,7 @@ class ClasificadorCargasReglasService:
             )
         reglas.append(f"Contexto industrial: omite heurísticas domésticas para P={p:.0f} W, Q={q:.0f} VAr")
         return DiagnosticoReglasCarga(
-            aparato_sugerido="Carga de proceso no clasificada",
+            aparato_sugerido="Máquina de proceso no clasificada",
             categoria=CategoriaCarga.OTROS,
             naturaleza_electrica=naturaleza,
             confianza=0.40,
@@ -298,7 +298,7 @@ class ClasificadorCargasReglasService:
 
         reglas.append(f"Sin coincidencia estricta de regla para P={p:.0f} W, t={t:.0f} s, Q={q:.0f} VAr")
         return DiagnosticoReglasCarga(
-            aparato_sugerido="Carga no clasificada",
+            aparato_sugerido="Máquina no clasificada",
             categoria=CategoriaCarga.OTROS,
             naturaleza_electrica=naturaleza,
             confianza=0.30,

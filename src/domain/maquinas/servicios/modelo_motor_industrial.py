@@ -1,10 +1,10 @@
-"""src/domain/cargas/servicios/modelo_motor_industrial.py — Modelo electromecánico determinístico para maquinaria y motores industriales."""
+"""src/domain/maquinas/servicios/modelo_motor_industrial.py — Modelo electromecánico determinístico para maquinaria y motores industriales."""
 
 import math
 from dataclasses import dataclass
 from enum import Enum
 
-from src.domain.cargas.value_objects import FirmaCarga, OrigenFirma
+from src.domain.maquinas.value_objects import FirmaCarga, OrigenFirma
 
 
 class RegimenMotorIndustrial(str, Enum):
@@ -98,7 +98,7 @@ class ModeloMotorFisicoService:
                     cos_phi=cos_phi,
                     confianza=0.15,
                     es_compatible=False,
-                    detalle="Carga puramente resistiva detectada, incompatible con motor de inducción a media carga.",
+                    detalle="Máquina puramente resistiva detectada, incompatible con motor de inducción a media carga.",
                 )
             return DiagnosticoMotorIndustrial(
                 regimen=RegimenMotorIndustrial.CARGA_PARCIAL,

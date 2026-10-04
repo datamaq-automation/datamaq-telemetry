@@ -9,15 +9,15 @@ from src.application.dtos.carga_dto import (
     CargaUpdateDTO,
     FirmaManualRequestDTO,
 )
-from src.application.mappers.carga_mapper import CargaMapper
-from src.domain.cargas.entities import Carga
-from src.domain.cargas.exceptions import (
+from src.application.mappers.maquina_mapper import MáquinaMapper
+from src.domain.maquinas.entities import Máquina
+from src.domain.maquinas.exceptions import (
     CargaDuplicadaError,
     CargaNoEncontradaError,
     FirmaCargaInvalidaError,
 )
-from src.domain.cargas.ports import RepositorioCargasPort
-from src.domain.cargas.value_objects import FirmaCarga, OrigenFirma
+from src.domain.maquinas.ports import RepositorioMáquinasPort
+from src.domain.maquinas.value_objects import FirmaCarga, OrigenFirma
 
 
 class GestionarCargasUseCase:
@@ -29,7 +29,7 @@ class GestionarCargasUseCase:
     este catálogo es esa inyección.
     """
 
-    def __init__(self, repo_cargas: RepositorioCargasPort):
+    def __init__(self, repo_cargas: RepositorioMáquinasPort):
         self.repo_cargas = repo_cargas
 
     def _obtener_o_fallar(self, carga_id: str) -> Carga:
@@ -45,10 +45,10 @@ class GestionarCargasUseCase:
                 cargas = [c for c in cargas if c.activa]
         else:
             cargas = self.repo_cargas.listar_por_dispositivo(dispositivo_id, solo_activas=solo_activas)
-        return [CargaMapper.to_dto(c) for c in cargas]
+        return [MáquinaMapper.to_dto(c) for c in cargas]
 
     def obtener_carga(self, carga_id: str) -> CargaResponseDTO:
-        return CargaMapper.to_dto(self._obtener_o_fallar(carga_id))
+        return MáquinaMapper.to_dto(self._obtener_o_fallar(carga_id))
 
     def registrar_carga(self, dto: CargaCreateDTO) -> CargaResponseDTO:
         existente = self.repo_cargas.obtener_por_nombre(dto.dispositivo_id, dto.nombre)
@@ -56,8 +56,8 @@ class GestionarCargasUseCase:
             raise CargaDuplicadaError(
                 f"El dispositivo '{dto.dispositivo_id}' ya tiene una carga llamada '{dto.nombre}'."
             )
-        entity = CargaMapper.create_dto_to_entity(dto, str(uuid.uuid4()))
-        return CargaMapper.to_dto(self.repo_cargas.guardar(entity))
+        entity = MáquinaMapper.create_dto_to_entity(dto, str(uuid.uuid4()))
+        return MáquinaMapper.to_dto(self.repo_cargas.guardar(entity))
 
     def actualizar_carga(self, carga_id: str, dto: CargaUpdateDTO) -> CargaResponseDTO:
         carga = self._obtener_o_fallar(carga_id)
@@ -80,7 +80,7 @@ class GestionarCargasUseCase:
         if dto.activa is not None:
             carga.activa = dto.activa
 
-        return CargaMapper.to_dto(self.repo_cargas.guardar(carga))
+        return MáquinaMapper.to_dto(self.repo_cargas.guardar(carga))
 
     def fijar_firma_manual(self, carga_id: str, dto: FirmaManualRequestDTO) -> CargaResponseDTO:
         """Calibración manual, el escape para cuando no hay campaña posible.
@@ -105,4 +105,4 @@ class GestionarCargasUseCase:
             muestras=0,
             medida_en=datetime.now(timezone.utc),
         )
-        return CargaMapper.to_dto(self.repo_cargas.guardar(carga))
+        return MáquinaMapper.to_dto(self.repo_cargas.guardar(carga))

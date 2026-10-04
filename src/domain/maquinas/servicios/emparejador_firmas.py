@@ -1,10 +1,10 @@
-"""src/domain/cargas/servicios/emparejador_firmas.py — Atribución de un episodio de potencia a una carga del catálogo."""
+"""src/domain/maquinas/servicios/emparejador_firmas.py — Atribución de un episodio de potencia a una carga del catálogo."""
 
 import math
 from datetime import tzinfo
 
-from src.domain.cargas.entities import Carga
-from src.domain.cargas.value_objects import (
+from src.domain.maquinas.entities import Máquina
+from src.domain.maquinas.value_objects import (
     CandidatoAtribucion,
     DecisionAtribucion,
     EpisodioCarga,
@@ -63,7 +63,7 @@ class EmparejadorFirmasService:
         return cls._gaussiana(abs(episodio.delta_w - firma.potencia_w), escala)
 
     @classmethod
-    def _factor_reactiva(cls, episodio: EpisodioCarga, carga: Carga) -> float:
+    def _factor_reactiva(cls, episodio: EpisodioCarga, carga: Máquina) -> float:
         """Coherencia entre lo que la carga declara ser y lo que el episodio muestra."""
         ratio = episodio.ratio_reactiva
         if ratio is None:
@@ -91,14 +91,14 @@ class EmparejadorFirmasService:
         return cls._gaussiana(abs(episodio.duracion_s - esperada), escala)
 
     @classmethod
-    def _factor_horario(cls, episodio: EpisodioCarga, carga: Carga, zona: tzinfo | None) -> float:
+    def _factor_horario(cls, episodio: EpisodioCarga, carga: Máquina, zona: tzinfo | None) -> float:
         """Sin franjas declaradas por carga, este factor todavía no discrimina."""
         del episodio, carga, zona
         return cls.NEUTRO
 
     @classmethod
     def puntuar(
-        cls, episodio: EpisodioCarga, cargas: list[Carga], zona: tzinfo | None = None
+        cls, episodio: EpisodioCarga, cargas: list[Máquina], zona: tzinfo | None = None
     ) -> list[CandidatoAtribucion]:
         candidatos: list[CandidatoAtribucion] = []
         for carga in cargas:
@@ -110,7 +110,7 @@ class EmparejadorFirmasService:
             f_h = cls._factor_horario(episodio, carga, zona)
             candidatos.append(
                 CandidatoAtribucion(
-                    carga_id=carga.id,
+                    maquina_id=carga.id,
                     nombre=carga.nombre,
                     score=round(f_p * f_q * f_d * f_h, 4),
                     factor_potencia_score=round(f_p, 4),
@@ -122,7 +122,7 @@ class EmparejadorFirmasService:
         return sorted(candidatos, key=lambda c: c.score, reverse=True)
 
     @classmethod
-    def decidir(cls, episodio: EpisodioCarga, cargas: list[Carga], zona: tzinfo | None = None) -> DecisionAtribucion:
+    def decidir(cls, episodio: EpisodioCarga, cargas: list[Máquina], zona: tzinfo | None = None) -> DecisionAtribucion:
         """Punto de entrada del servicio."""
         candidatos = cls.puntuar(episodio, cargas, zona)
         if not candidatos:
@@ -146,4 +146,4 @@ class EmparejadorFirmasService:
                 candidatos[:3],
             )
 
-        return DecisionAtribucion(primero.carga_id, primero.score, f"Atribuido a {primero.nombre}.", candidatos[:3])
+        return DecisionAtribucion(primero.maquina_id, primero.score, f"Atribuido a {primero.nombre}.", candidatos[:3])
