@@ -126,7 +126,8 @@ def test_endpoint_lineas_base_gitops(client):
     assert len(data) >= 1
     enb = data[0]
     assert enb["id"] == "enb-durax-usina-2026"
-    assert enb["nodoNombre"] == "TGBT Usina"
+    # La nomenclatura de datamaq-data nombra los nodos "<Ubicación> — <Función>".
+    assert enb["nodoNombre"].startswith("TGBT Usina")
     assert enb["secReferenciaKwhUnidad"] == 0.125
     assert enb["potenciaBaseKw"] == 15.0
     assert enb["autorizadoPor"] == "admin@durax.com.ar"
