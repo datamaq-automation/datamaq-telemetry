@@ -279,6 +279,52 @@ class MedicionFase:
 
 
 @dataclass(frozen=True)
+class RotacionFasorial:
+    """Transformación fasorial: reorden de fases + inversión de polaridad.
+
+    Value object inmutable que encapsula una configuración de rotación fasorial
+    (orden de fases + inversión de Q). Usado para:
+    - Diagnóstico de TI (orden de fases e inversión)
+    - Simulación de rotaciones en análisis metrológico
+    """
+
+    orden_fases: tuple[str, ...] = ("R", "S", "T")
+    invertida: bool = False
+
+    def __post_init__(self) -> None:
+        if not (1 <= len(self.orden_fases) <= 3):
+            raise ValueError(f"Orden de fases debe tener 1-3 elementos: {self.orden_fases}")
+        for fase in self.orden_fases:
+            if fase not in ("R", "S", "T"):
+                raise ValueError(f"Fase inválida (debe ser R, S o T): {fase}")
+
+    def aplicar_a_fase(self, medicion: "MedicionFase", indice: int) -> "MedicionFase":
+        """Aplica rotación a una medición de fase por su índice en el reorden.
+
+        Args:
+            medicion: Medición original (P, Q, S, FP)
+            indice: Posición en el reorden (0=R, 1=S, 2=T)
+
+        Returns:
+            MedicionFase con Q invertida si aplica, resto sin cambios
+        """
+        if indice >= len(self.orden_fases):
+            raise ValueError(f"Índice {indice} fuera de rango para {len(self.orden_fases)} fases")
+
+        p, q, s, fp = medicion.p, medicion.q, medicion.s, medicion.fp
+
+        if self.invertida and q is not None:
+            q = -q
+
+        return MedicionFase(p=p, q=q, s=s, fp=fp)
+
+    def posicion_legible(self) -> str:
+        """Representación legible: orden + (INV) si aplica."""
+        inv_str = " (INV)" if self.invertida else ""
+        return f"{','.join(self.orden_fases)}{inv_str}"
+
+
+@dataclass(frozen=True)
 class CandidatoTI:
     """Candidato de configuración de TI (orden de fases e inversión) con score.
 

@@ -15,6 +15,35 @@ API FastAPI y Worker MQTT para la ingesta y persistencia de telemetría de medid
 - Linter: `.venv/bin/ruff check .`
 - LSP de OpenCode: habilitado vía `opencode.json` (servidor `pyright` → `.venv/bin/pyright-langserver --stdio`); da feedback de diagnósticos de tipos de `src/` al agente. La verificación autoritativa de tipos sigue siendo `.venv/bin/pyright` (etapa 3 del Gauntlet).
 
+## Entornos (Development vs Producción)
+
+**Dos bases de datos completamente separadas:**
+- **Desarrollo/Testing (127.0.0.1:3306, `.env` local):** Vacía salvo por fixtures. Usada por tests locales y `./run.sh`.
+- **Producción (VPS, acceso via `ssh vps`):** Datos reales desde 2026-09. Script: `./scripts/logs.sh` (solo lectura de logs). Para queries SQL directas: `ssh vps` → `mysql -u ... -p...` (credenciales en VPS).
+
+**Regla:** Antes de queryar datos históricos/reales de medidores, validar: ¿esto es fixture de test (dev) o datos de producción? Si es producción, usar `ssh vps`.
+
+## Mapeo de IDs: YAML vs Base de Datos
+
+**YAML usa IDs lógicos (números o nombres); DB usa UUIDs.** No confundir. Ver tabla completa en `docs/topologia-medidores.md`.
+
+**Importante:**
+- **Las facturas se cargan a nivel PLANTA, NO dispositivo.** Una planta puede tener múltiples distribuidoras (no son opciones mutuamente excluyentes).
+- `device_uid` es el identificador MAC (ej. `EC:C9:FF:B5:7F:20`), puede variar en formato entre YAML y DB
+- Siempre validar consistencia: `python scripts/validate_topology.py`
+- Para validar energía contra factura: sumar energía de TODOS los dispositivos de la planta, comparar contra factura de esa planta
+
+**Validación automática:**
+```bash
+python scripts/validate_topology.py           # Verificar inconsistencias YAML ↔ DB
+python scripts/validate_topology.py --strict  # Fallar en warnings
+```
+
+**Fuentes de verdad:**
+- `data/organizaciones.yml` (topología, medidores, device_uid)
+- `devices` en DB (device_id, last_seen_at, status)
+- App viva (`https://app.datamaq.com.ar/plantas/...`) para verificación visual
+
 ## Reglas de Dependencia y Arquitectura
 
 - `src/domain/{tematica}/` — `entities.py`, `value_objects.py`, `services.py`, `ports.py`, `exceptions.py`. Dominio 100% puro: solo stdlib + `@dataclass(frozen=True)`; **prohibido importar librerías de terceros**.
@@ -39,6 +68,22 @@ API FastAPI y Worker MQTT para la ingesta y persistencia de telemetría de medid
 - **Todos los `__init__.py` (`src/` y `tests/`) deben ser de 0 bytes.**
 - **El LSP del editor (Pylance) debe alinear su exclusión con `pyrightconfig.json` vía `.vscode/settings.json` (`python.analysis.exclude`). Los `tests/` están excluidos del análisis de tipos por diseño; prohibido "corregirlos" con `cast`/`# type: ignore`.**
 - Commits: Conventional Commits (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`).
+- **Reportes y rutas:** Al generar reportes/documentos, siempre dar rutas absolutas completas (`/home/agustin/...`), no relativas.
+
+## Cuando Tengas Dudas o Preguntas
+
+**SIEMPRE indicar explícitamente:**
+```
+📋 PREGUNTA PARA: [Sesión Padre | Dueño]
+```
+
+**Criterio:**
+- **Sesión Padre:** Ambigüedad en briefing, inconsistencias YAML↔DB, bloqueos transversales
+  - Proveer: texto para copiar/pegar en reporte padre
+- **Dueño:** Clarificación de negocio, detalles técnicos de este repo
+  - Esperar respuesta directa aquí
+
+Ver `memory/clarificar-destinatario-preguntas.md` para tabla de criterios.
 
 ## Optimización de Tokens y Hardware Local (CPU, RAM, iGPU)
 
