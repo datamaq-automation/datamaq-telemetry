@@ -114,6 +114,38 @@ def test_yaml_organizaciones_repository_casos_borde(tmp_path):
     assert repo.obtener_planta_por_id("any") is None
 
 
+def test_obtener_instalacion_medidor_resuelve_por_dispositivo_id_con_id_semantico(tmp_path):
+    # Nomenclatura estructurada: el `id` del medidor es un slug `meter-*` y el UUID del
+    # dispositivo va en `dispositivo_id`, que es la clave con la que se une a la telemetría.
+    (tmp_path / "org.yml").write_text(
+        """
+organizaciones:
+  - id: "org-x"
+    nombre: "Org X"
+    plantas:
+      - id: "planta-x"
+        nombre: "Planta X"
+        medidores:
+          - id: "meter-x-principal-medicion-01"
+            dispositivo_id: "11111111-2222-3333-4444-555555555555"
+            tag_ubicacion: "TGBT Usina"
+            tipo_instalacion: "CONSUMO"
+            fases_con_ti: "R,S,T"
+""",
+        encoding="utf-8",
+    )
+    repo = YamlOrganizacionesRepository(data_dir=str(tmp_path))
+
+    inst = repo.obtener_instalacion_medidor("11111111-2222-3333-4444-555555555555")
+    assert inst is not None
+    assert inst.dispositivo_id == "11111111-2222-3333-4444-555555555555"
+    assert inst.tag_ubicacion == "TGBT Usina"
+    assert inst.fases_con_ti == "R,S,T"
+    # El slug sigue resolviendo, como cualquier `id` declarado.
+    assert repo.obtener_instalacion_medidor("meter-x-principal-medicion-01") is not None
+    assert repo.obtener_instalacion_medidor("99999999-2222-3333-4444-555555555555") is None
+
+
 def test_yaml_organizaciones_repository_estructura_modular_isa95(tmp_path):
     # Nivel 1 & 2: organizaciones/org-acme/
     org_dir = tmp_path / "organizaciones" / "org-acme"

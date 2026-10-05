@@ -330,10 +330,12 @@ class YamlOrganizacionesRepository(RepositorioOrganizacionesPort):
             for p in raw.get("plantas", []):
                 for m in p.get("medidores", []) or []:
                     m_id = str(m.get("id", ""))
+                    m_dispositivo_id = str(m.get("dispositivo_id", ""))
                     alias_ids = [str(a) for a in m.get("alias_ids", [])]
                     device_uid = str(m.get("device_uid", "")).replace(":", "").upper()
                     if (
                         str(dispositivo_id) == m_id
+                        or (m_dispositivo_id and str(dispositivo_id) == m_dispositivo_id)
                         or str(dispositivo_id) in alias_ids
                         or (disp_id_norm and disp_id_norm == device_uid)
                     ):
