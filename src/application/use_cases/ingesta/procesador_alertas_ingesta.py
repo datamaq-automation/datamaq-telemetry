@@ -272,6 +272,30 @@ def _evaluar_thd_fn(
     return alertas_raw
 
 
+def _evaluar_potencia_negativa_fn(
+    dispositivo: Dispositivo,
+    mac_raw: str,
+    lectura: LecturaInstantanea,
+    recorded_at: datetime,
+    repo: RepositorioTelemetriaPort,
+    pub: PublicadorEventosPort | None,
+    log: LoggerPort | None,
+) -> AlertaDispositivo | None:
+    tipo_inst = getattr(dispositivo, "tipo_instalacion", "CONSUMO")
+    alerta_raw = AnalizadorCalidadEnergiaService.evaluar_alerta_potencia_negativa(
+        dispositivo_id=dispositivo.id,
+        lectura=lectura,
+        tipo_instalacion=tipo_inst,
+        umbral_p_minima_w=-100.0,
+    )
+    alerta = ProcesadorAlertasIngesta._filtro_persistencia.procesar_alerta(
+        dispositivo.id, alerta_raw, categoria="POTENCIA_NEGATIVA", ahora=recorded_at
+    )
+    if alerta:
+        _despachar_alerta_fn(alerta, mac_raw, repo, pub, log, dispositivo)
+    return alerta_raw
+
+
 class ProcesadorAlertasIngesta:
     """Orquesta la evaluación, persistencia temporal y auto-resolución de alertas normativas."""
 
@@ -286,6 +310,7 @@ class ProcesadorAlertasIngesta:
     _evaluar_ti = staticmethod(_evaluar_ti_fn)
     _evaluar_fp = staticmethod(_evaluar_fp_fn)
     _evaluar_thd = staticmethod(_evaluar_thd_fn)
+    _evaluar_potencia_negativa = staticmethod(_evaluar_potencia_negativa_fn)
 
     @classmethod
     def configurar_notificador(
@@ -311,6 +336,7 @@ class ProcesadorAlertasIngesta:
         ],
         fp_raw: tuple[AlertaDispositivo | None, AlertaDispositivo | None],
         thd_raw: list[AlertaDispositivo],
+        potencia_neg_raw: AlertaDispositivo | None,
         repo: RepositorioTelemetriaPort,
         pub: PublicadorEventosPort | None,
         log: LoggerPort | None,
@@ -363,6 +389,8 @@ class ProcesadorAlertasIngesta:
                 pub,
                 log,
             )
+        if potencia_neg_raw is None:
+            cls._auto_resolver_alertas(dispositivo_id, mac_raw, ["POTENCIA_NEGATIVA"], recorded_at, repo, pub, log)
 
     @classmethod
     def procesar_alertas(
@@ -396,6 +424,9 @@ class ProcesadorAlertasIngesta:
             hay_anomalia_ti=hay_anomalia_ti,
         )
         thd_raw = cls._evaluar_thd(dispositivo, mac_raw, lectura, recorded_at, repo_telemetria, publicador, logger)
+        potencia_neg_raw = cls._evaluar_potencia_negativa(
+            dispositivo, mac_raw, lectura, recorded_at, repo_telemetria, publicador, logger
+        )
 
         cls._auto_resolver_todas_normalizadas(
             dispositivo.id,
@@ -406,6 +437,7 @@ class ProcesadorAlertasIngesta:
             ti_raw,
             fp_raw,
             thd_raw,
+            potencia_neg_raw,
             repo_telemetria,
             publicador,
             logger,

@@ -6,6 +6,9 @@ from src.domain.telemetria.entities import AlertaDispositivo, LecturaInstantanea
 from src.domain.telemetria.servicios.analizador_calidad_metrologica import (
     AnalizadorMetrologicoService,
 )
+from src.domain.telemetria.servicios.evaluador_potencia_negativa import (
+    EvaluadorPotenciaNegativaService,
+)
 from src.domain.telemetria.servicios.evaluador_ti_desconectado import (
     EvaluadorTiDesconectadoService,
 )
@@ -170,6 +173,7 @@ class EvaluadorAnomaliasFasesService:
 
     evaluar_alerta_tis_en_misma_fase = EvaluadorTisMismaFaseService.evaluar_alerta_tis_en_misma_fase
     evaluar_alerta_ti_desconectado = EvaluadorTiDesconectadoService.evaluar_alerta_ti_desconectado
+    evaluar_alerta_potencia_negativa = EvaluadorPotenciaNegativaService.evaluar_alerta_potencia_negativa
 
     @staticmethod
     def evaluar_alerta_desbalance_corriente(
