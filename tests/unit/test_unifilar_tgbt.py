@@ -222,7 +222,7 @@ def test_yaml_durax_incluye_metadatos_placa_y_layout():
     assert acometida.interruptor_cabecera is not None
     assert acometida.interruptor_cabecera.tag == "QM-01"
 
-    trafo_usina = por_id["node-durax-principal-transformacin-2"]
+    trafo_usina = por_id["node-durax-principal-transformacion-2"]
     assert trafo_usina.es_pasante is True
     assert trafo_usina.metadatos_placa is not None
     assert trafo_usina.metadatos_placa.potencia_nominal_kva == 1000.0
@@ -243,7 +243,7 @@ def test_obtener_unifilar_marca_trafos_pasantes():
     por_id = {n.id: n for n in unifilar.nodos}
 
     assert por_id["node-durax-principal-acometida-1"].es_pasante is False
-    assert por_id["node-durax-principal-transformacin-2"].es_pasante is True
-    assert por_id["node-durax-principal-transformacin-3"].es_pasante is True
+    assert por_id["node-durax-principal-transformacion-2"].es_pasante is True
+    assert por_id["node-durax-principal-transformacion-3"].es_pasante is True
     assert por_id["node-durax-principal-tgbt-4"].es_pasante is False
     assert por_id["node-durax-principal-tgbt-5"].es_pasante is False
