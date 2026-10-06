@@ -10,6 +10,8 @@ jobs:
   test-fresh-deps:
     name: Gauntlet con dependencias frescas
     runs-on: ubuntu-latest
+    env:
+      APP_ENV: test
     steps:
       - uses: actions/checkout@v4
 
