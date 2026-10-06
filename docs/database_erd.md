@@ -28,6 +28,8 @@ erDiagram
     ORGANIZATIONS ||--o{ FACILITIES : "FK_organization_id"
     ORGANIZATIONS ||--o{ USERS : "FK_organization_id"
     PLANS ||--o{ ORGANIZATIONS : "FK_plan_id"
+    USERS ||--o{ AUDITORIA_CAMBIO_CONTRASENA : "FK_usuario_id"
+    USERS ||--o{ CAMBIO_CONTRASENA_VALIDACIONES : "FK_usuario_id"
     USERS ||--o{ DISPOSITIVOS_CONFIABLES : "FK_usuario_id"
     USERS ||--o{ USER_FACILITY_ACCESS : "FK_user_id"
 
@@ -46,6 +48,15 @@ erDiagram
         json metadatos
     }
 
+    AUDITORIA_CAMBIO_CONTRASENA {
+        int id PK
+        string usuario_id FK
+        string ip
+        string user_agent
+        string estado
+        datetime creado_en
+    }
+
     AUDITORIA_CAMBIOS_TI {
         int id PK
         string device_id FK
@@ -56,6 +67,15 @@ erDiagram
         string commit_git
         string usuario
         datetime timestamp
+    }
+
+    CAMBIO_CONTRASENA_VALIDACIONES {
+        int id PK
+        string usuario_id FK
+        string codigo
+        datetime ttl_expira
+        datetime creado_en
+        datetime consumido_en
     }
 
     CAMPAIGN_SAMPLES {
@@ -407,6 +427,20 @@ erDiagram
 - `ix_audit_logs_categoria`: (`categoria`)
 - `ix_audit_logs_recurso_id`: (`recurso_id`)
 
+### Tabla `auditoria_cambio_contrasena`
+
+| Columna | Tipo SQL | Clave / Restricción | Nullable |
+| :--- | :--- | :--- | :--- |
+| `id` | `INTEGER` | **PRIMARY KEY** | No |
+| `usuario_id` | `VARCHAR(36)` | FK -> `users.id` | No |
+| `ip` | `VARCHAR(45)` | - | Sí |
+| `user_agent` | `VARCHAR(255)` | - | Sí |
+| `estado` | `VARCHAR(50)` | - | No |
+| `creado_en` | `DATETIME` | - | No |
+
+**Índices:**
+- `idx_auditoria_cambio_contrasena_usuario_creado`: (`usuario_id`, `creado_en`)
+
 ### Tabla `auditoria_cambios_ti`
 
 | Columna | Tipo SQL | Clave / Restricción | Nullable |
@@ -424,6 +458,20 @@ erDiagram
 **Índices:**
 - `idx_dispositivo_timestamp`: (`device_id`, `timestamp`)
 - `idx_tipo_cambio`: (`tipo_cambio`)
+
+### Tabla `cambio_contrasena_validaciones`
+
+| Columna | Tipo SQL | Clave / Restricción | Nullable |
+| :--- | :--- | :--- | :--- |
+| `id` | `INTEGER` | **PRIMARY KEY** | No |
+| `usuario_id` | `VARCHAR(36)` | FK -> `users.id` | No |
+| `codigo` | `VARCHAR(4)` | - | No |
+| `ttl_expira` | `DATETIME` | - | No |
+| `creado_en` | `DATETIME` | - | No |
+| `consumido_en` | `DATETIME` | - | Sí |
+
+**Índices:**
+- `idx_cambio_contrasena_validaciones_usuario_creado`: (`usuario_id`, `creado_en`)
 
 ### Tabla `campaign_samples`
 
