@@ -2,7 +2,7 @@
 """Genera propuesta de corrección de configuración de TI para aplicar vía API.
 
 Uso:
-  .venv/bin/python scripts/generar_propuesta_ti.py \\
+  ./.venv/bin/python scripts/generar_propuesta_ti.py \\
     --device-id c91713f1-0621-4a33-9279-c5327a317d96 \\
     --output propuesta.json
 """

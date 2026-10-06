@@ -4,7 +4,7 @@
 Rankea 6 candidatos de configuración (3 órdenes x 2 polaridades) por coherencia fasorial.
 
 Uso:
-  .venv/bin/python scripts/diagnosticar_ti.py \\
+  ./.venv/bin/python scripts/diagnosticar_ti.py \\
     --device-id c91713f1-0621-4a33-9279-c5327a317d96 \\
     --periodo-horas 24
 """

@@ -2,7 +2,7 @@
 """Compara dos medidores (Trafo 1 vs. Trafo 2) para validar coherencia de configs.
 
 Uso:
-  .venv/bin/python scripts/comparar_ti_bifasico.py \\
+  ./.venv/bin/python scripts/comparar_ti_bifasico.py \\
     --device-a 7434647d-5b87-4d4e-b4a5-a0d351315f0a \\
     --device-b c91713f1-0621-4a33-9279-c5327a317d96
 """

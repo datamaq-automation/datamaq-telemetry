@@ -5,7 +5,7 @@ Consulta producción vía SSH (ssh vps) para validar energía acumulada
 de un dispositivo contra rotación propuesta (R:0, S:15, etc).
 
 Uso:
-  .venv/bin/python scripts/validar_energia_trafo2_rotacion.py \\
+  ./.venv/bin/python scripts/validar_energia_trafo2_rotacion.py \\
     --device-id c91713f1-0621-4a33-9279-c5327a317d96 \\
     --rotacion-r 0 --rotacion-s 15 \\
     --fecha-inicio 2026-09-17

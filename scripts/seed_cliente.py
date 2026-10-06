@@ -11,7 +11,7 @@ en el YAML y crea lo que sí es transaccional:
   3. N x Dispositivos (por MAC address).
 
 Uso:
-  .venv/bin/python scripts/seed_cliente.py \\
+  ./.venv/bin/python scripts/seed_cliente.py \\
     --org-nombre "Vajillas Durax S.A." \\
     --planta-nombre "Planta Principal Durax" \\
     --usuario "instrumental@vajillasdurax.com.ar" \\
@@ -20,7 +20,7 @@ Uso:
     --dispositivo "AA:BB:CC:DD:EE:02" "SmartPlus Trifásico #2"
 
 Para un medidor ya registrado sin planta asignada:
-  .venv/bin/python scripts/seed_cliente.py \\
+  ./.venv/bin/python scripts/seed_cliente.py \\
     --org-nombre "Datamaq Uso Interno" \\
     --planta-nombre "Domicilio Agustín" \\
     --asignar-dispositivo-existente D48C49F03564

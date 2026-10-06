@@ -5,7 +5,7 @@ Compara 24h antes vs. 24h después de corrección para verificar que la
 configuración es correcta.
 
 Uso:
-  .venv/bin/python scripts/validar_correccion_ti.py \\
+  ./.venv/bin/python scripts/validar_correccion_ti.py \\
     --device-id c91713f1-0621-4a33-9279-c5327a317d96 \\
     --fecha-correccion 2026-09-27 \\
     --esperado-mejora 0.05

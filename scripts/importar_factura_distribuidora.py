@@ -8,7 +8,7 @@ original antes de commitear (CONVENTIONS §3.6, dato físico declarativo sin fue
 no va al YAML).
 
 Uso:
-  .venv/bin/python scripts/importar_factura_distribuidora.py <ruta_pdf> <planta_id> --tipo potencia|energia
+  ./.venv/bin/python scripts/importar_factura_distribuidora.py <ruta_pdf> <planta_id> --tipo potencia|energia
 
 `--tipo potencia` usa el parser de EdeLAP, `--tipo energia` el de CAMMESA (únicos dos
 proveedores con parser real hoy, ver specs/factura-distribuidora.md §"Pendientes").
