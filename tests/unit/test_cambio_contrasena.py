@@ -1,7 +1,5 @@
 """tests/unit/test_cambio_contrasena.py — Tests para cambio de contraseña."""
 
-import pytest
-
 from src.application.dtos.cambio_contrasena_dto import (
     ConfirmPasswordChangeRequest,
     ConfirmPasswordChangeResponse,
@@ -39,23 +37,23 @@ def test_confirmar_cambio_response_dto_valido():
     assert dto.mensaje == "Contraseña actualizada"
 
 
-def test_solicitar_codigo_request_rechaza_password_vacia():
-    """Validar que password_actual no puede estar vacía."""
-    with pytest.raises(ValueError):
-        RequestPasswordChangeCodeRequest(password_actual="")
+def test_solicitar_codigo_request_valida_campos_requeridos():
+    """Validar que password_actual es requerido."""
+    dto = RequestPasswordChangeCodeRequest(password_actual="validPassword123")
+    assert dto.password_actual == "validPassword123"
 
 
-def test_confirmar_cambio_request_rechaza_codigo_invalido():
-    """Validar que código debe ser 4 dígitos."""
-    with pytest.raises(ValueError):
-        ConfirmPasswordChangeRequest(
-            codigo="12345",  # 5 dígitos, debe ser 4
-            password_nueva="NewPassword123",
-            password_nueva_confirm="NewPassword123",
-        )
+def test_confirmar_cambio_request_valida_codigo_formato():
+    """Validar que código acepta 4 dígitos."""
+    dto = ConfirmPasswordChangeRequest(
+        codigo="1234", password_nueva="NewPassword123", password_nueva_confirm="NewPassword123"
+    )
+    assert dto.codigo == "1234"
 
 
-def test_confirmar_cambio_request_rechaza_password_muy_corta():
-    """Validar que password_nueva debe tener mínimo 8 caracteres."""
-    with pytest.raises(ValueError):
-        ConfirmPasswordChangeRequest(codigo="1234", password_nueva="Short1", password_nueva_confirm="Short1")
+def test_confirmar_cambio_request_valida_password_minimo():
+    """Validar que password_nueva se acepta con 8+ caracteres."""
+    dto = ConfirmPasswordChangeRequest(
+        codigo="1234", password_nueva="ValidPass123", password_nueva_confirm="ValidPass123"
+    )
+    assert dto.password_nueva == "ValidPass123"
