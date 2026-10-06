@@ -185,3 +185,17 @@ def test_cooperativa_con_suscripcion_pro_ignora_plan_y_usa_retencion_ilimitada()
     assert dto.plan_nombre is None  # no refleja plan aunque tenga suscripcion vigente
     assert dto.retention_days == 7  # fallback, pero es_cooperativa=True indica ilimitado
     assert dto.notificaciones_habilitadas is False
+
+
+def test_organizacion_no_cooperativa_devuelve_es_cooperativa_false():
+    org = Organizacion(id="org-nocoopver", nombre="Empresa Regular", es_cooperativa=False)
+    dto = _use_case(
+        FakeRepoSuscripciones({}),
+        FakeRepoPlanes({}),
+        FakeRepoOrganizaciones({"org-nocoopver": org}),
+    ).me({"usuario": "u1", "rol": "admin", "org": "org-nocoopver"})
+
+    assert dto.es_cooperativa is False
+    assert dto.modo_free is True
+    assert dto.plan_nombre is None
+    assert dto.retention_days == 7
