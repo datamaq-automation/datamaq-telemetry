@@ -70,6 +70,38 @@ python scripts/validate_topology.py --strict  # Fallar en warnings
 - Commits: Conventional Commits (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`).
 - **Reportes y rutas:** Al generar reportes/documentos, siempre dar rutas absolutas completas (`/home/agustin/...`), no relativas.
 
+## Comunicación con Sesión Padre Orquestadora (datamaq-01)
+
+**TODA respuesta, cierre de tarea o reporte de bloqueadores DEBE dirigirse al PADRE, no al dueño.**
+
+**Protocolo (obligatorio):**
+1. Carga la herramienta `SendMessage` (si está deferred, usa `ToolSearch("select:SendMessage")`)
+2. Envía mensaje a `datamaq-01` (sesión padre):
+   ```
+   SendMessage(to="datamaq-01", 
+     summary="[Resumen corto de lo que reportas]",
+     message="[Detalle completo del cierre / bloqueador / status]")
+   ```
+3. Verifica que el resultado diga `"success":true`
+
+**Ejemplos:**
+```
+✅ Correcto:
+SendMessage(to="datamaq-01", 
+  summary="Trazabilidad TI Bloque A ✅",
+  message="T1–T5 commiteado en feat/trazabilidad-cambios-ti. Gauntlet pasó, integración en deploy-server.sh pendiente.")
+
+❌ Incorrecto:
+"Completé la tarea" (sin SendMessage → va a dueño)
+SendMessage(to="agustin", ...) (envío directo al dueño, saltándose padre)
+```
+
+**Criterio: ¿a quién reportar?**
+- **Padre (datamaq-01):** Status de tarea, cierre de bloque, bloqueadores técnicos, coordinaciones con otros repos
+- **Dueño:** Solo si padre te pide que plantees pregunta de negocio al dueño explícitamente
+
+---
+
 ## Cuando Tengas Dudas o Preguntas
 
 **SIEMPRE indicar explícitamente:**
@@ -79,9 +111,9 @@ python scripts/validate_topology.py --strict  # Fallar en warnings
 
 **Criterio:**
 - **Sesión Padre:** Ambigüedad en briefing, inconsistencias YAML↔DB, bloqueos transversales
-  - Proveer: texto para copiar/pegar en reporte padre
-- **Dueño:** Clarificación de negocio, detalles técnicos de este repo
-  - Esperar respuesta directa aquí
+  - Usar SendMessage: `SendMessage(to="datamaq-01", summary="Pregunta", message="...")`
+- **Dueño:** Clarificación de negocio, detalles técnicos de este repo que padre no puede responder
+  - Padre te indicará explícitamente si traspasar pregunta al dueño
 
 Ver `memory/clarificar-destinatario-preguntas.md` para tabla de criterios.
 

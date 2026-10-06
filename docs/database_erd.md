@@ -9,6 +9,7 @@
 ```mermaid
 erDiagram
     CHARACTERIZATION_CAMPAIGNS ||--o{ CAMPAIGN_SAMPLES : "FK_campaign_id"
+    DEVICES ||--o{ AUDITORIA_CAMBIOS_TI : "FK_device_id"
     DEVICES ||--o{ CHARACTERIZATION_CAMPAIGNS : "FK_device_id"
     DEVICES ||--o{ DEVICE_ALERTS : "FK_device_id"
     DEVICES ||--o{ DEVICE_STATUS_LOGS : "FK_device_id"
@@ -43,6 +44,18 @@ erDiagram
         string recurso_tipo
         string recurso_id
         json metadatos
+    }
+
+    AUDITORIA_CAMBIOS_TI {
+        int id PK
+        string device_id FK
+        string tipo_cambio
+        string valor_anterior
+        string valor_nuevo
+        string motivo
+        string commit_git
+        string usuario
+        datetime timestamp
     }
 
     CAMPAIGN_SAMPLES {
@@ -393,6 +406,24 @@ erDiagram
 - `ix_audit_logs_actor_usuario_id`: (`actor_usuario_id`)
 - `ix_audit_logs_categoria`: (`categoria`)
 - `ix_audit_logs_recurso_id`: (`recurso_id`)
+
+### Tabla `auditoria_cambios_ti`
+
+| Columna | Tipo SQL | Clave / Restricción | Nullable |
+| :--- | :--- | :--- | :--- |
+| `id` | `INTEGER` | **PRIMARY KEY** | No |
+| `device_id` | `VARCHAR(36)` | FK -> `devices.id` | No |
+| `tipo_cambio` | `VARCHAR(100)` | - | No |
+| `valor_anterior` | `TEXT` | - | Sí |
+| `valor_nuevo` | `TEXT` | - | Sí |
+| `motivo` | `TEXT` | - | Sí |
+| `commit_git` | `VARCHAR(40)` | - | Sí |
+| `usuario` | `VARCHAR(100)` | - | Sí |
+| `timestamp` | `DATETIME` | - | No |
+
+**Índices:**
+- `idx_dispositivo_timestamp`: (`device_id`, `timestamp`)
+- `idx_tipo_cambio`: (`tipo_cambio`)
 
 ### Tabla `campaign_samples`
 

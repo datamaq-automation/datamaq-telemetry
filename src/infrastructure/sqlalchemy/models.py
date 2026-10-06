@@ -481,7 +481,7 @@ class AuditoriaChangesTIModel(Base):
         Index("idx_tipo_cambio", "tipo_cambio"),
     )
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     device_id: Mapped[str] = mapped_column(String(36), ForeignKey("devices.id", ondelete="CASCADE"), nullable=False)
     tipo_cambio: Mapped[str] = mapped_column(String(100), nullable=False)
     valor_anterior: Mapped[str | None] = mapped_column(Text, nullable=True)
