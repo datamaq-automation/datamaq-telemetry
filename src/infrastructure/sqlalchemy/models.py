@@ -492,3 +492,35 @@ class AuditoriaChangesTIModel(Base):
     timestamp: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
 
     device: Mapped["DeviceModel"] = relationship(back_populates="auditoria_cambios_ti")
+
+
+class CambioContraseniaValidacionModel(Base):
+    """Validación temporal de cambio de contraseña con OTP 4 dígitos."""
+
+    __tablename__ = "cambio_contrasena_validaciones"
+    __table_args__ = (Index("idx_cambio_contrasena_validaciones_usuario_creado", "usuario_id", "creado_en"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    usuario_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    codigo: Mapped[str] = mapped_column(String(4), nullable=False)
+    ttl_expira: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    creado_en: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
+    consumido_en: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+
+    usuario: Mapped["UserModel"] = relationship()
+
+
+class AuditoriaChangeContraseniaModel(Base):
+    """Auditoría de cambios de contraseña."""
+
+    __tablename__ = "auditoria_cambio_contrasena"
+    __table_args__ = (Index("idx_auditoria_cambio_contrasena_usuario_creado", "usuario_id", "creado_en"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    usuario_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    ip: Mapped[str | None] = mapped_column(String(45), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    estado: Mapped[str] = mapped_column(String(50), nullable=False)
+    creado_en: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
+
+    usuario: Mapped["UserModel"] = relationship()
