@@ -1,6 +1,7 @@
 """src/infrastructure/fastapi/routes/usuarios_router.py — Router de administración de usuarios."""
 
 import uuid
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -40,6 +41,8 @@ class UsuarioResponseDTO(BaseModel):
     rol: str
     organizacion_id: str | None
     esta_activo: bool
+    puede_cambiar_contrasena: bool = True
+    fecha_ultimo_cambio: datetime | None = None
     model_config = ConfigDict(from_attributes=True)
 
 

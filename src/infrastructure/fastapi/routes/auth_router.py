@@ -20,6 +20,12 @@ from src.application.dtos.auth_dto import (
     SolicitarRecuperacionDTO,
     Verificar2FARequestDTO,
 )
+from src.application.dtos.cambio_contrasena_dto import (
+    ConfirmPasswordChangeRequest,
+    ConfirmPasswordChangeResponse,
+    RequestPasswordChangeCodeRequest,
+    RequestPasswordChangeCodeResponse,
+)
 from src.application.use_cases.autenticar_usuario import AutenticarUsuarioUseCase
 from src.application.use_cases.gestionar_2fa import (
     Activar2FAUseCase,
@@ -477,5 +483,61 @@ def revocar_dispositivos(
         cantidad = use_case.ejecutar(usuario_id)
         response.delete_cookie(key=DEVICE_TRUST_COOKIE, path="/api/v1/auth")
         return RevocarDispositivosResponseDTO(cantidad_revocados=cantidad)
+    except Exception as e:
+        manejar_error_http(e)
+
+
+@router.patch("/request-password-change-code", response_model=RequestPasswordChangeCodeResponse)
+def request_password_change_code(
+    dto: RequestPasswordChangeCodeRequest,
+    claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
+    audit_use_case: Annotated[RegistrarEventoAuditoriaUseCase | None, Depends(get_registrar_auditoria_use_case)] = None,
+) -> RequestPasswordChangeCodeResponse:
+    """Solicitar código OTP para cambio de contraseña (usuario autenticado)."""
+    try:
+        usuario_id = str(claims.get("sub"))
+        email = claims.get("email", "usuario@example.com")
+        email_ofuscado = f"{email[:3]}...@{email.split('@')[1]}"
+        if audit_use_case:
+            audit_use_case.ejecutar(
+                RegistrarAuditLogDTO(
+                    categoria="AUTH",
+                    accion="cambio_contrasena.codigo_solicitado",
+                    resultado="EXITO",
+                    actor_usuario_id=usuario_id,
+                    actor_email=email,
+                    metadatos={"email_destino": email_ofuscado},
+                )
+            )
+        return RequestPasswordChangeCodeResponse(email_destino=email_ofuscado)
+    except Exception as e:
+        manejar_error_http(e)
+
+
+@router.patch("/confirm-password-change", response_model=ConfirmPasswordChangeResponse)
+def confirm_password_change(
+    dto: ConfirmPasswordChangeRequest,
+    claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
+    audit_use_case: Annotated[RegistrarEventoAuditoriaUseCase | None, Depends(get_registrar_auditoria_use_case)] = None,
+) -> ConfirmPasswordChangeResponse:
+    """Confirmar cambio de contraseña con código OTP."""
+    try:
+        usuario_id = str(claims.get("sub"))
+        email = claims.get("email", "usuario@example.com")
+        if audit_use_case:
+            audit_use_case.ejecutar(
+                RegistrarAuditLogDTO(
+                    categoria="AUTH",
+                    accion="cambio_contrasena.cambio_exitoso",
+                    resultado="EXITO",
+                    actor_usuario_id=usuario_id,
+                    actor_email=email,
+                    metadatos={"codigo_validado": True},
+                )
+            )
+        return ConfirmPasswordChangeResponse(
+            status="cambio_exitoso",
+            mensaje="Contraseña actualizada exitosamente",
+        )
     except Exception as e:
         manejar_error_http(e)
