@@ -84,6 +84,13 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
         git clone git@github.com-datamaq-data:datamaq-automation/datamaq-data.git data
     fi
 
+    echo "==> Detectando cambios TI en configuración (auditoría)..."
+    if [ -d "data/.git" ]; then
+        if ! ./.venv/bin/python -m scripts.detect_ti_changes; then
+            echo "ADVERTENCIA: la detección de cambios TI falló (no bloqueante)."
+        fi
+    fi
+
     echo "==> Backup de la base antes de migrar (D-5)..."
     source .env
     BACKUP_DIR="/tmp/datamaq-telemetry-pre-migracion"

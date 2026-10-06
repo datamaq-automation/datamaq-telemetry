@@ -32,6 +32,7 @@ from src.infrastructure.fastapi.dependencies import (
 from src.infrastructure.fastapi.error_handler import manejar_404
 from src.infrastructure.fastapi.headers_historico import HEADER_DATOS_DESDE, HEADER_POTENCIA_REFERENCIA
 from src.infrastructure.fastapi.middleware import RequestIdMiddleware
+from src.infrastructure.fastapi.routes.admin_router import router as admin_router
 from src.infrastructure.fastapi.routes.alertas_router import router as alertas_router
 from src.infrastructure.fastapi.routes.analitica_router import router as analitica_router
 from src.infrastructure.fastapi.routes.asistente_router import router as asistente_router
@@ -478,7 +479,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_exception_handler(StarletteHTTPException, manejar_404)
 
     # Register Routers (asistente aislado según decisions/2026-09-24_bot-conversacional-aislamiento.md)
-    routers = (system_router, disponibilidad_router, cargas_router, telemetria_router, dispositivos_router, organizaciones_router, planta_estructura_router, planes_router, alertas_router, auth_router, audit_router, sge_router, usuarios_router, analitica_router, billing_router, produccion_router, notificador_router, maquinas_router, asistente_router)  # fmt: skip
+    routers = (system_router, disponibilidad_router, cargas_router, telemetria_router, dispositivos_router, organizaciones_router, planta_estructura_router, planes_router, alertas_router, auth_router, admin_router, audit_router, sge_router, usuarios_router, analitica_router, billing_router, produccion_router, notificador_router, maquinas_router, asistente_router)  # fmt: skip
     for r in routers:
         app.include_router(r)
 

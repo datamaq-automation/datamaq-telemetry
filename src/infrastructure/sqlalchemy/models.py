@@ -113,6 +113,9 @@ class DeviceModel(Base):
         back_populates="device", cascade="all, delete-orphan"
     )
     alerts: Mapped[list["DeviceAlertModel"]] = relationship(back_populates="device", cascade="all, delete-orphan")
+    auditoria_cambios_ti: Mapped[list["AuditoriaChangesTIModel"]] = relationship(
+        back_populates="device", cascade="all, delete-orphan"
+    )
 
 
 class TelemetryInstantaneousModel(Base):
@@ -467,3 +470,25 @@ class DispositivoDiagnosticoModel(Base):
     mismatch: Mapped[bool | None] = mapped_column(nullable=True, comment="true si top != actual")
     alerta_enviada: Mapped[bool] = mapped_column(nullable=False, default=False)
     creado_en: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
+
+
+class AuditoriaChangesTIModel(Base):
+    """Auditoría de cambios en configuración de TI (Transformadores de Corriente)."""
+
+    __tablename__ = "auditoria_cambios_ti"
+    __table_args__ = (
+        Index("idx_dispositivo_timestamp", "device_id", "timestamp"),
+        Index("idx_tipo_cambio", "tipo_cambio"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    device_id: Mapped[str] = mapped_column(String(36), ForeignKey("devices.id", ondelete="CASCADE"), nullable=False)
+    tipo_cambio: Mapped[str] = mapped_column(String(100), nullable=False)
+    valor_anterior: Mapped[str | None] = mapped_column(Text, nullable=True)
+    valor_nuevo: Mapped[str | None] = mapped_column(Text, nullable=True)
+    motivo: Mapped[str | None] = mapped_column(Text, nullable=True)
+    commit_git: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    usuario: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    timestamp: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
+
+    device: Mapped["DeviceModel"] = relationship(back_populates="auditoria_cambios_ti")
