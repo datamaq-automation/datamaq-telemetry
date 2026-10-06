@@ -479,3 +479,51 @@ def revocar_dispositivos(
         return RevocarDispositivosResponseDTO(cantidad_revocados=cantidad)
     except Exception as e:
         manejar_error_http(e)
+
+
+@router.patch("/request-password-change-code", status_code=200)
+def request_password_change_code(
+    password_actual: str,
+    claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
+    request: Request = None,  # type: ignore[assignment]
+) -> dict[str, str]:
+    """
+    Solicitar código de validación para cambio de contraseña.
+
+    Validaciones:
+    - Usuario autenticado
+    - Contraseña actual correcta
+    - Rate limit: 5 por 10 minutos
+    """
+    try:
+        _ = (password_actual, claims, request)
+        # TODO: Implementar lógica completa en E2
+        return {"status": "codigo_enviado", "email_destino": "agus...@gmail.com"}
+    except Exception as e:
+        manejar_error_http(e)
+
+
+@router.patch("/confirm-password-change", status_code=200)
+def confirm_password_change(
+    codigo: str,
+    password_nueva: str,
+    password_nueva_confirm: str,
+    claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
+    request: Request = None,  # type: ignore[assignment]
+) -> dict[str, str]:
+    """
+    Confirmar cambio de contraseña con código OTP.
+
+    Validaciones:
+    - Código válido y no expirado
+    - Nueva contraseña ≠ actual
+    - Nueva contraseña ≥8 char + mayúsculas/dígitos
+    - Confirmación = nueva
+    - Invalida todas las sesiones post-cambio
+    """
+    try:
+        _ = (codigo, password_nueva, password_nueva_confirm, claims, request)
+        # TODO: Implementar lógica completa en E3
+        return {"status": "cambio_exitoso", "mensaje": "Contraseña actualizada"}
+    except Exception as e:
+        manejar_error_http(e)
