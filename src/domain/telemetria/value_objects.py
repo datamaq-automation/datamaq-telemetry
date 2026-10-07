@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 
 from src.domain.telemetria.exceptions import (
     CoordenadaInvalidaError,
@@ -350,3 +350,95 @@ class CandidatoTI:
         for fase in self.orden_fases:
             if fase not in ("R", "S", "T"):
                 raise ValueError(f"Fase inválida (debe ser R, S o T): {fase}")
+
+
+class GranularidadTelemetria(str, Enum):
+    """Granularidades permitidas en la telemetría histórica."""
+
+    CINCO_MINUTOS = "5m"
+    QUINCE_MINUTOS = "15m"
+    TREINTA_MINUTOS = "30m"
+    UNA_HORA = "1h"
+    UN_DIA = "1d"
+
+
+PeriodoTelemetria = Literal["24h", "7d", "30d"]
+
+
+class ConfigGranularidadPeriodo:
+    """Configuración de granularidades permitidas y default por período."""
+
+    def __init__(
+        self,
+        opciones: list[GranularidadTelemetria],
+        default: GranularidadTelemetria,
+    ) -> None:
+        self.opciones = opciones
+        self.default = default
+
+
+GRANULARIDADES_POR_PERIODO: dict[PeriodoTelemetria, ConfigGranularidadPeriodo] = {
+    "24h": ConfigGranularidadPeriodo(
+        opciones=[
+            GranularidadTelemetria.CINCO_MINUTOS,
+            GranularidadTelemetria.QUINCE_MINUTOS,
+            GranularidadTelemetria.TREINTA_MINUTOS,
+        ],
+        default=GranularidadTelemetria.CINCO_MINUTOS,
+    ),
+    "7d": ConfigGranularidadPeriodo(
+        opciones=[
+            GranularidadTelemetria.QUINCE_MINUTOS,
+            GranularidadTelemetria.TREINTA_MINUTOS,
+            GranularidadTelemetria.UNA_HORA,
+        ],
+        default=GranularidadTelemetria.TREINTA_MINUTOS,
+    ),
+    "30d": ConfigGranularidadPeriodo(
+        opciones=[
+            GranularidadTelemetria.UNA_HORA,
+            GranularidadTelemetria.UN_DIA,
+        ],
+        default=GranularidadTelemetria.UNA_HORA,
+    ),
+}
+
+
+def obtener_default_granularidad(periodo: PeriodoTelemetria) -> GranularidadTelemetria:
+    """Retorna la granularidad por defecto para un período dado."""
+    config = GRANULARIDADES_POR_PERIODO.get(periodo)
+    if not config:
+        raise ValueError(f"Período no válido: {periodo}")
+    return config.default
+
+
+def validar_granularidad(
+    granularidad: str | GranularidadTelemetria, periodo: PeriodoTelemetria
+) -> GranularidadTelemetria:
+    """Valida que la granularidad sea válida para el período dado.
+
+    Raises:
+        ValueError: Si granularidad no es válida para el período.
+    """
+    # Convertir a enum si es string
+    if isinstance(granularidad, str):
+        try:
+            granularidad_enum = GranularidadTelemetria(granularidad)
+        except ValueError:
+            valores_validos = ", ".join(g.value for g in GranularidadTelemetria)
+            raise ValueError(f"Granularidad '{granularidad}' no reconocida. Válidas: {valores_validos}") from None
+    else:
+        granularidad_enum = granularidad
+
+    # Verificar que sea válida para el período
+    config = GRANULARIDADES_POR_PERIODO.get(periodo)
+    if not config:
+        raise ValueError(f"Período no válido: {periodo}")
+
+    if granularidad_enum not in config.opciones:
+        valores_validos = ", ".join(g.value for g in config.opciones)
+        raise ValueError(
+            f"Granularidad '{granularidad_enum.value}' no válida para período '{periodo}'. Válidas: {valores_validos}"
+        )
+
+    return granularidad_enum

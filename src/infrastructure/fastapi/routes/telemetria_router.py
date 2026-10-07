@@ -20,6 +20,11 @@ from src.application.use_cases.agregacion_dispositivos import calcular_potencia_
 from src.application.use_cases.consultar_telemetria import ConsultarTelemetriaUseCase
 from src.application.use_cases.exportar_telemetria import ExportarTelemetriaUseCase
 from src.application.use_cases.gestionar_alertas import GestionarAlertasUseCase
+from src.domain.telemetria.value_objects import (
+    PeriodoTelemetria,
+    obtener_default_granularidad,
+    validar_granularidad,
+)
 from src.infrastructure.fastapi.dependencies import (
     get_alertas_use_case,
     get_exportar_telemetria_use_case,
@@ -115,6 +120,64 @@ def get_instantaneous_history(
 
 
 @router.get(
+    "/power/{device_id}",
+    response_model=list[dict[str, object]],
+    dependencies=[Depends(verificar_propiedad_dispositivo)],
+)
+def get_power_history(
+    device_id: str,
+    response: Response,
+    use_case: Annotated[ConsultarTelemetriaUseCase, Depends(get_telemetria_use_case)],
+    periodo: PeriodoTelemetria = Query("24h", description="Período: 24h, 7d, 30d"),
+    granularidad: str | None = Query(
+        None,
+        description="Granularidad temporal: 5m, 15m, 30m, 1h, 1d. Si omitido, se aplica default según período.",
+    ),
+    limit: int = Query(1000, le=5000, description="Límite máximo de registros"),
+):
+    """Histórico de potencia con granularidad configurable.
+
+    Parámetros:
+    - `periodo`: 24h, 7d, 30d
+    - `granularidad`: opcional. Si omitido, se usa default según período.
+      * 24h: [5m, 15m, 30m] → default 5m
+      * 7d: [15m, 30m, 1h] → default 30m
+      * 30d: [1h, 1d] → default 1h
+    """
+    try:
+        # Validar granularidad
+        if granularidad:
+            gran_validada = validar_granularidad(granularidad, periodo)
+        else:
+            gran_validada = obtener_default_granularidad(periodo)
+
+        # Calcular ventana temporal
+        ahora = datetime.now(tz.utc)
+        duracion = {"24h": 1, "7d": 7, "30d": 30}[periodo]
+        desde = ahora - timedelta(days=duracion)
+
+        # Para MVP: retornar datos instantáneos de potencia
+        # En versión futura: agregar según granularidad
+        lecturas = use_case.historico_instantaneas(
+            id_o_uid=device_id,
+            limite=limit,
+            desde=desde,
+        )
+
+        response.headers[HEADER_DATOS_DESDE] = formatear_datos_desde(use_case.datos_desde(device_id))
+        # Agregar header con granularidad aplicada
+        response.headers["X-Granularidad"] = gran_validada.value
+
+        return [dict(r) if isinstance(r, dict) else {"raw": r} for r in lecturas]
+
+    except ValueError as e:
+        # Validación de granularidad/período
+        manejar_error_http(e)
+    except Exception as e:
+        manejar_error_http(e)
+
+
+@router.get(
     "/energy/{device_id}",
     response_model=list[AcumuladoEnergiaDTO | EnergiaAgregadaDTO],
     dependencies=[Depends(verificar_propiedad_dispositivo)],
@@ -126,18 +189,48 @@ def get_energy_history(
     limit: int = Query(100, le=1000),
     days: int | None = Query(None, description="Últimos N días"),
     granularity: Literal["raw", "day", "month"] = Query("raw", description="Granularidad: raw, day, month"),
+    granularidad: str | None = Query(
+        None,
+        description="Granularidad temporal (nuevo): 5m, 15m, 30m, 1h, 1d. Incompatible con `granularity`.",
+    ),
     timezone: str = Query("America/Argentina/Buenos_Aires", description="Zona horaria IANA"),
 ):
     """El header `X-Datos-Desde` informa el corte de retención: `days` se acota a él sin aviso en
-    el body, así que el frontend lo necesita para titular el período real."""
+    el body, así que el frontend lo necesita para titular el período real.
+
+    Soporta dos esquemas de granularidad:
+    - Legado: `granularity` (raw|day|month)
+    - Nuevo: `granularidad` (5m|15m|30m|1h|1d) con validación por período
+    """
     try:
+        # Validar si se proporcionó granularidad nueva
+        if granularidad:
+            # Inducir período a partir de days o usar default 24h
+            periodo: PeriodoTelemetria = "24h"
+            if days:
+                if days <= 1:
+                    periodo = "24h"
+                elif days <= 7:
+                    periodo = "7d"
+                else:
+                    periodo = "30d"
+
+            # Validar granularidad
+            validar_granularidad(granularidad, periodo)
+
+        # Lógica original
         if granularity == "raw":
             desde = datetime.now(tz.utc) - timedelta(days=days) if days else None
             energias = use_case.listar_energias(device_id, limit, desde)
         else:
             energias = use_case.listar_energia_agregada(device_id, granularity, timezone, days)
+
         response.headers[HEADER_DATOS_DESDE] = formatear_datos_desde(use_case.datos_desde(device_id))
         return energias
+
+    except ValueError as e:
+        # Validación de granularidad
+        manejar_error_http(e)
     except Exception as e:
         manejar_error_http(e)
 
