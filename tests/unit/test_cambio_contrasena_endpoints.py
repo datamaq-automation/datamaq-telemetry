@@ -159,3 +159,32 @@ def test_base_guarda_solo_el_hash_del_codigo(cliente, email, db):
     fila = db.query(CambioContraseniaValidacionModel).one()
     assert email.codigos[0][1] not in fila.codigo_hash
     assert len(fila.codigo_hash) == 64
+
+
+@pytest.mark.parametrize(
+    "ruta",
+    ["/api/v1/auth/request-password-change-code", "/api/v1/auth/confirm-password-change"],
+)
+def test_sin_clave_otp_en_produccion_responde_503_sin_tocar_nada(db, email, ruta):
+    app = create_app()
+    app.dependency_overrides[get_db_session] = lambda: db
+    app.dependency_overrides[get_email_service] = lambda: email
+    app.dependency_overrides[get_usuario_actual] = lambda: CLAIMS
+    app.dependency_overrides[get_settings_dep] = lambda: Settings(
+        _env_file=None, API_SECRET_KEY="secreto-fuerte-123456", DB_PASSWORD="clave-segura"
+    )
+    cliente_prod = TestClient(app)
+
+    respuesta = cliente_prod.patch(
+        ruta,
+        json={
+            "password_actual": PASSWORD_ACTUAL,
+            "codigo": "1234",
+            "password_nueva": PASSWORD_NUEVA,
+            "password_nueva_confirm": PASSWORD_NUEVA,
+        },
+    )
+
+    assert respuesta.status_code == 503
+    assert email.codigos == []
+    assert db.query(CambioContraseniaValidacionModel).count() == 0

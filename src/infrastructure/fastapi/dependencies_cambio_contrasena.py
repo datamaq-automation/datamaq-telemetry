@@ -5,7 +5,7 @@ Viven fuera de dependencies.py para no superar el límite de tamaño de archivo 
 
 from typing import Annotated
 
-from fastapi import Depends
+from fastapi import Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from src.application.use_cases.cambio_contrasena import (
@@ -22,6 +22,15 @@ from src.infrastructure.sqlalchemy.repositories.cambio_contrasena_repository imp
 )
 
 
+def get_clave_otp(
+    settings: Annotated[Settings, Depends(get_settings_dep)],
+) -> str:
+    """Clave HMAC de los OTP. Sin clave usable (producción sin OTP_HMAC_KEY) el cambio responde 503."""
+    if not settings.otp_hmac_configurada:
+        raise HTTPException(status_code=503, detail="cambio_contrasena_no_disponible: falta OTP_HMAC_KEY")
+    return settings.OTP_HMAC_KEY
+
+
 def get_cambio_contrasena_repository(
     db: Annotated[Session, Depends(get_db_session)],
 ) -> RepositorioCambioContrasenaPort:
@@ -32,14 +41,14 @@ def get_solicitar_cambio_contrasena_use_case(
     usuarios_repo: Annotated[RepositorioUsuariosPort, Depends(get_usuarios_repository)],
     repo: Annotated[RepositorioCambioContrasenaPort, Depends(get_cambio_contrasena_repository)],
     email_service: Annotated[ServicioEmailPort, Depends(get_email_service)],
-    settings: Annotated[Settings, Depends(get_settings_dep)],
+    clave_otp: Annotated[str, Depends(get_clave_otp)],
 ) -> SolicitarCambioContrasenaUseCase:
     return SolicitarCambioContrasenaUseCase(
         repo=repo,
         usuarios=usuarios_repo,
         hash_service=HashContrasenaService,
         email=email_service,
-        clave_otp=settings.OTP_HMAC_KEY,
+        clave_otp=clave_otp,
     )
 
 
@@ -47,12 +56,12 @@ def get_confirmar_cambio_contrasena_use_case(
     usuarios_repo: Annotated[RepositorioUsuariosPort, Depends(get_usuarios_repository)],
     repo: Annotated[RepositorioCambioContrasenaPort, Depends(get_cambio_contrasena_repository)],
     email_service: Annotated[ServicioEmailPort, Depends(get_email_service)],
-    settings: Annotated[Settings, Depends(get_settings_dep)],
+    clave_otp: Annotated[str, Depends(get_clave_otp)],
 ) -> ConfirmarCambioContrasenaUseCase:
     return ConfirmarCambioContrasenaUseCase(
         repo=repo,
         usuarios=usuarios_repo,
         hash_service=HashContrasenaService,
         email=email_service,
-        clave_otp=settings.OTP_HMAC_KEY,
+        clave_otp=clave_otp,
     )

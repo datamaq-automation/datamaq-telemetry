@@ -1,5 +1,6 @@
 """src/infrastructure/settings/config.py."""
 
+import logging
 import os
 import secrets
 from functools import lru_cache
@@ -154,14 +155,17 @@ class Settings(BaseSettings):
                 raise ValueError("DB_PASSWORD debe tener al menos 8 caracteres en producción")
             if (self.CORS_ORIGINS or "").strip() == "*":
                 raise ValueError("CORS_ORIGINS no puede ser '*' en producción")
-            if not self.OTP_HMAC_KEY or len(self.OTP_HMAC_KEY) < 16:
-                raise ValueError("OTP_HMAC_KEY debe tener al menos 16 caracteres en producción")
-            if self.OTP_HMAC_KEY == self.API_SECRET_KEY:
-                raise ValueError("OTP_HMAC_KEY debe ser distinta de API_SECRET_KEY")
+            # No aborta: la API levanta y el cambio de contraseña responde 503 hasta cargar la clave.
+            if not self.otp_hmac_configurada:
+                logging.getLogger("settings").critical(
+                    "OTP_HMAC_KEY ausente, corta o igual a API_SECRET_KEY: el cambio de contraseña "
+                    "responde 503 hasta cargar una clave de al menos 16 caracteres distinta de API_SECRET_KEY"
+                )
         elif not self.API_SECRET_KEY:
             object.__setattr__(self, "API_SECRET_KEY", secrets.token_urlsafe(32))
-        if not self.OTP_HMAC_KEY:
-            # Solo desarrollo/test: los OTP firmados con clave efímera no sobreviven a un reinicio.
+        # Solo desarrollo/test: en producción nunca se genera una clave (quedaría "configurada" con un
+        # valor distinto en cada reinicio). Los OTP con clave efímera no sobreviven a un reinicio.
+        if self.DEBUG and not self.OTP_HMAC_KEY:
             object.__setattr__(self, "OTP_HMAC_KEY", secrets.token_urlsafe(32))
         return self
 
@@ -169,6 +173,11 @@ class Settings(BaseSettings):
     def database_url(self) -> str:
         pwd = f":{self.DB_PASSWORD}" if self.DB_PASSWORD else ""
         return f"mysql+pymysql://{self.DB_USER}{pwd}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}?charset=utf8mb4"
+
+    @property
+    def otp_hmac_configurada(self) -> bool:
+        """True si la clave OTP es usable: >=16 caracteres y distinta de API_SECRET_KEY."""
+        return len(self.OTP_HMAC_KEY) >= 16 and self.OTP_HMAC_KEY != self.API_SECRET_KEY
 
     @property
     def auth_cookie_secure(self) -> bool:
