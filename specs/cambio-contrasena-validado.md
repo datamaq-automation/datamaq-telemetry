@@ -86,3 +86,12 @@ devolvían 200 y auditaban un cambio que no ocurría).
 5. **Atomicidad (deuda, no implementada):** "consumir código + guardar hash + revocar sesiones" no ocurre en una sola transacción. Motivo: cada repositorio hace `commit()` por su cuenta (`MySQLUsuariosRepository.guardar` lo usan más de seis llamadores) y no hay unidad de trabajo. Hacerlo transaccional exige introducir un puerto de unidad de trabajo o cambiar el contrato de commit de los repositorios: rediseño, no se hizo. Efecto si falla a mitad: el código queda consumido y el usuario pide uno nuevo; no hay pérdida de datos. Pendiente de decisión.
 6. **Inconsistencia con recuperación:** la recuperación de contraseña sigue exigiendo solo ≥8 caracteres (decisión D del padre). La decide el dueño.
 7. **Template HTML de email:** los emails de cambio son texto plano; el template HTML de recuperación no se replicó. Lo decide el dueño.
+
+## Estado de entrega (2026-10-08)
+
+- **Local, sin push.** `origin/main` = `62715d5`; `main` = `dad7425`, adelante 15 y atrás 0.
+- Gauntlet `scripts/pre-push.sh` en verde sobre `dad7425`: unit 1757 passed / 4 skipped, integración 79 passed / 3 skipped.
+- Commits, del más viejo al más nuevo: `c826a80` (hotfix stubs → 501), `56a1472` (dominio), `070b954` (migración), `87b1a9c` (emails), `ba5ddf6` (config OTP_HMAC_KEY), `dbdecf8` (casos de uso), `d555552` (repositorio), `295d041` (endpoints y DI), `e83fe11` (spec), `d4acc31` y `ded6e4d` (chore formato/imports), `4d0668f` (límite cuenta contraseñas erróneas), `e1a6480` (arranque no abortivo y 503), `393adbc` (spec deploy y deudas), `dad7425` (chore formato).
+- **Para el push, el dueño debe autorizar:** la migración `b7c3d9e1f2a4` (DROP de `codigo` en tabla vacía según el código) y el deploy que la aplica.
+- **Antes del deploy:** cargar `OTP_HMAC_KEY` en `/var/www/datamaq-telemetry/.env` (≥16 caracteres, distinta de `API_SECRET_KEY`).
+- Fuera de alcance de esta entrega: `workflow_dispatch` en `ci-nightly.yml` (pendiente de decisión del dueño).
