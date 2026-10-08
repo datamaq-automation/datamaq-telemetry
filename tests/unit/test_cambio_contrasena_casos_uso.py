@@ -339,4 +339,3 @@ def test_contrasenas_erroneas_viejas_no_cuentan_fuera_de_la_ventana(escenario):
         repo.registrar_auditoria("u-1", "intento_fallido", None, None, viejo)
     _solicitar(repo, usuarios, email).ejecutar("u-1", PASSWORD_ACTUAL, None, None)
     assert len(email.codigos) == 1
-
