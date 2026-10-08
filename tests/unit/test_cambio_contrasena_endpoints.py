@@ -13,8 +13,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from src.domain.auth.services import HashContrasenaService
-from src.infrastructure.fastapi.dependencies import get_email_service, get_usuario_actual
-from src.infrastructure.fastapi.dependencies import get_settings_dep
+from src.infrastructure.fastapi.dependencies import get_email_service, get_settings_dep, get_usuario_actual
 from src.infrastructure.fastapi.server import create_app
 from src.infrastructure.settings.config import Settings
 from src.infrastructure.sqlalchemy.database import get_db_session
