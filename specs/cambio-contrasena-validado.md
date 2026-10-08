@@ -67,11 +67,22 @@ devolvían 200 y auditaban un cambio que no ocurría).
 - `scripts/verify_architecture.py` y `scripts/verify_code_size.py` en verde.
 - Migración `b7c3d9e1f2a4` encadenada desde `1a35ebb54900`; `REVISION_HEAD` y `docs/database_erd.md` actualizados.
 
-## Pendientes y riesgos (no bloquean el commit, deciden el padre o el dueño)
+## Despliegue
 
-1. **Despliegue:** con la validación de arranque, el VPS no levanta hasta tener `OTP_HMAC_KEY` (≥16 caracteres, distinta de `API_SECRET_KEY`) en su `.env`.
-2. **Migración en producción:** `b7c3d9e1f2a4` hace DROP de `codigo` y la tabla debe estar vacía (verificado en el código, sin query a producción). El deploy ejecuta migraciones.
-3. **Adivinación de `password_actual`:** el límite de 5 solicitudes cuenta solo códigos emitidos. Un usuario logueado puede probar contraseñas en `request-password-change-code` sin límite. Propuesta: contar también los `intento_fallido` de auditoría en la misma ventana.
-4. **IP de auditoría:** reutiliza `_obtener_ip_cliente`, que confía en `X-Forwarded-For` (falsificable). Es el patrón existente de la app.
-5. **Atomicidad:** cada paso hace commit por separado; si falla entre "código consumido" y "hash guardado", el usuario debe pedir un código nuevo. No hay pérdida de datos, pero no es transaccional.
-6. **Inconsistencia con recuperación:** la recuperación de contraseña sigue exigiendo solo ≥8 caracteres (decisión D del padre, registrada como pendiente).
+**Paso obligatorio para activar el cambio de contraseña:** cargar `OTP_HMAC_KEY` en el `.env` del VPS
+(`/var/www/datamaq-telemetry`), con al menos 16 caracteres y distinta de `API_SECRET_KEY`. Generar con
+`python -c "import secrets; print(secrets.token_urlsafe(32))"`.
+
+- Sin la clave, la API **arranca igual** (no tumba el resto de los endpoints): loguea un error crítico
+  y los dos endpoints de cambio de contraseña responden **503** sin enviar código ni tocar la BD.
+- La migración `b7c3d9e1f2a4` corre en el deploy (ver punto 2 de Pendientes).
+
+## Pendientes y riesgos (deciden el padre o el dueño)
+
+1. **Despliegue:** resuelto en el código (ver sección Despliegue). Falta cargar la clave en el VPS antes de que el cambio de contraseña funcione.
+2. **Migración en producción:** `b7c3d9e1f2a4` hace DROP de `codigo` en `cambio_contrasena_validaciones`. La tabla debe estar vacía: verificado en el código (ninguna ruta escribió nunca en ella), sin consulta a producción. El deploy ejecuta migraciones; requiere autorización del dueño.
+3. **Adivinación de `password_actual`:** resuelto. El límite de 5 por 10 min cuenta solicitudes emitidas más eventos `intento_fallido` de la auditoría del usuario, y el chequeo ocurre antes de verificar la contraseña. Un éxito no resetea el límite dentro de la ventana. Efecto colateral: los códigos erróneos también consumen presupuesto (más restrictivo).
+4. **IP de auditoría (deuda):** reutiliza `_obtener_ip_cliente`, que confía en `X-Forwarded-For` (falsificable). Es el patrón existente de la app; no se cambió.
+5. **Atomicidad (deuda, no implementada):** "consumir código + guardar hash + revocar sesiones" no ocurre en una sola transacción. Motivo: cada repositorio hace `commit()` por su cuenta (`MySQLUsuariosRepository.guardar` lo usan más de seis llamadores) y no hay unidad de trabajo. Hacerlo transaccional exige introducir un puerto de unidad de trabajo o cambiar el contrato de commit de los repositorios: rediseño, no se hizo. Efecto si falla a mitad: el código queda consumido y el usuario pide uno nuevo; no hay pérdida de datos. Pendiente de decisión.
+6. **Inconsistencia con recuperación:** la recuperación de contraseña sigue exigiendo solo ≥8 caracteres (decisión D del padre). La decide el dueño.
+7. **Template HTML de email:** los emails de cambio son texto plano; el template HTML de recuperación no se replicó. Lo decide el dueño.
