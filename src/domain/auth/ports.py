@@ -101,6 +101,14 @@ class ServicioEmailPort(ABC):
     def enviar_email_recuperacion(self, destinatario: str, enlace_restablecimiento: str) -> bool:
         pass
 
+    @abstractmethod
+    def enviar_codigo_cambio_contrasena(self, destinatario: str, codigo: str) -> bool:
+        """Envía el OTP de 4 dígitos. El código nunca debe quedar en logs."""
+
+    @abstractmethod
+    def notificar_cambio_contrasena(self, destinatario: str, momento: datetime, ip: str | None) -> bool:
+        """Confirma que la contraseña cambió. No incluye la contraseña ni el código."""
+
 
 class RepositorioDispositivosConfiablesPort(ABC):
     @abstractmethod

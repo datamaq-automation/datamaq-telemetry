@@ -1,6 +1,7 @@
 """src/infrastructure/auth/email_service.py."""
 
 import smtplib
+from datetime import datetime
 from email.message import EmailMessage
 from email.utils import formataddr, formatdate, make_msgid
 
@@ -93,6 +94,49 @@ class SmtpEmailService(ServicioEmailPort, NotificadorAlertasPort):
         )
         msg.add_alternative(html_content, subtype="html")
         return self._enviar_smtp(msg, "email_recuperacion", destinatario)
+
+    def enviar_codigo_cambio_contrasena(self, destinatario: str, codigo: str) -> bool:
+        if self.app_env == "test":
+            # Sin el código: los logs no deben contenerlo (ni siquiera en modo simulado).
+            logger.info("email_simulado_test", destinatario=destinatario, asunto="cambio_contrasena_codigo")
+            return True
+        msg = EmailMessage()
+        msg["Subject"] = "Confirmación: Cambiar Contraseña en DataMaq"
+        msg["From"] = formataddr(("Datamaq Telemetry", self.from_email))
+        msg["To"] = destinatario
+        msg["Date"] = formatdate(localtime=True)
+        msg["Message-ID"] = make_msgid(domain="datamaq.com.ar")
+        msg["X-Mailer"] = "Datamaq Telemetry Mailer 1.0"
+        msg.set_content(
+            "Estimado usuario,\n\n"
+            "Recibimos una solicitud para cambiar la contraseña de su cuenta en Datamaq Telemetry.\n\n"
+            f"Su código de validación es: {codigo}\n\n"
+            "El código vence en 10 minutos y sólo puede usarse una vez.\n"
+            "Si usted no realizó esta solicitud, ignore este mensaje: su contraseña no fue modificada.\n\n"
+            "Atentamente,\nEl equipo de Soporte y Seguridad de Datamaq Telemetry"
+        )
+        return self._enviar_smtp(msg, "email_cambio_contrasena_codigo", destinatario)
+
+    def notificar_cambio_contrasena(self, destinatario: str, momento: datetime, ip: str | None) -> bool:
+        if self.app_env == "test":
+            logger.info("email_simulado_test", destinatario=destinatario, asunto="cambio_contrasena_confirmado")
+            return True
+        msg = EmailMessage()
+        msg["Subject"] = "Contraseña cambiada - Datamaq Telemetry"
+        msg["From"] = formataddr(("Datamaq Telemetry", self.from_email))
+        msg["To"] = destinatario
+        msg["Date"] = formatdate(localtime=True)
+        msg["Message-ID"] = make_msgid(domain="datamaq.com.ar")
+        msg["X-Mailer"] = "Datamaq Telemetry Mailer 1.0"
+        msg.set_content(
+            "Estimado usuario,\n\n"
+            f"Su contraseña de Datamaq Telemetry fue cambiada el {momento.isoformat()} "
+            f"desde la IP {ip or 'desconocida'}.\n"
+            "Todas sus sesiones activas fueron cerradas: deberá volver a iniciar sesión.\n\n"
+            "Si no fue usted, comuníquese de inmediato con el administrador del sistema.\n\n"
+            "Atentamente,\nEl equipo de Soporte y Seguridad de Datamaq Telemetry"
+        )
+        return self._enviar_smtp(msg, "email_cambio_contrasena_confirmado", destinatario)
 
     def _enviar_smtp(self, msg: EmailMessage, log_event: str, destinatario: str) -> bool:
         try:
