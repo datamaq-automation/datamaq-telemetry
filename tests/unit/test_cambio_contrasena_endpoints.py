@@ -112,9 +112,7 @@ def test_solicitar_sin_autenticacion_responde_401(db, email):
     app.dependency_overrides[get_db_session] = lambda: db
     app.dependency_overrides[get_email_service] = lambda: email
     sin_token = TestClient(app)
-    respuesta = sin_token.patch(
-        "/api/v1/auth/request-password-change-code", json={"password_actual": PASSWORD_ACTUAL}
-    )
+    respuesta = sin_token.patch("/api/v1/auth/request-password-change-code", json={"password_actual": PASSWORD_ACTUAL})
     assert respuesta.status_code == 401
 
 
