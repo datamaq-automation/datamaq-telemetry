@@ -271,6 +271,7 @@ def test_servidor_rechaza_cors_asterisco_en_produccion():
         APP_ENV="production",
         DEBUG=False,
         API_SECRET_KEY="secreto-fuerte-123456",
+        OTP_HMAC_KEY="clave-otp-de-prueba-0123456789",
         DB_PASSWORD="clave-segura-prod",
     )
     object.__setattr__(settings_prod_invalido, "CORS_ORIGINS", "*")

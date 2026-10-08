@@ -23,6 +23,7 @@ def _settings_prod() -> Settings:
         _env_file=None,
         DEBUG=False,
         API_SECRET_KEY="secreto-fuerte-123456",
+        OTP_HMAC_KEY="clave-otp-de-prueba-0123456789",
         DB_PASSWORD="clave-segura",
     )
 

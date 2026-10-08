@@ -156,6 +156,7 @@ async def test_security_headers_middleware_defensivos():
         _env_file=None,
         DEBUG=False,
         API_SECRET_KEY="secreto-fuerte-super-seguro-123456",
+        OTP_HMAC_KEY="clave-otp-de-prueba-0123456789",
         DB_PASSWORD="clave-segura",
     )
     app_mock = MagicMock()

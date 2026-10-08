@@ -44,6 +44,8 @@ class Settings(BaseSettings):
     API_PORT: int = 8885
     API_SECRET_KEY: str = ""
     API_SECRET_KEY_ANTERIOR: str = ""
+    # Clave HMAC de los OTP de cambio de contraseña. Dedicada: no reutilizar API_SECRET_KEY.
+    OTP_HMAC_KEY: str = ""
     AUTH_TOKEN_EXPIRA_MINUTOS: int = 120
     AUTH_REQUIRED: bool = True
     GUEST_ORGANIZATION_ID: str | None = None
@@ -152,8 +154,15 @@ class Settings(BaseSettings):
                 raise ValueError("DB_PASSWORD debe tener al menos 8 caracteres en producción")
             if (self.CORS_ORIGINS or "").strip() == "*":
                 raise ValueError("CORS_ORIGINS no puede ser '*' en producción")
+            if not self.OTP_HMAC_KEY or len(self.OTP_HMAC_KEY) < 16:
+                raise ValueError("OTP_HMAC_KEY debe tener al menos 16 caracteres en producción")
+            if self.OTP_HMAC_KEY == self.API_SECRET_KEY:
+                raise ValueError("OTP_HMAC_KEY debe ser distinta de API_SECRET_KEY")
         elif not self.API_SECRET_KEY:
             object.__setattr__(self, "API_SECRET_KEY", secrets.token_urlsafe(32))
+        if not self.OTP_HMAC_KEY:
+            # Solo desarrollo/test: los OTP firmados con clave efímera no sobreviven a un reinicio.
+            object.__setattr__(self, "OTP_HMAC_KEY", secrets.token_urlsafe(32))
         return self
 
     @property
