@@ -15,6 +15,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Sin `data/` los tests de YAML real fallan (ver run 37591679334): mismo checkout que ci.yml.
+      - name: Checkout datamaq-data (repo independiente de datos maestros)
+        uses: actions/checkout@v7
+        with:
+          repository: datamaq-automation/datamaq-data
+          ssh-key: ${{ secrets.SSH_DEPLOY_KEY_DATA }}
+          path: data
+
       # Misma versión que producción (VPS: 3.12.14): una rotura acá significa "rompería en prod".
       - name: Setup Python 3.12
         uses: actions/setup-python@v5
