@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import Annotated, Any
 
 import structlog
-from fastapi import APIRouter, Cookie, Depends, Request, Response
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
 
 from src.application.dtos.audit_dto import RegistrarAuditLogDTO
 from src.application.dtos.auth_dto import (
@@ -19,12 +19,6 @@ from src.application.dtos.auth_dto import (
     Setup2FAResponseDTO,
     SolicitarRecuperacionDTO,
     Verificar2FARequestDTO,
-)
-from src.application.dtos.cambio_contrasena_dto import (
-    ConfirmPasswordChangeRequest,
-    ConfirmPasswordChangeResponse,
-    RequestPasswordChangeCodeRequest,
-    RequestPasswordChangeCodeResponse,
 )
 from src.application.use_cases.autenticar_usuario import AutenticarUsuarioUseCase
 from src.application.use_cases.gestionar_2fa import (
@@ -487,57 +481,20 @@ def revocar_dispositivos(
         manejar_error_http(e)
 
 
-@router.patch("/request-password-change-code", response_model=RequestPasswordChangeCodeResponse)
+@router.patch("/request-password-change-code", status_code=501)
 def request_password_change_code(
-    dto: RequestPasswordChangeCodeRequest,
     claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
-    audit_use_case: Annotated[RegistrarEventoAuditoriaUseCase | None, Depends(get_registrar_auditoria_use_case)] = None,
-) -> RequestPasswordChangeCodeResponse:
-    """Solicitar código OTP para cambio de contraseña (usuario autenticado)."""
-    try:
-        usuario_id = str(claims.get("sub"))
-        email = claims.get("email", "usuario@example.com")
-        email_ofuscado = f"{email[:3]}...@{email.split('@')[1]}"
-        if audit_use_case:
-            audit_use_case.ejecutar(
-                RegistrarAuditLogDTO(
-                    categoria="AUTH",
-                    accion="cambio_contrasena.codigo_solicitado",
-                    resultado="EXITO",
-                    actor_usuario_id=usuario_id,
-                    actor_email=email,
-                    metadatos={"email_destino": email_ofuscado},
-                )
-            )
-        return RequestPasswordChangeCodeResponse(email_destino=email_ofuscado)
-    except Exception as e:
-        manejar_error_http(e)
+) -> None:
+    """Stub deshabilitado: el cambio de contraseña con validación por email aún no existe.
+
+    No lee el body ni escribe auditoría. Antes devolvía 200 y registraba un cambio que no ocurría.
+    """
+    raise HTTPException(status_code=501, detail="Cambio de contraseña con validación no implementado")
 
 
-@router.patch("/confirm-password-change", response_model=ConfirmPasswordChangeResponse)
+@router.patch("/confirm-password-change", status_code=501)
 def confirm_password_change(
-    dto: ConfirmPasswordChangeRequest,
     claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
-    audit_use_case: Annotated[RegistrarEventoAuditoriaUseCase | None, Depends(get_registrar_auditoria_use_case)] = None,
-) -> ConfirmPasswordChangeResponse:
-    """Confirmar cambio de contraseña con código OTP."""
-    try:
-        usuario_id = str(claims.get("sub"))
-        email = claims.get("email", "usuario@example.com")
-        if audit_use_case:
-            audit_use_case.ejecutar(
-                RegistrarAuditLogDTO(
-                    categoria="AUTH",
-                    accion="cambio_contrasena.cambio_exitoso",
-                    resultado="EXITO",
-                    actor_usuario_id=usuario_id,
-                    actor_email=email,
-                    metadatos={"codigo_validado": True},
-                )
-            )
-        return ConfirmPasswordChangeResponse(
-            status="cambio_exitoso",
-            mensaje="Contraseña actualizada exitosamente",
-        )
-    except Exception as e:
-        manejar_error_http(e)
+) -> None:
+    """Stub deshabilitado: no valida código ni cambia la contraseña. Ver `request_password_change_code`."""
+    raise HTTPException(status_code=501, detail="Cambio de contraseña con validación no implementado")
