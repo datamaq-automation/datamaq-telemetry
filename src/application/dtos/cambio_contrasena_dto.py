@@ -1,12 +1,12 @@
 """DTOs para cambio de contraseña autenticado."""
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class RequestPasswordChangeCodeRequest(BaseModel):
     """Body para solicitar código OTP."""
 
-    password_actual: str = Field(..., description="Contraseña actual para validar")
+    password_actual: str = Field(..., min_length=1, description="Contraseña actual para validar")
 
 
 class RequestPasswordChangeCodeResponse(BaseModel):
@@ -19,9 +19,15 @@ class RequestPasswordChangeCodeResponse(BaseModel):
 class ConfirmPasswordChangeRequest(BaseModel):
     """Body para confirmar cambio de contraseña."""
 
-    codigo: str = Field(..., min_length=4, max_length=4, description="Código OTP de 4 dígitos")
+    codigo: str = Field(..., pattern=r"^[0-9]{4}$", description="Código OTP de 4 dígitos")
     password_nueva: str = Field(..., description="Nueva contraseña")
     password_nueva_confirm: str = Field(..., description="Confirmación de nueva contraseña")
+
+    @model_validator(mode="after")
+    def _confirmacion_coincide(self) -> "ConfirmPasswordChangeRequest":
+        if self.password_nueva != self.password_nueva_confirm:
+            raise ValueError("Las contraseñas no coinciden")
+        return self
 
 
 class ConfirmPasswordChangeResponse(BaseModel):

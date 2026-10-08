@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import Annotated, Any
 
 import structlog
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Cookie, Depends, Request, Response
 
 from src.application.dtos.audit_dto import RegistrarAuditLogDTO
 from src.application.dtos.auth_dto import (
@@ -20,7 +20,17 @@ from src.application.dtos.auth_dto import (
     SolicitarRecuperacionDTO,
     Verificar2FARequestDTO,
 )
+from src.application.dtos.cambio_contrasena_dto import (
+    ConfirmPasswordChangeRequest,
+    ConfirmPasswordChangeResponse,
+    RequestPasswordChangeCodeRequest,
+    RequestPasswordChangeCodeResponse,
+)
 from src.application.use_cases.autenticar_usuario import AutenticarUsuarioUseCase
+from src.application.use_cases.cambio_contrasena import (
+    ConfirmarCambioContrasenaUseCase,
+    SolicitarCambioContrasenaUseCase,
+)
 from src.application.use_cases.gestionar_2fa import (
     Activar2FAUseCase,
     Desactivar2FAUseCase,
@@ -63,6 +73,10 @@ from src.infrastructure.fastapi.dependencies import (
     get_usuario_actual,
     get_usuarios_repository,
     no_permitido_para_invitados_2fa,
+)
+from src.infrastructure.fastapi.dependencies_cambio_contrasena import (
+    get_confirmar_cambio_contrasena_use_case,
+    get_solicitar_cambio_contrasena_use_case,
 )
 from src.infrastructure.fastapi.error_handler import manejar_error_http
 from src.infrastructure.settings.config import Settings
@@ -481,20 +495,45 @@ def revocar_dispositivos(
         manejar_error_http(e)
 
 
-@router.patch("/request-password-change-code", status_code=501)
+@router.patch("/request-password-change-code", response_model=RequestPasswordChangeCodeResponse)
 def request_password_change_code(
+    dto: RequestPasswordChangeCodeRequest,
+    request: Request,
     claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
-) -> None:
-    """Stub deshabilitado: el cambio de contraseña con validación por email aún no existe.
+    use_case: Annotated[SolicitarCambioContrasenaUseCase, Depends(get_solicitar_cambio_contrasena_use_case)],
+) -> RequestPasswordChangeCodeResponse:
+    """Valida la contraseña actual y envía un código OTP de 4 dígitos al email del usuario."""
+    try:
+        resultado = use_case.ejecutar(
+            usuario_id=str(claims.get("sub")),
+            password_actual=dto.password_actual,
+            ip=_obtener_ip_cliente(request),
+            user_agent=request.headers.get("User-Agent"),
+        )
+        return RequestPasswordChangeCodeResponse(email_destino=resultado.email_destino)
+    except Exception as e:
+        manejar_error_http(e)
 
-    No lee el body ni escribe auditoría. Antes devolvía 200 y registraba un cambio que no ocurría.
-    """
-    raise HTTPException(status_code=501, detail="Cambio de contraseña con validación no implementado")
 
-
-@router.patch("/confirm-password-change", status_code=501)
+@router.patch("/confirm-password-change", response_model=ConfirmPasswordChangeResponse)
 def confirm_password_change(
+    dto: ConfirmPasswordChangeRequest,
+    request: Request,
     claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
-) -> None:
-    """Stub deshabilitado: no valida código ni cambia la contraseña. Ver `request_password_change_code`."""
-    raise HTTPException(status_code=501, detail="Cambio de contraseña con validación no implementado")
+    use_case: Annotated[ConfirmarCambioContrasenaUseCase, Depends(get_confirmar_cambio_contrasena_use_case)],
+) -> ConfirmPasswordChangeResponse:
+    """Valida el código OTP, cambia la contraseña y cierra todas las sesiones del usuario."""
+    try:
+        use_case.ejecutar(
+            usuario_id=str(claims.get("sub")),
+            codigo=dto.codigo,
+            password_nueva=dto.password_nueva,
+            ip=_obtener_ip_cliente(request),
+            user_agent=request.headers.get("User-Agent"),
+        )
+        return ConfirmPasswordChangeResponse(
+            status="cambio_exitoso",
+            mensaje="Contraseña actualizada. Por favor vuelva a iniciar sesión.",
+        )
+    except Exception as e:
+        manejar_error_http(e)

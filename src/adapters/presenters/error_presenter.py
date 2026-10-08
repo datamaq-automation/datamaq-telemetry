@@ -4,10 +4,12 @@ from typing import Any
 
 from src.domain.auth.exceptions import (
     Codigo2FAInvalidoError,
+    CodigoCambioInvalidoError,
     ContrasenaDebilError,
     CredencialesInvalidasError,
     DemasiadosIntentosError,
     NombreUsuarioInvalidoError,
+    NoSePudoEnviarCodigoError,
     Operacion2FANoDisponibleParaInvitadoError,
     Setup2FAInvalidoError,
     TokenMFAPendienteInvalidoError,
@@ -46,6 +48,11 @@ from src.domain.telemetria.exceptions import (
     PlantaNoEncontradaError,
     TensionInvalidaError,
 )
+
+_ERRORES_CAMBIO_CONTRASENA: dict[type[Exception], tuple[int, dict[str, str]]] = {
+    CodigoCambioInvalidoError: (400, {"error": "ValidationError", "mensaje": "codigo_invalido_o_expirado"}),
+    NoSePudoEnviarCodigoError: (503, {"error": "ServiceUnavailable", "mensaje": "envio_codigo_no_disponible"}),
+}
 
 
 class ErrorPresenter:
@@ -117,6 +124,8 @@ class ErrorPresenter:
             return 400, {"error": "ValidationError", "mensaje": "token_recuperacion_invalido"}
         elif isinstance(exc, ContrasenaDebilError):
             return 400, {"error": "ValidationError", "mensaje": "contrasena_debil"}
+        elif type(exc) in _ERRORES_CAMBIO_CONTRASENA:
+            return _ERRORES_CAMBIO_CONTRASENA[type(exc)]
         elif isinstance(exc, UsuarioInactivoError):
             return 403, {"error": "Forbidden", "mensaje": "usuario_inactivo"}
         elif isinstance(exc, Operacion2FANoDisponibleParaInvitadoError):
