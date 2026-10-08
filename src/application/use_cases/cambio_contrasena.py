@@ -64,17 +64,21 @@ class SolicitarCambioContrasenaUseCase:
         if usuario is None or not usuario.esta_activo:
             raise CredencialesInvalidasError("Usuario no válido")
 
-        if not self.hash_service.verificar(password_actual, usuario.hash_contrasena):
-            self.repo.registrar_auditoria(usuario_id, "intento_fallido", ip, user_agent, ahora)
-            raise CredencialesInvalidasError("Contraseña actual incorrecta")
-
+        # El límite va ANTES de verificar la contraseña: si no, cada intento erróneo seguiría sin costo.
         desde = ServicioTTLValidacion.inicio_ventana_solicitudes(ahora)
-        if self.repo.contar_solicitudes_desde(usuario_id, desde) >= ServicioTTLValidacion.MAX_SOLICITUDES:
+        consumidas = self.repo.contar_solicitudes_desde(usuario_id, desde) + self.repo.contar_auditoria_desde(
+            usuario_id, "intento_fallido", desde
+        )
+        if consumidas >= ServicioTTLValidacion.MAX_SOLICITUDES:
             raise DemasiadosIntentosError(
                 "Demasiadas solicitudes de código. Espere 10 minutos.",
                 usuario=usuario.usuario,
                 retry_after_seg=ServicioTTLValidacion.VENTANA_SOLICITUDES_MINUTOS * 60,
             )
+
+        if not self.hash_service.verificar(password_actual, usuario.hash_contrasena):
+            self.repo.registrar_auditoria(usuario_id, "intento_fallido", ip, user_agent, ahora)
+            raise CredencialesInvalidasError("Contraseña actual incorrecta")
 
         # Solo vale el último código: cada solicitud invalida las anteriores.
         self.repo.invalidar_vigentes(usuario_id, ahora)

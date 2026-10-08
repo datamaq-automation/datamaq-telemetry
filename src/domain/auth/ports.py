@@ -151,6 +151,10 @@ class RepositorioCambioContrasenaPort(ABC):
         pass
 
     @abstractmethod
+    def contar_auditoria_desde(self, usuario_id: str, estado: str, desde: datetime) -> int:
+        """Cuenta eventos de auditoría de cambio de contraseña del usuario con ese estado desde `desde`."""
+
+    @abstractmethod
     def obtener_vigente(self, usuario_id: str, ahora: datetime) -> ValidacionCambioContrasena | None:
         pass
 

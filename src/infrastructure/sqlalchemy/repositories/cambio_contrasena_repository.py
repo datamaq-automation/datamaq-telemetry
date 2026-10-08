@@ -63,6 +63,18 @@ class MySQLCambioContrasenaRepository(RepositorioCambioContrasenaPort):
             or 0
         )
 
+    def contar_auditoria_desde(self, usuario_id: str, estado: str, desde: datetime) -> int:
+        return (
+            self.db.query(func.count(AuditoriaChangeContraseniaModel.id))
+            .filter(
+                AuditoriaChangeContraseniaModel.usuario_id == usuario_id,
+                AuditoriaChangeContraseniaModel.estado == estado,
+                AuditoriaChangeContraseniaModel.creado_en >= desde,
+            )
+            .scalar()
+            or 0
+        )
+
     def obtener_vigente(self, usuario_id: str, ahora: datetime) -> ValidacionCambioContrasena | None:
         model = (
             self.db.query(CambioContraseniaValidacionModel)

@@ -34,6 +34,7 @@ AHORA = datetime(2026, 10, 8, 12, 0, tzinfo=timezone.utc)
 class RepoValidacionesFake:
     validaciones: list[ValidacionCambioContrasena] = field(default_factory=list)
     auditoria: list[tuple[str, str | None]] = field(default_factory=list)
+    auditoria_detalle: list[tuple[str, str, datetime]] = field(default_factory=list)
     _seq: int = 0
 
     def crear_validacion(self, usuario_id, codigo_hash, ttl_expira, ahora):
@@ -70,6 +71,10 @@ class RepoValidacionesFake:
 
     def registrar_auditoria(self, usuario_id, estado, ip, user_agent, ahora):
         self.auditoria.append((estado, ip))
+        self.auditoria_detalle.append((usuario_id, estado, ahora))
+
+    def contar_auditoria_desde(self, usuario_id, estado, desde):
+        return sum(1 for u, e, t in self.auditoria_detalle if u == usuario_id and e == estado and t >= desde)
 
 
 class UsuariosFake:
@@ -298,3 +303,40 @@ def test_fallo_de_email_de_confirmacion_no_revierte_el_cambio(escenario):
     email_caido = EmailFake(ok=False)
     _confirmar(repo, usuarios, email_caido).ejecutar("u-1", "4273", PASSWORD_NUEVA, None, None)
     assert HashContrasenaService.verificar(PASSWORD_NUEVA, usuarios.usuario.hash_contrasena)
+
+
+# --- Límite de solicitudes incluye contraseñas erróneas (adivinación de password_actual) ---
+
+
+def test_cinco_contrasenas_erroneas_bloquean_la_sexta_aunque_sea_la_correcta(escenario):
+    repo, usuarios, email = escenario
+    caso = _solicitar(repo, usuarios, email)
+    for _ in range(5):
+        with pytest.raises(CredencialesInvalidasError):
+            caso.ejecutar("u-1", "Incorrecta1", None, None)
+    with pytest.raises(DemasiadosIntentosError):
+        caso.ejecutar("u-1", PASSWORD_ACTUAL, None, None)
+    assert email.codigos == []
+
+
+def test_exito_no_resetea_el_limite_dentro_de_la_ventana(escenario):
+    repo, usuarios, email = escenario
+    caso = _solicitar(repo, usuarios, email)
+    for _ in range(3):
+        with pytest.raises(CredencialesInvalidasError):
+            caso.ejecutar("u-1", "Incorrecta1", None, None)
+    caso.ejecutar("u-1", PASSWORD_ACTUAL, None, None)  # éxito: 1 solicitud
+    with pytest.raises(CredencialesInvalidasError):
+        caso.ejecutar("u-1", "Incorrecta1", None, None)  # 5 cuentan en total
+    with pytest.raises(DemasiadosIntentosError):
+        caso.ejecutar("u-1", PASSWORD_ACTUAL, None, None)
+
+
+def test_contrasenas_erroneas_viejas_no_cuentan_fuera_de_la_ventana(escenario):
+    repo, usuarios, email = escenario
+    viejo = AHORA - timedelta(minutes=11)
+    for _ in range(5):
+        repo.registrar_auditoria("u-1", "intento_fallido", None, None, viejo)
+    _solicitar(repo, usuarios, email).ejecutar("u-1", PASSWORD_ACTUAL, None, None)
+    assert len(email.codigos) == 1
+

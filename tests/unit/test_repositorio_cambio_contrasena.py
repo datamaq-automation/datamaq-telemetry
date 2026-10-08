@@ -91,3 +91,11 @@ def test_auditoria_guarda_estado_ip_y_trunca_user_agent(repo, db):
     assert fila.estado == "intento_fallido"
     assert fila.ip == "10.0.0.1"
     assert len(fila.user_agent) == 255
+
+
+def test_contar_auditoria_filtra_por_usuario_estado_y_ventana(repo):
+    repo.registrar_auditoria("u-1", "intento_fallido", "10.0.0.1", None, AHORA)
+    repo.registrar_auditoria("u-1", "intento_fallido", "10.0.0.1", None, AHORA - timedelta(minutes=11))
+    repo.registrar_auditoria("u-1", "cambio_exitoso", "10.0.0.1", None, AHORA)
+    repo.registrar_auditoria("u-2", "intento_fallido", "10.0.0.1", None, AHORA)
+    assert repo.contar_auditoria_desde("u-1", "intento_fallido", AHORA - timedelta(minutes=10)) == 1
