@@ -495,14 +495,15 @@ class AuditoriaChangesTIModel(Base):
 
 
 class CambioContraseniaValidacionModel(Base):
-    """Validación temporal de cambio de contraseña con OTP 4 dígitos."""
+    """Validación temporal de cambio de contraseña con OTP 4 dígitos (guardado como HMAC-SHA256)."""
 
     __tablename__ = "cambio_contrasena_validaciones"
     __table_args__ = (Index("idx_cambio_contrasena_validaciones_usuario_creado", "usuario_id", "creado_en"),)
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     usuario_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    codigo: Mapped[str] = mapped_column(String(4), nullable=False)
+    codigo_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    intentos_fallidos: Mapped[int] = mapped_column(default=0, server_default="0", nullable=False)
     ttl_expira: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
     creado_en: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
     consumido_en: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)

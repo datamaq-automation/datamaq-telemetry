@@ -72,7 +72,8 @@ erDiagram
     CAMBIO_CONTRASENA_VALIDACIONES {
         int id PK
         string usuario_id FK
-        string codigo
+        string codigo_hash
+        int intentos_fallidos
         datetime ttl_expira
         datetime creado_en
         datetime consumido_en
@@ -465,7 +466,8 @@ erDiagram
 | :--- | :--- | :--- | :--- |
 | `id` | `INTEGER` | **PRIMARY KEY** | No |
 | `usuario_id` | `VARCHAR(36)` | FK -> `users.id` | No |
-| `codigo` | `VARCHAR(4)` | - | No |
+| `codigo_hash` | `VARCHAR(64)` | - | No |
+| `intentos_fallidos` | `INTEGER` | - | No |
 | `ttl_expira` | `DATETIME` | - | No |
 | `creado_en` | `DATETIME` | - | No |
 | `consumido_en` | `DATETIME` | - | Sí |
