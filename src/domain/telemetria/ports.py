@@ -20,6 +20,7 @@ from src.domain.telemetria.entities import (
     Suscripcion,
     ZonaPlanta,
 )
+from src.domain.telemetria.servicios.harmonics_thd import ThdFase
 from src.domain.telemetria.value_objects import (
     EstadoDispositivo,
     LecturaPotenciaTemporal,
@@ -71,6 +72,14 @@ class RepositorioTelemetriaPort(ABC):
     @abstractmethod
     def guardar_instantanea(self, lectura: LecturaInstantanea) -> None:
         pass
+
+    def actualizar_thd_instantanea(
+        self, dispositivo_id: str, momento: datetime, ventana_s: int, thd: dict[str, ThdFase]
+    ) -> bool:
+        """Completa THDv y THDi por fase en la última fila persistida del dispositivo dentro de
+        (momento - ventana_s, momento]. Devuelve False si no hay fila en esa ventana. No es abstracto
+        para que los fakes de test no tengan que implementarlo."""
+        return False
 
     @abstractmethod
     def guardar_energia(self, acumulado: AcumuladoEnergia, prioritario: bool = True) -> None:

@@ -1,7 +1,7 @@
 """src/infrastructure/sqlalchemy/repositories/telemetria_repository.py."""
 
 from collections.abc import Iterator
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy import asc, desc, func, select
@@ -15,6 +15,7 @@ from src.domain.telemetria.entities import (
     LogEstadoDispositivo,
 )
 from src.domain.telemetria.ports import RepositorioTelemetriaPort
+from src.domain.telemetria.servicios.harmonics_thd import ThdFase
 from src.domain.telemetria.value_objects import (
     LecturaPotenciaTemporal,
 )
@@ -244,6 +245,32 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
     def obtener_alerta_por_id(self, alerta_id: int) -> AlertaDispositivo | None:
         m = self.db.query(DeviceAlertModel).filter(DeviceAlertModel.id == alerta_id).first()
         return self._alerta_to_entity(m) if m else None
+
+    def actualizar_thd_instantanea(
+        self, dispositivo_id: str, momento: datetime, ventana_s: int, thd: dict[str, ThdFase]
+    ) -> bool:
+        fila = (
+            self.db.query(TelemetryInstantaneousModel)
+            .filter(
+                TelemetryInstantaneousModel.device_id == dispositivo_id,
+                TelemetryInstantaneousModel.recorded_at <= momento,
+                TelemetryInstantaneousModel.recorded_at > momento - timedelta(seconds=ventana_s),
+            )
+            .order_by(desc(TelemetryInstantaneousModel.recorded_at))
+            .first()
+        )
+        if fila is None:
+            return False
+        for fase, sufijo in (("R", "r"), ("S", "s"), ("T", "t")):
+            valores = thd.get(fase)
+            if valores is None:
+                continue
+            if valores.thd_v_pct is not None:
+                setattr(fila, f"thd_v_{sufijo}", Decimal(str(valores.thd_v_pct)))
+            if valores.thd_i_pct is not None:
+                setattr(fila, f"thd_i_{sufijo}", Decimal(str(valores.thd_i_pct)))
+        self.db.commit()
+        return True
 
     def obtener_ultima_instantanea(self, dispositivo_id: str) -> LecturaInstantanea | None:
         m = (
