@@ -55,6 +55,17 @@ SELECT 'T', device_id, COUNT(*), SUM(thd_i_t > 15), SUM(thd_i_t > 100),
 FROM telemetry_instantaneous WHERE thd_i_t IS NOT NULL GROUP BY device_id
 ORDER BY device_id, fase
 """,
+        "cobertura_telemetria": """
+SELECT device_id,
+  COUNT(*) AS total_lecturas,
+  COUNT(thd_v_r) AS thd_v_r_no_nulos, COUNT(thd_v_s) AS thd_v_s_no_nulos, COUNT(thd_v_t) AS thd_v_t_no_nulos,
+  COUNT(thd_i_r) AS thd_i_r_no_nulos, COUNT(thd_i_s) AS thd_i_s_no_nulos, COUNT(thd_i_t) AS thd_i_t_no_nulos,
+  COUNT(current_r) AS current_r_no_nulos, COUNT(current_s) AS current_s_no_nulos, COUNT(current_t) AS current_t_no_nulos,
+  MIN(recorded_at) AS desde, MAX(recorded_at) AS hasta
+FROM telemetry_instantaneous
+GROUP BY device_id
+ORDER BY device_id
+""",
         "auditoria_cambio_contrasena": """
 SELECT estado, DATE(creado_en) AS dia, COUNT(*) AS registros
 FROM auditoria_cambio_contrasena
