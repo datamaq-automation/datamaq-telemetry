@@ -22,8 +22,13 @@ def test_ejecuta_los_tres_checks_y_devuelve_claves_ordenadas():
     puerto = _PuertoFalso()
     resultado = AuditarProduccionUseCase(puerto).ejecutar()
     assert list(resultado.keys()) == sorted(resultado.keys())
-    assert set(resultado.keys()) == {"auditoria_cambio_contrasena", "entorno_remoto", "thd_i_agregados"}
-    assert sorted(puerto.consultas) == ["auditoria_cambio_contrasena", "thd_i_agregados"]
+    assert set(resultado.keys()) == {
+        "auditoria_cambio_contrasena",
+        "cobertura_telemetria",
+        "entorno_remoto",
+        "thd_i_agregados",
+    }
+    assert sorted(puerto.consultas) == ["auditoria_cambio_contrasena", "cobertura_telemetria", "thd_i_agregados"]
 
 
 def test_entorno_remoto_se_devuelve_tal_cual_lo_reporta_el_puerto():
@@ -34,7 +39,10 @@ def test_entorno_remoto_se_devuelve_tal_cual_lo_reporta_el_puerto():
 def test_no_contiene_sql_ni_nombres_fuera_de_los_checks_permitidos():
     puerto = _PuertoFalso()
     AuditarProduccionUseCase(puerto).ejecutar()
-    assert all(nombre in {"thd_i_agregados", "auditoria_cambio_contrasena"} for nombre in puerto.consultas)
+    assert all(
+        nombre in {"thd_i_agregados", "auditoria_cambio_contrasena", "cobertura_telemetria"}
+        for nombre in puerto.consultas
+    )
 
 
 def test_falla_del_puerto_se_propaga_sin_resultado_parcial():

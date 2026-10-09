@@ -6,7 +6,7 @@ son la allowlist que el adaptador resuelve a consultas fijas.
 
 from src.application.ports.auditoria_produccion_port import AuditoriaProduccionPort
 
-CHECKS_CONSULTA: tuple[str, ...] = ("auditoria_cambio_contrasena", "thd_i_agregados")
+CHECKS_CONSULTA: tuple[str, ...] = ("auditoria_cambio_contrasena", "cobertura_telemetria", "thd_i_agregados")
 
 
 class AuditarProduccionUseCase:
