@@ -1,6 +1,6 @@
 # Spec: THD_I con indicador de fiabilidad (bloques B2–B3)
 
-> **Estado:** B1 cerrado (`3a62583`, `091fd36`, local, sin push). **B2 implementado** (commits `829b997`, `eb4c0fa`, `9dfbe29`, local): umbral 10 % de la corriente nominal del TI declarada en YAML, `None` sin TI declarado. **B3 bloqueado:** falta definir "período" (`desde`/`hasta` o ventana fija) y qué dispositivo mide el nodo de cabecera. Ver decisión `decisions/2026-10-09_alcance-thd-y-umbral-fiabilidad.md`.
+> **Estado:** B1 cerrado (`3a62583`, `091fd36`, local, sin push). **B2 implementado** (commits `829b997`, `eb4c0fa`, `9dfbe29`, local): umbral 10 % de la corriente nominal del TI declarada en YAML, `None` sin TI declarado. **B3 DIFERIDO por decisión del padre (2026-10-09):** el endpoint `balance-energia` recibe todas sus entradas por Query y ninguna vista de la app lo consume (Balance/CUSUM sin cablear por decisión del dueño). Definir período y dispositivo de cabecera pertenece a esa iniciativa. El Query `thd_i_promedio_pct` queda como está. Ver decisión `decisions/2026-10-09_alcance-thd-y-umbral-fiabilidad.md`.
 >
 > **Corrección vs. el texto de abajo:** la decisión del dueño fija el umbral en 10 % de la corriente nominal del TI (opción b), no un mínimo absoluto en amperios. El campo YAML es `corriente_nominal_ti_a` por medidor, con clave por fase (`{R: 100, S: 100, T: 150}`), bajo `medidores[]` de `organizaciones.yml`. Lo carga `datamaq-data`; el valor lo aporta el dueño.
 > **Origen:** bloque `datamaq-telemetry` de `/datamaq/specs/thd-visualizacion-calidad-energia.md` (padre `datamaq-2c`).
@@ -66,7 +66,7 @@ indicador de fiabilidad del THD_I.
 **B3 — balance SGE:**
 - `ConsultarBalanceEnergiaUseCase.ejecutar` (`consultar_balance_energia.py:22`) hoy recibe `thd_i_promedio_pct` como parámetro desde el Query (`sge_router.py:279`).
 - Propuesta: el caso de uso calcula el promedio de `thd_i_pct` **solo sobre fases con `thd_i_fiable is True`** de las lecturas del período. Si ninguna fase es fiable → `None` (el diagnóstico por THD no se dispara).
-- **Compatibilidad:** el Query param se mantiene un ciclo como override explícito (deprecado). Quitarlo requiere aviso previo al padre (ver bloque B3).
+- **Estado: DIFERIDO.** No implementar. El Query `thd_i_promedio_pct` no cambia. Cuando se retome, quitarlo requiere aviso previo al padre.
 - B3 **depende de B2** y no puede implementarse antes.
 
 ## 4. Matriz de Pruebas
