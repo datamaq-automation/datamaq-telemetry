@@ -29,8 +29,7 @@ class BalanceEnergiaService:
 
     TOLERANCIA_PERDIDAS_MAXIMA_PCT = 0.04
     TOLERANCIA_PERDIDAS_ELEVADAS_PCT = 0.10
-    # Umbral interno, no normativo: no hay norma ni decisión que lo fundamente.
-    # IEEE 519 limita la corriente con TDD (contra IL), no con THD_I instantáneo.
+    # Umbral interno, sin respaldo normativo documentado (ver specs/thd-visualizacion-calidad-energia.md).
     UMBRAL_THD_I_CRITICO_PCT = 15.0
 
     @classmethod
