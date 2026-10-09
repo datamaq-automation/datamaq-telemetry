@@ -22,7 +22,7 @@ class DatosMaestrosMedidorService:
     def aplicar_instalacion(dispositivo: Dispositivo, instalacion: InstalacionMedidor | None) -> Dispositivo:
         if instalacion is None:
             return dispositivo
-        cambios: dict[str, str] = {}
+        cambios: dict[str, object] = {}
         if instalacion.tag_ubicacion is not None:
             cambios["ubicacion_tag"] = instalacion.tag_ubicacion
         if instalacion.tipo_instalacion is not None:
@@ -33,6 +33,8 @@ class DatosMaestrosMedidorService:
             cambios["ct_fases_invertidas"] = instalacion.ct_fases_invertidas
         if instalacion.correccion_angular_fases is not None:
             cambios["correccion_angular_fases"] = instalacion.correccion_angular_fases
+        if instalacion.corriente_nominal_ti_a is not None:
+            cambios["corriente_nominal_ti_a"] = dict(instalacion.corriente_nominal_ti_a)
         return replace(dispositivo, **cambios) if cambios else dispositivo
 
     @staticmethod

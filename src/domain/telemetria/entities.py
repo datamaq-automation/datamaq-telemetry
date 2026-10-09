@@ -164,6 +164,8 @@ class InstalacionMedidor:
     correccion_angular_fases: str | None = None
     invertido: bool | None = None
     orden_fases: list[str] | None = None
+    # Corriente nominal real del TI por fase (A), p. ej. {"R": 100.0}. Base del umbral de fiabilidad del THD_I.
+    corriente_nominal_ti_a: dict[str, float] | None = None
 
     def campos_declarados(self) -> set[str]:
         return {
@@ -176,6 +178,7 @@ class InstalacionMedidor:
                 ("correccion_angular_fases", self.correccion_angular_fases),
                 ("invertido", self.invertido),
                 ("orden_fases", self.orden_fases),
+                ("corriente_nominal_ti_a", self.corriente_nominal_ti_a),
             )
             if valor is not None
         }
@@ -244,6 +247,8 @@ class Dispositivo:
     # Derivada del nodo del unifilar que este medidor mide (data/organizaciones.yml).
     # No se persiste en MySQL: la resuelve DatosMaestrosMedidorService en cada lectura.
     tension_nominal_v: float | None = None
+    # Derivada del YAML (InstalacionMedidor), no se persiste en MySQL.
+    corriente_nominal_ti_a: dict[str, float] | None = None
     creado_en: datetime = field(default_factory=ahora_utc)
     actualizado_en: datetime = field(default_factory=ahora_utc)
 
