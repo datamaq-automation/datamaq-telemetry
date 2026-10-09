@@ -29,6 +29,8 @@ class BalanceEnergiaService:
 
     TOLERANCIA_PERDIDAS_MAXIMA_PCT = 0.04
     TOLERANCIA_PERDIDAS_ELEVADAS_PCT = 0.10
+    # Umbral interno, no normativo: no hay norma ni decisión que lo fundamente.
+    # IEEE 519 limita la corriente con TDD (contra IL), no con THD_I instantáneo.
     UMBRAL_THD_I_CRITICO_PCT = 15.0
 
     @classmethod
@@ -59,7 +61,7 @@ class BalanceEnergiaService:
                     True,
                     (
                         f"Pérdidas elevadas ({residual_pct:.1%}) justificadas por distorsión armónica en corriente "
-                        f"(THD_I {thd_i_promedio_pct:.1f}% > {cls.UMBRAL_THD_I_CRITICO_PCT}% IEEE 519) "
+                        f"(THD_I {thd_i_promedio_pct:.1f}% > {cls.UMBRAL_THD_I_CRITICO_PCT}%, umbral interno) "
                         "que eleva pérdidas térmicas Joule I^2*R en trafo/cables."
                     ),
                 )
