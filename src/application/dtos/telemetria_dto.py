@@ -25,6 +25,8 @@ class MedicionFaseDTO(BaseModel):
     phi_grados: float | None = None
     thd_v_pct: float | None = None
     thd_i_pct: float | None = None
+    # True: la corriente de la fase supera el umbral sobre el TI declarado; False o None: thd_i_pct no es representativo.
+    thd_i_fiable: bool | None = None
     angulo_correccion: float | None = None
 
 

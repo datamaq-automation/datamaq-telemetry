@@ -74,6 +74,20 @@ def _parsear_factura(f: dict) -> FacturaDistribuidora:
     )
 
 
+def _parsear_corriente_nominal_ti(bloque: object) -> dict[str, float] | None:
+    """`corriente_nominal_ti_a: {R: 100, S: 100, T: 150}` → dict por fase.
+    Descarta fases con valor no numérico o no positivo; sin ninguna válida devuelve None
+    (el THD_I queda sin fiabilidad determinada, nunca True)."""
+    if not isinstance(bloque, dict):
+        return None
+    valores: dict[str, float] = {}
+    for fase, valor in bloque.items():
+        if isinstance(valor, bool) or not isinstance(valor, (int, float)) or valor <= 0:
+            continue
+        valores[str(fase).strip().upper()] = float(valor)
+    return valores or None
+
+
 def _parsear_coordenadas(n: dict) -> CoordenadasNodoUnifilar | None:
     if "coordenadas" not in n or not isinstance(n["coordenadas"], dict):
         return None
@@ -348,6 +362,7 @@ class YamlOrganizacionesRepository(RepositorioOrganizacionesPort):
                             correccion_angular_fases=m.get("correccion_angular_fases"),
                             invertido=m.get("invertido"),
                             orden_fases=m.get("orden_fases"),
+                            corriente_nominal_ti_a=_parsear_corriente_nominal_ti(m.get("corriente_nominal_ti_a")),
                         )
         return None
 
