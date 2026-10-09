@@ -171,7 +171,11 @@ def test_sin_clave_otp_en_produccion_responde_503_sin_tocar_nada(db, email, ruta
     app.dependency_overrides[get_email_service] = lambda: email
     app.dependency_overrides[get_usuario_actual] = lambda: CLAIMS
     app.dependency_overrides[get_settings_dep] = lambda: Settings(
-        _env_file=None, API_SECRET_KEY="secreto-fuerte-123456", DB_PASSWORD="clave-segura"
+        _env_file=None,
+        APP_ENV="production",
+        DEBUG=False,
+        API_SECRET_KEY="secreto-fuerte-123456",
+        DB_PASSWORD="clave-segura",
     )
     cliente_prod = TestClient(app)
 

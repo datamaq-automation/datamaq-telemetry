@@ -10,7 +10,9 @@ import pytest
 
 from src.infrastructure.settings.config import Settings
 
-_BASE_PROD = {"API_SECRET_KEY": "secreto-fuerte-123456", "DB_PASSWORD": "clave-segura"}
+# APP_ENV y DEBUG explícitos: el entorno del proceso (CI exporta APP_ENV=test) no debe decidir la postura.
+_PERFIL_PROD = {"APP_ENV": "production", "DEBUG": False}
+_BASE_PROD = {**_PERFIL_PROD, "API_SECRET_KEY": "secreto-fuerte-123456", "DB_PASSWORD": "clave-segura"}
 
 
 def _settings(monkeypatch, **overrides):
@@ -55,4 +57,9 @@ def test_desarrollo_genera_clave_si_falta(monkeypatch):
 def test_produccion_sigue_abortando_por_otros_secretos(monkeypatch):
     # El aborto de arranque se mantiene para el resto de los secretos.
     with pytest.raises(ValueError, match="DB_PASSWORD"):
-        _settings(monkeypatch, API_SECRET_KEY="secreto-fuerte-123456", OTP_HMAC_KEY="clave-otp-dedicada-0123456789")
+        _settings(
+            monkeypatch,
+            **_PERFIL_PROD,
+            API_SECRET_KEY="secreto-fuerte-123456",
+            OTP_HMAC_KEY="clave-otp-dedicada-0123456789",
+        )
