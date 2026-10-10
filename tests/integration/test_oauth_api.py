@@ -1,19 +1,31 @@
 """tests/integration/test_oauth_api.py — Pruebas de integración de la API para OAuth 2.0 PKCE."""
 
 import uuid
+from typing import Any
 
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 from starlette.testclient import TestClient
 
 from src.domain.oauth.services import calcular_code_challenge
-from src.infrastructure.fastapi.dependencies import get_usuario_actual
+from src.infrastructure.fastapi.dependencies import get_db_session, get_usuario_actual
 from src.infrastructure.fastapi.server import create_app
-from src.infrastructure.sqlalchemy.database import get_session_factory
-from src.infrastructure.sqlalchemy.models import UserModel
+from src.infrastructure.sqlalchemy.models import Base, UserModel
+from src.infrastructure.sqlalchemy.repositories.oauth_repository import sembrar_clientes_oauth
 
 
-def _crear_usuario_test() -> str:
-    session_factory = get_session_factory()
+def _crear_app_test() -> tuple[Any, str]:
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    session_factory = sessionmaker(bind=engine)
+
     with session_factory() as db:
+        sembrar_clientes_oauth(db)
         user_id = str(uuid.uuid4())
         nuevo = UserModel(
             id=user_id,
@@ -25,7 +37,15 @@ def _crear_usuario_test() -> str:
         )
         db.add(nuevo)
         db.commit()
-        return user_id
+
+    app = create_app()
+
+    def _override_db():
+        with session_factory() as db:
+            yield db
+
+    app.dependency_overrides[get_db_session] = _override_db
+    return app, user_id
 
 
 def test_oauth_metadata_discovery_rfc8414():
@@ -59,8 +79,7 @@ def test_oauth_metadata_protected_resource_rfc9728():
 
 def test_oauth_flujo_completo_pkce_y_rotacion_refresh():
     """Valida el ciclo de vida completo de OAuth 2.0 PKCE: consentimiento -> code -> tokens -> refresh -> revoke."""
-    app = create_app()
-    user_id = _crear_usuario_test()
+    app, user_id = _crear_app_test()
 
     # Simular sesión activa del usuario para la pantalla de consentimiento
     app.dependency_overrides[get_usuario_actual] = lambda: {
@@ -156,8 +175,7 @@ def test_oauth_flujo_completo_pkce_y_rotacion_refresh():
 
 def test_oauth_token_verifier_invalido():
     """Valida que un code_verifier incorrecto devuelva error 400 invalid_grant."""
-    app = create_app()
-    user_id = _crear_usuario_test()
+    app, user_id = _crear_app_test()
     app.dependency_overrides[get_usuario_actual] = lambda: {
         "sub": user_id,
         "org": "org_durax_1",
@@ -195,8 +213,7 @@ def test_oauth_token_verifier_invalido():
 
 def test_oauth_revocar_integracion_por_cliente():
     """Valida que DELETE /api/v1/usuarios/integraciones/{client_id} revoque el acceso."""
-    app = create_app()
-    user_id = _crear_usuario_test()
+    app, user_id = _crear_app_test()
     app.dependency_overrides[get_usuario_actual] = lambda: {
         "sub": user_id,
         "org": "org_durax_1",
@@ -242,8 +259,7 @@ def test_oauth_revocar_integracion_por_cliente():
 
 def test_oauth_consent_info_y_consent_flow():
     """Valida los endpoints de la UI de consentimiento (consent-info y consent)."""
-    app = create_app()
-    user_id = _crear_usuario_test()
+    app, user_id = _crear_app_test()
     app.dependency_overrides[get_usuario_actual] = lambda: {
         "sub": user_id,
         "org": "org-durax",
