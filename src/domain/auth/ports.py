@@ -51,6 +51,8 @@ class GeneradorTokenPort(ABC):
         expira_en: datetime,
         rol: str = "operador",
         organizacion_id: str | None = None,
+        scope: str | None = None,
+        client_id: str | None = None,
     ) -> str:
         pass
 

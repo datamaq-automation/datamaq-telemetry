@@ -44,6 +44,7 @@ from src.infrastructure.fastapi.routes.disponibilidad_router import router as di
 from src.infrastructure.fastapi.routes.dispositivos_router import router as dispositivos_router
 from src.infrastructure.fastapi.routes.maquinas_router import router as maquinas_router
 from src.infrastructure.fastapi.routes.notificador_router import router as notificador_router
+from src.infrastructure.fastapi.routes.oauth_router import router as oauth_router
 from src.infrastructure.fastapi.routes.organizaciones_router import router as organizaciones_router
 from src.infrastructure.fastapi.routes.planes_router import router as planes_router
 from src.infrastructure.fastapi.routes.planta_estructura_router import router as planta_estructura_router
@@ -446,6 +447,20 @@ def _desconectar_cliente_ws(cliente: ConnectedClient, client_host: str, evento: 
     log_fn(evento, client=client_host, total_activos=len(active_websockets), **detalle)
 
 
+class NormalizarMcpRutaMiddleware:
+    """Normaliza /mcp a /mcp/ en memoria para responder directamente sin redirección 307."""
+
+    def __init__(self, app: Any) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        if scope.get("type") == "http" and scope.get("path") == "/mcp":
+            scope = dict(scope)
+            scope["path"] = "/mcp/"
+            scope["raw_path"] = b"/mcp/"
+        await self.app(scope, receive, send)
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     app = FastAPI(
@@ -481,13 +496,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         expose_headers=[HEADER_DATOS_DESDE, HEADER_POTENCIA_REFERENCIA],
     )
 
+    app.add_middleware(NormalizarMcpRutaMiddleware)
     app.add_middleware(SecurityHeadersMiddleware, settings=settings)
     app.add_middleware(RequestIdMiddleware)
     app.add_exception_handler(Exception, manejar_excepcion_no_mapeada)
     app.add_exception_handler(StarletteHTTPException, manejar_404)
 
     # Register Routers (asistente aislado según decisions/2026-09-24_bot-conversacional-aislamiento.md)
-    routers = (system_router, disponibilidad_router, cargas_router, telemetria_router, dispositivos_router, organizaciones_router, planta_estructura_router, planes_router, alertas_router, auth_router, admin_router, audit_router, sge_router, usuarios_router, analitica_router, billing_router, produccion_router, notificador_router, maquinas_router, asistente_router)  # fmt: skip
+    routers = (system_router, disponibilidad_router, cargas_router, telemetria_router, dispositivos_router, organizaciones_router, planta_estructura_router, planes_router, alertas_router, auth_router, admin_router, audit_router, sge_router, usuarios_router, analitica_router, billing_router, produccion_router, notificador_router, maquinas_router, oauth_router, asistente_router)  # fmt: skip
     for r in routers:
         app.include_router(r)
 

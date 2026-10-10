@@ -31,6 +31,8 @@ erDiagram
     USERS ||--o{ AUDITORIA_CAMBIO_CONTRASENA : "FK_usuario_id"
     USERS ||--o{ CAMBIO_CONTRASENA_VALIDACIONES : "FK_usuario_id"
     USERS ||--o{ DISPOSITIVOS_CONFIABLES : "FK_usuario_id"
+    USERS ||--o{ OAUTH_CODES : "FK_user_id"
+    USERS ||--o{ OAUTH_REFRESH_TOKENS : "FK_user_id"
     USERS ||--o{ USER_FACILITY_ACCESS : "FK_user_id"
 
     AUDIT_LOGS {
@@ -266,6 +268,42 @@ erDiagram
         decimal persistence_seconds
         datetime created_at
         datetime updated_at
+    }
+
+    OAUTH_CLIENTS {
+        int id PK
+        string client_id UK
+        string client_name
+        string redirect_uris
+        boolean is_trusted
+        datetime created_at
+    }
+
+    OAUTH_CODES {
+        int id PK
+        string code_hash UK
+        string client_id
+        string user_id FK
+        string organization_id
+        string redirect_uri
+        string code_challenge
+        string code_challenge_method
+        string scope
+        datetime expires_at
+        boolean used
+        datetime created_at
+    }
+
+    OAUTH_REFRESH_TOKENS {
+        int id PK
+        string token_hash UK
+        string client_id
+        string user_id FK
+        string organization_id
+        string scope
+        datetime expires_at
+        datetime revoked_at
+        datetime created_at
     }
 
     ORGANIZATIONS {
@@ -719,6 +757,61 @@ erDiagram
 | `persistence_seconds` | `NUMERIC(8, 2)` | - | No |
 | `created_at` | `DATETIME` | - | No |
 | `updated_at` | `DATETIME` | - | No |
+
+### Tabla `oauth_clients`
+
+| Columna | Tipo SQL | Clave / Restricción | Nullable |
+| :--- | :--- | :--- | :--- |
+| `id` | `INTEGER` | **PRIMARY KEY** | No |
+| `client_id` | `VARCHAR(128)` | UNIQUE | No |
+| `client_name` | `VARCHAR(128)` | - | No |
+| `redirect_uris` | `TEXT` | - | No |
+| `is_trusted` | `BOOLEAN` | - | No |
+| `created_at` | `DATETIME` | - | No |
+
+**Índices:**
+- `ix_oauth_clients_client_id` (UNIQUE): (`client_id`)
+
+### Tabla `oauth_codes`
+
+| Columna | Tipo SQL | Clave / Restricción | Nullable |
+| :--- | :--- | :--- | :--- |
+| `id` | `INTEGER` | **PRIMARY KEY** | No |
+| `code_hash` | `VARCHAR(64)` | UNIQUE | No |
+| `client_id` | `VARCHAR(128)` | - | No |
+| `user_id` | `VARCHAR(36)` | FK -> `users.id` | No |
+| `organization_id` | `VARCHAR(36)` | - | Sí |
+| `redirect_uri` | `VARCHAR(512)` | - | No |
+| `code_challenge` | `VARCHAR(128)` | - | No |
+| `code_challenge_method` | `VARCHAR(16)` | - | No |
+| `scope` | `VARCHAR(256)` | - | No |
+| `expires_at` | `DATETIME` | - | No |
+| `used` | `BOOLEAN` | - | No |
+| `created_at` | `DATETIME` | - | No |
+
+**Índices:**
+- `idx_oauth_codes_client_user`: (`client_id`, `user_id`)
+- `idx_oauth_codes_expires_at`: (`expires_at`)
+- `ix_oauth_codes_code_hash` (UNIQUE): (`code_hash`)
+
+### Tabla `oauth_refresh_tokens`
+
+| Columna | Tipo SQL | Clave / Restricción | Nullable |
+| :--- | :--- | :--- | :--- |
+| `id` | `INTEGER` | **PRIMARY KEY** | No |
+| `token_hash` | `VARCHAR(64)` | UNIQUE | No |
+| `client_id` | `VARCHAR(128)` | - | No |
+| `user_id` | `VARCHAR(36)` | FK -> `users.id` | No |
+| `organization_id` | `VARCHAR(36)` | - | Sí |
+| `scope` | `VARCHAR(256)` | - | No |
+| `expires_at` | `DATETIME` | - | No |
+| `revoked_at` | `DATETIME` | - | Sí |
+| `created_at` | `DATETIME` | - | No |
+
+**Índices:**
+- `idx_oauth_refresh_tokens_client_user`: (`client_id`, `user_id`)
+- `idx_oauth_refresh_tokens_expires_at`: (`expires_at`)
+- `ix_oauth_refresh_tokens_token_hash` (UNIQUE): (`token_hash`)
 
 ### Tabla `organizations`
 

@@ -46,6 +46,7 @@ from src.domain.auth.ports import (
     ServicioEmailPort,
 )
 from src.domain.auth.services import HashContrasenaService, RateLimiterService, TokenRevocationService
+from src.domain.oauth.ports import OAuthRepositoryPort
 from src.domain.telemetria.ports import RepositorioDispositivosPort
 from src.infrastructure.auth.email_service import SmtpEmailService
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
@@ -318,6 +319,18 @@ def get_usuarios_repository(db: Annotated[Session, Depends(get_db_session)]) -> 
 
 def get_auditoria_repository(db: Annotated[Session, Depends(get_db_session)]) -> RepositorioAuditoriaPort:
     return MySQLAuditoriaRepository(db)
+
+
+def get_oauth_repository(db: Annotated[Session, Depends(get_db_session)]) -> OAuthRepositoryPort:
+    from src.infrastructure.sqlalchemy.repositories.oauth_repository import MySQLOAuthRepository
+
+    return MySQLOAuthRepository(db)
+
+
+def get_jwt_token_service(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> JwtTokenService:
+    return JwtTokenService(settings.API_SECRET_KEY)
 
 
 def get_registrar_auditoria_use_case(

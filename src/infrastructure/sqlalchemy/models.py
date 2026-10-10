@@ -525,3 +525,11 @@ class AuditoriaChangeContraseniaModel(Base):
     creado_en: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
 
     usuario: Mapped["UserModel"] = relationship()
+
+
+# Reexportación de modelos OAuth 2.0 PKCE para compatibilidad y registro en Base.metadata
+from src.infrastructure.sqlalchemy.oauth_models import (  # noqa: E402, F401
+    OAuthClientModel,
+    OAuthCodeModel,
+    OAuthRefreshTokenModel,
+)

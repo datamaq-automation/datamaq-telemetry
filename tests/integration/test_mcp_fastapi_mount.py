@@ -35,8 +35,8 @@ def test_mcp_handshake_initialize() -> None:
         assert "protocolVersion" in response.text
 
 
-def test_mcp_redirect_sin_barra_final() -> None:
-    """Verifica que POST /mcp redirige y procesa el handshake con 200 text/event-stream."""
+def test_mcp_directo_sin_barra_final_ni_307() -> None:
+    """Verifica que POST /mcp sin barra final responde directamente HTTP 200 text/event-stream sin 307."""
     app = create_app()
 
     payload = {
@@ -57,7 +57,7 @@ def test_mcp_redirect_sin_barra_final() -> None:
     }
 
     with TestClient(app) as client:
-        response = client.post("/mcp", json=payload, headers=headers, follow_redirects=True)
+        response = client.post("/mcp", json=payload, headers=headers, follow_redirects=False)
         assert response.status_code == 200
         assert "text/event-stream" in response.headers.get("content-type", "")
 
