@@ -21,7 +21,9 @@ config = context.config
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # disable_existing_loggers=False: en tests alembic corre dentro del mismo proceso que la app y, con el
+    # default (True), deshabilita loggers ya creados (p. ej. "settings"). En producción corre como CLI aparte.
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 
 def resolver_database_url() -> str:
