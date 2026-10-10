@@ -57,7 +57,7 @@ Soportar el parámetro `granularity` (`auto`, `1m`, `5m`, `15m`, `1h`) para opti
 
 Incorporar en la ingesta y modelo de base de datos las magnitudes de distorsión armónica:
 
-- `thd_v_r`, `thd_v_s`, `thd_v_t` (Distorsión de tensión, límite normativo .0\%$).
+- `thd_v_r`, `thd_v_s`, `thd_v_t` (Distorsión de tensión; umbrales internos de alerta, no normativos).
 - `thd_i_r`, `thd_i_s`, `thd_i_t` (Distorsión de corriente).
 - Disparo automático de alerta `RIESGO_RESONANCIA_CAPACITORES` cuando $\text{THD}_V > 4.0\%$ simultáneo con $\text{FP} > 0.98$.
 
