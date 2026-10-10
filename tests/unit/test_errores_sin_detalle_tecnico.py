@@ -101,3 +101,27 @@ def test_analitica_penalizaciones_excepcion_responde_500_generico_sin_filtrar():
     assert r.status_code == 500
     assert r.json()["detail"] == _GENERICO
     assert _SECRETO not in r.text
+
+
+def test_cambio_contrasena_sin_otp_responde_503_con_codigo_sin_sufijo():
+    import pytest
+    from fastapi import HTTPException
+
+    from src.infrastructure.fastapi.dependencies_cambio_contrasena import get_clave_otp
+    from src.infrastructure.settings.config import Settings
+
+    settings = Settings(
+        _env_file=None,
+        APP_ENV="production",
+        DEBUG=False,
+        API_SECRET_KEY="secreto-fuerte-123456",
+        DB_PASSWORD="clave-segura",
+        OTP_HMAC_KEY="",
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        get_clave_otp(settings)
+
+    assert exc.value.status_code == 503
+    assert exc.value.detail == "cambio_contrasena_no_disponible"
+    assert "OTP_HMAC_KEY" not in str(exc.value.detail)

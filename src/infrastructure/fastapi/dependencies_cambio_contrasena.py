@@ -16,10 +16,13 @@ from src.domain.auth.ports import RepositorioCambioContrasenaPort, RepositorioUs
 from src.domain.auth.services import HashContrasenaService
 from src.infrastructure.fastapi.dependencies import get_email_service, get_settings_dep, get_usuarios_repository
 from src.infrastructure.settings.config import Settings
+from src.infrastructure.settings.logger import get_logger
 from src.infrastructure.sqlalchemy.database import get_db_session
 from src.infrastructure.sqlalchemy.repositories.cambio_contrasena_repository import (
     MySQLCambioContrasenaRepository,
 )
+
+logger = get_logger("cambio_contrasena")
 
 
 def get_clave_otp(
@@ -27,7 +30,9 @@ def get_clave_otp(
 ) -> str:
     """Clave HMAC de los OTP. Sin clave usable (producción sin OTP_HMAC_KEY) el cambio responde 503."""
     if not settings.otp_hmac_configurada:
-        raise HTTPException(status_code=503, detail="cambio_contrasena_no_disponible: falta OTP_HMAC_KEY")
+        # El código es contrato con app-datamaq: no lleva sufijo. El nombre de la variable va solo al log.
+        logger.error("cambio_contrasena_sin_otp_hmac_key", variable="OTP_HMAC_KEY")
+        raise HTTPException(status_code=503, detail="cambio_contrasena_no_disponible")
     return settings.OTP_HMAC_KEY
 
 
