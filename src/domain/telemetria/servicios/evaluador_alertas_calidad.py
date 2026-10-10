@@ -11,6 +11,10 @@ from src.domain.telemetria.servicios.evaluador_anomalias_fases import (
 )
 from src.domain.telemetria.value_objects import SeveridadAlerta
 
+# Los umbrales de THD_V (5 % y 8 %) son internos. La norma se cita solo como referencia, sin afirmar cumplimiento.
+# Decisión: decisions/2026-10-09_alcance-thd-y-umbral-fiabilidad.md (addendum 2026-10-10).
+_REFERENCIA_THD_V = "referencia: IEEE 519-2014 fija 8 % en ≤1 kV y 5 % en 1 a 69 kV en el PCC"
+
 
 class EvaluadorAlertasCalidadService(EvaluadorAnomaliasFasesService):
     """Evaluación pura de reglas normativas y generación de alertas de calidad de red."""
@@ -323,7 +327,7 @@ class EvaluadorAlertasCalidadService(EvaluadorAnomaliasFasesService):
                             dispositivo_id=dispositivo_id,
                             tipo_alerta="ALTO_THD_TENSION_CRITICAL",
                             severidad=SeveridadAlerta.CRITICAL,
-                            mensaje=f"THD de Tensión Crítico en Fase {nombre_fase}: {thd_v}% (Límite IEC: {umbral_thd_v_critico}%)",
+                            mensaje=f"THD de Tensión Crítico en Fase {nombre_fase}: {thd_v}% (umbral interno: {umbral_thd_v_critico}%; {_REFERENCIA_THD_V})",
                             disparada_en=t_disparo,
                             fase=nombre_fase,
                             valor_medido=thd_v,
@@ -340,14 +344,14 @@ class EvaluadorAlertasCalidadService(EvaluadorAnomaliasFasesService):
                             dispositivo_id=dispositivo_id,
                             tipo_alerta="ALTO_THD_TENSION_WARNING",
                             severidad=SeveridadAlerta.WARNING,
-                            mensaje=f"THD de Tensión Elevado en Fase {nombre_fase}: {thd_v}% (Límite IEEE 519: {umbral_thd_v_warning}%)",
+                            mensaje=f"THD de Tensión Elevado en Fase {nombre_fase}: {thd_v}% (umbral interno: {umbral_thd_v_warning}%; {_REFERENCIA_THD_V})",
                             disparada_en=t_disparo,
                             fase=nombre_fase,
                             valor_medido=thd_v,
                             valor_umbral=umbral_thd_v_warning,
                             unidad="%",
                             categoria="DISTORSION_ARMONICA",
-                            observaciones="Supera límite normativo. Verificar presencia de cargas no lineales o variadores de velocidad.",
+                            observaciones="Supera el umbral interno. Verificar presencia de cargas no lineales o variadores de velocidad.",
                         )
                     )
 
