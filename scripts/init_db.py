@@ -39,7 +39,7 @@ def init_database():
 
         print("[*] Aplicando migraciones de esquema (alembic upgrade head)...")
         print(
-            "[i] Si la BD ya tenía tablas legacy, use: venv/bin/alembic stamp 209ce0774d59 && venv/bin/alembic upgrade head"
+            "[i] Si la BD ya tenía tablas legacy, use: .venv/bin/alembic stamp 209ce0774d59 && .venv/bin/alembic upgrade head"
         )
         command.upgrade(_config_alembic(), "head")
         print("[+] Migraciones aplicadas correctamente.")
