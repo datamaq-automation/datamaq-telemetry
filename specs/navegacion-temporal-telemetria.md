@@ -43,7 +43,7 @@ ventanas del pasado sin cambiar el comportamiento cuando no se envía.
   antes del `[:limite]`, se pierden los ~16 intervalos (~80 min) **más antiguos** de la semana.
 - Gotchas del repo: el hook de edición poda imports sin uso (agregar el import y su uso en la misma
   edición); límite de 75 líneas por método (`test_verify_code_size`); correr los tests con
-  `venv/bin/python -m pytest`.
+  `.venv/bin/python -m pytest`.
 
 ### 1.1 Certezas agregadas por la sesión hija (2026-09-24)
 
@@ -222,6 +222,6 @@ Escenario 11: repositorio SQLAlchemy filtra recorded_at <= hasta
 - `./scripts/pre-push.sh`: integridad (`__init__.py` 0 bytes, headers de ruta relativa, tamaño:
   ≤ 500 líneas por archivo de `src/`, ≤ 75 por método), `ruff check .`, `ruff format --check .`,
   `pyright` 0 errores, tests unitarios con cobertura ≥ 85 %.
-- `venv/bin/python scripts/verify_architecture.py`: `domain/` solo stdlib.
+- `.venv/bin/python scripts/verify_architecture.py`: `domain/` solo stdlib.
 - Tests de integración existentes (`test_buffer_en_vivo_endpoint.py`, `test_telemetria_api.py`) verdes.
 - Sin cambios de migraciones (`REVISION_HEAD` intacto) ni de `docs/database_erd.md`.

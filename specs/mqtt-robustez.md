@@ -243,11 +243,11 @@ executor.
 ## 5. Criterios del Gauntlet
 
 ```bash
-venv/bin/python scripts/verify_architecture.py
-venv/bin/ruff check .
-venv/bin/ruff format --check .
-venv/bin/pytest --cov=src
-venv/bin/pyright src/
+.venv/bin/python scripts/verify_architecture.py
+.venv/bin/ruff check .
+.venv/bin/ruff format --check .
+.venv/bin/pytest --cov=src
+.venv/bin/pyright src/
 ```
 
 Reglas inmutables: `__init__.py` de 0 bytes; prohibidos `# type: ignore`,

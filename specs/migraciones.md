@@ -48,7 +48,7 @@ Adoptar **Alembic** como mecanismo oficial de migraciones de esquema de la base 
 
 ## 5. Criterios del Gauntlet
 
-- `venv/bin/pytest tests/unit/` → 100% aprobados, cobertura de `src/` ≥ 85% (Alembic no toca `src/`; sin impacto).
+- `.venv/bin/pytest tests/unit/` → 100% aprobados, cobertura de `src/` ≥ 85% (Alembic no toca `src/`; sin impacto).
 - `bash scripts/pre-push.sh` → Exit Code 0 (etapas 1-4).
 - `ruff check .` y `ruff format --check .` → 0 errores (los archivos de migración y `env.py` deben pasar estilo).
 - `pyright` (etapa 3) → 0 diagnósticos en `src/` (sin cambios en `src/`).

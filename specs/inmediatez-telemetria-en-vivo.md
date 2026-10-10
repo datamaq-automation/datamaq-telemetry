@@ -79,4 +79,4 @@ Entonces el publicador recibe el payload crudo íntegro en "m/wifi/UNKNOWNMAC/ac
 
 - `./scripts/pre-push.sh`: integridad, `ruff check .`, `ruff format --check .`, `pyright`.
 - `agy-opt audit-dip`: 0 violaciones.
-- `venv/bin/pytest tests/unit/ --cov=src --cov-fail-under=85`: 100% verde, cobertura >= 85%.
+- `.venv/bin/pytest tests/unit/ --cov=src --cov-fail-under=85`: 100% verde, cobertura >= 85%.

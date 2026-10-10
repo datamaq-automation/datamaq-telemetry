@@ -160,11 +160,11 @@ Sin dependencias externas en `domain/auth/` (solo stdlib):
 ## 6. Criterios del Gauntlet
 
 ```bash
-venv/bin/python scripts/verify_architecture.py
-venv/bin/ruff check .
-venv/bin/ruff format --check .
-venv/bin/pytest --cov=src
-venv/bin/pyright src/
+.venv/bin/python scripts/verify_architecture.py
+.venv/bin/ruff check .
+.venv/bin/ruff format --check .
+.venv/bin/pytest --cov=src
+.venv/bin/pyright src/
 ```
 
 Criterio de cobertura de esta iteración: el módulo `auth` (dominio, aplicación,
