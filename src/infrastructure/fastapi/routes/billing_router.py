@@ -19,6 +19,9 @@ from src.infrastructure.fastapi.dependencies_billing import (
 )
 from src.infrastructure.fastapi.error_handler import manejar_error_http
 from src.infrastructure.settings.config import get_settings
+from src.infrastructure.settings.logger import get_logger
+
+logger = get_logger("billing")
 
 router = APIRouter(prefix="/api/v1", tags=["Billing"])
 
@@ -69,7 +72,13 @@ async def webhook_mercadopago(
     if not data_id:
         raise HTTPException(status_code=400, detail="Falta data.id en la notificación.")
     if not x_signature or not x_request_id:
-        raise HTTPException(status_code=400, detail="Faltan headers de firma (x-signature/x-request-id).")
+        # Mercado Pago reintenta por código de estado, no por el texto: el detalle de qué header falta va al log.
+        logger.warning(
+            "webhook_mp_sin_firma",
+            falta_x_signature=not x_signature,
+            falta_x_request_id=not x_request_id,
+        )
+        raise HTTPException(status_code=400, detail="Solicitud sin firma válida.")
 
     try:
         validar_firma_mp(x_signature, x_request_id, data_id, settings.MP_WEBHOOK_SECRET)

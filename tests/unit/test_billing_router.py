@@ -152,6 +152,8 @@ def test_webhook_sin_headers_de_firma_400():
     response = client.post("/api/v1/webhooks/mercadopago?data.id=preap-1&id=evt-1")
 
     assert response.status_code == 400
+    assert response.json()["detail"] == "Solicitud sin firma válida."
+    assert "x-signature" not in response.text
     mocks["webhook"].ejecutar.assert_not_called()
 
 
