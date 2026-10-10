@@ -54,3 +54,8 @@ class OAuthRepositoryPort(ABC):
     def listar_integraciones_usuario(self, user_id: str) -> list[dict[str, Any]]:
         """Lista las integraciones autorizadas activas para la vista de perfil del usuario."""
         pass
+
+    @abstractmethod
+    def registrar_o_actualizar_cliente(self, client_id: str, client_name: str, redirect_uris: list[str]) -> OAuthClient:
+        """Registra un nuevo cliente o sincroniza sus redirect_uris (RFC 7591 Dynamic Client Registration)."""
+        pass

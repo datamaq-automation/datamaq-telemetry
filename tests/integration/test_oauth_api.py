@@ -59,11 +59,42 @@ def test_oauth_metadata_discovery_rfc8414():
         assert data["authorization_endpoint"].endswith("/oauth/authorize")
         assert data["token_endpoint"].endswith("/oauth/token")
         assert data["revocation_endpoint"].endswith("/oauth/revoke")
+        assert data["registration_endpoint"].endswith("/oauth/register")
         assert "code" in data["response_types_supported"]
         assert "authorization_code" in data["grant_types_supported"]
         assert "refresh_token" in data["grant_types_supported"]
         assert "S256" in data["code_challenge_methods_supported"]
         assert "read:telemetria" in data["scopes_supported"]
+
+
+def test_oauth_dynamic_client_registration_rfc7591():
+    """Valida el registro dinámico de clientes OAuth 2.0 (RFC 7591) usado por Claude.ai."""
+    app, _ = _crear_app_test()
+    with TestClient(app) as client:
+        # Petición de auto-registro típica de Claude.ai
+        reg_payload = {
+            "client_name": "Claude",
+            "redirect_uris": ["https://claude.ai/api/mcp/oauth/callback"],
+            "grant_types": ["authorization_code", "refresh_token"],
+            "response_types": ["code"],
+        }
+        res = client.post("/oauth/register", json=reg_payload)
+        assert res.status_code == 201
+        data = res.json()
+        assert data["client_id"] == "claude-ai"
+        assert "https://claude.ai/api/mcp/oauth/callback" in data["redirect_uris"]
+        assert data["token_endpoint_auth_method"] == "none"
+
+        # También debe responder en el alias /api/v1/oauth/register
+        reg_payload_alias = {
+            "client_name": "Otro Cliente",
+            "redirect_uris": ["http://localhost:3000/oauth/cb"],
+        }
+        res_alias = client.post("/api/v1/oauth/register", json=reg_payload_alias)
+        assert res_alias.status_code == 201
+        data_alias = res_alias.json()
+        assert data_alias["client_id"].startswith("dyn-")
+        assert "http://localhost:3000/oauth/cb" in data_alias["redirect_uris"]
 
 
 def test_oauth_metadata_protected_resource_rfc9728():

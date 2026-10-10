@@ -1,5 +1,4 @@
-"""src/infrastructure/fastapi/routes/oauth_router.py — Servidor de Autorización OAuth 2.0 (PKCE) y Discovery."""
-
+import uuid
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Request
@@ -8,6 +7,8 @@ from fastapi.responses import JSONResponse
 from src.application.dtos.oauth_dtos import (
     OAuthAuthorizeRequestDTO,
     OAuthAuthorizeResponseDTO,
+    OAuthClientRegistrationRequestDTO,
+    OAuthClientRegistrationResponseDTO,
     OAuthConsentInfoResponseDTO,
     OAuthConsentProcessRequestDTO,
     OAuthConsentProcessResponseDTO,
@@ -53,6 +54,7 @@ def metadata_oauth_authorization_server(
         authorization_endpoint=f"{app_base}/oauth/authorize",
         token_endpoint=f"{issuer}/oauth/token",
         revocation_endpoint=f"{issuer}/oauth/revoke",
+        registration_endpoint=f"{issuer}/oauth/register",
         response_types_supported=["code"],
         grant_types_supported=["authorization_code", "refresh_token"],
         code_challenge_methods_supported=["S256"],
@@ -75,6 +77,44 @@ def metadata_oauth_protected_resource(
         "scopes_supported": ["read:telemetria", "read:analitica", "read:alertas"],
         "bearer_methods_supported": ["header"],
     }
+
+
+@router.post(
+    "/oauth/register",
+    response_model=OAuthClientRegistrationResponseDTO,
+    status_code=201,
+)
+@router.post(
+    "/api/v1/oauth/register",
+    response_model=OAuthClientRegistrationResponseDTO,
+    status_code=201,
+)
+def registrar_cliente_dinamico_oauth(
+    dto: OAuthClientRegistrationRequestDTO,
+    repo_oauth: Annotated[OAuthRepositoryPort, Depends(get_oauth_repository)],
+) -> Any:
+    """Registro dinámico de clientes OAuth 2.0 según RFC 7591."""
+    es_claude = any(
+        "claude.ai" in uri.lower() or "claude.com" in uri.lower() or "anthropic" in uri.lower()
+        for uri in dto.redirect_uris
+    )
+    client_id = "claude-ai" if es_claude else f"dyn-{uuid.uuid4().hex[:12]}"
+    client_name = dto.client_name or ("Claude (Anthropic)" if es_claude else "Cliente Dinámico")
+
+    cliente = repo_oauth.registrar_o_actualizar_cliente(
+        client_id=client_id,
+        client_name=client_name,
+        redirect_uris=dto.redirect_uris,
+    )
+
+    return OAuthClientRegistrationResponseDTO(
+        client_id=cliente.client_id,
+        client_name=cliente.client_name,
+        redirect_uris=list(cliente.redirect_uris),
+        grant_types=dto.grant_types or ["authorization_code", "refresh_token"],
+        response_types=dto.response_types or ["code"],
+        token_endpoint_auth_method="none",
+    )
 
 
 DESCRIPCIONES_SCOPES = {

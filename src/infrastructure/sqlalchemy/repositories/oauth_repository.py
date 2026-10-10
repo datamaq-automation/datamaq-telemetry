@@ -222,3 +222,32 @@ class MySQLOAuthRepository(OAuthRepositoryPort):
                 }
 
         return list(integraciones.values())
+
+    def registrar_o_actualizar_cliente(self, client_id: str, client_name: str, redirect_uris: list[str]) -> OAuthClient:
+        model = self.db.query(OAuthClientModel).filter(OAuthClientModel.client_id == client_id).first()
+        uris_nuevas = set(u.strip() for u in redirect_uris if u.strip())
+        if model:
+            uris_existentes = set(u.strip() for u in model.redirect_uris.split(",") if u.strip())
+            todas = sorted(uris_existentes.union(uris_nuevas))
+            model.redirect_uris = ",".join(todas)
+            if client_name and model.client_name != client_name and client_name != "Claude":
+                model.client_name = client_name
+            self.db.commit()
+        else:
+            ahora = datetime.now(timezone.utc)
+            model = OAuthClientModel(
+                client_id=client_id,
+                client_name=client_name or "Cliente Dinámico",
+                redirect_uris=",".join(sorted(uris_nuevas)),
+                is_trusted=True,
+                created_at=ahora,
+            )
+            self.db.add(model)
+            self.db.commit()
+
+        return OAuthClient(
+            client_id=model.client_id,
+            client_name=model.client_name,
+            redirect_uris=tuple(u.strip() for u in model.redirect_uris.split(",") if u.strip()),
+            created_at=model.created_at,
+        )

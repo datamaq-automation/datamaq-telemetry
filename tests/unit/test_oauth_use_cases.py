@@ -109,6 +109,27 @@ class InMemoryOAuthRepository(OAuthRepositoryPort):
                 }
         return list(activas.values())
 
+    def registrar_o_actualizar_cliente(self, client_id: str, client_name: str, redirect_uris: list[str]) -> OAuthClient:
+        existente = self.clientes.get(client_id)
+        uris_nuevas = set(u.strip() for u in redirect_uris if u.strip())
+        if existente:
+            todas = sorted(set(existente.redirect_uris).union(uris_nuevas))
+            cliente = OAuthClient(
+                client_id=client_id,
+                client_name=client_name or existente.client_name,
+                redirect_uris=tuple(todas),
+                created_at=existente.created_at,
+            )
+        else:
+            cliente = OAuthClient(
+                client_id=client_id,
+                client_name=client_name,
+                redirect_uris=tuple(sorted(uris_nuevas)),
+                created_at=datetime.now(timezone.utc),
+            )
+        self.clientes[client_id] = cliente
+        return cliente
+
 
 class FakeTokenService(GeneradorTokenPort):
     def generar(

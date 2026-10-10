@@ -96,8 +96,30 @@ class OAuthDiscoveryMetadataDTO(BaseModel):
     authorization_endpoint: str
     token_endpoint: str
     revocation_endpoint: str
+    registration_endpoint: str | None = None
     response_types_supported: list[str] = Field(default_factory=lambda: ["code"])
     grant_types_supported: list[str] = Field(default_factory=lambda: ["authorization_code", "refresh_token"])
     code_challenge_methods_supported: list[str] = Field(default_factory=lambda: ["S256"])
     scopes_supported: list[str] = Field(default_factory=lambda: ["read:telemetria", "read:analitica", "read:alertas"])
     token_endpoint_auth_methods_supported: list[str] = Field(default_factory=lambda: ["none"])
+
+
+class OAuthClientRegistrationRequestDTO(BaseModel):
+    """Solicitud de Dynamic Client Registration según RFC 7591."""
+
+    client_name: str | None = Field(default="Claude", max_length=128)
+    redirect_uris: list[str] = Field(min_length=1)
+    grant_types: list[str] | None = Field(default_factory=lambda: ["authorization_code", "refresh_token"])
+    response_types: list[str] | None = Field(default_factory=lambda: ["code"])
+    token_endpoint_auth_method: str | None = "none"
+
+
+class OAuthClientRegistrationResponseDTO(BaseModel):
+    """Respuesta de Dynamic Client Registration según RFC 7591."""
+
+    client_id: str
+    client_name: str
+    redirect_uris: list[str]
+    grant_types: list[str] = Field(default_factory=lambda: ["authorization_code", "refresh_token"])
+    response_types: list[str] = Field(default_factory=lambda: ["code"])
+    token_endpoint_auth_method: str = "none"
