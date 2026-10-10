@@ -108,4 +108,5 @@ def test_preguntar_traduce_excepcion_interna_a_500():
     response = client.post("/api/v1/asistente/preguntar", json={"pregunta": "¿Qué pasó con el medidor 3?"})
 
     assert response.status_code == 500
-    assert "el modelo de inferencia no respondió" in response.json()["detail"]
+    assert response.json()["detail"] == "Ocurrió un error interno en el servidor"
+    assert "el modelo de inferencia no respondió" not in response.text

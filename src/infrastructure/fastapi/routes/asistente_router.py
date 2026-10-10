@@ -14,8 +14,11 @@ from src.infrastructure.fastapi.dependencies import (
     get_procesar_pregunta_asistente_use_case,
     get_usuario_actual,
 )
+from src.infrastructure.settings.logger import get_logger
 
 router = APIRouter(prefix="/api/v1/asistente", tags=["Asistente Conversacional"])
+logger = get_logger("asistente")
+_ERROR_INTERNO = "Ocurrió un error interno en el servidor"
 
 
 @router.post(
@@ -49,7 +52,7 @@ def preguntar(
             razon_sin_groq=resultado.razon_sin_groq,
         )
     except Exception as err:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error procesando la consulta del asistente: {err}",
-        ) from err
+        logger.error(
+            "asistente_error_procesando_pregunta", exc_info=True, organizacion_id=organizacion_id, error=str(err)
+        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=_ERROR_INTERNO) from err
