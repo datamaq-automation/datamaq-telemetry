@@ -41,7 +41,10 @@ class DispositivoUpdateDTO(BaseModel):
     correccion_angular_fases: str | None = Field(None, description="Ej: R:-60,S:60")
     invertido: bool | None = None
     orden_fases: list[str] | None = None
-    categoria_tarifaria: str | None = Field(None, description="T1-R, T1-G, T2, T3")
+    categoria_tarifaria: str | None = Field(
+        None,
+        description="Categoría tarifaria de la distribuidora (string libre), p. ej. T1-R, T2, T3-BT, T3-MT, T5M12",
+    )
     penalizacion_reactiva_aplica: bool | None = None
     esta_activo: bool | None = None
     planta_id: str | None = None

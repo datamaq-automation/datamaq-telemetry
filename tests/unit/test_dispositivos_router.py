@@ -514,3 +514,11 @@ def test_activar_realtime_error_inesperado_500():
     response = client.post("/api/v1/dispositivos/dev-1/realtime")
 
     assert response.status_code == 500
+
+
+def test_update_dto_acepta_categoria_tarifaria_libre_de_la_distribuidora():
+    """categoria_tarifaria es string libre según la distribuidora (T3-MT, nomenclatura EDELAP T5M12)."""
+    from src.application.dtos.dispositivo_dto import DispositivoUpdateDTO
+
+    for categoria in ("T1-R", "T2", "T3-BT", "T3-MT", "T5M12"):
+        assert DispositivoUpdateDTO(categoria_tarifaria=categoria).categoria_tarifaria == categoria
