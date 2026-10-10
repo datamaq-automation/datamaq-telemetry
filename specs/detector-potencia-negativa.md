@@ -42,12 +42,14 @@ en la segunda lectura consecutiva; una lectura normal reinicia la racha.
   Si el padre quiere la ventana de 5 min con umbral de 5, es un cambio acotado en el filtro, no en el evaluador.
 - Slack: no verificado en este repo. El despacho de la alerta usa el notificador existente
   (`_despachar_alerta_fn`); la spec original lo nombraba explícitamente.
+- **Pendiente (sin acción):** verificar la escalada a Slack. Queda sin verificar por decisión del padre.
 
-## Desvío de límite
+## Desvío de límite (aceptado por el padre)
 
 - **Spec:** "P = -100 W (límite) → alerta CRITICAL".
-- **Código:** el umbral es estricto (`P < -100 W`). En exactamente -100 W no hay alerta.
-- Se mantiene el código. El test `test_potencia_exactamente_en_el_umbral_no_alerta` fija el comportamiento actual.
+- **Código:** el umbral es **estricto**: alerta solo si `P < -100 W`. En exactamente -100,0 W no hay alerta.
+- **Por qué se acepta:** exactamente -100,0 W no ocurre de forma estable en la medición; en la práctica es lo mismo que la spec.
+- El test `test_potencia_exactamente_en_el_umbral_no_alerta` fija el comportamiento actual.
 
 ## Otros puntos verificados
 
