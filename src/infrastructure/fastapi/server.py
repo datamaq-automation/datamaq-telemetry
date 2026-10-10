@@ -67,6 +67,9 @@ from src.infrastructure.sqlalchemy.mysql_repositories import (
     MySQLDispositivosRepository,
 )
 from src.infrastructure.yaml.repositories.organizaciones_repository import YamlOrganizacionesRepository
+from tools.mcp.server import mcp as datamaq_mcp
+
+mcp_app = datamaq_mcp.streamable_http_app()
 
 logger = get_logger("server")
 
@@ -368,7 +371,12 @@ async def lifespan(app: FastAPI):
 
     logger.info("servidor_datamaq_listo", websockets_route="/ws/live", docs_route="/docs")
 
-    yield
+    try:
+        async with mcp_app.router.lifespan_context(mcp_app):
+            yield
+    finally:
+        if hasattr(datamaq_mcp, "_session_manager") and datamaq_mcp._session_manager is not None:
+            datamaq_mcp._session_manager._has_started = False
 
     # Clean shutdown
     logger.info("deteniendo_servidor_datamaq")
@@ -499,5 +507,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             _desconectar_cliente_ws(cliente, client_host, "ws_cliente_desconectado", code=e.code)
         except Exception as e:
             _desconectar_cliente_ws(cliente, client_host, "ws_cliente_error_conexion", error=str(e))
+
+    # Servidor MCP Streamable HTTP para Claude Desktop / Claude Code / Claude.ai
+    app.mount("/mcp", mcp_app)
 
     return app
