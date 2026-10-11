@@ -266,6 +266,9 @@ class PuntoPotenciaNodoUnifilarDTO(BaseModel):
     potencia_aparente_total_va: float | None = None
     factor_desplazamiento_total: float | None = None
     dispositivos_sin_dato: list[str] = Field(default_factory=list)
+    # Campos aditivos (opcionales): promedio del bloque y pico de muestras del bloque, en kW.
+    promedio_kw: float | None = None
+    demanda_max_kw: float | None = None
 
 
 class HistoricoNodoUnifilarDTO(BaseModel):

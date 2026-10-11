@@ -40,6 +40,10 @@ from src.domain.telemetria.value_objects import TipoNodoUnifilar
 _log = structlog.get_logger(__name__)
 
 
+def _a_kw(valor_w: float | None) -> float | None:
+    return round(valor_w / 1000.0, 2) if valor_w is not None else None
+
+
 def _mapear_agregado_por_fase(ag: AgregadoPorFase | None) -> AgregadoPorFaseDTO | None:
     if ag is None:
         return None
@@ -378,6 +382,8 @@ class ConsultarNodoUnifilarUseCase:
                     potencia_aparente_total_va=p.potencia_aparente_total_va,
                     factor_desplazamiento_total=p.factor_desplazamiento_total,
                     dispositivos_sin_dato=p.dispositivos_sin_dato,
+                    promedio_kw=_a_kw(p.potencia_activa_total_w),
+                    demanda_max_kw=_a_kw(p.demanda_max_w),
                 )
                 for p in puntos
             ],

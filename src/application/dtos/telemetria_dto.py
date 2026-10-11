@@ -76,6 +76,9 @@ class LecturaInstantaneaDTO(BaseModel):
     tension_neutro_estimada_V: float | None = None
     thd_v_promedio_pct: float | None = None
     thd_i_total_pct: float | None = None
+    # Campos aditivos (opcionales), solo en bloques agregados: promedio del bloque y pico de muestras, en kW.
+    promedio_kw: float | None = None
+    demanda_max_kw: float | None = None
     analitica: AnaliticaCalidadEnergiaDTO | None = None
     diagnostico_instalacion: DiagnosticoInstalacionDTO | None = None
     nivel_tension: NivelTension | None = Field(

@@ -182,6 +182,8 @@ class TelemetriaMapper:
             tension_neutro_estimada_V=lectura.tension_neutro_estimada,
             thd_v_promedio_pct=lectura.thd_v_promedio_porcentaje,
             thd_i_total_pct=lectura.thd_i_total_porcentaje,
+            promedio_kw=round(p_tot / 1000.0, 2) if p_tot is not None and lectura.demanda_max_w is not None else None,
+            demanda_max_kw=round(lectura.demanda_max_w / 1000.0, 2) if lectura.demanda_max_w is not None else None,
             analitica=TelemetriaMapper.analitica_to_dto(analitica),
             diagnostico_instalacion=diag_inst_dto,
             nivel_tension=nivel_tension,
