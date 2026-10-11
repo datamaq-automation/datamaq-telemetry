@@ -4,6 +4,7 @@ Expone herramientas de diagnóstico y analítica energética para Claude Desktop
 utilizando FastMCP sobre transporte stdio y cliente HTTP httpx.
 """
 
+import math
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -247,7 +248,7 @@ _BUCKET_SEGUNDOS = 300  # Serie de planta en buckets de 5 min (misma granularida
 
 
 def _agregar_serie_planta(lecturas_por_dispositivo: list[list[dict[str, Any]]]) -> list[dict[str, float | None]]:
-    """Suma P y Q de todos los dispositivos por bucket de 5 min; FP es el promedio de los puntos."""
+    """Suma algebraicamente P y Q de todos los dispositivos por bucket de 5 min y calcula FP vectorial (|P|/S)."""
     buckets: dict[int, dict[str, Any]] = {}
     for lecturas in lecturas_por_dispositivo:
         for lectura in lecturas:
@@ -256,23 +257,37 @@ def _agregar_serie_planta(lecturas_por_dispositivo: list[list[dict[str, Any]]]) 
                 continue
             instante = datetime.fromisoformat(marca.replace("Z", "+00:00"))
             clave = int(instante.timestamp()) // _BUCKET_SEGUNDOS
-            bucket = buckets.setdefault(clave, {"p_w": None, "q_var": None, "fps": []})
+            bucket = buckets.setdefault(clave, {"p_w": None, "q_var": None})
             p_w = lectura.get("potencia_activa_total_W")
             q_var = lectura.get("potencia_reactiva_total_VAR")
             if p_w is not None:
                 bucket["p_w"] = (bucket["p_w"] or 0.0) + float(p_w)
             if q_var is not None:
                 bucket["q_var"] = (bucket["q_var"] or 0.0) + float(q_var)
-            if lectura.get("factor_potencia_total") is not None:
-                bucket["fps"].append(float(lectura["factor_potencia_total"]))
-    return [
-        {
-            "p_kw": b["p_w"] / 1000.0 if b["p_w"] is not None else None,
-            "q_kvar": b["q_var"] / 1000.0 if b["q_var"] is not None else None,
-            "fp": sum(b["fps"]) / len(b["fps"]) if b["fps"] else None,
-        }
-        for _, b in sorted(buckets.items())
-    ]
+
+    resultado = []
+    for _, b in sorted(buckets.items()):
+        p_w = b["p_w"]
+        q_var = b["q_var"]
+        p_kw = p_w / 1000.0 if p_w is not None else None
+        q_kvar = q_var / 1000.0 if q_var is not None else None
+
+        fp_bucket = None
+        if p_w is not None or q_var is not None:
+            p_val = p_w or 0.0
+            q_val = q_var or 0.0
+            s_val = math.sqrt(p_val**2 + q_val**2)
+            if s_val > 0:
+                fp_bucket = abs(p_val) / s_val
+
+        resultado.append(
+            {
+                "p_kw": p_kw,
+                "q_kvar": q_kvar,
+                "fp": fp_bucket,
+            }
+        )
+    return resultado
 
 
 def _promedio(valores: list[float]) -> float | None:
@@ -321,21 +336,34 @@ async def datamaq_consultar_potencia_reciente(
     serie = _agregar_serie_planta(lecturas_por_dispositivo)
     p_kw = [b["p_kw"] for b in serie if b["p_kw"] is not None]
     q_kvar = [b["q_kvar"] for b in serie if b["q_kvar"] is not None]
-    fps = [b["fp"] for b in serie if b["fp"] is not None]
 
-    return {
+    p_acum = sum(p_kw) if p_kw else 0.0
+    q_acum = sum(q_kvar) if q_kvar else 0.0
+    denominador = math.sqrt(p_acum**2 + q_acum**2)
+    fp_global = (abs(p_acum) / denominador) if denominador > 0 else None
+
+    puntos_esperados = (horas * 3600) // 300
+    puntos_count = len(serie)
+    cobertura_puntos_pct = round((puntos_count / puntos_esperados) * 100, 1) if puntos_esperados > 0 else 0.0
+
+    respuesta: dict[str, Any] = {
         "planta_id": planta_id,
         "horas": horas,
         "metodo": "suma por bucket de 5 min de los dispositivos de la planta",
         "dispositivos_consultados": len(ids),
         "dispositivos_con_error": con_error,
-        "puntos_medicion_count": len(serie),
+        "puntos_medicion_count": puntos_count,
+        "cobertura_puntos_pct": cobertura_puntos_pct,
         "potencia_activa_promedio_kw": round(_promedio(p_kw), 2) if p_kw else None,
         "potencia_activa_max_kw": round(max(p_kw), 2) if p_kw else None,
         "potencia_reactiva_promedio_kvar": round(_promedio(q_kvar), 2) if q_kvar else None,
         "potencia_reactiva_max_kvar": round(max(q_kvar), 2) if q_kvar else None,
-        "factor_potencia_promedio": round(_promedio(fps), 3) if fps else None,
+        "factor_potencia_promedio": round(fp_global, 3) if fp_global is not None else None,
     }
+    if cobertura_puntos_pct < 80.0:
+        respuesta["advertencia_datos"] = "Datos incompletos (<80% de cobertura)"
+
+    return respuesta
 
 
 def main() -> None:

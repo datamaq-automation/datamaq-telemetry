@@ -284,7 +284,43 @@ async def test_datamaq_consultar_potencia_reciente_suma_dispositivos_por_bucket(
     assert resumen["potencia_activa_max_kw"] == 150.0
     assert resumen["potencia_reactiva_promedio_kvar"] == 70.0
     assert resumen["potencia_reactiva_max_kvar"] == 80.0
-    assert resumen["factor_potencia_promedio"] == pytest.approx(0.915, abs=1e-3)
+    # Vectorial global: S = sqrt(270^2 + 140^2) ≈ 304.14 -> 270 / 304.14 ≈ 0.888
+    assert resumen["factor_potencia_promedio"] == pytest.approx(0.888, abs=1e-3)
+    assert resumen["cobertura_puntos_pct"] == 0.7
+    assert resumen["advertencia_datos"] == "Datos incompletos (<80% de cobertura)"
+
+
+@pytest.mark.asyncio
+async def test_datamaq_consultar_potencia_reciente_calculo_vectorial_fp():
+    """Un bucket con Medidor 1 (P=100kW, Q=0kvar, FP=1.0) y Medidor 2 (P=0kW, Q=100kvar, FP=0.0).
+
+    Promedio lineal erróneo anterior: 0.50.
+    Cálculo vectorial regulatorio esperado: 100 / sqrt(100^2 + 100^2) = 100 / 141.42 ≈ 0.707.
+    """
+    lecturas = {
+        "m1": [_lectura("2026-10-10T12:00:00Z", 100_000.0, 0.0, 1.0)],
+        "m2": [_lectura("2026-10-10T12:00:00Z", 0.0, 100_000.0, 0.0)],
+    }
+    set_client(
+        httpx.AsyncClient(transport=httpx.MockTransport(_handler_potencia(lecturas)), base_url="http://datamaq.local")
+    )
+    resumen = await datamaq_consultar_potencia_reciente(planta_id="planta-pacheco", horas=24)
+    assert resumen["factor_potencia_promedio"] == pytest.approx(0.707, abs=1e-3)
+
+
+@pytest.mark.asyncio
+async def test_datamaq_consultar_potencia_reciente_cobertura_adecuada_sin_advertencia():
+    """Con cobertura >= 80%, no debe incluir advertencia_datos."""
+    # Para 1 hora: esperados = 12 puntos. Creamos 10 puntos (10/12 = 83.3%)
+    lecturas_d1 = [_lectura(f"2026-10-10T12:{i * 5:02d}:00Z", 50_000.0, 20_000.0, 0.93) for i in range(10)]
+    set_client(
+        httpx.AsyncClient(
+            transport=httpx.MockTransport(_handler_potencia({"d1": lecturas_d1})), base_url="http://datamaq.local"
+        )
+    )
+    resumen = await datamaq_consultar_potencia_reciente(planta_id="planta-pacheco", horas=1)
+    assert resumen["cobertura_puntos_pct"] == 83.3
+    assert "advertencia_datos" not in resumen
 
 
 @pytest.mark.asyncio
