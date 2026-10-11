@@ -128,9 +128,11 @@ async def _ejecutar_peticion(
                 detalle = exc.response.text
 
             if codigo == 401:
+                www_auth = exc.response.headers.get("www-authenticate", "")
+                extra_diag = f" (Diagnóstico: {www_auth})" if www_auth else ""
                 mensaje = (
                     "Error 401 (No autorizado): Verifique que DATAMAQ_AUTH_TOKEN "
-                    f"sea válido y esté configurado. Detalle: {detalle}"
+                    f"sea válido y esté configurado. Detalle: {detalle}{extra_diag}"
                 )
             elif codigo == 403:
                 mensaje = (
@@ -138,7 +140,10 @@ async def _ejecutar_peticion(
                     f"Detalle: {detalle}"
                 )
             elif codigo == 404:
-                mensaje = f"Error 404 (No encontrado): El recurso solicitado en {ruta} no existe. Detalle: {detalle}"
+                mensaje = (
+                    f"Error 404 (No encontrado): El recurso o ruta solicitada en {ruta} no existe "
+                    f"o no pertenece a la organización del token. Detalle: {detalle}"
+                )
             else:
                 mensaje = f"Error HTTP {codigo} al consultar {ruta}: {detalle}"
 

@@ -201,6 +201,66 @@ def test_get_usuario_actual_sin_cookie_ni_header(monkeypatch):
     except HTTPException as e:
         assert e.status_code == 401
         assert e.detail == "credenciales_invalidas"
+        assert e.headers is not None
+        assert 'error="missing_token"' in e.headers.get("WWW-Authenticate", "")
+
+
+def test_get_usuario_actual_header_formato_invalido(monkeypatch):
+    settings = Settings(_env_file=None, AUTH_REQUIRED=True, DEBUG=True, API_SECRET_KEY="s3cr3t0")
+    monkeypatch.setattr(deps, "get_settings", lambda: settings)
+
+    try:
+        deps.get_usuario_actual(authorization="TokenMalformadoSinBearer", datamaq_token=None)
+        raise AssertionError("Se esperaba HTTPException 401")
+    except HTTPException as e:
+        assert e.status_code == 401
+        assert e.detail == "credenciales_invalidas"
+        assert e.headers is not None
+        assert 'error="invalid_request"' in e.headers.get("WWW-Authenticate", "")
+
+
+def test_get_usuario_actual_token_expirado(monkeypatch):
+    settings = Settings(_env_file=None, AUTH_REQUIRED=True, DEBUG=True, API_SECRET_KEY="s3cr3t0")
+    monkeypatch.setattr(deps, "get_settings", lambda: settings)
+
+    service = JwtTokenService("s3cr3t0")
+    token_expirado = service.generar(
+        "usuario-1",
+        "operador@planta.local",
+        datetime.now(timezone.utc) - timedelta(minutes=10),
+    )
+
+    try:
+        deps.get_usuario_actual(authorization=f"Bearer {token_expirado}", datamaq_token=None)
+        raise AssertionError("Se esperaba HTTPException 401")
+    except HTTPException as e:
+        assert e.status_code == 401
+        assert e.detail == "credenciales_invalidas"
+        assert e.headers is not None
+        assert 'error="invalid_token"' in e.headers.get("WWW-Authenticate", "")
+        assert 'error_description="Token expirado"' in e.headers.get("WWW-Authenticate", "")
+
+
+def test_get_usuario_actual_token_firma_invalida(monkeypatch):
+    settings = Settings(_env_file=None, AUTH_REQUIRED=True, DEBUG=True, API_SECRET_KEY="s3cr3t0")
+    monkeypatch.setattr(deps, "get_settings", lambda: settings)
+
+    service_ajeno = JwtTokenService("otra_clave_distinta")
+    token_ajeno = service_ajeno.generar(
+        "usuario-1",
+        "operador@planta.local",
+        datetime.now(timezone.utc) + timedelta(minutes=30),
+    )
+
+    try:
+        deps.get_usuario_actual(authorization=f"Bearer {token_ajeno}", datamaq_token=None)
+        raise AssertionError("Se esperaba HTTPException 401")
+    except HTTPException as e:
+        assert e.status_code == 401
+        assert e.detail == "credenciales_invalidas"
+        assert e.headers is not None
+        assert 'error="invalid_token"' in e.headers.get("WWW-Authenticate", "")
+        assert 'error_description="Token invalido o firma no verificada"' in e.headers.get("WWW-Authenticate", "")
 
 
 def test_token_valido_con_cookie_valida():

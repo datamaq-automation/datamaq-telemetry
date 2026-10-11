@@ -1,5 +1,6 @@
 """src/infrastructure/fastapi/dependencies.py."""
 
+import json
 from datetime import datetime, timezone
 from functools import lru_cache
 from typing import Annotated, Any
@@ -49,7 +50,7 @@ from src.domain.auth.services import HashContrasenaService, RateLimiterService, 
 from src.domain.oauth.ports import OAuthRepositoryPort
 from src.domain.telemetria.ports import RepositorioDispositivosPort
 from src.infrastructure.auth.email_service import SmtpEmailService
-from src.infrastructure.auth.jwt_token_service import JwtTokenService
+from src.infrastructure.auth.jwt_token_service import JwtTokenService, _b64url_decode
 from src.infrastructure.paho_mqtt.mqtt_listener import MQTTListener
 from src.infrastructure.settings.config import Settings, get_settings
 from src.infrastructure.settings.logger import get_logger
@@ -452,12 +453,44 @@ def get_usuario_actual(
         return {"sub": "anon", "rol": "admin"}
     token = extraer_token(datamaq_token, authorization)
     if token is None:
-        raise HTTPException(status_code=401, detail="credenciales_invalidas")
+        if authorization is None and datamaq_token is None:
+            raise HTTPException(
+                status_code=401,
+                detail="credenciales_invalidas",
+                headers={
+                    "WWW-Authenticate": 'Bearer error="missing_token", error_description="Token de autenticacion no provisto"'
+                },
+            )
+        raise HTTPException(
+            status_code=401,
+            detail="credenciales_invalidas",
+            headers={
+                "WWW-Authenticate": 'Bearer error="invalid_request", error_description="Formato de encabezado Authorization invalido (se requiere Bearer <token>)"'
+            },
+        )
     token_service = JwtTokenService(settings.API_SECRET_KEY)
     adicionales = [settings.API_SECRET_KEY_ANTERIOR] if settings.API_SECRET_KEY_ANTERIOR else None
     claims = token_service.verificar(token, adicionales)
     if claims is None:
-        raise HTTPException(status_code=401, detail="credenciales_invalidas")
+        motivo_error = "invalid_token"
+        desc = "Token invalido o firma no verificada"
+        try:
+            partes = token.split(".")
+            if len(partes) == 3:
+                payload_raw = json.loads(_b64url_decode(partes[1]).decode("utf-8"))
+                exp = payload_raw.get("exp")
+                if isinstance(exp, (int, float)) and exp <= datetime.now(timezone.utc).timestamp():
+                    desc = "Token expirado"
+            else:
+                desc = "Token malformado"
+        except Exception:
+            pass
+
+        raise HTTPException(
+            status_code=401,
+            detail="credenciales_invalidas",
+            headers={"WWW-Authenticate": f'Bearer error="{motivo_error}", error_description="{desc}"'},
+        )
 
     sub = str(claims.get("sub", ""))
     iat = int(claims.get("iat", 0))
@@ -465,7 +498,11 @@ def get_usuario_actual(
     # Verificación de revocación de sesión por cambio de contraseña o logout en memoria
     revocation = get_token_revocation_service()
     if revocation.esta_revocado(sub, iat):
-        raise HTTPException(status_code=401, detail="credenciales_invalidas")
+        raise HTTPException(
+            status_code=401,
+            detail="credenciales_invalidas",
+            headers={"WWW-Authenticate": 'Bearer error="invalid_token", error_description="Sesion o token revocado"'},
+        )
 
     # Verificación de revocación global persistida en base de datos (ISO 27001 A.5.15)
     if repo_usuarios is not None and sub:
@@ -476,7 +513,13 @@ def get_usuario_actual(
                 rev_dt = rev_dt.replace(tzinfo=timezone.utc)
             token_iat = datetime.fromtimestamp(iat, tz=timezone.utc)
             if token_iat < rev_dt:
-                raise HTTPException(status_code=401, detail="credenciales_invalidas")
+                raise HTTPException(
+                    status_code=401,
+                    detail="credenciales_invalidas",
+                    headers={
+                        "WWW-Authenticate": 'Bearer error="invalid_token", error_description="Sesion revocada por cambio de seguridad"'
+                    },
+                )
 
     return claims
 
