@@ -7,6 +7,7 @@ utilizando FastMCP sobre transporte stdio y cliente HTTP httpx.
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import datetime
 from typing import Any
 
 import httpx
@@ -222,6 +223,42 @@ async def datamaq_consultar_penalizaciones(
     return {"resultado": resultado}
 
 
+_BUCKET_SEGUNDOS = 300  # Serie de planta en buckets de 5 min (misma granularidad que el backend)
+
+
+def _agregar_serie_planta(lecturas_por_dispositivo: list[list[dict[str, Any]]]) -> list[dict[str, float | None]]:
+    """Suma P y Q de todos los dispositivos por bucket de 5 min; FP es el promedio de los puntos."""
+    buckets: dict[int, dict[str, Any]] = {}
+    for lecturas in lecturas_por_dispositivo:
+        for lectura in lecturas:
+            marca = lectura.get("registrado_en")
+            if not isinstance(marca, str):
+                continue
+            instante = datetime.fromisoformat(marca.replace("Z", "+00:00"))
+            clave = int(instante.timestamp()) // _BUCKET_SEGUNDOS
+            bucket = buckets.setdefault(clave, {"p_w": None, "q_var": None, "fps": []})
+            p_w = lectura.get("potencia_activa_total_W")
+            q_var = lectura.get("potencia_reactiva_total_VAR")
+            if p_w is not None:
+                bucket["p_w"] = (bucket["p_w"] or 0.0) + float(p_w)
+            if q_var is not None:
+                bucket["q_var"] = (bucket["q_var"] or 0.0) + float(q_var)
+            if lectura.get("factor_potencia_total") is not None:
+                bucket["fps"].append(float(lectura["factor_potencia_total"]))
+    return [
+        {
+            "p_kw": b["p_w"] / 1000.0 if b["p_w"] is not None else None,
+            "q_kvar": b["q_var"] / 1000.0 if b["q_var"] is not None else None,
+            "fp": sum(b["fps"]) / len(b["fps"]) if b["fps"] else None,
+        }
+        for _, b in sorted(buckets.items())
+    ]
+
+
+def _promedio(valores: list[float]) -> float | None:
+    return sum(valores) / len(valores) if valores else None
+
+
 @mcp.tool()
 async def datamaq_consultar_potencia_reciente(
     planta_id: str,
@@ -230,58 +267,54 @@ async def datamaq_consultar_potencia_reciente(
 ) -> dict[str, Any]:
     """Consulta el resumen de demanda activa (kW) y reactiva (kVAr) de una planta en una ventana de horas reciente.
 
+    Recorre los dispositivos de la planta y consulta la serie instantánea de cada uno; la planta se
+    arma sumando P y Q por bucket de 5 min. Los dispositivos que fallan se listan en
+    `dispositivos_con_error` sin cortar la consulta.
+
     Args:
         planta_id: Identificador único de la planta industrial.
-        horas: Cantidad de horas recientes a consultar (por defecto 24).
+        horas: Cantidad de horas recientes a consultar (por defecto 24, máximo 720).
         ctx: Contexto de ejecución FastMCP inyectado automáticamente.
     """
     token = _resolver_token(ctx)
-    parametros: dict[str, Any] = {
-        "planta_id": planta_id,
-        "horas": horas,
-    }
-    resultado = await _ejecutar_peticion("GET", "/api/v1/telemetria/rango", token=token, params=parametros)
+    dispositivos = await _ejecutar_peticion("GET", "/api/v1/dispositivos", token=token, params={"planta_id": planta_id})
+    ids = (
+        [d["id"] for d in dispositivos if isinstance(d, dict) and d.get("id")] if isinstance(dispositivos, list) else []
+    )
 
-    if isinstance(resultado, dict):
-        return resultado
+    lecturas_por_dispositivo: list[list[dict[str, Any]]] = []
+    con_error: list[str] = []
+    for dispositivo_id in ids:
+        try:
+            lecturas = await _ejecutar_peticion(
+                "GET",
+                f"/api/v1/telemetria/instantaneous/{dispositivo_id}",
+                token=token,
+                params={"hours": horas, "granularity": "5m", "limit": 5000},
+            )
+        except RuntimeError:
+            con_error.append(dispositivo_id)
+            continue
+        if isinstance(lecturas, list):
+            lecturas_por_dispositivo.append([x for x in lecturas if isinstance(x, dict)])
 
-    if isinstance(resultado, list) and resultado:
-        p_activa = [
-            float(p["potencia_activa_total_kw"])
-            if "potencia_activa_total_kw" in p and p["potencia_activa_total_kw"] is not None
-            else (float(p.get("potencia_activa_total_w", 0.0)) / 1000.0)
-            for p in resultado
-            if isinstance(p, dict)
-        ]
-        q_reactiva = [
-            float(p["potencia_reactiva_total_kvar"])
-            if "potencia_reactiva_total_kvar" in p and p["potencia_reactiva_total_kvar"] is not None
-            else (float(p.get("potencia_reactiva_total_var", 0.0)) / 1000.0)
-            for p in resultado
-            if isinstance(p, dict)
-        ]
-        fps = [
-            float(p["factor_potencia_total"])
-            for p in resultado
-            if isinstance(p, dict) and p.get("factor_potencia_total") is not None
-        ]
-
-        return {
-            "planta_id": planta_id,
-            "horas": horas,
-            "puntos_medicion_count": len(resultado),
-            "potencia_activa_promedio_kw": round(sum(p_activa) / len(p_activa), 2) if p_activa else None,
-            "potencia_activa_max_kw": round(max(p_activa), 2) if p_activa else None,
-            "potencia_reactiva_promedio_kvar": round(sum(q_reactiva) / len(q_reactiva), 2) if q_reactiva else None,
-            "potencia_reactiva_max_kvar": round(max(q_reactiva), 2) if q_reactiva else None,
-            "factor_potencia_promedio": round(sum(fps) / len(fps), 3) if fps else None,
-        }
+    serie = _agregar_serie_planta(lecturas_por_dispositivo)
+    p_kw = [b["p_kw"] for b in serie if b["p_kw"] is not None]
+    q_kvar = [b["q_kvar"] for b in serie if b["q_kvar"] is not None]
+    fps = [b["fp"] for b in serie if b["fp"] is not None]
 
     return {
         "planta_id": planta_id,
         "horas": horas,
-        "puntos_medicion_count": 0,
-        "mensaje": "Sin registros de telemetría disponibles para el período seleccionado",
+        "metodo": "suma por bucket de 5 min de los dispositivos de la planta",
+        "dispositivos_consultados": len(ids),
+        "dispositivos_con_error": con_error,
+        "puntos_medicion_count": len(serie),
+        "potencia_activa_promedio_kw": round(_promedio(p_kw), 2) if p_kw else None,
+        "potencia_activa_max_kw": round(max(p_kw), 2) if p_kw else None,
+        "potencia_reactiva_promedio_kvar": round(_promedio(q_kvar), 2) if q_kvar else None,
+        "potencia_reactiva_max_kvar": round(max(q_kvar), 2) if q_kvar else None,
+        "factor_potencia_promedio": round(_promedio(fps), 3) if fps else None,
     }
 
 
