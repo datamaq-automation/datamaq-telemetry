@@ -8,6 +8,33 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ## [Sin publicar]
 
+## [1.5.0] - 2026-10-11
+
+### Agregado
+- **Campo `version` (SemVer 1.5.0) en todas las herramientas del MCP:** las respuestas de `datamaq_listar_plantas`, `datamaq_consultar_alertas`, `datamaq_analizar_capacitores`, `datamaq_consultar_penalizaciones` y `datamaq_consultar_potencia_reciente` incorporan el campo `"version": "1.5.0"`.
+- **Campos de cobertura de medición en `datamaq_consultar_potencia_reciente`:** se incorporan `cobertura_puntos_pct` (porcentaje de registros sobre el total esperado según el intervalo y cadencia de 5 minutos), `puntos_medicion_count` y la clave condicional `advertencia_datos: "Datos incompletos (<80% de cobertura)"` ante lagunas o microcortes de conectividad (ej. dispositivos residenciales o monofásicos de prueba en Planta Casa).
+- **Enriquecimiento y aislamiento de alertas en el MCP:** `datamaq_consultar_alertas` valida que cada alerta devuelta pertenezca a los medidores de la planta especificada e inyecta `planta_id` y `dispositivo_tag` (tomado de `ubicacion_tag` del medidor) en cada elemento devuelto.
+- **Endpoint `GET /version` y enriquecimiento de `GET /health`:** el endpoint de salud reporta metadatos operativos: `version`, `commit` (hash de git), `fecha_despliegue` (ISO UTC), `mysql_conectado` (booleano) y `mqtt_conectado` (booleano), manteniendo compatibilidad con las sondas heredadas (`database_conectada`, `migraciones`, `datamaq_data`).
+- **Filtrado por `planta_id` en API de alertas:** `GET /api/v1/alertas` admite el parámetro de consulta `planta_id` para acotar la búsqueda a los dispositivos asociados a una planta industrial particular.
+
+### Cambiado
+- **Cálculo vectorial de factor de potencia (FP):** en `datamaq_consultar_potencia_reciente`, se reemplaza el promediado lineal aritmético de FP instantáneo por integración vectorial SSOT:
+  `FP = |P_acum| / sqrt(P_acum² + Q_acum²)`
+  a partir de la potencia activa acumulada (kW) y reactiva acumulada (kVAr) de todos los dispositivos de la planta por bucket de 5 minutos. Este cálculo equivale formalmente al cociente de energías del período `kWh / sqrt(kWh² + kVArh²)`, conforme a los criterios regulatorios ENRE y normas tarifarias vigentes.
+- **Cálculo real de intervalos bajo factor de potencia en penalizaciones:** `GET /api/v1/analitica/penalizaciones/planta` evalúa los buckets reales de 5 minutos con `FP < 0.95` a partir de la serie histórica agregada por planta y admite `periodo_dias` (1 a 30 días, por defecto 7). Se eliminan constantes ficticias previas (58 intervalos, 14.5 h, $27.467 ARS) y se fija `penalizacion_estimada_ars: null` con el motivo explícito hasta disponer del cuadro tarifario homologado de cada distribuidora.
+- **Manejo diagnóstico de excepciones en cliente FastMCP:** `_ejecutar_peticion` en `tools/mcp/server.py` discrimina detalladamente entre códigos de estado HTTP 401 (token inválido o expirado), 403 (permisos insuficientes), 404 (recurso no encontrado) y 500 (error interno), incluyendo el cuerpo de respuesta de la API para diagnóstico preciso.
+
+## [1.4.0] - 2026-10-10
+
+### Agregado
+- **Servidor FastMCP Streamable HTTP (`/mcp`):** montaje de servidor MCP en FastAPI sobre transporte HTTP SSE / Streamable para integración directa con asistentes de IA (Claude Code, Claude Desktop, Claude.ai).
+- **Servidor de autorización OAuth2 PKCE RFC 7591 / RFC 9728:** soporte para Dynamic Client Registration y Resource Server Discovery bajo la especificación RFC 9728.
+- **Generador de tokens JWT de servicio:** script `tools/mcp/generar_token_servicio.py` para emitir credenciales Bearer institucionales y de larga duración con asignación configurable de rol (`superadmin`, `operador`, `admin`) y organización (`--org`).
+
+### Corregido
+- **Corrección de ruta inexistente en consulta de potencia MCP:** reemplazo de la llamada a la ruta `/api/v1/telemetria/rango` (inexistente en la API) por agregación en cliente de los dispositivos de la planta vía `GET /api/v1/dispositivos?planta_id=...` y `GET /api/v1/telemetria/instantaneous/{dispositivo_id}`.
+- **Consistencia de API_SECRET_KEY:** uso de `get_settings()` en utilidades de prueba MCP para entornos de CI sin archivo `.env` local.
+
 ### Corregido
 - **Doble cálculo de la potencia de referencia al cargar el dashboard.** El gráfico y el histograma piden el mismo histórico en paralelo y los dos calculaban el P99 de 30 días (~1,2 s cada uno, medido en producción). La caché ahora hace un solo cálculo por clave; el segundo pedido espera el resultado.
 - **Alcance tarifario del cargo por reactiva (D-11): la exención nunca se ejecutaba en producción.** `categoria_tarifaria` y `penalizacion_reactiva_aplica` existían en el DTO de dispositivo desde antes, pero nunca fueron columnas reales de `devices` — `DispositivosRepository._to_entity`/`guardar` no las mapeaban en ningún sentido, así que `PATCH /api/v1/dispositivos/{id}` las aceptaba pero era un no-op silencioso: la categoría siempre volvía al default `"T2"`. Además, `_evaluar_abstencion_enre` eximía del cargo por "es monofásico" o "demanda < 10 kW", asumiendo monofásico/chico == residencial == exento — un T1-G (comercio, consorcio) monofásico con medición de reactiva sí está alcanzado por el régimen, y quedaba exento por error. Se corrigen ambos: migración + repositorio cableado de punta a punta, y la exención pasa a depender solo de `categoria_tarifaria`/`penalizacion_reactiva_aplica` explícitos.

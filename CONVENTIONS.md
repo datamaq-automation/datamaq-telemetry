@@ -103,11 +103,12 @@ Para garantizar consistencia entre el backend (`datamaq-telemetry`) y el fronten
 ## 5. Versionado de API y Compatibilidad con el Frontend
 
 Todo endpoint de negocio vive bajo `/api/{version}/{recurso}` (ej. `/api/v1/telemetria`, `/api/v1/dispositivos`). Excepciones explícitas fuera de este esquema:
-* Sondas de infraestructura: `/health`, `/health/live`, `/health/ready`, `/favicon.ico` — consumidas por balanceadores/monitores externos al contrato de negocio, no se versionan.
+* Sondas de infraestructura: `/health`, `/health/live`, `/health/ready`, `/version`, `/favicon.ico` — consumidas por balanceadores/monitores externos al contrato de negocio, no se versionan.
 * WebSocket `/ws/live` — la versión de un contrato de conexión persistente no se resuelve por URL; queda fuera de este esquema hasta que se defina un mecanismo propio (ej. negociación de subprotocolo).
+* Servidor MCP (`/mcp`): las herramientas FastMCP adhieren al versionado SemVer SSOT definido en `src/version.py`. Toda herramienta debe incluir el campo `version` en su respuesta y consumir estrictamente endpoints versionados existentes (`/api/v1/...`). Queda terminantemente prohibido asumir o invocar rutas no oficiales o no versionadas (ej. `/telemetria/rango`) sin un contrato y versionado formal.
 
 **La versión es por router/recurso, no global.** Un cambio incompatible en un recurso (ej. `telemetria`) se resuelve introduciendo `/api/v2/telemetria`, sin forzar a los demás recursos (`auth`, `alertas`, etc.) a moverse de versión.
 
-* **Breaking change** (requiere nueva versión del recurso): remover o renombrar un campo, cambiar su tipo, remover un valor de enum ya consumido por el frontend, cambiar la semántica de autenticación.
-* **No-breaking** (se aplica in-place en la versión vigente): agregar un campo opcional, agregar un valor de enum nuevo — siempre que el frontend valide de forma tolerante (`safeParse` en Zod, no `parse`).
-* **Proceso ante un breaking change:** documentar en `docs/informe-cambios-contrato-*.md`, indexar en `docs/README.md` y coordinar el despliegue con `app-datamaq` antes de retirar la versión anterior del recurso afectado.
+* **Breaking change** (requiere nueva versión del recurso): remover o renombrar un campo, cambiar su tipo, remover un valor de enum ya consumido por el frontend o clientes MCP, cambiar la semántica de autenticación.
+* **No-breaking** (se aplica in-place en la versión vigente): agregar un campo opcional o enriquecido (como `cobertura_puntos_pct`, `advertencia_datos` o `version`), agregar un valor de enum nuevo — siempre que el frontend o cliente valide de forma tolerante.
+* **Proceso ante un breaking change:** documentar en `CHANGELOG.md` y en `docs/informe-cambios-contrato-*.md`, indexar en `docs/README.md` y coordinar el despliegue con `app-datamaq` antes de retirar la versión anterior del recurso afectado.
