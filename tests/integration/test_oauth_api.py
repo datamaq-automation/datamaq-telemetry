@@ -356,3 +356,35 @@ def test_oauth_consent_info_y_consent_flow():
         redirect_url = approved_res.json()["redirect_url"]
         assert "code=" in redirect_url
         assert "state=state_123" in redirect_url
+
+
+def test_oauth_consent_con_state_largo_mcp():
+    """Valida que un state extenso (>1000 caracteres, ej. JWT/JWE de Google MCP) es aceptado y reflejado en el callback."""
+    app, user_id = _crear_app_test()
+    app.dependency_overrides[get_usuario_actual] = lambda: {
+        "sub": user_id,
+        "org": "org-durax",
+        "rol": "ingeniero",
+    }
+
+    verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+    challenge = calcular_code_challenge(verifier)
+    state_largo = "state_google_mcp_" + "x" * 1200
+
+    with TestClient(app) as client:
+        res = client.post(
+            "/api/v1/oauth/consent",
+            json={
+                "client_id": "claude-ai",
+                "redirect_uri": "https://claude.ai/api/mcp/oauth/callback",
+                "code_challenge": challenge,
+                "code_challenge_method": "S256",
+                "scope": "read:telemetria",
+                "state": state_largo,
+                "aprobado": True,
+            },
+        )
+        assert res.status_code == 200
+        redirect_url = res.json()["redirect_url"]
+        assert "code=" in redirect_url
+        assert f"state={state_largo}" in redirect_url
