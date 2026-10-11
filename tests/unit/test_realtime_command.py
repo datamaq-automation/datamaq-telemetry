@@ -9,6 +9,7 @@ from starlette.testclient import TestClient
 
 from src.infrastructure.fastapi import server
 from src.infrastructure.fastapi.dependencies import registrar_mqtt_listener
+from src.infrastructure.fastapi.renovacion_tiempo_real import INTERVALO_RENOVACION_S, marca_renovacion
 from src.infrastructure.fastapi.server import (
     ConnectedClient,
     _registrar_cliente_ws,
@@ -80,8 +81,8 @@ def test_renovar_modo_tiempo_real_medidores_itera_dispositivos():
     mock_repo.listar.return_value = [mock_disp]
 
     with (
-        patch("src.infrastructure.fastapi.server.get_session_factory", return_value=lambda: mock_db),
-        patch("src.infrastructure.fastapi.server.MySQLDispositivosRepository", return_value=mock_repo),
+        patch("src.infrastructure.fastapi.renovacion_tiempo_real.get_session_factory", return_value=lambda: mock_db),
+        patch("src.infrastructure.fastapi.renovacion_tiempo_real.MySQLDispositivosRepository", return_value=mock_repo),
     ):
         _renovar_modo_tiempo_real_medidores(mock_listener, [_cliente(es_superadmin=True)])
 
@@ -93,17 +94,27 @@ def test_renovar_con_cliente_de_una_organizacion_lista_solo_esa_organizacion():
     mock_repo = MagicMock()
     mock_repo.listar.return_value = []
     with (
-        patch("src.infrastructure.fastapi.server.get_session_factory", return_value=lambda: MagicMock()),
-        patch("src.infrastructure.fastapi.server.MySQLDispositivosRepository", return_value=mock_repo),
+        patch(
+            "src.infrastructure.fastapi.renovacion_tiempo_real.get_session_factory", return_value=lambda: MagicMock()
+        ),
+        patch("src.infrastructure.fastapi.renovacion_tiempo_real.MySQLDispositivosRepository", return_value=mock_repo),
     ):
         _renovar_modo_tiempo_real_medidores(MagicMock(), [_cliente(org="org-a")])
     mock_repo.listar.assert_called_once_with(organizacion_id="org-a")
 
 
 def test_renovar_sin_alcance_no_abre_sesion():
-    with patch("src.infrastructure.fastapi.server.get_session_factory") as factory:
+    with patch("src.infrastructure.fastapi.renovacion_tiempo_real.get_session_factory") as factory:
         _renovar_modo_tiempo_real_medidores(MagicMock(), [_cliente(org=None)])
     factory.assert_not_called()
+
+
+@pytest.fixture(autouse=True)
+def _marca_limpia():
+    """La marca es estado de módulo: cada test arranca sin renovación previa."""
+    marca_renovacion.ultima = 0.0
+    yield
+    marca_renovacion.ultima = 0.0
 
 
 def _cliente(org: str | None = None, es_superadmin: bool = False) -> ConnectedClient:
@@ -182,3 +193,51 @@ def test_heartbeat_loguea_el_error_en_vez_de_tragarlo():
     finally:
         server.active_websockets.clear()
     logger.warning.assert_called_once_with("ws_heartbeat_fallido", error="broker caido")
+
+
+def _un_tick_de_heartbeat() -> None:
+    """Corre una vuelta de `_ws_heartbeat_loop` sin esperar los 25 s."""
+    esperas = iter([None, asyncio.CancelledError()])
+
+    async def _sleep(_s: float) -> None:
+        resultado = next(esperas)
+        if resultado is not None:
+            raise resultado
+
+    with patch("src.infrastructure.fastapi.server.asyncio.sleep", side_effect=_sleep):
+        asyncio.run(_ws_heartbeat_loop())
+
+
+def _con_websocket_async(cliente: ConnectedClient) -> ConnectedClient:
+    cliente.websocket = AsyncMock()
+    return cliente
+
+
+def test_primer_tick_del_heartbeat_no_repite_la_renovacion_de_la_conexion(renovaciones):
+    """#15: al conectarse se veían dos realtime_mode_auto_renovado separados por 1,4 s."""
+    _registrar_cliente_ws(_con_websocket_async(_cliente(org="org-a")), "h")
+    _un_tick_de_heartbeat()
+    assert len(renovaciones) == 1
+
+
+def test_heartbeat_renueva_cuando_vence_la_marca(renovaciones):
+    _registrar_cliente_ws(_con_websocket_async(_cliente(org="org-a")), "h")
+    marca_renovacion.ultima -= INTERVALO_RENOVACION_S
+    _un_tick_de_heartbeat()
+    assert len(renovaciones) == 2
+
+
+def test_cliente_de_otra_organizacion_no_corre_la_marca_de_las_ya_conectadas(renovaciones):
+    """Correrla dejaría a org-a sin renovar más de 120 s: el medidor volvería a 5 min."""
+    _registrar_cliente_ws(_con_websocket_async(_cliente(org="org-a")), "h")
+    marca_previa = marca_renovacion.ultima
+    _registrar_cliente_ws(_con_websocket_async(_cliente(org="org-b")), "h")
+    assert len(renovaciones) == 2
+    assert marca_renovacion.ultima == marca_previa
+
+
+def test_superadmin_que_llega_despues_corre_la_marca(renovaciones):
+    _registrar_cliente_ws(_con_websocket_async(_cliente(org="org-a")), "h")
+    marca_renovacion.ultima = 0.0
+    _registrar_cliente_ws(_con_websocket_async(_cliente(es_superadmin=True)), "h")
+    assert marca_renovacion.ultima > 0.0
