@@ -1,9 +1,11 @@
 """src/domain/telemetria/servicios/agregador_lecturas.py — Servicio para remuestreo y agregación temporal de lecturas instantáneas."""
 
+from dataclasses import replace
 from datetime import datetime, timezone
 
 from src.domain.telemetria.entities import LecturaInstantanea, MedicionFase
 from src.domain.telemetria.servicios.calculos_potencia import CalculadoraPotenciaService
+from src.domain.telemetria.servicios.promedio_subbloques import promedio_por_subbloques
 from src.domain.telemetria.value_objects import (
     Corriente,
     FactorPotencia,
@@ -12,6 +14,35 @@ from src.domain.telemetria.value_objects import (
     PotenciaReactiva,
     Tension,
 )
+
+
+def _con_potencias_por_subbloques(
+    agregada: LecturaInstantanea,
+    items: list[LecturaInstantanea],
+    intervalo_segundos: int,
+) -> LecturaInstantanea:
+    """P y Q del bloque como media de sus sub-bloques de 5 min (decisión 2026-10-11).
+
+    S y FP del bloque siguen con el promedio de muestras de `_agregar_grupo_lecturas`.
+    """
+
+    def _epoch(it: LecturaInstantanea) -> float:
+        reg = it.registrado_en if it.registrado_en.tzinfo is not None else it.registrado_en.replace(tzinfo=timezone.utc)
+        return reg.timestamp()
+
+    p = promedio_por_subbloques(
+        [(_epoch(it), it.potencia_activa_total.vatios) for it in items if it.potencia_activa_total is not None],
+        intervalo_segundos,
+    )
+    q = promedio_por_subbloques(
+        [(_epoch(it), it.potencia_reactiva_total.var) for it in items if it.potencia_reactiva_total is not None],
+        intervalo_segundos,
+    )
+    return replace(
+        agregada,
+        potencia_activa_total=PotenciaActiva(vatios=p) if p is not None else agregada.potencia_activa_total,
+        potencia_reactiva_total=PotenciaReactiva(var=q) if q is not None else agregada.potencia_reactiva_total,
+    )
 
 
 class AgregadorLecturasService:
@@ -232,7 +263,7 @@ class AgregadorLecturasService:
             bucket_items = buckets[bucket_ts]
             bucket_dt = datetime.fromtimestamp(bucket_ts, tz=timezone.utc)
             agregada = cls._agregar_grupo_lecturas(bucket_items, bucket_dt, es_monofasico=es_monofasico)
-            resultado.append(agregada)
+            resultado.append(_con_potencias_por_subbloques(agregada, bucket_items, intervalo_segundos))
 
         return resultado
 

@@ -7,6 +7,7 @@ from datetime import date, datetime, timezone
 import structlog
 
 from src.domain.telemetria.entities import EnergiaAgregada, LecturaInstantanea, MedicionFase
+from src.domain.telemetria.servicios.promedio_subbloques import promedio_por_subbloques
 from src.domain.telemetria.servicios.tensiones_de_linea import tensiones_de_linea
 
 _log = structlog.get_logger(__name__)
@@ -223,8 +224,8 @@ class AgregadorDispositivosService:
         # Muestras por (bucket, dispositivo): varias lecturas de un mismo medidor en un bucket
         # (p. ej. las crudas del buffer en vivo antepuestas al histórico ya agregado) son muestras
         # de UNA potencia media. Se promedian por medidor y recién después se suma entre medidores.
-        muestras_p: dict[tuple[int, str], list[float]] = {}
-        muestras_q: dict[tuple[int, str], list[float]] = {}
+        muestras_p: dict[tuple[int, str], list[tuple[float, float]]] = {}
+        muestras_q: dict[tuple[int, str], list[tuple[float, float]]] = {}
         hubo_dato_por_bucket: dict[int, bool] = {}
         q_completa_por_bucket: dict[int, bool] = {}
         dispositivos_con_dato_por_bucket: dict[int, set[str]] = {}
@@ -240,17 +241,17 @@ class AgregadorDispositivosService:
                 if potencia_w is None:
                     hubo_dato_por_bucket.setdefault(bucket_ts, False)
                     continue
-                muestras_p.setdefault((bucket_ts, dispositivo_id), []).append(potencia_w)
+                muestras_p.setdefault((bucket_ts, dispositivo_id), []).append((m.timestamp(), potencia_w))
                 hubo_dato_por_bucket[bucket_ts] = True
                 dispositivos_con_dato_por_bucket.setdefault(bucket_ts, set()).add(dispositivo_id)
                 if reactiva_var is None:
                     q_completa_por_bucket[bucket_ts] = False
                 else:
                     q_completa_por_bucket.setdefault(bucket_ts, True)
-                    muestras_q.setdefault((bucket_ts, dispositivo_id), []).append(reactiva_var)
+                    muestras_q.setdefault((bucket_ts, dispositivo_id), []).append((m.timestamp(), reactiva_var))
 
-        totales_p_por_bucket = _sumar_promedios_por_bucket(muestras_p)
-        totales_q_por_bucket = _sumar_promedios_por_bucket(muestras_q)
+        totales_p_por_bucket = _sumar_promedios_por_bucket(muestras_p, intervalo_segundos)
+        totales_q_por_bucket = _sumar_promedios_por_bucket(muestras_q, intervalo_segundos)
         maximos_por_bucket = _maximo_potencia_por_bucket(lecturas_por_dispositivo, intervalo_segundos)
 
         todos_los_dispositivos = set(lecturas_por_dispositivo.keys())
@@ -359,11 +360,16 @@ def _maximo_potencia_por_bucket(
     return maximos
 
 
-def _sumar_promedios_por_bucket(muestras: dict[tuple[int, str], list[float]]) -> dict[int, float]:
-    """Promedia las muestras de cada (bucket, dispositivo) y suma esos promedios por bucket."""
+def _sumar_promedios_por_bucket(
+    muestras: dict[tuple[int, str], list[tuple[float, float]]],
+    intervalo_segundos: int,
+) -> dict[int, float]:
+    """Promedia por sub-bloques las muestras de cada (bucket, dispositivo) y suma esos promedios por bucket."""
     totales: dict[int, float] = {}
-    for (bucket_ts, _), valores in muestras.items():
-        totales[bucket_ts] = totales.get(bucket_ts, 0.0) + sum(valores) / len(valores)
+    for (bucket_ts, _), pares in muestras.items():
+        promedio = promedio_por_subbloques(pares, intervalo_segundos)
+        if promedio is not None:
+            totales[bucket_ts] = totales.get(bucket_ts, 0.0) + promedio
     return totales
 
 
