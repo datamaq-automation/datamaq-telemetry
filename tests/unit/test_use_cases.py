@@ -898,8 +898,7 @@ def test_consultar_telemetria_con_analitica_calidad_energia():
     assert res.analitica.potencia_reactiva_a_compensar_kvar > 0
     assert res.analitica.banco_sugerido_kvar is not None
     assert res.analitica.banco_sugerido_kvar >= res.analitica.potencia_reactiva_a_compensar_kvar
-    assert res.analitica.penalizacion_estimada_ars is not None
-    assert res.analitica.penalizacion_estimada_ars > 0
+    assert res.analitica.penalizacion_estimada_ars is None
     assert res.analitica.desbalance_tension_porcentaje == 2.27
     assert res.analitica.desbalance_corriente_porcentaje is not None
     assert res.analitica.estado_fp == "PENALIZADO"

@@ -70,7 +70,7 @@ def test_analitica_reactiva_aplica_para_t2():
     )
 
     assert analitica.requiere_compensacion is True
-    assert analitica.penalizacion_estimada_ars is not None
+    assert analitica.penalizacion_estimada_ars is None
     assert analitica.motivo_abstencion is None
 
 

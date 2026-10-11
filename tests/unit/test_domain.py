@@ -814,11 +814,13 @@ def test_dimensionador_estimacion_penalizacion_ars():
     )
     assert penalizacion == 1310625.0
 
-    # FP >= 0.95 -> 0.0 (Sin penalización)
+    # FP >= 0.95 -> 0.0 (Sin penalización), con tarifa explícita
     assert (
         DimensionadorCompensacionService.estimar_penalizacion_mensual_ars(
             potencia_activa_kw=100.0,
             fp_actual=0.95,
+            tarifa_kwh_ars=95.0,
+            cargo_potencia_kw_ars=1500.0,
         )
         == 0.0
     )
@@ -826,8 +828,20 @@ def test_dimensionador_estimacion_penalizacion_ars():
         DimensionadorCompensacionService.estimar_penalizacion_mensual_ars(
             potencia_activa_kw=100.0,
             fp_actual=0.99,
+            tarifa_kwh_ars=95.0,
+            cargo_potencia_kw_ars=1500.0,
         )
         == 0.0
+    )
+
+    # Sin tarifa verificada no hay cifra en ARS, aunque el FP esté bajo el umbral ni sobre él
+    assert DimensionadorCompensacionService.estimar_penalizacion_mensual_ars(100.0, 0.80) is None
+    assert DimensionadorCompensacionService.estimar_penalizacion_mensual_ars(100.0, 0.99) is None
+    assert (
+        DimensionadorCompensacionService.estimar_penalizacion_mensual_ars(
+            potencia_activa_kw=100.0, fp_actual=0.80, tarifa_kwh_ars=95.0
+        )
+        is None
     )
 
     # Entradas inválidas
@@ -943,7 +957,8 @@ def test_calcular_analitica_completa():
     assert analitica.requiere_compensacion is True
     assert analitica.potencia_reactiva_a_compensar_kvar == 45.83
     assert analitica.banco_sugerido_kvar == 50.0
-    assert analitica.penalizacion_estimada_ars is not None and analitica.penalizacion_estimada_ars > 0
+    # Sin tarifa verificada de la distribuidora no hay penalización en ARS
+    assert analitica.penalizacion_estimada_ars is None
     assert analitica.desbalance_tension_porcentaje == 2.27
     assert analitica.desbalance_corriente_porcentaje is not None
     assert analitica.estado_fp == EstadoFactorPotencia.PENALIZADO
@@ -967,7 +982,7 @@ def test_calcular_analitica_completa():
     assert analitica_optima.requiere_compensacion is False
     assert analitica_optima.potencia_reactiva_a_compensar_kvar == 0.0
     assert analitica_optima.banco_sugerido_kvar is None
-    assert analitica_optima.penalizacion_estimada_ars == 0.0
+    assert analitica_optima.penalizacion_estimada_ars is None
     assert analitica_optima.desbalance_tension_porcentaje == 0.0
     assert analitica_optima.desbalance_corriente_porcentaje == 0.0
     assert analitica_optima.estado_fp == EstadoFactorPotencia.OPTIMO
@@ -1118,7 +1133,7 @@ def test_analitica_dimensiona_compensacion_con_carga_facturable():
 
     assert analitica.requiere_compensacion is True
     assert analitica.banco_sugerido_kvar is not None
-    assert analitica.penalizacion_estimada_ars is not None
+    assert analitica.penalizacion_estimada_ars is None
 
 
 def test_mensajes_thd_tension_son_umbral_interno_no_normativo():
