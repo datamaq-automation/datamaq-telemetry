@@ -9,6 +9,7 @@ import subprocess
 from collections.abc import Callable
 
 from src.application.ports.auditoria_produccion_port import AuditoriaProduccionPort
+from src.infrastructure.produccion.comandos_allowlist import comando_permitido
 from src.infrastructure.produccion.consultas_allowlist import CONSULTAS, validar_solo_lectura
 from src.infrastructure.produccion.parseo_salida import parse_entorno, parse_tsv
 
@@ -71,3 +72,8 @@ class AdaptadorAuditoriaProduccionSsh(AuditoriaProduccionPort):
     def entorno_remoto(self) -> dict[str, object]:
         salida = self._ejecutor(self._ssh(_COMANDO_ENTORNO), "", TIMEOUT_S)
         return parse_entorno(salida)
+
+    def ejecutar_comando(self, nombre: str) -> str:
+        # Solo nombres de COMANDOS_REMOTOS; comando_permitido valida el texto antes de enviarlo por ssh.
+        comando = comando_permitido(nombre)
+        return self._ejecutor(self._ssh(comando), "", TIMEOUT_S).strip()
