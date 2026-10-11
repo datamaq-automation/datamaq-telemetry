@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 import httpx
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import Context, FastMCP
 
 mcp = FastMCP(
     "datamaq-mcp",
@@ -45,6 +45,38 @@ def _obtener_configuracion() -> tuple[str, str | None]:
     return api_url, auth_token
 
 
+def _resolver_token(ctx: Context | None = None) -> str | None:
+    """Resuelve el token Bearer en orden de prioridad:
+    1. Header Authorization entrante vía MCP Context (clientes HTTP / OAuth como Claude.ai).
+    2. Variable de entorno DATAMAQ_AUTH_TOKEN (modo CLI stdio).
+    3. Si no existe ninguno y no hay _custom_client inyectado para tests, emite excepción 401.
+    """
+    if ctx is not None:
+        try:
+            req_ctx = getattr(ctx, "request_context", None)
+            if req_ctx is not None:
+                request = getattr(req_ctx, "request", None)
+                if request is not None and hasattr(request, "headers") and request.headers is not None:
+                    auth_header = request.headers.get("authorization")
+                    if auth_header:
+                        if auth_header.lower().startswith("bearer "):
+                            return auth_header[7:].strip()
+                        return auth_header.strip()
+        except Exception:
+            pass
+
+    token_env = os.getenv("DATAMAQ_AUTH_TOKEN")
+    if token_env and token_env.strip():
+        return token_env.strip()
+
+    if _custom_client is not None:
+        return None
+
+    raise RuntimeError(
+        "Error 401 (No autorizado): No se suministró token de autenticación (vía header Bearer o DATAMAQ_AUTH_TOKEN)."
+    )
+
+
 @asynccontextmanager
 async def _obtener_cliente_http() -> AsyncIterator[httpx.AsyncClient]:
     """Context manager que provee un AsyncClient para interactuar con DataMaq API."""
@@ -52,23 +84,29 @@ async def _obtener_cliente_http() -> AsyncIterator[httpx.AsyncClient]:
         yield _custom_client
         return
 
-    api_url, auth_token = _obtener_configuracion()
+    api_url, _ = _obtener_configuracion()
     headers: dict[str, str] = {
         "Accept": "application/json",
         "User-Agent": "DataMaq-MCP-Server/1.0",
     }
-    if auth_token:
-        headers["Authorization"] = f"Bearer {auth_token}"
-
     async with httpx.AsyncClient(base_url=api_url, headers=headers, timeout=30.0) as client:
         yield client
 
 
-async def _ejecutar_peticion(metodo: str, ruta: str, **kwargs: Any) -> Any:
+async def _ejecutar_peticion(
+    metodo: str,
+    ruta: str,
+    token: str | None = None,
+    **kwargs: Any,
+) -> Any:
     """Ejecuta una petición HTTP contra la API de DataMaq gestionando errores."""
+    headers = dict(kwargs.pop("headers", {}) or {})
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
     async with _obtener_cliente_http() as client:
         try:
-            response = await client.request(metodo, ruta, **kwargs)
+            response = await client.request(metodo, ruta, headers=headers, **kwargs)
             response.raise_for_status()
             return response.json()
         except httpx.HTTPStatusError as exc:
@@ -99,9 +137,10 @@ async def _ejecutar_peticion(metodo: str, ruta: str, **kwargs: Any) -> Any:
 
 
 @mcp.tool()
-async def datamaq_listar_plantas() -> list[dict[str, Any]]:
+async def datamaq_listar_plantas(ctx: Context | None = None) -> list[dict[str, Any]]:
     """Retorna las plantas industriales a las que el usuario autenticado tiene acceso en DataMaq."""
-    resultado = await _ejecutar_peticion("GET", "/api/v1/plantas")
+    token = _resolver_token(ctx)
+    resultado = await _ejecutar_peticion("GET", "/api/v1/plantas", token=token)
     if isinstance(resultado, list):
         return resultado
     return [resultado]
@@ -111,18 +150,21 @@ async def datamaq_listar_plantas() -> list[dict[str, Any]]:
 async def datamaq_consultar_alertas(
     planta_id: str,
     solo_abiertas: bool = True,
+    ctx: Context | None = None,
 ) -> list[dict[str, Any]]:
     """Lista las alertas eléctricas y operativas recientes para la planta especificada.
 
     Args:
         planta_id: Identificador de la planta industrial.
         solo_abiertas: Si es True, solo retorna alertas no resueltas.
+        ctx: Contexto de ejecución FastMCP inyectado automáticamente.
     """
+    token = _resolver_token(ctx)
     parametros: dict[str, Any] = {
         "planta_id": planta_id,
         "solo_abiertas": solo_abiertas,
     }
-    resultado = await _ejecutar_peticion("GET", "/api/v1/alertas", params=parametros)
+    resultado = await _ejecutar_peticion("GET", "/api/v1/alertas", token=token, params=parametros)
     if isinstance(resultado, list):
         return resultado
     return [resultado]
@@ -132,18 +174,23 @@ async def datamaq_consultar_alertas(
 async def datamaq_analizar_capacitores(
     planta_id: str,
     periodo_dias: int = 30,
+    ctx: Context | None = None,
 ) -> dict[str, Any]:
     """Ejecuta la analítica SSOT de banco de capacitores y recomendación de compensación en kVAr.
 
     Args:
         planta_id: Identificador único de la planta industrial.
         periodo_dias: Ventana de análisis en días (por defecto 30, mínimo según ISO 50001).
+        ctx: Contexto de ejecución FastMCP inyectado automáticamente.
     """
+    token = _resolver_token(ctx)
     parametros: dict[str, Any] = {
         "planta_id": planta_id,
         "periodo_dias": periodo_dias,
     }
-    resultado = await _ejecutar_peticion("GET", "/api/v1/analitica/banco-capacitores/planta", params=parametros)
+    resultado = await _ejecutar_peticion(
+        "GET", "/api/v1/analitica/banco-capacitores/planta", token=token, params=parametros
+    )
     if isinstance(resultado, dict):
         return resultado
     return {"resultado": resultado}
@@ -153,18 +200,23 @@ async def datamaq_analizar_capacitores(
 async def datamaq_consultar_penalizaciones(
     planta_id: str,
     periodo_dias: int = 7,
+    ctx: Context | None = None,
 ) -> dict[str, Any]:
     """Obtiene el acumulado estimado de recargos y multas por bajo factor de potencia (cos phi).
 
     Args:
         planta_id: Identificador único de la planta industrial.
         periodo_dias: Ventana de análisis en días (por defecto 7).
+        ctx: Contexto de ejecución FastMCP inyectado automáticamente.
     """
+    token = _resolver_token(ctx)
     parametros: dict[str, Any] = {
         "planta_id": planta_id,
         "periodo_dias": periodo_dias,
     }
-    resultado = await _ejecutar_peticion("GET", "/api/v1/analitica/penalizaciones/planta", params=parametros)
+    resultado = await _ejecutar_peticion(
+        "GET", "/api/v1/analitica/penalizaciones/planta", token=token, params=parametros
+    )
     if isinstance(resultado, dict):
         return resultado
     return {"resultado": resultado}
@@ -174,18 +226,21 @@ async def datamaq_consultar_penalizaciones(
 async def datamaq_consultar_potencia_reciente(
     planta_id: str,
     horas: int = 24,
+    ctx: Context | None = None,
 ) -> dict[str, Any]:
     """Consulta el resumen de demanda activa (kW) y reactiva (kVAr) de una planta en una ventana de horas reciente.
 
     Args:
         planta_id: Identificador único de la planta industrial.
         horas: Cantidad de horas recientes a consultar (por defecto 24).
+        ctx: Contexto de ejecución FastMCP inyectado automáticamente.
     """
+    token = _resolver_token(ctx)
     parametros: dict[str, Any] = {
         "planta_id": planta_id,
         "horas": horas,
     }
-    resultado = await _ejecutar_peticion("GET", "/api/v1/telemetria/rango", params=parametros)
+    resultado = await _ejecutar_peticion("GET", "/api/v1/telemetria/rango", token=token, params=parametros)
 
     if isinstance(resultado, dict):
         return resultado

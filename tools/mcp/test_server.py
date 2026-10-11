@@ -6,9 +6,11 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Any
+from unittest.mock import MagicMock
 
 import httpx
 import pytest
+from mcp.server.fastmcp import Context
 
 from tools.mcp.server import (
     datamaq_analizar_capacitores,
@@ -293,6 +295,94 @@ async def test_manejo_errores_404_no_encontrado():
 
     assert "404" in str(exc_info.value)
     assert "Planta inexistente" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_propagacion_token_desde_context_header():
+    """Valida que el header Authorization recibido en FastMCP Context se propague como Bearer token."""
+    header_recibido: list[str | None] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        header_recibido.append(request.headers.get("authorization"))
+        return httpx.Response(200, json=[{"planta_id": "planta-test"}])
+
+    mock_client = httpx.AsyncClient(
+        transport=httpx.MockTransport(handler),
+        base_url="http://datamaq.local",
+    )
+    set_client(mock_client)
+
+    mock_ctx = MagicMock(spec=Context)
+    mock_request = MagicMock()
+    mock_request.headers = {"authorization": "Bearer oauth-dynamic-token-xyz"}
+    mock_ctx.request_context.request = mock_request
+
+    resultado = await datamaq_listar_plantas(ctx=mock_ctx)
+
+    assert len(resultado) == 1
+    assert header_recibido == ["Bearer oauth-dynamic-token-xyz"]
+
+
+@pytest.mark.asyncio
+async def test_propagacion_token_desde_variable_entorno(monkeypatch: pytest.MonkeyPatch):
+    """Valida que si no hay Context, se use DATAMAQ_AUTH_TOKEN de entorno."""
+    monkeypatch.setenv("DATAMAQ_AUTH_TOKEN", "token-desde-env-123")
+    header_recibido: list[str | None] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        header_recibido.append(request.headers.get("authorization"))
+        return httpx.Response(200, json=[{"planta_id": "planta-test"}])
+
+    mock_client = httpx.AsyncClient(
+        transport=httpx.MockTransport(handler),
+        base_url="http://datamaq.local",
+    )
+    set_client(mock_client)
+
+    resultado = await datamaq_listar_plantas(ctx=None)
+
+    assert len(resultado) == 1
+    assert header_recibido == ["Bearer token-desde-env-123"]
+
+
+@pytest.mark.asyncio
+async def test_prioridad_header_sobre_variable_entorno(monkeypatch: pytest.MonkeyPatch):
+    """Valida que el header en Context tenga precedencia sobre DATAMAQ_AUTH_TOKEN."""
+    monkeypatch.setenv("DATAMAQ_AUTH_TOKEN", "token-env-ignorado")
+    header_recibido: list[str | None] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        header_recibido.append(request.headers.get("authorization"))
+        return httpx.Response(200, json=[{"planta_id": "planta-test"}])
+
+    mock_client = httpx.AsyncClient(
+        transport=httpx.MockTransport(handler),
+        base_url="http://datamaq.local",
+    )
+    set_client(mock_client)
+
+    mock_ctx = MagicMock(spec=Context)
+    mock_request = MagicMock()
+    mock_request.headers = {"authorization": "Bearer token-header-prioritario"}
+    mock_ctx.request_context.request = mock_request
+
+    resultado = await datamaq_listar_plantas(ctx=mock_ctx)
+
+    assert len(resultado) == 1
+    assert header_recibido == ["Bearer token-header-prioritario"]
+
+
+@pytest.mark.asyncio
+async def test_error_sin_token_cuando_no_hay_cliente_mock(monkeypatch: pytest.MonkeyPatch):
+    """Valida que se emita error 401 si no hay token (ni header ni env) y no hay cliente mock."""
+    monkeypatch.delenv("DATAMAQ_AUTH_TOKEN", raising=False)
+    set_client(None)
+
+    with pytest.raises(RuntimeError) as exc_info:
+        await datamaq_listar_plantas(ctx=None)
+
+    assert "Error 401 (No autorizado)" in str(exc_info.value)
+    assert "DATAMAQ_AUTH_TOKEN" in str(exc_info.value)
 
 
 def test_archivo_claude_desktop_config_valido():
