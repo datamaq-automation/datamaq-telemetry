@@ -98,14 +98,23 @@ def test_oauth_dynamic_client_registration_rfc7591():
 
 
 def test_oauth_metadata_protected_resource_rfc9728():
-    """Valida que GET /.well-known/oauth-protected-resource exponga metadata RFC 9728 para clientes MCP."""
+    """Valida que GET /.well-known/oauth-protected-resource (y /mcp) expongan metadata RFC 9728 para clientes MCP."""
     app = create_app()
     with TestClient(app) as client:
+        # Consulta sin sufijo
         res = client.get("/.well-known/oauth-protected-resource")
         assert res.status_code == 200
         data = res.json()
         assert data["resource"].endswith("/mcp")
         assert "authorization_servers" in data
+
+        # Consulta con sufijo de recurso /mcp (solicitado por clientes MCP como Claude)
+        res_mcp = client.get("/.well-known/oauth-protected-resource/mcp")
+        assert res_mcp.status_code == 200
+        data_mcp = res_mcp.json()
+        assert data_mcp["resource"].endswith("/mcp")
+        assert "authorization_servers" in data_mcp
+        assert "scopes_supported" in data_mcp
 
 
 def test_oauth_flujo_completo_pkce_y_rotacion_refresh():

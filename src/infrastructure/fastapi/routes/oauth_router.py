@@ -64,9 +64,12 @@ def metadata_oauth_authorization_server(
 
 
 @router.get("/.well-known/oauth-protected-resource")
+@router.get("/.well-known/oauth-protected-resource/mcp")
+@router.get("/.well-known/oauth-protected-resource/{resource_path:path}")
 def metadata_oauth_protected_resource(
     request: Request,
     settings: Annotated[Settings, Depends(get_settings)],
+    resource_path: str = "",
 ) -> dict[str, Any]:
     """Descubrimiento de metadatos de Recurso Protegido OAuth 2.0 según RFC 9728 para clientes MCP."""
     es_prod = settings.APP_ENV == "production"
