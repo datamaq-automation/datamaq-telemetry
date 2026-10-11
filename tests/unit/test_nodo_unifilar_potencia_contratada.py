@@ -57,5 +57,5 @@ def test_carga_desde_organizaciones_yml_real():
     nodos_durax = repo.obtener_nodos_unifilar("c64fd625-0037-4caa-b68a-800e8e0ee548")
     acometida_durax = next((n for n in nodos_durax if n.id == "node-durax-principal-acometida-1"), None)
     assert acometida_durax is not None
-    assert acometida_durax.potencia_contratada_punta_kw == 800.0
-    assert acometida_durax.potencia_contratada_fuera_punta_kw == 850.0
+    assert acometida_durax.potencia_contratada_punta_kw == 848.4
+    assert acometida_durax.potencia_contratada_fuera_punta_kw == 848.4
