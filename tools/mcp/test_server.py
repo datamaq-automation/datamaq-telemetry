@@ -211,6 +211,29 @@ async def test_datamaq_consultar_penalizaciones():
     assert penalizaciones["horas_bajo_fp"] == 14.5
 
 
+@pytest.mark.asyncio
+async def test_datamaq_consultar_penalizaciones_periodo_personalizado():
+    """Prueba que el parámetro periodo_dias sea enviado correctamente a la API."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/api/v1/analitica/penalizaciones/planta"
+        assert request.url.params.get("planta_id") == "planta-pacheco"
+        assert request.url.params.get("periodo_dias") == "14"
+        return httpx.Response(
+            200,
+            json={"planta_id": "planta-pacheco", "periodo_dias": 14, "disponible": True},
+        )
+
+    mock_client = httpx.AsyncClient(
+        transport=httpx.MockTransport(handler),
+        base_url="http://datamaq.local",
+    )
+    set_client(mock_client)
+
+    res = await datamaq_consultar_penalizaciones(planta_id="planta-pacheco", periodo_dias=14)
+    assert res["periodo_dias"] == 14
+
+
 def _handler_potencia(lecturas_por_id: dict[str, Any], errores: set[str] | None = None):
     """Mock de la API: lista de dispositivos de la planta y serie instantánea por dispositivo."""
     errores = errores or set()

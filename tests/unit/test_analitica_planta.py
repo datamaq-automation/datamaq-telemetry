@@ -57,6 +57,19 @@ def test_obtener_penalizaciones_planta_exito():
     assert data["moneda"] == "ARS"
 
 
+def test_obtener_penalizaciones_planta_parametro_periodo_dias():
+    app = create_app(get_settings())
+    app.dependency_overrides[get_usuario_actual] = mock_get_usuario_actual
+    app.dependency_overrides[resolver_planta_permitida] = lambda planta_id=None: planta_id
+
+    client = TestClient(app)
+    response = client.get("/api/v1/analitica/penalizaciones/planta?planta_id=planta-garin&periodo_dias=14")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["planta_id"] == "planta-garin"
+    assert data["periodo_dias"] == 14
+
+
 def _crear_punto_potencia_fake(
     fp: float = 0.996, potencia_w: float = 258600.0, q_var: float = 24000.0
 ) -> PuntoPotencia:
