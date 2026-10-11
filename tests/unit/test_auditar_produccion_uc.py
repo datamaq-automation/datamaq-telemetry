@@ -9,16 +9,21 @@ from src.application.use_cases.auditar_produccion import AuditarProduccionUseCas
 class _PuertoFalso(AuditoriaProduccionPort):
     def __init__(self) -> None:
         self.consultas: list[str] = []
+        self.comandos: list[str] = []
 
     def consultar(self, nombre: str) -> list[dict[str, object]]:
         self.consultas.append(nombre)
         return [{"nombre": nombre, "filas": 1}]
 
+    def ejecutar_comando(self, nombre: str) -> str:
+        self.comandos.append(nombre)
+        return f"salida-{nombre}"
+
     def entorno_remoto(self) -> dict[str, object]:
         return {"otp_hmac_key_longitud": 32, "app_env": "production"}
 
 
-def test_ejecuta_los_tres_checks_y_devuelve_claves_ordenadas():
+def test_ejecuta_los_checks_y_devuelve_claves_ordenadas():
     puerto = _PuertoFalso()
     resultado = AuditarProduccionUseCase(puerto).ejecutar()
     assert list(resultado.keys()) == sorted(resultado.keys())
@@ -26,9 +31,20 @@ def test_ejecuta_los_tres_checks_y_devuelve_claves_ordenadas():
         "auditoria_cambio_contrasena",
         "cobertura_telemetria",
         "entorno_remoto",
+        "health_local",
+        "servicio_backend_activo",
         "thd_i_agregados",
+        "version_desplegada",
     }
     assert sorted(puerto.consultas) == ["auditoria_cambio_contrasena", "cobertura_telemetria", "thd_i_agregados"]
+
+
+def test_checks_de_comando_pasan_por_el_puerto_por_nombre_y_su_salida_se_reporta():
+    puerto = _PuertoFalso()
+    resultado = AuditarProduccionUseCase(puerto).ejecutar()
+    assert sorted(puerto.comandos) == ["health_local", "servicio_backend_activo", "version_desplegada"]
+    assert resultado["version_desplegada"] == "salida-version_desplegada"
+    assert resultado["servicio_backend_activo"] == "salida-servicio_backend_activo"
 
 
 def test_entorno_remoto_se_devuelve_tal_cual_lo_reporta_el_puerto():

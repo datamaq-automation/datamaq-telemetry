@@ -15,3 +15,7 @@ class AuditoriaProduccionPort(ABC):
     @abstractmethod
     def entorno_remoto(self) -> dict[str, object]:
         """Valores de entorno no secretos del despliegue remoto (nunca valores de claves)."""
+
+    @abstractmethod
+    def ejecutar_comando(self, nombre: str) -> str:
+        """Ejecuta el comando remoto `nombre` de la allowlist de solo lectura y devuelve su salida."""

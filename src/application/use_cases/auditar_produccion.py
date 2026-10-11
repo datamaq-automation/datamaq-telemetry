@@ -7,6 +7,7 @@ son la allowlist que el adaptador resuelve a consultas fijas.
 from src.application.ports.auditoria_produccion_port import AuditoriaProduccionPort
 
 CHECKS_CONSULTA: tuple[str, ...] = ("auditoria_cambio_contrasena", "cobertura_telemetria", "thd_i_agregados")
+CHECKS_COMANDO: tuple[str, ...] = ("health_local", "servicio_backend_activo", "version_desplegada")
 
 
 class AuditarProduccionUseCase:
@@ -15,5 +16,6 @@ class AuditarProduccionUseCase:
 
     def ejecutar(self) -> dict[str, object]:
         resultado: dict[str, object] = {nombre: self._puerto.consultar(nombre) for nombre in CHECKS_CONSULTA}
+        resultado.update({nombre: self._puerto.ejecutar_comando(nombre) for nombre in CHECKS_COMANDO})
         resultado["entorno_remoto"] = self._puerto.entorno_remoto()
         return {clave: resultado[clave] for clave in sorted(resultado)}
