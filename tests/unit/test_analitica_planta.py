@@ -109,8 +109,8 @@ def test_dimensionador_fp_bajo_con_recomendacion():
     """Valida que con FP < 0.95 y Q > 0, SÍ se recomienda banco."""
     mock_consultar = MagicMock()
 
-    # Simular histórico con FP=0.88 (bajo) y Q>0 (inductiva)
-    puntos = [_crear_punto_potencia_fake(fp=0.88, potencia_w=120000.0, q_var=100000.0) for _ in range(10)]
+    # Simular histórico con FP=0.88 (bajo, P=120 kW, Q=64.765 kvar -> S=136.36 kVA -> FP=0.88) y Q>0 (inductiva)
+    puntos = [_crear_punto_potencia_fake(fp=0.88, potencia_w=120000.0, q_var=64765.0) for _ in range(10)]
 
     with patch("src.application.use_cases.consultar_analitica_planta.calcular_historico", return_value=puntos):
         use_case = ConsultarAnaliticaPlantaUseCase(consultar_telemetria=mock_consultar)
@@ -256,3 +256,47 @@ def test_obtener_penalizaciones_sin_histórico_no_inventa_cifras():
     assert resultado.intervalos_bajo_fp_count is None
     assert resultado.horas_bajo_fp is None
     assert resultado.penalizacion_estimada_ars is None
+
+
+def test_banco_capacitores_regimen_capacitivo_predominante_q_prom_negativa():
+    """Caso San Martín: Q_prom negativa (-65 kVAr) pero Q_max positiva puntual.
+
+    Valida que no se recomienden capacitores (Qc=0) y se informe la razón de régimen capacitivo.
+    """
+    mock_consultar = MagicMock()
+    # P_prom = 50 kW, Q_prom = (-70 + -65 + 5)/3 = -43.33 kVAr (capacitivo). Q_max = 5.0 (inductivo puntual)
+    puntos = [
+        _crear_punto_potencia_fake(fp=0.60, potencia_w=50000.0, q_var=-70000.0),
+        _crear_punto_potencia_fake(fp=0.60, potencia_w=50000.0, q_var=-65000.0),
+        _crear_punto_potencia_fake(fp=0.99, potencia_w=50000.0, q_var=5000.0),
+    ]
+
+    with patch("src.application.use_cases.consultar_analitica_planta.calcular_historico", return_value=puntos):
+        use_case = ConsultarAnaliticaPlantaUseCase(consultar_telemetria=mock_consultar)
+        resultado = use_case.obtener_banco_capacitores(planta_id="planta-san-martin", periodo_dias=30)
+
+    assert resultado.potencia_reactiva_promedio_kvar < 0.0
+    assert resultado.potencia_reactiva_max_kvar == 5.0
+    assert resultado.sobrecompensacion_sostenida is False  # porque Q_max > 0
+    assert resultado.qc_necesaria_kvar == 0.0
+    assert resultado.banco_comercial_sugerido_kvar is None
+    assert resultado.escalones_sugeridos_kvar == []
+    assert resultado.razon_no_recomendacion is not None
+    assert "Régimen capacitivo predominante" in resultado.razon_no_recomendacion
+
+
+def test_banco_capacitores_calculo_vectorial_fp():
+    """Valida cálculo vectorial de FP efectivo (|P|/S) en vez de promedio lineal."""
+    mock_consultar = MagicMock()
+    puntos = [
+        _crear_punto_potencia_fake(fp=1.0, potencia_w=100000.0, q_var=0.0),
+        _crear_punto_potencia_fake(fp=0.0, potencia_w=0.0, q_var=100000.0),
+    ]
+
+    with patch("src.application.use_cases.consultar_analitica_planta.calcular_historico", return_value=puntos):
+        use_case = ConsultarAnaliticaPlantaUseCase(consultar_telemetria=mock_consultar)
+        resultado = use_case.obtener_banco_capacitores(planta_id="planta-test-vectorial", periodo_dias=30)
+
+    # P_prom = 50 kW, Q_prom = 50 kvar -> S = sqrt(50^2 + 50^2) ≈ 70.71 kW -> FP = 50 / 70.71 ≈ 0.707
+    # Con promedio lineal daría 0.50
+    assert resultado.fp_promedio == 0.707

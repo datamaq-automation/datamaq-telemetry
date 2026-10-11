@@ -1,4 +1,5 @@
 # src/application/use_cases/consultar_analitica_planta.py
+import math
 from datetime import datetime, timezone
 
 from src.application.dtos.analitica_dto import (
@@ -110,7 +111,10 @@ class ConsultarAnaliticaPlantaUseCase:
         p_prom = sum(p_kw_vals) / len(p_kw_vals)
         q_prom = sum(q_kvar_vals) / len(q_kvar_vals)
         q_max = max(q_kvar_vals)
-        fp_prom = (sum(fp_vals) / len(fp_vals)) if fp_vals else None
+
+        s_prom = math.sqrt(p_prom**2 + q_prom**2)
+        fp_vectorial = (abs(p_prom) / s_prom) if s_prom > 0 else None
+        fp_prom = fp_vectorial if fp_vectorial is not None else ((sum(fp_vals) / len(fp_vals)) if fp_vals else None)
         fp_objetivo = 0.96
 
         qc_calc, banco_sugerido, escalones = self._calcular_banco_sugerido(p_prom, fp_prom, q_prom, fp_objetivo)
@@ -121,6 +125,12 @@ class ConsultarAnaliticaPlantaUseCase:
             banco_sugerido = None
             escalones = []
             razon_no_recomendacion = "Sobrecompensación reactiva sostenida (régimen capacitivo)"
+        elif q_prom <= 0.0 or (qc_calc == 0.0 and fp_prom is not None and fp_prom < 0.95):
+            banco_sugerido = None
+            escalones = []
+            razon_no_recomendacion = (
+                "Régimen capacitivo predominante (sobrecompensación reactiva): no se requieren capacitores adicionales"
+            )
         elif fp_prom is not None and fp_prom > 0.95:
             banco_sugerido = None
             escalones = []
