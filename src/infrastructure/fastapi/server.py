@@ -337,8 +337,8 @@ async def _ws_heartbeat_loop() -> None:
                         _renovar_modo_tiempo_real_medidores(listener, list(active_websockets))
         except asyncio.CancelledError:
             break
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("ws_heartbeat_fallido", error=str(e))
 
 
 @asynccontextmanager

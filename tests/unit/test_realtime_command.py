@@ -1,7 +1,8 @@
 """tests/unit/test_realtime_command.py."""
 
+import asyncio
 from datetime import datetime, timezone
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from starlette.testclient import TestClient
@@ -12,6 +13,7 @@ from src.infrastructure.fastapi.server import (
     ConnectedClient,
     _registrar_cliente_ws,
     _renovar_modo_tiempo_real_medidores,
+    _ws_heartbeat_loop,
     create_app,
 )
 from src.infrastructure.paho_mqtt.mqtt_listener import MQTTListener
@@ -157,3 +159,26 @@ def test_superadmin_que_llega_despues_renueva(renovaciones):
     superadmin = _cliente(es_superadmin=True)
     _registrar_cliente_ws(superadmin, "h")
     assert renovaciones[-1] == [superadmin]
+
+
+def test_heartbeat_loguea_el_error_en_vez_de_tragarlo():
+    server.active_websockets.clear()
+    cliente = ConnectedClient(websocket=AsyncMock(), organizacion_id="org-a", es_superadmin=False)
+    server.active_websockets.append(cliente)
+    esperas = iter([None, asyncio.CancelledError()])
+
+    async def _sleep(_s: float) -> None:
+        resultado = next(esperas)
+        if resultado is not None:
+            raise resultado
+
+    try:
+        with (
+            patch("src.infrastructure.fastapi.server.asyncio.sleep", side_effect=_sleep),
+            patch("src.infrastructure.fastapi.server.get_mqtt_listener", side_effect=RuntimeError("broker caido")),
+            patch("src.infrastructure.fastapi.server.logger") as logger,
+        ):
+            asyncio.run(_ws_heartbeat_loop())
+    finally:
+        server.active_websockets.clear()
+    logger.warning.assert_called_once_with("ws_heartbeat_fallido", error="broker caido")
