@@ -79,25 +79,47 @@ async def test_datamaq_listar_plantas():
 
 @pytest.mark.asyncio
 async def test_datamaq_consultar_alertas():
-    """Prueba datamaq_consultar_alertas con filtros de planta y estado."""
+    """Prueba datamaq_consultar_alertas con filtros de planta, enriquecimiento y salvaguarda."""
 
     def handler(request: httpx.Request) -> httpx.Response:
-        assert request.url.path == "/api/v1/alertas"
-        assert request.url.params.get("planta_id") == "planta-pacheco"
-        assert request.url.params.get("solo_abiertas") == "true"
-        return httpx.Response(
-            200,
-            json=[
-                {
-                    "id": 101,
-                    "dispositivo_id": "medidor-01",
-                    "tipo_alerta": "BAJO_FACTOR_POTENCIA",
-                    "severidad": "WARNING",
-                    "mensaje": "Factor de potencia por debajo de 0.85 sostenido",
-                    "esta_resuelta": False,
-                }
-            ],
-        )
+        if request.url.path == "/api/v1/dispositivos":
+            assert request.url.params.get("planta_id") == "planta-pacheco"
+            return httpx.Response(
+                200,
+                json=[
+                    {
+                        "id": "medidor-01",
+                        "ubicacion_tag": "TGBT General",
+                        "nombre": "Medidor Principal",
+                        "planta_id": "planta-pacheco",
+                    }
+                ],
+            )
+        if request.url.path == "/api/v1/alertas":
+            assert request.url.params.get("planta_id") == "planta-pacheco"
+            assert request.url.params.get("solo_abiertas") == "true"
+            return httpx.Response(
+                200,
+                json=[
+                    {
+                        "id": 101,
+                        "dispositivo_id": "medidor-01",
+                        "tipo_alerta": "BAJO_FACTOR_POTENCIA",
+                        "severidad": "WARNING",
+                        "mensaje": "Factor de potencia por debajo de 0.85 sostenido",
+                        "esta_resuelta": False,
+                    },
+                    {
+                        "id": 999,
+                        "dispositivo_id": "medidor-ajeno",
+                        "tipo_alerta": "TENSION_ALTA",
+                        "severidad": "CRITICAL",
+                        "mensaje": "Alerta que no pertenece a planta-pacheco",
+                        "esta_resuelta": False,
+                    },
+                ],
+            )
+        return httpx.Response(404, json={"detail": "Not found"})
 
     mock_client = httpx.AsyncClient(
         transport=httpx.MockTransport(handler),
@@ -110,6 +132,8 @@ async def test_datamaq_consultar_alertas():
     assert len(alertas) == 1
     assert alertas[0]["id"] == 101
     assert alertas[0]["tipo_alerta"] == "BAJO_FACTOR_POTENCIA"
+    assert alertas[0]["planta_id"] == "planta-pacheco"
+    assert alertas[0]["dispositivo_tag"] == "TGBT General"
 
 
 @pytest.mark.asyncio

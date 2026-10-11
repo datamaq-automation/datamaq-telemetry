@@ -161,14 +161,34 @@ async def datamaq_consultar_alertas(
         ctx: Contexto de ejecución FastMCP inyectado automáticamente.
     """
     token = _resolver_token(ctx)
+    dispositivos_resp = await _ejecutar_peticion(
+        "GET", "/api/v1/dispositivos", token=token, params={"planta_id": planta_id}
+    )
+    dispositivos_map: dict[str, str] = {}
+    if isinstance(dispositivos_resp, list):
+        for d in dispositivos_resp:
+            if isinstance(d, dict) and d.get("id"):
+                dispositivos_map[d["id"]] = d.get("ubicacion_tag") or d.get("nombre") or d["id"]
+
     parametros: dict[str, Any] = {
         "planta_id": planta_id,
         "solo_abiertas": solo_abiertas,
     }
     resultado = await _ejecutar_peticion("GET", "/api/v1/alertas", token=token, params=parametros)
-    if isinstance(resultado, list):
-        return resultado
-    return [resultado]
+    alertas_raw = resultado if isinstance(resultado, list) else [resultado]
+
+    alertas_filtradas: list[dict[str, Any]] = []
+    for a in alertas_raw:
+        if not isinstance(a, dict):
+            continue
+        dev_id = a.get("dispositivo_id")
+        if dev_id and dev_id in dispositivos_map:
+            alerta_enriquecida = dict(a)
+            alerta_enriquecida["planta_id"] = planta_id
+            alerta_enriquecida["dispositivo_tag"] = dispositivos_map[dev_id]
+            alertas_filtradas.append(alerta_enriquecida)
+
+    return alertas_filtradas
 
 
 @mcp.tool()

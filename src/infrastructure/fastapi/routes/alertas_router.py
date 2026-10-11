@@ -32,6 +32,7 @@ def list_alertas(
     limit: int = Query(100, le=500, description="Límite de registros"),
     desde: datetime | None = Query(None, description="Fecha de inicio ISO8601"),
     hasta: datetime | None = Query(None, description="Fecha de fin ISO8601"),
+    planta_id: str | None = Query(None, description="Filtrar alertas por ID de planta"),
 ):
     # Roles globales ven todas; el resto, solo las de su organización (un device_id ajeno da []).
     organizacion_id = None
@@ -47,6 +48,7 @@ def list_alertas(
         desde=desde,
         hasta=hasta,
         organizacion_id=organizacion_id,
+        planta_id=planta_id,
     )
 
 
