@@ -45,10 +45,10 @@ class AnaliticaPenalizacionesPlantaDTO(BaseModel):
     planta_id: str = Field(..., description="Identificador único de la planta")
     periodo_dias: int = Field(default=7, description="Ventana de análisis en días")
     disponible: bool = Field(
-        default=False, description="False mientras el cálculo real de penalizaciones no esté implementado"
+        default=False, description="True si hubo histórico con FP y se calcularon intervalos y horas bajo FP"
     )
     motivo_no_disponible: str | None = Field(
-        default=None, description="Por qué no hay cifra (ej. 'Cálculo no implementado'); None si disponible"
+        default=None, description="Por qué falta la penalización en ARS (o por qué no hay histórico)"
     )
     intervalos_bajo_fp_count: int | None = Field(
         default=None, description="Cantidad de intervalos de medición con FP < 0.95; None si no disponible"

@@ -217,3 +217,29 @@ def test_obtener_banco_capacitores_resuelve_dispositivos_via_repo():
         horas=30 * 24,
     )
     assert resultado.potencia_activa_promedio_kw == 120.0
+
+
+def test_obtener_penalizaciones_cuenta_intervalos_bajo_fp_reales():
+    """Cuenta buckets con FP < 0.95 de la serie real; no publica ARS sin tarifa."""
+    puntos = [_crear_punto_potencia_fake(fp=0.90)] * 3 + [_crear_punto_potencia_fake(fp=0.99)] * 7
+    use_case = ConsultarAnaliticaPlantaUseCase(consultar_telemetria=MagicMock())
+    with (
+        patch.object(ConsultarAnaliticaPlantaUseCase, "_resolver_dispositivos", return_value=["dev-1"]),
+        patch("src.application.use_cases.consultar_analitica_planta.calcular_historico", return_value=puntos),
+    ):
+        resultado = use_case.obtener_penalizaciones(planta_id="planta-garin", periodo_dias=7)
+    assert resultado.disponible is True
+    assert resultado.intervalos_bajo_fp_count == 3
+    assert resultado.horas_bajo_fp == 0.25  # 3 buckets de 5 min
+    assert resultado.penalizacion_estimada_ars is None
+    assert resultado.motivo_no_disponible
+
+
+def test_obtener_penalizaciones_sin_histórico_no_inventa_cifras():
+    use_case = ConsultarAnaliticaPlantaUseCase(consultar_telemetria=MagicMock())
+    with patch.object(ConsultarAnaliticaPlantaUseCase, "_resolver_dispositivos", return_value=[]):
+        resultado = use_case.obtener_penalizaciones(planta_id="planta-sin-datos")
+    assert resultado.disponible is False
+    assert resultado.intervalos_bajo_fp_count is None
+    assert resultado.horas_bajo_fp is None
+    assert resultado.penalizacion_estimada_ars is None
