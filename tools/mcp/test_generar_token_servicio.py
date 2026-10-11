@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
-from src.infrastructure.settings.config import Settings
+from src.infrastructure.settings.config import get_settings
 from tools.mcp.generar_token_servicio import (
     construir_instrucciones,
     generar_token_servicio,
@@ -21,7 +21,7 @@ def test_generar_token_servicio_por_defecto():
     assert isinstance(token, str)
     assert len(token.split(".")) == 3
 
-    settings = Settings()
+    settings = get_settings()
     token_service = JwtTokenService(settings.API_SECRET_KEY)
     claims = token_service.verificar(token)
 
@@ -44,7 +44,7 @@ def test_generar_token_servicio_argumentos_personalizados():
         usuario_id="uuid-fijo-123",
     )
 
-    settings = Settings()
+    settings = get_settings()
     claims = JwtTokenService(settings.API_SECRET_KEY).verificar(token)
     assert claims is not None
     assert claims["usuario"] == "admin_externo"
@@ -83,7 +83,7 @@ def test_main_cli_solo_token():
     token_impreso = f.getvalue().strip()
     assert len(token_impreso.split(".")) == 3
 
-    claims = JwtTokenService(Settings().API_SECRET_KEY).verificar(token_impreso)
+    claims = JwtTokenService(get_settings().API_SECRET_KEY).verificar(token_impreso)
     assert claims is not None
     assert claims["usuario"] == "ci_worker"
 

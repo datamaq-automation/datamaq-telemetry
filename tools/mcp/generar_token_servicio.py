@@ -17,7 +17,7 @@ if str(_repo_root) not in sys.path:
     sys.path.insert(0, str(_repo_root))
 
 from src.infrastructure.auth.jwt_token_service import JwtTokenService  # noqa: E402
-from src.infrastructure.settings.config import Settings  # noqa: E402
+from src.infrastructure.settings.config import get_settings  # noqa: E402
 
 
 def generar_token_servicio(
@@ -36,7 +36,7 @@ def generar_token_servicio(
         rol: Rol asignado al token ('superadmin', 'administrador', 'operador').
         organizacion_id: Identificador de organización opcional.
         usuario_id: UUID o ID del sujeto ('sub'). Si es None, se genera un UUIDv4.
-        secret_key: Clave secreta HMAC. Si es None, se obtiene de Settings().API_SECRET_KEY.
+        secret_key: Clave secreta HMAC. Si es None, se obtiene de get_settings().API_SECRET_KEY.
 
     Returns:
         Token JWT firmado en formato string.
@@ -44,9 +44,9 @@ def generar_token_servicio(
     if dias <= 0:
         raise ValueError("El parámetro dias debe ser un entero positivo mayor a 0.")
 
-    clave = secret_key if secret_key is not None else Settings().API_SECRET_KEY
+    clave = secret_key if secret_key is not None else get_settings().API_SECRET_KEY
     if not clave:
-        raise ValueError("No se pudo obtener una clave secreta válida desde Settings().API_SECRET_KEY.")
+        raise ValueError("No se pudo obtener una clave secreta válida desde get_settings().API_SECRET_KEY.")
 
     sub = usuario_id if usuario_id is not None else str(uuid.uuid4())
     ahora = datetime.now(timezone.utc)
