@@ -94,6 +94,33 @@ class TestAgregadorLecturasSubbloques:
         assert agregadas[0].potencia_reactiva_total.var == pytest.approx(7000.0 / 30.0)
         assert agregadas[0].demanda_max_w == 4000.0
 
+        # S y FP de la misma fila: recompuestos desde P y Q del bloque (una sola base).
+        p = agregadas[0].potencia_activa_total.vatios
+        q = agregadas[0].potencia_reactiva_total.var
+        s = agregadas[0].potencia_aparente_total.va
+        assert s**2 == pytest.approx(p**2 + q**2, rel=1e-4)
+        assert agregadas[0].factor_potencia_total.valor == pytest.approx(p / s, abs=1e-4)
+
+    def test_sin_reactiva_el_bloque_no_tiene_s_ni_fp_de_otra_base(self):
+        lecturas = [
+            LecturaInstantanea(
+                id=None,
+                dispositivo_id="A",
+                registrado_en=_t(s),
+                fase_r=MedicionFase(),
+                fase_s=MedicionFase(),
+                fase_t=MedicionFase(),
+                potencia_activa_total=PotenciaActiva(w),
+            )
+            for s, w in MUESTRAS_DESIGUALES
+        ]
+        agregadas = AgregadorLecturasService.agregar_lecturas_en_intervalo(lecturas, BLOQUE)
+
+        assert agregadas[0].potencia_activa_total.vatios == pytest.approx(7000.0 / 3.0)
+        assert agregadas[0].potencia_reactiva_total is None
+        assert agregadas[0].potencia_aparente_total is None
+        assert agregadas[0].factor_potencia_total is None
+
 
 class _ConsultarFalso:
     """Stub del caso de uso: devuelve muestras crudas y un piso de plan configurable."""

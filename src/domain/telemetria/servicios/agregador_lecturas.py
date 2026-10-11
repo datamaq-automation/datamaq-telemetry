@@ -4,6 +4,7 @@ from dataclasses import replace
 from datetime import datetime, timezone
 
 from src.domain.telemetria.entities import LecturaInstantanea, MedicionFase
+from src.domain.telemetria.servicios.agregador_dispositivos import recomponer_s_y_cos_fi
 from src.domain.telemetria.servicios.calculos_potencia import CalculadoraPotenciaService
 from src.domain.telemetria.servicios.promedio_subbloques import promedio_por_subbloques
 from src.domain.telemetria.value_objects import (
@@ -23,7 +24,8 @@ def _con_potencias_por_subbloques(
 ) -> LecturaInstantanea:
     """P y Q del bloque como media de sus sub-bloques de 5 min (decisión 2026-10-11).
 
-    S y FP del bloque siguen con el promedio de muestras de `_agregar_grupo_lecturas`.
+    S y FP se recomponen desde ese mismo P y Q (S² = P² + Q²), para que la fila tenga una sola base. Si falta Q
+    no se puede recomponer: S y FP quedan en None, como en la suma de medidores.
     """
 
     def _epoch(it: LecturaInstantanea) -> float:
@@ -38,10 +40,15 @@ def _con_potencias_por_subbloques(
         [(_epoch(it), it.potencia_reactiva_total.var) for it in items if it.potencia_reactiva_total is not None],
         intervalo_segundos,
     )
+    if p is None:
+        return agregada
+    s, fp = recomponer_s_y_cos_fi(p, q)
     return replace(
         agregada,
-        potencia_activa_total=PotenciaActiva(vatios=p) if p is not None else agregada.potencia_activa_total,
-        potencia_reactiva_total=PotenciaReactiva(var=q) if q is not None else agregada.potencia_reactiva_total,
+        potencia_activa_total=PotenciaActiva(vatios=p),
+        potencia_reactiva_total=PotenciaReactiva(var=q) if q is not None else None,
+        potencia_aparente_total=PotenciaAparente(va=s) if s is not None else None,
+        factor_potencia_total=FactorPotencia(valor=fp) if fp is not None else None,
     )
 
 

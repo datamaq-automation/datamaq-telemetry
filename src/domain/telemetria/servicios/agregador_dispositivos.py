@@ -115,7 +115,7 @@ def _punto_potencia(
     )
 
 
-def _recomponer_s_y_cos_fi(p_w: float | None, q_var: float | None) -> tuple[float | None, float | None]:
+def recomponer_s_y_cos_fi(p_w: float | None, q_var: float | None) -> tuple[float | None, float | None]:
     """Recompone S y cos φ (factor de desplazamiento) del P y Q ya sumados.
 
     S y FP no son aditivas entre dispositivos: hay que sumar P y Q por separado y
@@ -164,7 +164,7 @@ class AgregadorDispositivosService:
 
         p = round(total_p, 2) if hubo_dato else None
         q = round(total_q, 2) if hubo_dato and q_completa else None
-        s, fp = _recomponer_s_y_cos_fi(p, q)
+        s, fp = recomponer_s_y_cos_fi(p, q)
         return PotenciaSumada(
             potencia_activa_total_w=p,
             dispositivos_sin_dato=sin_dato,
@@ -265,7 +265,7 @@ class AgregadorDispositivosService:
                 if hubo_dato and q_completa_por_bucket.get(bucket_ts)
                 else None
             )
-            s, fp = _recomponer_s_y_cos_fi(p, q)
+            s, fp = recomponer_s_y_cos_fi(p, q)
             demanda_max = maximos_por_bucket[bucket_ts] if hubo_dato else None
             sin_dato = sorted(todos_los_dispositivos - con_dato)
             resultado.append(_punto_potencia(bucket_ts, p, q, s, fp, sin_dato, demanda_max))
@@ -302,7 +302,7 @@ class AgregadorDispositivosService:
             p = round(sum_p[k], 2) if sum_p[k] != 0.0 else None
             q_val = sum_q[k]
             q = round(q_val, 2) if q_completa[k] and q_val is not None else None
-            s, fp = _recomponer_s_y_cos_fi(p, q)
+            s, fp = recomponer_s_y_cos_fi(p, q)
             return FaseAgregada(
                 voltage_V=v_prom[k],
                 current_A=i_sum[k],
