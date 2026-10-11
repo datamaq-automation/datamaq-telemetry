@@ -91,6 +91,12 @@ def test_roles_globales_listan_todas(cliente, rol):
     assert _tipos(cliente({"sub": "u-g", "rol": rol}).get("/api/v1/alertas")) == {"ALERTA_A", "ALERTA_B"}
 
 
+def test_listado_filtrado_por_planta_id_aisla_alertas_de_otra_planta(cliente):
+    client_global = cliente({"sub": "u-g", "rol": "superadmin"})
+    assert _tipos(client_global.get("/api/v1/alertas?planta_id=planta-a")) == {"ALERTA_A"}
+    assert _tipos(client_global.get("/api/v1/alertas?planta_id=planta-b")) == {"ALERTA_B"}
+
+
 def test_usuario_sin_organizacion_no_lista_nada(cliente):
     assert _tipos(cliente({"sub": "u-x", "rol": "operador"}).get("/api/v1/alertas")) == set()
 

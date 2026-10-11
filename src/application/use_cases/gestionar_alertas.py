@@ -32,7 +32,19 @@ class GestionarAlertasUseCase:
         desde: datetime | None = None,
         hasta: datetime | None = None,
         organizacion_id: str | None = None,
+        planta_id: str | None = None,
     ) -> list[AlertaResponseDTO]:
+        ids_planta: set[str] | None = None
+        if planta_id:
+            if not self.repo_dispositivos:
+                return []
+            dispositivos = self.repo_dispositivos.listar(planta_id=planta_id, organizacion_id=organizacion_id)
+            ids_planta = {d.id for d in dispositivos if d.id}
+            if not ids_planta:
+                return []
+            if dispositivo_id and dispositivo_id not in ids_planta:
+                return []
+
         alertas = self.repo_telemetria.listar_alertas(
             dispositivo_id=dispositivo_id,
             solo_abiertas=solo_abiertas,
@@ -42,6 +54,8 @@ class GestionarAlertasUseCase:
             hasta=hasta,
             organizacion_id=organizacion_id,
         )
+        if ids_planta is not None:
+            alertas = [a for a in alertas if a.dispositivo_id in ids_planta]
         return [AlertaMapper.to_dto(a) for a in alertas]
 
     def resolver_alerta(self, alerta_id: int, observaciones: str | None = None) -> AlertaResponseDTO:

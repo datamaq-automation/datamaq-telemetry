@@ -4,6 +4,7 @@ Expone herramientas de diagnóstico y analítica energética para Claude Desktop
 utilizando FastMCP sobre transporte stdio y cliente HTTP httpx.
 """
 
+import math
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -139,7 +140,12 @@ async def _ejecutar_peticion(
 
 @mcp.tool()
 async def datamaq_listar_plantas(ctx: Context | None = None) -> list[dict[str, Any]]:
-    """Retorna las plantas industriales a las que el usuario autenticado tiene acceso en DataMaq."""
+    """Retorna las plantas industriales a las que el usuario autenticado tiene acceso en DataMaq.
+
+    Las plantas agrupan uno o más medidores de energía eléctrica (tableros generales,
+    trafos o celdas de media tensión). Toda la analítica y diagnósticos posteriores se
+    agregan a nivel planta sumando vectorialmente las mediciones de sus dispositivos.
+    """
     token = _resolver_token(ctx)
     resultado = await _ejecutar_peticion("GET", "/api/v1/plantas", token=token)
     if isinstance(resultado, list):
@@ -153,7 +159,14 @@ async def datamaq_consultar_alertas(
     solo_abiertas: bool = True,
     ctx: Context | None = None,
 ) -> list[dict[str, Any]]:
-    """Lista las alertas eléctricas y operativas recientes para la planta especificada.
+    """Lista las alertas eléctricas y operativas aisladas para la planta especificada.
+
+    Aisla y enriquece las alertas correspondientes a los medidores de la planta con
+    `planta_id` y `dispositivo_tag`. Discrimina alertas por bajo factor de potencia según
+    los criterios normativos:
+    - Umbral tarifario clásico de distribuidoras (FP < 0.85): penalizaciones severas y recargos.
+    - Umbral normativo regulatorio vigente ENRE 85/2024 (FP < 0.95): requerimiento federal
+      de eficiencia y base de dimensionamiento de bancos de capacitores.
 
     Args:
         planta_id: Identificador de la planta industrial.
@@ -161,14 +174,34 @@ async def datamaq_consultar_alertas(
         ctx: Contexto de ejecución FastMCP inyectado automáticamente.
     """
     token = _resolver_token(ctx)
+    dispositivos_resp = await _ejecutar_peticion(
+        "GET", "/api/v1/dispositivos", token=token, params={"planta_id": planta_id}
+    )
+    dispositivos_map: dict[str, str] = {}
+    if isinstance(dispositivos_resp, list):
+        for d in dispositivos_resp:
+            if isinstance(d, dict) and d.get("id"):
+                dispositivos_map[d["id"]] = d.get("ubicacion_tag") or d.get("nombre") or d["id"]
+
     parametros: dict[str, Any] = {
         "planta_id": planta_id,
         "solo_abiertas": solo_abiertas,
     }
     resultado = await _ejecutar_peticion("GET", "/api/v1/alertas", token=token, params=parametros)
-    if isinstance(resultado, list):
-        return resultado
-    return [resultado]
+    alertas_raw = resultado if isinstance(resultado, list) else [resultado]
+
+    alertas_filtradas: list[dict[str, Any]] = []
+    for a in alertas_raw:
+        if not isinstance(a, dict):
+            continue
+        dev_id = a.get("dispositivo_id")
+        if dev_id and dev_id in dispositivos_map:
+            alerta_enriquecida = dict(a)
+            alerta_enriquecida["planta_id"] = planta_id
+            alerta_enriquecida["dispositivo_tag"] = dispositivos_map[dev_id]
+            alertas_filtradas.append(alerta_enriquecida)
+
+    return alertas_filtradas
 
 
 @mcp.tool()
@@ -178,6 +211,11 @@ async def datamaq_analizar_capacitores(
     ctx: Context | None = None,
 ) -> dict[str, Any]:
     """Ejecuta la analítica SSOT de banco de capacitores y recomendación de compensación en kVAr.
+
+    Calcula la potencia reactiva necesaria para alcanzar el factor de potencia objetivo normativo
+    ENRE 85/2024 (FP >= 0.95, típicamente objetivo 0.96) a partir de la integración vectorial
+    de potencia activa (kW) y reactiva (kVAr) de todos los medidores de la planta en la ventana.
+    Distingue la compensación regulatoria (meta 0.95) del límite de recargos tarifarios (0.85).
 
     Args:
         planta_id: Identificador único de la planta industrial.
@@ -205,9 +243,14 @@ async def datamaq_consultar_penalizaciones(
 ) -> dict[str, Any]:
     """Obtiene el acumulado estimado de recargos y multas por bajo factor de potencia (cos phi).
 
+    Evalúa los intervalos donde el factor de potencia global de la planta desciende por debajo
+    del umbral tarifario contractual (0.85), a partir de mediciones reales agregadas a nivel planta.
+    Permite parametrizar la ventana de análisis (`periodo_dias`, 1 a 30 días, por defecto 7).
+    Distingue el umbral tarifario de penalización (0.85) del estándar normativo ENRE 85/2024 (0.95).
+
     Args:
         planta_id: Identificador único de la planta industrial.
-        periodo_dias: Ventana de análisis en días (por defecto 7).
+        periodo_dias: Ventana de análisis en días (por defecto 7, de 1 a 30 días).
         ctx: Contexto de ejecución FastMCP inyectado automáticamente.
     """
     token = _resolver_token(ctx)
@@ -227,7 +270,7 @@ _BUCKET_SEGUNDOS = 300  # Serie de planta en buckets de 5 min (misma granularida
 
 
 def _agregar_serie_planta(lecturas_por_dispositivo: list[list[dict[str, Any]]]) -> list[dict[str, float | None]]:
-    """Suma P y Q de todos los dispositivos por bucket de 5 min; FP es el promedio de los puntos."""
+    """Suma algebraicamente P y Q de todos los dispositivos por bucket de 5 min y calcula FP vectorial (|P|/S)."""
     buckets: dict[int, dict[str, Any]] = {}
     for lecturas in lecturas_por_dispositivo:
         for lectura in lecturas:
@@ -236,23 +279,37 @@ def _agregar_serie_planta(lecturas_por_dispositivo: list[list[dict[str, Any]]]) 
                 continue
             instante = datetime.fromisoformat(marca.replace("Z", "+00:00"))
             clave = int(instante.timestamp()) // _BUCKET_SEGUNDOS
-            bucket = buckets.setdefault(clave, {"p_w": None, "q_var": None, "fps": []})
+            bucket = buckets.setdefault(clave, {"p_w": None, "q_var": None})
             p_w = lectura.get("potencia_activa_total_W")
             q_var = lectura.get("potencia_reactiva_total_VAR")
             if p_w is not None:
                 bucket["p_w"] = (bucket["p_w"] or 0.0) + float(p_w)
             if q_var is not None:
                 bucket["q_var"] = (bucket["q_var"] or 0.0) + float(q_var)
-            if lectura.get("factor_potencia_total") is not None:
-                bucket["fps"].append(float(lectura["factor_potencia_total"]))
-    return [
-        {
-            "p_kw": b["p_w"] / 1000.0 if b["p_w"] is not None else None,
-            "q_kvar": b["q_var"] / 1000.0 if b["q_var"] is not None else None,
-            "fp": sum(b["fps"]) / len(b["fps"]) if b["fps"] else None,
-        }
-        for _, b in sorted(buckets.items())
-    ]
+
+    resultado = []
+    for _, b in sorted(buckets.items()):
+        p_w = b["p_w"]
+        q_var = b["q_var"]
+        p_kw = p_w / 1000.0 if p_w is not None else None
+        q_kvar = q_var / 1000.0 if q_var is not None else None
+
+        fp_bucket = None
+        if p_w is not None or q_var is not None:
+            p_val = p_w or 0.0
+            q_val = q_var or 0.0
+            s_val = math.sqrt(p_val**2 + q_val**2)
+            if s_val > 0:
+                fp_bucket = abs(p_val) / s_val
+
+        resultado.append(
+            {
+                "p_kw": p_kw,
+                "q_kvar": q_kvar,
+                "fp": fp_bucket,
+            }
+        )
+    return resultado
 
 
 def _promedio(valores: list[float]) -> float | None:
@@ -265,11 +322,14 @@ async def datamaq_consultar_potencia_reciente(
     horas: int = 24,
     ctx: Context | None = None,
 ) -> dict[str, Any]:
-    """Consulta el resumen de demanda activa (kW) y reactiva (kVAr) de una planta en una ventana de horas reciente.
+    """Consulta el resumen de demanda activa (kW) y reactiva (kVAr) de una planta en una ventana reciente.
 
-    Recorre los dispositivos de la planta y consulta la serie instantánea de cada uno; la planta se
-    arma sumando P y Q por bucket de 5 min. Los dispositivos que fallan se listan en
-    `dispositivos_con_error` sin cortar la consulta.
+    Recorre los medidores de la planta agregando vectorialmente las potencias activa (P) y
+    reactiva (Q) por bucket de 5 min (S = sqrt(P^2 + Q^2), FP = |P| / S). El factor de potencia
+    promedio del período se calcula sobre las sumas acumuladas vectoriales conforme a la regulación
+    ENRE/CAMMESA, evitando distorsiones aritméticas en plantas multi-medidor.
+    Incluye porcentaje de cobertura de mediciones y advertencia si es menor al 80%.
+    Permite evaluar el desempeño frente al umbral tarifario (0.85) y normativo ENRE 85/2024 (0.95).
 
     Args:
         planta_id: Identificador único de la planta industrial.
@@ -301,21 +361,34 @@ async def datamaq_consultar_potencia_reciente(
     serie = _agregar_serie_planta(lecturas_por_dispositivo)
     p_kw = [b["p_kw"] for b in serie if b["p_kw"] is not None]
     q_kvar = [b["q_kvar"] for b in serie if b["q_kvar"] is not None]
-    fps = [b["fp"] for b in serie if b["fp"] is not None]
 
-    return {
+    p_acum = sum(p_kw) if p_kw else 0.0
+    q_acum = sum(q_kvar) if q_kvar else 0.0
+    denominador = math.sqrt(p_acum**2 + q_acum**2)
+    fp_global = (abs(p_acum) / denominador) if denominador > 0 else None
+
+    puntos_esperados = (horas * 3600) // 300
+    puntos_count = len(serie)
+    cobertura_puntos_pct = round((puntos_count / puntos_esperados) * 100, 1) if puntos_esperados > 0 else 0.0
+
+    respuesta: dict[str, Any] = {
         "planta_id": planta_id,
         "horas": horas,
         "metodo": "suma por bucket de 5 min de los dispositivos de la planta",
         "dispositivos_consultados": len(ids),
         "dispositivos_con_error": con_error,
-        "puntos_medicion_count": len(serie),
+        "puntos_medicion_count": puntos_count,
+        "cobertura_puntos_pct": cobertura_puntos_pct,
         "potencia_activa_promedio_kw": round(_promedio(p_kw), 2) if p_kw else None,
         "potencia_activa_max_kw": round(max(p_kw), 2) if p_kw else None,
         "potencia_reactiva_promedio_kvar": round(_promedio(q_kvar), 2) if q_kvar else None,
         "potencia_reactiva_max_kvar": round(max(q_kvar), 2) if q_kvar else None,
-        "factor_potencia_promedio": round(_promedio(fps), 3) if fps else None,
+        "factor_potencia_promedio": round(fp_global, 3) if fp_global is not None else None,
     }
+    if cobertura_puntos_pct < 80.0:
+        respuesta["advertencia_datos"] = "Datos incompletos (<80% de cobertura)"
+
+    return respuesta
 
 
 def main() -> None:

@@ -79,25 +79,47 @@ async def test_datamaq_listar_plantas():
 
 @pytest.mark.asyncio
 async def test_datamaq_consultar_alertas():
-    """Prueba datamaq_consultar_alertas con filtros de planta y estado."""
+    """Prueba datamaq_consultar_alertas con filtros de planta, enriquecimiento y salvaguarda."""
 
     def handler(request: httpx.Request) -> httpx.Response:
-        assert request.url.path == "/api/v1/alertas"
-        assert request.url.params.get("planta_id") == "planta-pacheco"
-        assert request.url.params.get("solo_abiertas") == "true"
-        return httpx.Response(
-            200,
-            json=[
-                {
-                    "id": 101,
-                    "dispositivo_id": "medidor-01",
-                    "tipo_alerta": "BAJO_FACTOR_POTENCIA",
-                    "severidad": "WARNING",
-                    "mensaje": "Factor de potencia por debajo de 0.85 sostenido",
-                    "esta_resuelta": False,
-                }
-            ],
-        )
+        if request.url.path == "/api/v1/dispositivos":
+            assert request.url.params.get("planta_id") == "planta-pacheco"
+            return httpx.Response(
+                200,
+                json=[
+                    {
+                        "id": "medidor-01",
+                        "ubicacion_tag": "TGBT General",
+                        "nombre": "Medidor Principal",
+                        "planta_id": "planta-pacheco",
+                    }
+                ],
+            )
+        if request.url.path == "/api/v1/alertas":
+            assert request.url.params.get("planta_id") == "planta-pacheco"
+            assert request.url.params.get("solo_abiertas") == "true"
+            return httpx.Response(
+                200,
+                json=[
+                    {
+                        "id": 101,
+                        "dispositivo_id": "medidor-01",
+                        "tipo_alerta": "BAJO_FACTOR_POTENCIA",
+                        "severidad": "WARNING",
+                        "mensaje": "Factor de potencia por debajo de 0.85 sostenido",
+                        "esta_resuelta": False,
+                    },
+                    {
+                        "id": 999,
+                        "dispositivo_id": "medidor-ajeno",
+                        "tipo_alerta": "TENSION_ALTA",
+                        "severidad": "CRITICAL",
+                        "mensaje": "Alerta que no pertenece a planta-pacheco",
+                        "esta_resuelta": False,
+                    },
+                ],
+            )
+        return httpx.Response(404, json={"detail": "Not found"})
 
     mock_client = httpx.AsyncClient(
         transport=httpx.MockTransport(handler),
@@ -110,6 +132,8 @@ async def test_datamaq_consultar_alertas():
     assert len(alertas) == 1
     assert alertas[0]["id"] == 101
     assert alertas[0]["tipo_alerta"] == "BAJO_FACTOR_POTENCIA"
+    assert alertas[0]["planta_id"] == "planta-pacheco"
+    assert alertas[0]["dispositivo_tag"] == "TGBT General"
 
 
 @pytest.mark.asyncio
@@ -187,6 +211,29 @@ async def test_datamaq_consultar_penalizaciones():
     assert penalizaciones["horas_bajo_fp"] == 14.5
 
 
+@pytest.mark.asyncio
+async def test_datamaq_consultar_penalizaciones_periodo_personalizado():
+    """Prueba que el parámetro periodo_dias sea enviado correctamente a la API."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/api/v1/analitica/penalizaciones/planta"
+        assert request.url.params.get("planta_id") == "planta-pacheco"
+        assert request.url.params.get("periodo_dias") == "14"
+        return httpx.Response(
+            200,
+            json={"planta_id": "planta-pacheco", "periodo_dias": 14, "disponible": True},
+        )
+
+    mock_client = httpx.AsyncClient(
+        transport=httpx.MockTransport(handler),
+        base_url="http://datamaq.local",
+    )
+    set_client(mock_client)
+
+    res = await datamaq_consultar_penalizaciones(planta_id="planta-pacheco", periodo_dias=14)
+    assert res["periodo_dias"] == 14
+
+
 def _handler_potencia(lecturas_por_id: dict[str, Any], errores: set[str] | None = None):
     """Mock de la API: lista de dispositivos de la planta y serie instantánea por dispositivo."""
     errores = errores or set()
@@ -237,7 +284,43 @@ async def test_datamaq_consultar_potencia_reciente_suma_dispositivos_por_bucket(
     assert resumen["potencia_activa_max_kw"] == 150.0
     assert resumen["potencia_reactiva_promedio_kvar"] == 70.0
     assert resumen["potencia_reactiva_max_kvar"] == 80.0
-    assert resumen["factor_potencia_promedio"] == pytest.approx(0.915, abs=1e-3)
+    # Vectorial global: S = sqrt(270^2 + 140^2) ≈ 304.14 -> 270 / 304.14 ≈ 0.888
+    assert resumen["factor_potencia_promedio"] == pytest.approx(0.888, abs=1e-3)
+    assert resumen["cobertura_puntos_pct"] == 0.7
+    assert resumen["advertencia_datos"] == "Datos incompletos (<80% de cobertura)"
+
+
+@pytest.mark.asyncio
+async def test_datamaq_consultar_potencia_reciente_calculo_vectorial_fp():
+    """Un bucket con Medidor 1 (P=100kW, Q=0kvar, FP=1.0) y Medidor 2 (P=0kW, Q=100kvar, FP=0.0).
+
+    Promedio lineal erróneo anterior: 0.50.
+    Cálculo vectorial regulatorio esperado: 100 / sqrt(100^2 + 100^2) = 100 / 141.42 ≈ 0.707.
+    """
+    lecturas = {
+        "m1": [_lectura("2026-10-10T12:00:00Z", 100_000.0, 0.0, 1.0)],
+        "m2": [_lectura("2026-10-10T12:00:00Z", 0.0, 100_000.0, 0.0)],
+    }
+    set_client(
+        httpx.AsyncClient(transport=httpx.MockTransport(_handler_potencia(lecturas)), base_url="http://datamaq.local")
+    )
+    resumen = await datamaq_consultar_potencia_reciente(planta_id="planta-pacheco", horas=24)
+    assert resumen["factor_potencia_promedio"] == pytest.approx(0.707, abs=1e-3)
+
+
+@pytest.mark.asyncio
+async def test_datamaq_consultar_potencia_reciente_cobertura_adecuada_sin_advertencia():
+    """Con cobertura >= 80%, no debe incluir advertencia_datos."""
+    # Para 1 hora: esperados = 12 puntos. Creamos 10 puntos (10/12 = 83.3%)
+    lecturas_d1 = [_lectura(f"2026-10-10T12:{i * 5:02d}:00Z", 50_000.0, 20_000.0, 0.93) for i in range(10)]
+    set_client(
+        httpx.AsyncClient(
+            transport=httpx.MockTransport(_handler_potencia({"d1": lecturas_d1})), base_url="http://datamaq.local"
+        )
+    )
+    resumen = await datamaq_consultar_potencia_reciente(planta_id="planta-pacheco", horas=1)
+    assert resumen["cobertura_puntos_pct"] == 83.3
+    assert "advertencia_datos" not in resumen
 
 
 @pytest.mark.asyncio

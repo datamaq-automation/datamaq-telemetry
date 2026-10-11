@@ -79,6 +79,7 @@ def test_listar_alertas_sin_filtros_retorna_lista():
         desde=None,
         hasta=None,
         organizacion_id="org-test-1",
+        planta_id=None,
     )
     data = response.json()
     assert len(data) == 1
@@ -114,6 +115,7 @@ def test_listar_alertas_filtro_device_id():
         desde=None,
         hasta=None,
         organizacion_id="org-test-1",
+        planta_id=None,
     )
     data = response.json()
     assert data[0]["dispositivo_id"] == "dev-xyz-999"
@@ -134,6 +136,7 @@ def test_listar_alertas_filtro_solo_abiertas_true():
         desde=None,
         hasta=None,
         organizacion_id="org-test-1",
+        planta_id=None,
     )
 
 
@@ -152,6 +155,7 @@ def test_listar_alertas_filtro_solo_abiertas_false():
         desde=None,
         hasta=None,
         organizacion_id="org-test-1",
+        planta_id=None,
     )
 
 
@@ -170,6 +174,7 @@ def test_listar_alertas_filtro_severidad():
         desde=None,
         hasta=None,
         organizacion_id="org-test-1",
+        planta_id=None,
     )
     assert response.json()[0]["severidad"] == "CRITICAL"
 
@@ -189,6 +194,7 @@ def test_listar_alertas_filtro_limit_personalizado():
         desde=None,
         hasta=None,
         organizacion_id="org-test-1",
+        planta_id=None,
     )
 
 
@@ -207,6 +213,7 @@ def test_listar_alertas_filtro_limit_maximo_permitido():
         desde=None,
         hasta=None,
         organizacion_id="org-test-1",
+        planta_id=None,
     )
 
 
@@ -234,6 +241,7 @@ def test_listar_alertas_filtro_fechas_desde_hasta():
         desde=datetime(2026, 9, 1, 0, 0, 0, tzinfo=timezone.utc),
         hasta=datetime(2026, 9, 10, 23, 59, 59, tzinfo=timezone.utc),
         organizacion_id="org-test-1",
+        planta_id=None,
     )
 
 
@@ -264,6 +272,26 @@ def test_listar_alertas_combinacion_todos_los_filtros():
         desde=datetime(2026, 9, 5, 8, 0, 0, tzinfo=timezone.utc),
         hasta=datetime(2026, 9, 6, 18, 0, 0, tzinfo=timezone.utc),
         organizacion_id="org-test-1",
+        planta_id=None,
+    )
+
+
+def test_listar_alertas_filtro_planta_id():
+    client, mocks = _cliente()
+    mocks["alertas"].listar_alertas.return_value = [_alerta_response_dto()]
+
+    response = client.get("/api/v1/alertas?planta_id=planta-garin")
+
+    assert response.status_code == 200
+    mocks["alertas"].listar_alertas.assert_called_once_with(
+        dispositivo_id=None,
+        solo_abiertas=False,
+        severidad=None,
+        limite=100,
+        desde=None,
+        hasta=None,
+        organizacion_id="org-test-1",
+        planta_id="planta-garin",
     )
 
 
