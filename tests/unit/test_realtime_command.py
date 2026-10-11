@@ -1,11 +1,16 @@
 """tests/unit/test_realtime_command.py."""
 
+from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
+import pytest
 from starlette.testclient import TestClient
 
+from src.infrastructure.fastapi import server
 from src.infrastructure.fastapi.dependencies import registrar_mqtt_listener
 from src.infrastructure.fastapi.server import (
+    ConnectedClient,
+    _registrar_cliente_ws,
     _renovar_modo_tiempo_real_medidores,
     create_app,
 )
@@ -69,12 +74,86 @@ def test_renovar_modo_tiempo_real_medidores_itera_dispositivos():
     mock_repo = MagicMock()
     mock_disp = MagicMock()
     mock_disp.device_uid.valor = "AABBCCDDEEFF"
+    mock_disp.visto_por_ultima_vez = datetime.now(timezone.utc)
     mock_repo.listar.return_value = [mock_disp]
 
     with (
         patch("src.infrastructure.fastapi.server.get_session_factory", return_value=lambda: mock_db),
         patch("src.infrastructure.fastapi.server.MySQLDispositivosRepository", return_value=mock_repo),
     ):
-        _renovar_modo_tiempo_real_medidores(mock_listener)
+        _renovar_modo_tiempo_real_medidores(mock_listener, [_cliente(es_superadmin=True)])
 
         mock_listener.activar_tiempo_real_dispositivo.assert_called_once_with("AABBCCDDEEFF", segundos=120)
+        mock_repo.listar.assert_called_once_with()
+
+
+def test_renovar_con_cliente_de_una_organizacion_lista_solo_esa_organizacion():
+    mock_repo = MagicMock()
+    mock_repo.listar.return_value = []
+    with (
+        patch("src.infrastructure.fastapi.server.get_session_factory", return_value=lambda: MagicMock()),
+        patch("src.infrastructure.fastapi.server.MySQLDispositivosRepository", return_value=mock_repo),
+    ):
+        _renovar_modo_tiempo_real_medidores(MagicMock(), [_cliente(org="org-a")])
+    mock_repo.listar.assert_called_once_with(organizacion_id="org-a")
+
+
+def test_renovar_sin_alcance_no_abre_sesion():
+    with patch("src.infrastructure.fastapi.server.get_session_factory") as factory:
+        _renovar_modo_tiempo_real_medidores(MagicMock(), [_cliente(org=None)])
+    factory.assert_not_called()
+
+
+def _cliente(org: str | None = None, es_superadmin: bool = False) -> ConnectedClient:
+    return ConnectedClient(websocket=MagicMock(), organizacion_id=org, es_superadmin=es_superadmin)
+
+
+@pytest.fixture
+def renovaciones():
+    """Clientes con los que se pidió renovar al conectar uno nuevo; aísla `active_websockets`."""
+    llamadas: list[list[ConnectedClient]] = []
+    listener = MagicMock()
+    listener.esta_conectado.return_value = True
+    server.active_websockets.clear()
+    with (
+        patch("src.infrastructure.fastapi.server.get_mqtt_listener", return_value=listener),
+        patch(
+            "src.infrastructure.fastapi.server._renovar_modo_tiempo_real_medidores",
+            side_effect=lambda _l, clientes: llamadas.append(clientes),
+        ),
+    ):
+        yield llamadas
+    server.active_websockets.clear()
+
+
+def test_primer_cliente_renueva_su_alcance(renovaciones):
+    cliente = _cliente(org="org-a")
+    _registrar_cliente_ws(cliente, "h")
+    assert renovaciones == [[cliente]]
+
+
+def test_cliente_de_una_organizacion_ya_cubierta_no_renueva(renovaciones):
+    _registrar_cliente_ws(_cliente(org="org-a"), "h")
+    _registrar_cliente_ws(_cliente(org="org-a"), "h")
+    assert len(renovaciones) == 1
+
+
+def test_cliente_de_otra_organizacion_renueva_sin_esperar_al_heartbeat(renovaciones):
+    _registrar_cliente_ws(_cliente(org="org-a"), "h")
+    nuevo = _cliente(org="org-b")
+    _registrar_cliente_ws(nuevo, "h")
+    assert renovaciones[-1] == [nuevo]
+    assert len(renovaciones) == 2
+
+
+def test_con_superadmin_conectado_otro_cliente_no_renueva(renovaciones):
+    _registrar_cliente_ws(_cliente(es_superadmin=True), "h")
+    _registrar_cliente_ws(_cliente(org="org-b"), "h")
+    assert len(renovaciones) == 1
+
+
+def test_superadmin_que_llega_despues_renueva(renovaciones):
+    _registrar_cliente_ws(_cliente(org="org-a"), "h")
+    superadmin = _cliente(es_superadmin=True)
+    _registrar_cliente_ws(superadmin, "h")
+    assert renovaciones[-1] == [superadmin]
