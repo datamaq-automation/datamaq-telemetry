@@ -14,6 +14,8 @@ from typing import Any
 import httpx
 from mcp.server.fastmcp import Context, FastMCP
 
+from src.version import __version__ as MCP_VERSION
+
 mcp = FastMCP(
     "datamaq-mcp",
     instructions=(
@@ -148,9 +150,14 @@ async def datamaq_listar_plantas(ctx: Context | None = None) -> list[dict[str, A
     """
     token = _resolver_token(ctx)
     resultado = await _ejecutar_peticion("GET", "/api/v1/plantas", token=token)
-    if isinstance(resultado, list):
-        return resultado
-    return [resultado]
+    plantas_raw = resultado if isinstance(resultado, list) else [resultado]
+    plantas: list[dict[str, Any]] = []
+    for p in plantas_raw:
+        if isinstance(p, dict):
+            p_dict = dict(p)
+            p_dict["version"] = MCP_VERSION
+            plantas.append(p_dict)
+    return plantas
 
 
 @mcp.tool()
@@ -199,6 +206,7 @@ async def datamaq_consultar_alertas(
             alerta_enriquecida = dict(a)
             alerta_enriquecida["planta_id"] = planta_id
             alerta_enriquecida["dispositivo_tag"] = dispositivos_map[dev_id]
+            alerta_enriquecida["version"] = MCP_VERSION
             alertas_filtradas.append(alerta_enriquecida)
 
     return alertas_filtradas
@@ -230,9 +238,9 @@ async def datamaq_analizar_capacitores(
     resultado = await _ejecutar_peticion(
         "GET", "/api/v1/analitica/banco-capacitores/planta", token=token, params=parametros
     )
-    if isinstance(resultado, dict):
-        return resultado
-    return {"resultado": resultado}
+    resp = dict(resultado) if isinstance(resultado, dict) else {"resultado": resultado}
+    resp["version"] = MCP_VERSION
+    return resp
 
 
 @mcp.tool()
@@ -261,9 +269,9 @@ async def datamaq_consultar_penalizaciones(
     resultado = await _ejecutar_peticion(
         "GET", "/api/v1/analitica/penalizaciones/planta", token=token, params=parametros
     )
-    if isinstance(resultado, dict):
-        return resultado
-    return {"resultado": resultado}
+    resp = dict(resultado) if isinstance(resultado, dict) else {"resultado": resultado}
+    resp["version"] = MCP_VERSION
+    return resp
 
 
 _BUCKET_SEGUNDOS = 300  # Serie de planta en buckets de 5 min (misma granularidad que el backend)
@@ -384,6 +392,7 @@ async def datamaq_consultar_potencia_reciente(
         "potencia_reactiva_promedio_kvar": round(_promedio(q_kvar), 2) if q_kvar else None,
         "potencia_reactiva_max_kvar": round(max(q_kvar), 2) if q_kvar else None,
         "factor_potencia_promedio": round(fp_global, 3) if fp_global is not None else None,
+        "version": MCP_VERSION,
     }
     if cobertura_puntos_pct < 80.0:
         respuesta["advertencia_datos"] = "Datos incompletos (<80% de cobertura)"

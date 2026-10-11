@@ -73,7 +73,9 @@ async def test_datamaq_listar_plantas():
 
     assert len(plantas) == 2
     assert plantas[0]["id"] == "planta-alpha"
+    assert plantas[0]["version"] == "1.5.0"
     assert plantas[1]["nombre"] == "Planta Beta"
+    assert plantas[1]["version"] == "1.5.0"
     assert len(solicitudes_recibidas) == 1
 
 
@@ -134,6 +136,7 @@ async def test_datamaq_consultar_alertas():
     assert alertas[0]["tipo_alerta"] == "BAJO_FACTOR_POTENCIA"
     assert alertas[0]["planta_id"] == "planta-pacheco"
     assert alertas[0]["dispositivo_tag"] == "TGBT General"
+    assert alertas[0]["version"] == "1.5.0"
 
 
 @pytest.mark.asyncio
@@ -175,6 +178,7 @@ async def test_datamaq_analizar_capacitores():
     assert resultado["banco_comercial_sugerido_kvar"] == 25.0
     assert resultado["escalones_sugeridos_kvar"] == [10.0, 15.0]
     assert resultado["fp_promedio"] == 0.88
+    assert resultado["version"] == "1.5.0"
 
 
 @pytest.mark.asyncio
@@ -209,6 +213,7 @@ async def test_datamaq_consultar_penalizaciones():
     assert penalizaciones["planta_id"] == "planta-pacheco"
     assert penalizaciones["penalizacion_estimada_ars"] == 45200.50
     assert penalizaciones["horas_bajo_fp"] == 14.5
+    assert penalizaciones["version"] == "1.5.0"
 
 
 @pytest.mark.asyncio
@@ -288,6 +293,7 @@ async def test_datamaq_consultar_potencia_reciente_suma_dispositivos_por_bucket(
     assert resumen["factor_potencia_promedio"] == pytest.approx(0.888, abs=1e-3)
     assert resumen["cobertura_puntos_pct"] == 0.7
     assert resumen["advertencia_datos"] == "Datos incompletos (<80% de cobertura)"
+    assert resumen["version"] == "1.5.0"
 
 
 @pytest.mark.asyncio
