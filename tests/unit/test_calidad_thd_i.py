@@ -8,7 +8,7 @@ from src.domain.telemetria.servicios.calidad_thd_i import (
 )
 
 
-def test_umbral_provisional_es_10_por_ciento():
+def test_umbral_interno_es_10_por_ciento():
     assert UMBRAL_FIABILIDAD_THD_I_PCT_DE_NOMINAL == 10.0
 
 
