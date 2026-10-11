@@ -12,7 +12,7 @@ class OAuthAuthorizeRequestDTO(BaseModel):
     redirect_uri: str = Field(min_length=1, max_length=512)
     code_challenge: str = Field(min_length=43, max_length=128)
     code_challenge_method: Literal["S256"] = "S256"
-    state: str | None = Field(default=None, max_length=512)
+    state: str | None = Field(default=None, max_length=4096)
     scope: str = Field(default="read:telemetria read:analitica read:alertas", max_length=256)
 
 
@@ -51,7 +51,7 @@ class OAuthConsentProcessRequestDTO(BaseModel):
     code_challenge: str = Field(min_length=43, max_length=128)
     code_challenge_method: Literal["S256"] = "S256"
     scope: str = Field(default="read:telemetria", max_length=256)
-    state: str | None = Field(default=None, max_length=512)
+    state: str | None = Field(default=None, max_length=4096)
     aprobado: bool = True
 
 
