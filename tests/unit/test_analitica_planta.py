@@ -258,6 +258,34 @@ def test_obtener_penalizaciones_sin_histórico_no_inventa_cifras():
     assert resultado.penalizacion_estimada_ars is None
 
 
+def _penalizaciones_con_facturas(facturas: list) -> str | None:
+    """Ejecuta obtener_penalizaciones con histórico bajo FP y devuelve el motivo de la respuesta."""
+    repo_org = MagicMock()
+    repo_org.obtener_facturas_planta.return_value = facturas
+    use_case = ConsultarAnaliticaPlantaUseCase(consultar_telemetria=MagicMock(), repo_organizaciones=repo_org)
+    puntos = [_crear_punto_potencia_fake(fp=0.90)]
+    with (
+        patch.object(ConsultarAnaliticaPlantaUseCase, "_resolver_dispositivos", return_value=["dev-1"]),
+        patch("src.application.use_cases.consultar_analitica_planta.calcular_historico", return_value=puntos),
+    ):
+        return use_case.obtener_penalizaciones(planta_id="planta-durax").motivo_no_disponible
+
+
+def test_penalizaciones_motivo_sin_factura_cargada():
+    assert _penalizaciones_con_facturas([]) == "sin factura de distribuidora cargada para esta planta"
+
+
+def test_penalizaciones_motivo_factura_de_energia_no_cuenta_como_distribuidora():
+    """Una factura de energía (CAMMESA) no es de la distribuidora: el motivo sigue siendo 'sin factura'."""
+    energia = MagicMock(tipo_dato="energia", proveedor="CAMMESA")
+    assert _penalizaciones_con_facturas([energia]) == "sin factura de distribuidora cargada para esta planta"
+
+
+def test_penalizaciones_motivo_sin_tarifa_nombra_distribuidora():
+    potencia = MagicMock(tipo_dato="potencia", proveedor="Edesur")
+    assert _penalizaciones_con_facturas([potencia]) == "sin tarifa para la distribuidora Edesur"
+
+
 def test_banco_capacitores_regimen_capacitivo_predominante_q_prom_negativa():
     """Caso San Martín: Q_prom negativa (-65 kVAr) pero Q_max positiva puntual.
 

@@ -154,6 +154,18 @@ class ConsultarAnaliticaPlantaUseCase:
             fecha_calculo=datetime.now(timezone.utc),
         )
 
+    def _motivo_penalizacion_ars_no_calculada(self, planta_id: str) -> str:
+        """Motivo real por el que no hay ARS: sin factura de distribuidora, o sin su tarifa en el código."""
+        if self.repo_organizaciones is None:
+            return "sin repositorio de organizaciones: no se pudo verificar la factura de distribuidora"
+        facturas_potencia = [
+            f for f in self.repo_organizaciones.obtener_facturas_planta(planta_id) if f.tipo_dato == "potencia"
+        ]
+        if not facturas_potencia:
+            return "sin factura de distribuidora cargada para esta planta"
+        # Facturas ordenadas por período descendente: la primera es la más reciente.
+        return f"sin tarifa para la distribuidora {facturas_potencia[0].proveedor}"
+
     def obtener_penalizaciones(self, planta_id: str, periodo_dias: int = 7) -> AnaliticaPenalizacionesPlantaDTO:
         """Intervalos y horas bajo FP reales por planta. La penalización en ARS queda sin calcular.
 
@@ -190,9 +202,7 @@ class ConsultarAnaliticaPlantaUseCase:
             planta_id=planta_id,
             periodo_dias=periodo_dias,
             disponible=True,
-            motivo_no_disponible=(
-                "Penalización en ARS no calculada: falta la tarifa de la distribuidora de esta planta"
-            ),
+            motivo_no_disponible=self._motivo_penalizacion_ars_no_calculada(planta_id),
             intervalos_bajo_fp_count=intervalos_bajo,
             horas_bajo_fp=round(intervalos_bajo * intervalo_h, 2),
             penalizacion_estimada_ars=None,
