@@ -1,4 +1,7 @@
 # src/infrastructure/yaml/repositories/organizaciones_repository.py
+from datetime import datetime, timezone
+from typing import Any
+
 import structlog
 
 from src.domain.sge.entities import FacturaDistribuidora
@@ -22,6 +25,21 @@ from src.domain.telemetria.value_objects import (
 from src.infrastructure.yaml.loaders import cargar_facturas_distribuidora, cargar_organizaciones_completas
 
 logger = structlog.get_logger(__name__)
+
+_FECHA_DECLARATIVA_BASE = datetime(2026, 9, 1, 0, 0, 0, tzinfo=timezone.utc)
+
+
+def _parsear_fecha_opt(valor: Any, fallback: datetime) -> datetime:
+    """Parsea una fecha ISO o datetime opcional, devolviendo el fallback determinista si es None o inválida."""
+    if isinstance(valor, datetime):
+        return valor if valor.tzinfo is not None else valor.replace(tzinfo=timezone.utc)
+    if isinstance(valor, str) and valor.strip():
+        try:
+            dt = datetime.fromisoformat(valor.replace("Z", "+00:00"))
+            return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
+        except Exception:
+            pass
+    return fallback
 
 
 def _float_opt(f: dict, clave: str) -> float | None:
@@ -237,6 +255,8 @@ class YamlOrganizacionesRepository(RepositorioOrganizacionesPort):
             plantas = raw.get("plantas", [])
             for p in plantas:
                 if str(p.get("id")) == str(planta_id):
+                    creado_en = _parsear_fecha_opt(p.get("creado_en"), _FECHA_DECLARATIVA_BASE)
+                    actualizado_en = _parsear_fecha_opt(p.get("actualizado_en"), creado_en)
                     return Planta(
                         id=str(p["id"]),
                         organizacion_id=str(raw["id"]),
@@ -246,6 +266,8 @@ class YamlOrganizacionesRepository(RepositorioOrganizacionesPort):
                         latitud=p.get("latitud"),
                         longitud=p.get("longitud"),
                         layout_svg_url=p.get("layout_svg_url"),
+                        creado_en=creado_en,
+                        actualizado_en=actualizado_en,
                     )
         return None
 
@@ -256,6 +278,8 @@ class YamlOrganizacionesRepository(RepositorioOrganizacionesPort):
             if organizacion_id and org_id != str(organizacion_id):
                 continue
             for p in raw.get("plantas", []):
+                creado_en = _parsear_fecha_opt(p.get("creado_en"), _FECHA_DECLARATIVA_BASE)
+                actualizado_en = _parsear_fecha_opt(p.get("actualizado_en"), creado_en)
                 plantas.append(
                     Planta(
                         id=str(p["id"]),
@@ -266,6 +290,8 @@ class YamlOrganizacionesRepository(RepositorioOrganizacionesPort):
                         latitud=p.get("latitud"),
                         longitud=p.get("longitud"),
                         layout_svg_url=p.get("layout_svg_url"),
+                        creado_en=creado_en,
+                        actualizado_en=actualizado_en,
                     )
                 )
         return plantas
