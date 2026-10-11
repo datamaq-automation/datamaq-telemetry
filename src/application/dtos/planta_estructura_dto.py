@@ -257,6 +257,9 @@ class ResumenNodoUnifilarDTO(BaseModel):
     potencia_adquirida_fuera_punta_en_curso_kw: float | None = None
     ultima_potencia_adquirida_punta_kw: float | None = None
     ultima_potencia_adquirida_fuera_punta_kw: float | None = None
+    # Campo aditivo (opcional): máximo de bloques de 15 min del mes de facturación anterior (kW).
+    potencia_adquirida_punta_mes_anterior_kw: float | None = None
+    potencia_adquirida_fuera_punta_mes_anterior_kw: float | None = None
 
 
 class PuntoPotenciaNodoUnifilarDTO(BaseModel):

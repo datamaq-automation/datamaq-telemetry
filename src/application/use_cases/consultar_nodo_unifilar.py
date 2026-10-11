@@ -1,6 +1,7 @@
 """src/application/use_cases/consultar_nodo_unifilar.py."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 import structlog
 
@@ -42,6 +43,12 @@ _log = structlog.get_logger(__name__)
 
 def _a_kw(valor_w: float | None) -> float | None:
     return round(valor_w / 1000.0, 2) if valor_w is not None else None
+
+
+def ventana_mes_anterior(ahora_local: datetime) -> tuple[datetime, datetime]:
+    """[inicio, fin) del mes calendario anterior a ``ahora_local``, en su misma zona horaria."""
+    inicio_mes_actual = ahora_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    return (inicio_mes_actual - timedelta(days=1)).replace(day=1), inicio_mes_actual
 
 
 def _mapear_agregado_por_fase(ag: AgregadoPorFase | None) -> AgregadoPorFaseDTO | None:
@@ -90,6 +97,7 @@ def _construir_resumen_nodo_dto(
     energia_sumada: list[EnergiaAgregada],
     compensacion_hist: CompensacionHistoricaDTO | None,
     triada: tuple[float | None, float | None, float | None, float | None, float | None, float | None],
+    adquirida_mes_anterior: tuple[float | None, float | None] = (None, None),
 ) -> ResumenNodoUnifilarDTO:
     (
         pot_contratada_punta,
@@ -125,6 +133,8 @@ def _construir_resumen_nodo_dto(
         potencia_contratada_fuera_punta_kw=pot_contratada_fp,
         potencia_adquirida_punta_en_curso_kw=adquirida_curso_punta,
         potencia_adquirida_fuera_punta_en_curso_kw=adquirida_curso_fp,
+        potencia_adquirida_punta_mes_anterior_kw=adquirida_mes_anterior[0],
+        potencia_adquirida_fuera_punta_mes_anterior_kw=adquirida_mes_anterior[1],
         ultima_potencia_adquirida_punta_kw=ultima_adquirida_punta,
         ultima_potencia_adquirida_fuera_punta_kw=ultima_adquirida_fp,
     )
@@ -233,6 +243,26 @@ class ConsultarNodoUnifilarUseCase:
             sobrecompensacion_sostenida=sobrecompensacion_sostenida,
         )
 
+    def _adquirida_mes_anterior(
+        self,
+        nodo: NodoUnifilar,
+        dispositivos_ids: list[str],
+        zona: str,
+    ) -> tuple[float | None, float | None]:
+        """Potencia adquirida del mes de facturación anterior: máximo de bloques de 15 min, punta y
+        fuera de punta. Solo en acometida o raíz, igual que la potencia adquirida en curso."""
+        if not dispositivos_ids or not (nodo.tipo == TipoNodoUnifilar.ACOMETIDA or nodo.parent_id is None):
+            return None, None
+        desde, hasta = ventana_mes_anterior(datetime.now(ZoneInfo(zona)))
+        demanda = calcular_demanda_cuartohoraria(
+            dispositivos_ids,
+            self.consultar_telemetria,
+            desde=desde,
+            hasta=hasta,
+            zona=zona,
+        )
+        return demanda.potencia_adquirida_punta_kw, demanda.potencia_adquirida_fuera_punta_kw
+
     def _resolver_triada_potencia(
         self,
         planta_id: str,
@@ -334,6 +364,7 @@ class ConsultarNodoUnifilarUseCase:
         )
 
         triada = self._resolver_triada_potencia(planta_id, nodo, dispositivos_ids, zona)
+        adquirida_mes_anterior = self._adquirida_mes_anterior(nodo, dispositivos_ids, zona)
 
         return _construir_resumen_nodo_dto(
             planta_id=planta_id,
@@ -344,6 +375,7 @@ class ConsultarNodoUnifilarUseCase:
             energia_sumada=energia_sumada,
             compensacion_hist=compensacion_hist,
             triada=triada,
+            adquirida_mes_anterior=adquirida_mes_anterior,
         )
 
     def historico(
