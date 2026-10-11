@@ -17,6 +17,7 @@ from src.domain.telemetria.ports import RepositorioOrganizacionesPort
 from src.domain.telemetria.value_objects import (
     CoordenadasNodoUnifilar,
     CoordenadasZona,
+    EsquemaPotencia,
     InterruptorCabecera,
     MetadatosPlaca,
     PosicionLayout,
@@ -166,8 +167,32 @@ def _parsear_metadatos_placa(n: dict) -> MetadatosPlaca | None:
     return MetadatosPlaca(**kwargs, datos_adicionales=adicionales if adicionales else None)
 
 
+def _parsear_esquema_potencia(n: dict) -> tuple[EsquemaPotencia, float | None]:
+    """Esquema tarifario de la potencia y su capacidad convenida. Lanza ValueError si la combinación no es válida.
+
+    Sin `esquema_potencia` el nodo queda como por_franja (comportamiento previo). Un error acá aborta la
+    carga de la planta: es intencional, un contrato mal declarado no debe costearse en silencio.
+    """
+    nodo_id = n.get("id")
+    esquema_raw = n.get("esquema_potencia")
+    try:
+        esquema = EsquemaPotencia.POR_FRANJA if esquema_raw is None else EsquemaPotencia(str(esquema_raw))
+    except ValueError as exc:
+        raise ValueError(f"nodo '{nodo_id}': esquema_potencia '{esquema_raw}' no reconocido") from exc
+
+    capacidad_raw = n.get("capacidad_convenida_kw")
+    capacidad = float(capacidad_raw) if capacidad_raw is not None else None
+
+    if esquema is EsquemaPotencia.CAPACIDAD_UNICA and (capacidad is None or capacidad <= 0):
+        raise ValueError(f"nodo '{nodo_id}': esquema capacidad_unica requiere capacidad_convenida_kw > 0")
+    if esquema is EsquemaPotencia.POR_FRANJA and capacidad is not None:
+        raise ValueError(f"nodo '{nodo_id}': capacidad_convenida_kw solo aplica con esquema capacidad_unica")
+    return esquema, capacidad
+
+
 def _parsear_nodo_unifilar(n: dict, planta_id: str) -> NodoUnifilar:
     tipo_raw = str(n.get("tipo", "CARGA")).upper()
+    esquema_potencia, capacidad_convenida_kw = _parsear_esquema_potencia(n)
     if tipo_raw in TipoNodoUnifilar.__members__:
         tipo = TipoNodoUnifilar[tipo_raw]
     else:
@@ -205,6 +230,8 @@ def _parsear_nodo_unifilar(n: dict, planta_id: str) -> NodoUnifilar:
             if n.get("potencia_contratada_fuera_punta_kw") is not None
             else (float(n["potencia_contratada_kw"]) if n.get("potencia_contratada_kw") is not None else None)
         ),
+        esquema_potencia=esquema_potencia,
+        capacidad_convenida_kw=capacidad_convenida_kw,
         penalizacion_reactiva_aplica=(
             bool(n["penalizacion_reactiva_aplica"]) if n.get("penalizacion_reactiva_aplica") is not None else None
         ),
