@@ -187,74 +187,77 @@ async def test_datamaq_consultar_penalizaciones():
     assert penalizaciones["horas_bajo_fp"] == 14.5
 
 
-@pytest.mark.asyncio
-async def test_datamaq_consultar_potencia_reciente_dict():
-    """Prueba datamaq_consultar_potencia_reciente cuando el backend responde con resumen directo."""
+def _handler_potencia(lecturas_por_id: dict[str, Any], errores: set[str] | None = None):
+    """Mock de la API: lista de dispositivos de la planta y serie instantánea por dispositivo."""
+    errores = errores or set()
 
     def handler(request: httpx.Request) -> httpx.Response:
-        assert request.url.path == "/api/v1/telemetria/rango"
-        assert request.url.params.get("planta_id") == "planta-pacheco"
-        assert request.url.params.get("horas") == "24"
-        return httpx.Response(
-            200,
-            json={
-                "planta_id": "planta-pacheco",
-                "horas": 24,
-                "potencia_activa_promedio_kw": 110.2,
-                "potencia_reactiva_promedio_kvar": 42.1,
-                "factor_potencia_promedio": 0.93,
-            },
-        )
+        if request.url.path == "/api/v1/dispositivos":
+            assert request.url.params.get("planta_id") == "planta-pacheco"
+            return httpx.Response(200, json=[{"id": dev} for dev in lecturas_por_id])
+        prefijo = "/api/v1/telemetria/instantaneous/"
+        assert request.url.path.startswith(prefijo)
+        dev = request.url.path[len(prefijo) :]
+        assert request.url.params.get("granularity") == "5m"
+        if dev in errores:
+            return httpx.Response(404, json={"detail": "no existe"})
+        return httpx.Response(200, json=lecturas_por_id[dev])
 
-    mock_client = httpx.AsyncClient(
-        transport=httpx.MockTransport(handler),
-        base_url="http://datamaq.local",
+    return handler
+
+
+def _lectura(registrado_en: str, p_w: float, q_var: float, fp: float) -> dict[str, Any]:
+    return {
+        "registrado_en": registrado_en,
+        "potencia_activa_total_W": p_w,
+        "potencia_reactiva_total_VAR": q_var,
+        "factor_potencia_total": fp,
+    }
+
+
+@pytest.mark.asyncio
+async def test_datamaq_consultar_potencia_reciente_suma_dispositivos_por_bucket():
+    """La planta suma P y Q de sus dispositivos por bucket de 5 min, no promedia dispositivos sueltos."""
+    lecturas = {
+        "d1": [
+            _lectura("2026-10-10T12:00:00Z", 100_000.0, 50_000.0, 0.89),
+            _lectura("2026-10-10T12:05:00Z", 120_000.0, 60_000.0, 0.93),
+        ],
+        "d2": [_lectura("2026-10-10T12:00:30Z", 50_000.0, 30_000.0, 0.91)],
+    }
+    set_client(
+        httpx.AsyncClient(transport=httpx.MockTransport(_handler_potencia(lecturas)), base_url="http://datamaq.local")
     )
-    set_client(mock_client)
-
     resumen = await datamaq_consultar_potencia_reciente(planta_id="planta-pacheco", horas=24)
-
-    assert resumen["planta_id"] == "planta-pacheco"
-    assert resumen["potencia_activa_promedio_kw"] == 110.2
-    assert resumen["factor_potencia_promedio"] == 0.93
+    # Bucket 12:00 = 150 kW / 80 kvar (d1+d2); bucket 12:05 = 120 kW / 60 kvar (solo d1)
+    assert resumen["dispositivos_consultados"] == 2
+    assert resumen["dispositivos_con_error"] == []
+    assert resumen["puntos_medicion_count"] == 2
+    assert resumen["potencia_activa_promedio_kw"] == 135.0
+    assert resumen["potencia_activa_max_kw"] == 150.0
+    assert resumen["potencia_reactiva_promedio_kvar"] == 70.0
+    assert resumen["potencia_reactiva_max_kvar"] == 80.0
+    assert resumen["factor_potencia_promedio"] == pytest.approx(0.915, abs=1e-3)
 
 
 @pytest.mark.asyncio
-async def test_datamaq_consultar_potencia_reciente_serie_lecturas():
-    """Prueba agregación local cuando el backend retorna una lista de lecturas temporales."""
+async def test_datamaq_consultar_potencia_reciente_dispositivo_con_error_no_corta():
+    """Un dispositivo que responde 404 se reporta y no tumba la consulta de la planta."""
+    lecturas = {"d1": [_lectura("2026-10-10T12:00:00Z", 80_000.0, 40_000.0, 0.9)], "d2": []}
+    handler = _handler_potencia(lecturas, errores={"d2"})
+    set_client(httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="http://datamaq.local"))
+    resumen = await datamaq_consultar_potencia_reciente(planta_id="planta-pacheco", horas=24)
+    assert resumen["dispositivos_con_error"] == ["d2"]
+    assert resumen["potencia_activa_promedio_kw"] == 80.0
 
-    def handler(request: httpx.Request) -> httpx.Response:
-        assert request.url.path == "/api/v1/telemetria/rango"
-        return httpx.Response(
-            200,
-            json=[
-                {
-                    "potencia_activa_total_kw": 100.0,
-                    "potencia_reactiva_total_kvar": 50.0,
-                    "factor_potencia_total": 0.89,
-                },
-                {
-                    "potencia_activa_total_kw": 120.0,
-                    "potencia_reactiva_total_kvar": 60.0,
-                    "factor_potencia_total": 0.91,
-                },
-            ],
-        )
 
-    mock_client = httpx.AsyncClient(
-        transport=httpx.MockTransport(handler),
-        base_url="http://datamaq.local",
-    )
-    set_client(mock_client)
-
-    resumen = await datamaq_consultar_potencia_reciente(planta_id="planta-pacheco", horas=12)
-
-    assert resumen["puntos_medicion_count"] == 2
-    assert resumen["potencia_activa_promedio_kw"] == 110.0
-    assert resumen["potencia_activa_max_kw"] == 120.0
-    assert resumen["potencia_reactiva_promedio_kvar"] == 55.0
-    assert resumen["potencia_reactiva_max_kvar"] == 60.0
-    assert resumen["factor_potencia_promedio"] == 0.90
+@pytest.mark.asyncio
+async def test_datamaq_consultar_potencia_reciente_planta_sin_dispositivos():
+    set_client(httpx.AsyncClient(transport=httpx.MockTransport(_handler_potencia({})), base_url="http://datamaq.local"))
+    resumen = await datamaq_consultar_potencia_reciente(planta_id="planta-pacheco", horas=24)
+    assert resumen["dispositivos_consultados"] == 0
+    assert resumen["puntos_medicion_count"] == 0
+    assert resumen["potencia_activa_promedio_kw"] is None
 
 
 @pytest.mark.asyncio

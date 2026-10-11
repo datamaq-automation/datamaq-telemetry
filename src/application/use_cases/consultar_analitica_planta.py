@@ -12,6 +12,9 @@ from src.domain.telemetria.analizador_reactiva import (
 )
 from src.domain.telemetria.ports import RepositorioOrganizacionesPort
 
+# Límite de FP por debajo del cual un intervalo cuenta como penalizable (mismo valor que el DTO)
+_FP_LIMITE_PENALIZACION = 0.95
+
 
 class ConsultarAnaliticaPlantaUseCase:
     """Caso de uso SSOT para el cálculo de analítica reactiva y penalizaciones a nivel de planta."""
@@ -142,26 +145,46 @@ class ConsultarAnaliticaPlantaUseCase:
         )
 
     def obtener_penalizaciones(self, planta_id: str, periodo_dias: int = 7) -> AnaliticaPenalizacionesPlantaDTO:
-        p_kw = 120.0
-        fp_actual = 0.88
-        horas_bajo_fp = 14.5
-        intervalos_count = int(horas_bajo_fp * 4)  # Mediciones cada 15 minutos
+        """Intervalos y horas bajo FP reales por planta. La penalización en ARS queda sin calcular.
 
-        penalizacion_ars = (
-            DimensionadorCompensacionService.estimar_penalizacion_mensual_ars(
-                potencia_activa_kw=p_kw,
-                fp_actual=fp_actual,
-                horas_mes=horas_bajo_fp,
+        Antes devolvía constantes fijas (P=120 kW, FP=0.88, 14,5 h) iguales para toda planta.
+        Ahora cuenta buckets reales de la serie sumada de la planta. La tarifa no se inventa: sin
+        tarifa de la distribuidora, penalizacion_estimada_ars queda None.
+        """
+        periodo_dias = max(1, min(30, periodo_dias))
+        horas = periodo_dias * 24
+        ahora = datetime.now(timezone.utc)
+        disps = self._resolver_dispositivos(planta_id, None)
+        puntos = (
+            calcular_historico(
+                dispositivos_ids=disps,
+                consultar_telemetria=self.consultar_telemetria,
+                granularidad="5m",
+                horas=horas,
             )
-            or 0.0
+            if disps
+            else []
         )
-
+        fp_vals = [p.factor_desplazamiento_total for p in puntos if p.factor_desplazamiento_total is not None]
+        if not fp_vals:
+            return AnaliticaPenalizacionesPlantaDTO(
+                planta_id=planta_id,
+                periodo_dias=periodo_dias,
+                disponible=False,
+                motivo_no_disponible="Sin registros de telemetría con FP en el período",
+                timestamp_calculo=ahora,
+            )
+        intervalo_h = ConsultarTelemetriaUseCase._resolver_intervalo_segundos("5m", horas) / 3600.0
+        intervalos_bajo = sum(1 for fp in fp_vals if fp < _FP_LIMITE_PENALIZACION)
         return AnaliticaPenalizacionesPlantaDTO(
             planta_id=planta_id,
             periodo_dias=periodo_dias,
-            intervalos_bajo_fp_count=intervalos_count,
-            horas_bajo_fp=horas_bajo_fp,
-            penalizacion_estimada_ars=round(penalizacion_ars, 2),
-            moneda="ARS",
-            timestamp_calculo=datetime.now(timezone.utc),
+            disponible=True,
+            motivo_no_disponible=(
+                "Penalización en ARS no calculada: falta la tarifa de la distribuidora de esta planta"
+            ),
+            intervalos_bajo_fp_count=intervalos_bajo,
+            horas_bajo_fp=round(intervalos_bajo * intervalo_h, 2),
+            penalizacion_estimada_ars=None,
+            timestamp_calculo=ahora,
         )
