@@ -12,6 +12,7 @@ from src.application.dtos.telemetria_dto import (
     TelemetriaLatestResponseDTO,
 )
 from src.application.mappers.telemetria_mapper import TelemetriaMapper
+from src.application.use_cases.lecturas_crudas_potencia import LecturasCrudasPotencia
 from src.domain.telemetria.entities import Dispositivo, Suscripcion
 from src.domain.telemetria.exceptions import (
     DispositivoNoEncontradoError,
@@ -56,6 +57,7 @@ class ConsultarTelemetriaUseCase:
         self.buffer_en_vivo = buffer_en_vivo
         self.repo_suscripciones = repo_suscripciones
         self.billing_habilitado = billing_habilitado
+        self.lecturas_crudas = LecturasCrudasPotencia(self)
 
     def _suscripcion_de_dispositivo(self, dev: Dispositivo) -> Suscripcion | None:
         """Suscripción de la organización del dispositivo; None si no se puede resolver la organización."""

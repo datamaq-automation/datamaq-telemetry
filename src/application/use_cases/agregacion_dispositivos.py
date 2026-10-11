@@ -103,25 +103,26 @@ def calcular_historico(
         hasta=hasta.isoformat() if hasta else None,
     )
 
-    intervalo_segundos = ConsultarTelemetriaUseCase._resolver_intervalo_segundos(granularidad, horas)
-    if intervalo_segundos <= 0:
-        intervalo_segundos = 300
-
-    # Un intervalo por bucket de la ventana (+1 por el bucket parcial del borde): con un tope fijo
-    # de 2000, una semana a 5 min (2016 buckets) perdía sus ~80 min más antiguos.
-    limite = max(2000, math.ceil(horas * 3600 / intervalo_segundos) + 1)
+    intervalo_pedido = ConsultarTelemetriaUseCase._resolver_intervalo_segundos(granularidad, horas)
+    if intervalo_pedido <= 0:
+        intervalo_pedido = 300
+    # El piso del plan se aplica al intervalo de salida, no al de muestreo: el bloque de 15 min se arma desde
+    # muestras crudas (decisión 2026-10-11). Con varios medidores, vale el piso más alto.
+    intervalo_segundos = max(
+        [intervalo_pedido]
+        + [consultar_telemetria.lecturas_crudas.intervalo_minimo_segundos(d) for d in dispositivos_ids]
+    )
     desde = (hasta or datetime.now(timezone.utc)) - timedelta(hours=horas)
+    # Persistencia con throttle de 300 s: como mucho una muestra cada 5 min por medidor. horas * 60 deja holgura
+    # y cubre la ventana entera, sin truncar muestras que alimentan el pico.
+    limite = max(5000, horas * 60)
 
-    lecturas_por_dispositivo: dict[str, list[tuple]] = {}
-    for dispositivo_id in dispositivos_ids:
-        lecturas_dto = consultar_telemetria.listar_instantaneas(
-            dispositivo_id, limite=limite, desde=desde, granularidad=granularidad, horas=horas, hasta=hasta
+    lecturas_por_dispositivo = {
+        dispositivo_id: consultar_telemetria.lecturas_crudas.listar(
+            dispositivo_id, limite=limite, desde=desde, hasta=hasta
         )
-        lecturas_por_dispositivo[dispositivo_id] = [
-            (lectura.registrado_en, lectura.potencia_activa_total_W, lectura.potencia_reactiva_total_VAR)
-            for lectura in lecturas_dto
-        ]
-
+        for dispositivo_id in dispositivos_ids
+    }
     return AgregadorDispositivosService.sumar_potencia_en_el_tiempo(lecturas_por_dispositivo, intervalo_segundos)
 
 

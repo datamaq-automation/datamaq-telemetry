@@ -72,8 +72,19 @@ def use_case():
     ]
     consultar_telemetria.listar_instantaneas.return_value = []
     consultar_telemetria.datos_desde.return_value = datetime(2026, 8, 29, tzinfo=timezone.utc)
+    # El histórico de nodo lee muestras crudas: se espejan las instantáneas mockeadas de cada test.
+    consultar_telemetria.lecturas_crudas.intervalo_minimo_segundos.return_value = 0
+    consultar_telemetria.lecturas_crudas.listar.side_effect = _filas_desde_instantaneas(consultar_telemetria)
 
     return ConsultarNodoUnifilarUseCase(repo_org, repo_telemetria, consultar_telemetria)
+
+
+def _filas_desde_instantaneas(consultar_telemetria):
+    def listar(dispositivo_id, limite=None, desde=None, hasta=None):
+        instantaneas = consultar_telemetria.listar_instantaneas(dispositivo_id, limite=limite, desde=desde, hasta=hasta)
+        return [(d.registrado_en, d.potencia_activa_total_W, d.potencia_reactiva_total_VAR) for d in instantaneas]
+
+    return listar
 
 
 def test_nodo_virtual_suma_los_dos_trafos(use_case):

@@ -150,12 +150,13 @@ def test_historico_instantaneas_informa_el_corte_de_retencion():
 
 def test_calcular_historico_dimensiona_el_limite_y_pasa_la_ventana():
     consultar = MagicMock()
-    consultar.listar_instantaneas.return_value = []
+    consultar.lecturas_crudas.listar.return_value = []
+    consultar.lecturas_crudas.intervalo_minimo_segundos.return_value = 0
     hasta = datetime(2026, 9, 10, 8, 0, tzinfo=timezone.utc)
 
     calcular_historico(["a", "b"], consultar, "5m", 168, hasta)
 
-    for llamada in consultar.listar_instantaneas.call_args_list:
+    for llamada in consultar.lecturas_crudas.listar.call_args_list:
         assert llamada.kwargs["limite"] >= 2017
         assert llamada.kwargs["desde"] == hasta - timedelta(hours=168)
         assert llamada.kwargs["hasta"] == hasta
@@ -240,6 +241,11 @@ def test_nodo_filtra_puntos_anteriores_al_corte_mas_reciente(nodo_use_case):
     consultar.listar_instantaneas.side_effect = lambda dev, **kw: [
         _lectura_dto(dev, c2 + timedelta(minutes=5)),
         _lectura_dto(dev, c1 + timedelta(minutes=5)),
+    ]
+    consultar.lecturas_crudas.intervalo_minimo_segundos.return_value = 0
+    consultar.lecturas_crudas.listar.side_effect = lambda dev, **kw: [
+        (d.registrado_en, d.potencia_activa_total_W, d.potencia_reactiva_total_VAR)
+        for d in consultar.listar_instantaneas(dev, **kw)
     ]
 
     historico = nodo_use_case.historico("p", "mt", "o", "5m", 24, hasta=c2 + timedelta(hours=1))
