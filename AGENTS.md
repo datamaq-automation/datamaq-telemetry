@@ -8,7 +8,7 @@ API FastAPI y Worker MQTT para la ingesta y persistencia de telemetría de medid
 - Push y Deploy con feedback en vivo: `./push.sh` o `git push-watch` — ejecuta Gauntlet local, hace push y transmite el estado en vivo de CI y CD Deploy en GitHub Actions.
 - Inspección de logs en VPS: `./scripts/logs.sh [-f | -n 200 | --status | --mqtt | --save]` — consulta y transmite logs de producción.
 - Gauntlet completo (CI): `./scripts/ci.sh` — integridad, ruff, pyright, tests unitarios con cobertura >=85%, integración.
-- Gauntlet pre-push (local): `./scripts/pre-push.sh` — etapas 1-4 (sin integración).
+- Gauntlet pre-push (local): `./scripts/pre-push.sh` — etapas 0-6, incluye integración. Flujo de ramas, PRs y commits: `../CONTRIBUTING.md` (repo padre).
 - Hook de git: `git config core.hooksPath .githooks` (una vez por clonado; invoca `scripts/pre-push.sh` en cada push).
 - Tests unitarios: `.venv/bin/pytest tests/unit/` (agregar `-n auto` para usar todos los núcleos: 57 s → 24 s en 8 cores; un archivo suelto conviene correrlo sin `-n`, el arranque de los workers cuesta ~2 s).
 - Verificación de arquitectura y tamaño: `.venv/bin/python scripts/verify_architecture.py && .venv/bin/python scripts/verify_code_size.py`
@@ -67,7 +67,7 @@ python scripts/validate_topology.py --strict  # Fallar en warnings
 - **Imports absolutos `from src....` — nunca relativos.**
 - **Todos los `__init__.py` (`src/` y `tests/`) deben ser de 0 bytes.**
 - **El LSP del editor (Pylance) debe alinear su exclusión con `pyrightconfig.json` vía `.vscode/settings.json` (`python.analysis.exclude`). Los `tests/` están excluidos del análisis de tipos por diseño; prohibido "corregirlos" con `cast`/`# type: ignore`.**
-- Commits: Conventional Commits (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`).
+- Commits: formato y reglas en `../CONTRIBUTING.md` §7 (repo padre).
 - **Reportes y rutas:** Al generar reportes/documentos, siempre dar rutas absolutas completas (`/home/agustin/...`), no relativas.
 
 ## Comunicación con Sesión Padre Orquestadora (datamaq-01)
