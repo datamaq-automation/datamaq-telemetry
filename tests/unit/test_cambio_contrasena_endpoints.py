@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from src.domain.auth.services import HashContrasenaService
+from src.domain.usuarios.servicios_contrasena import GeneradorCodigoOTP
 from src.infrastructure.fastapi.dependencies import get_email_service, get_settings_dep, get_usuario_actual
 from src.infrastructure.fastapi.server import create_app
 from src.infrastructure.settings.config import Settings
@@ -155,9 +156,12 @@ def test_codigo_ya_usado_no_sirve_de_nuevo(cliente, email):
 
 
 def test_base_guarda_solo_el_hash_del_codigo(cliente, email, db):
+    # Se verifica que el valor guardado es el HMAC del código, no una búsqueda de substrings: un código de
+    # 4 dígitos puede aparecer por azar dentro de un hash hexadecimal (~0,1 % por ejecución).
     _solicitar(cliente)
     fila = db.query(CambioContraseniaValidacionModel).one()
-    assert email.codigos[0][1] not in fila.codigo_hash
+    codigo = email.codigos[0][1]
+    assert fila.codigo_hash == GeneradorCodigoOTP.calcular_hmac(codigo, CLAVE_OTP)
     assert len(fila.codigo_hash) == 64
 
 
