@@ -66,13 +66,22 @@ Infraestructura:
 
 ## 5. Criterios del Gauntlet
 
-`./scripts/pre-push.sh` en verde (con `APP_ENV=test`, como CI): arquitectura, tamaño (`server.py` 541/550 líneas), ruff,
+`./scripts/pre-push.sh` en verde (con `APP_ENV=test`, como CI): arquitectura, tamaño (`server.py` 526/550 líneas), ruff,
 pyright y tests unitarios con cobertura ≥ 85 %.
 
 ## 6. Notas de implementación
 
-- `server.py` quedó en 541 líneas, con un límite de 550. La lógica nueva va al caso de uso para no acercarlo más al
-  límite.
+- **Renovación doble al conectarse (agregado 2026-10-11, último comentario de #15):** en producción hubo dos
+  `realtime_mode_auto_renovado` separados por 1,4 s (4 de 137 desde el 09/10). `_registrar_cliente_ws` renovaba, pero
+  `ultimo_sync_realtime` era una variable local de `_ws_heartbeat_loop` y quedaba vieja mientras no había clientes.
+  Ahora la renovación y una marca compartida (`MarcaRenovacion`, intervalo 60 s) viven en
+  `src/infrastructure/fastapi/renovacion_tiempo_real.py`, y los dos caminos la usan. La conexión **solo corre la marca
+  si renovó todo el alcance conectado** (primer cliente o superadmin). Si un cliente de otra organización la corriera,
+  las organizaciones ya conectadas podrían pasar 60 + 25 s + el desfase sin renovar, más que los 120 s de `time_s`.
+  Para la organización nueva, una renovación de más en el siguiente tick es inofensiva. Tests en
+  `test_realtime_command.py`: primer tick sin repetir, tick con la marca vencida, otra organización no corre la marca,
+  y un superadmin que llega después sí la corre.
+- `server.py` bajó de 541 a 526 líneas (límite 550): la renovación salió a su propio módulo.
 - Verificación en producción (la hace el padre): con un cliente que no es superadmin conectado,
   `realtime_mode_auto_renovado` informa solo los dispositivos de su organización, y no aparece `mqtt_mensaje_recibido`
   para `conf/com`.
