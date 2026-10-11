@@ -44,8 +44,20 @@ class AnaliticaBancoCapacitoresPlantaDTO(BaseModel):
 class AnaliticaPenalizacionesPlantaDTO(BaseModel):
     planta_id: str = Field(..., description="Identificador único de la planta")
     periodo_dias: int = Field(default=7, description="Ventana de análisis en días")
-    intervalos_bajo_fp_count: int = Field(..., description="Cantidad de intervalos de medición con FP < 0.95")
-    horas_bajo_fp: float = Field(..., description="Horas acumuladas con bajo factor de potencia")
-    penalizacion_estimada_ars: float = Field(..., description="Penalización estimada acumulada en ARS")
+    disponible: bool = Field(
+        default=False, description="False mientras el cálculo real de penalizaciones no esté implementado"
+    )
+    motivo_no_disponible: str | None = Field(
+        default=None, description="Por qué no hay cifra (ej. 'Cálculo no implementado'); None si disponible"
+    )
+    intervalos_bajo_fp_count: int | None = Field(
+        default=None, description="Cantidad de intervalos de medición con FP < 0.95; None si no disponible"
+    )
+    horas_bajo_fp: float | None = Field(
+        default=None, description="Horas acumuladas con bajo factor de potencia; None si no disponible"
+    )
+    penalizacion_estimada_ars: float | None = Field(
+        default=None, description="Penalización estimada acumulada en ARS; None si no disponible"
+    )
     moneda: str = Field(default="ARS", description="Código de moneda")
     timestamp_calculo: datetime = Field(..., description="Fecha y hora ISO del cálculo")

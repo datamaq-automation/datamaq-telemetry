@@ -142,26 +142,15 @@ class ConsultarAnaliticaPlantaUseCase:
         )
 
     def obtener_penalizaciones(self, planta_id: str, periodo_dias: int = 7) -> AnaliticaPenalizacionesPlantaDTO:
-        p_kw = 120.0
-        fp_actual = 0.88
-        horas_bajo_fp = 14.5
-        intervalos_count = int(horas_bajo_fp * 4)  # Mediciones cada 15 minutos
+        """Penalizaciones por bajo FP. Hasta tener cálculo real desde telemetría, no devuelve cifras.
 
-        penalizacion_ars = (
-            DimensionadorCompensacionService.estimar_penalizacion_mensual_ars(
-                potencia_activa_kw=p_kw,
-                fp_actual=fp_actual,
-                horas_mes=horas_bajo_fp,
-            )
-            or 0.0
-        )
-
+        Antes devolvía constantes fijas (P=120 kW, FP=0.88, 14,5 h) iguales para toda planta: cifras
+        inventadas que parecían reales. Ahora informa explícitamente que no hay dato disponible.
+        """
         return AnaliticaPenalizacionesPlantaDTO(
             planta_id=planta_id,
             periodo_dias=periodo_dias,
-            intervalos_bajo_fp_count=intervalos_count,
-            horas_bajo_fp=horas_bajo_fp,
-            penalizacion_estimada_ars=round(penalizacion_ars, 2),
-            moneda="ARS",
+            disponible=False,
+            motivo_no_disponible="Cálculo de penalizaciones por planta no implementado: sin cifra real",
             timestamp_calculo=datetime.now(timezone.utc),
         )

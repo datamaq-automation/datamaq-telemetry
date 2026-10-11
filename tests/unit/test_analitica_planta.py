@@ -48,8 +48,12 @@ def test_obtener_penalizaciones_planta_exito():
     data = response.json()
     assert data["planta_id"] == "planta-garin"
     assert data["periodo_dias"] == 7
-    assert data["horas_bajo_fp"] == 14.5
-    assert data["penalizacion_estimada_ars"] > 0
+    # Sin cálculo real: no se publican cifras (antes eran constantes inventadas, iguales por planta)
+    assert data["disponible"] is False
+    assert data["motivo_no_disponible"]
+    assert data["horas_bajo_fp"] is None
+    assert data["intervalos_bajo_fp_count"] is None
+    assert data["penalizacion_estimada_ars"] is None
     assert data["moneda"] == "ARS"
 
 
