@@ -352,6 +352,17 @@ class CostoEstimadoResponseDTO(BaseModel):
         validation_alias="motivoPotenciaSinDato",
         serialization_alias="motivoPotenciaSinDato",
     )
+    # False oculta el costo estimado (esquema capacidad única sin M-2 integrada o sin facturas verificadas).
+    costo_estimado_habilitado: bool = Field(
+        default=True,
+        validation_alias="costoEstimadoHabilitado",
+        serialization_alias="costoEstimadoHabilitado",
+    )
+    motivo_costo_no_disponible: str | None = Field(
+        default=None,
+        validation_alias="motivoCostoNoDisponible",
+        serialization_alias="motivoCostoNoDisponible",
+    )
 
     model_config = ConfigDict(
         populate_by_name=True,

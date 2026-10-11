@@ -10,10 +10,11 @@ from src.application.use_cases.agregacion_dispositivos import (
 )
 from src.application.use_cases.consultar_telemetria import ConsultarTelemetriaUseCase
 from src.domain.sge.entities import FacturaDistribuidora
+from src.domain.telemetria.entities import NodoUnifilar
 from src.domain.telemetria.exceptions import PlantaNoEncontradaError
 from src.domain.telemetria.ports import RepositorioOrganizacionesPort, RepositorioTelemetriaPort
 from src.domain.telemetria.servicios.arbol_unifilar import ArbolUnifilarService
-from src.domain.telemetria.value_objects import TipoNodoUnifilar
+from src.domain.telemetria.value_objects import EsquemaPotencia, TipoNodoUnifilar
 
 # Días desde el cierre del período de la factura de origen a partir de los cuales se avisa que la
 # tarifa pudo cambiar (D4 de la decisión del dueño): un ciclo de facturación son ~30 días, con
@@ -73,19 +74,36 @@ class ConsultarCostoEstimadoUseCase:
             planta_id, nodo_id, dispositivos_ids, facturas
         )
 
+        habilitado, motivo_no_disponible = self._habilitacion_costo(
+            self._repo_org.obtener_nodos_unifilar(planta_id), facturas
+        )
+
         return CostoEstimadoResponseDTO(
             planta_id=planta_id,
             periodo_actual=datetime.now(ZONA_FACTURACION).strftime("%Y-%m"),
             kwh_consumido_periodo_actual=kwh_consumido_ahora,
             valor_energia_ars_kwh_promedio=valor_kwh,
-            costo_energia_ars=costo_energia_ars,
+            # Con el costo oculto no se publica ningún importe, ni siquiera el parcial de energía.
+            costo_energia_ars=costo_energia_ars if habilitado else None,
             periodo_factura_origen=factura_energia.periodo if factura_energia else None,
             aviso_tarifa_desactualizada=self._tarifa_desactualizada(
                 factura_energia.periodo if factura_energia else None
             ),
-            costo_potencia_ars=costo_potencia_ars,
+            costo_potencia_ars=costo_potencia_ars if habilitado else None,
             motivo_potencia_sin_dato=motivo_potencia,
+            costo_estimado_habilitado=habilitado,
+            motivo_costo_no_disponible=motivo_no_disponible,
         )
+
+    @staticmethod
+    def _habilitacion_costo(nodos: list[NodoUnifilar], facturas: list[FacturaDistribuidora]) -> tuple[bool, str | None]:
+        """Capacidad única queda oculta: M-2 todavía no está integrada en este caso de uso, y sin facturas de potencia
+        verificadas no hay de dónde tomar precios ni demanda. Por esquema por franja no cambia nada."""
+        if not any(n.esquema_potencia is EsquemaPotencia.CAPACIDAD_UNICA for n in nodos):
+            return True, None
+        if not any(f.tipo_dato == "potencia" for f in facturas):
+            return False, "sin liquidaciones verificadas para esta planta"
+        return False, "estructura tarifaria en revisión"
 
     def _calcular_costo_potencia(
         self,

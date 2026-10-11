@@ -14,7 +14,7 @@ import pytest
 from src.application.use_cases.consultar_costo_estimado import ConsultarCostoEstimadoUseCase
 from src.domain.sge.entities import FacturaDistribuidora
 from src.domain.telemetria.entities import EnergiaAgregada, NodoUnifilar, Planta
-from src.domain.telemetria.value_objects import TipoNodoUnifilar
+from src.domain.telemetria.value_objects import EsquemaPotencia, TipoNodoUnifilar
 
 PLANTA_ID = "planta-x"
 
@@ -335,3 +335,58 @@ def test_costo_energia_fallback_a_monomica_si_no_hay_tarifa_integral():
     # Al no haber importe_neto_ars, hace fallback a tarifa monómica ($10/kWh)
     assert resultado.valor_energia_ars_kwh_promedio == pytest.approx(10.0)
     assert resultado.costo_energia_ars == pytest.approx(5000.0)
+
+
+def _acometida_capacidad_unica() -> NodoUnifilar:
+    return NodoUnifilar(
+        id="acometida-1",
+        planta_id=PLANTA_ID,
+        nombre="Acometida",
+        tipo=TipoNodoUnifilar.ACOMETIDA,
+        tension_nominal_v=13200.0,
+        esquema_potencia=EsquemaPotencia.CAPACIDAD_UNICA,
+        capacidad_convenida_kw=848.4,
+    )
+
+
+def test_capacidad_unica_sin_facturas_oculta_el_costo_y_no_publica_importes():
+    use_case = _use_case([_factura_energia("2026-08", valor_kwh_promedio=2.0)], [_acometida_capacidad_unica()])
+
+    with patch(
+        "src.application.use_cases.consultar_costo_estimado.calcular_resumen",
+        return_value=_mockear_kwh_mes_actual(500.0),
+    ):
+        resultado = use_case.ejecutar(planta_id=PLANTA_ID)
+
+    assert resultado.costo_estimado_habilitado is False
+    assert resultado.motivo_costo_no_disponible == "sin liquidaciones verificadas para esta planta"
+    # Aunque haya energía en vivo y factura de energía, no se publica ningún importe parcial.
+    assert resultado.costo_energia_ars is None
+    assert resultado.costo_potencia_ars is None
+
+
+def test_capacidad_unica_con_facturas_sigue_oculta_hasta_integrar_m2():
+    use_case = _use_case([_factura_potencia("2026-08", importe_potencia_ars=500_000.0)], [_acometida_capacidad_unica()])
+
+    with patch(
+        "src.application.use_cases.consultar_costo_estimado.calcular_resumen",
+        return_value=_mockear_kwh_mes_actual(500.0),
+    ):
+        resultado = use_case.ejecutar(planta_id=PLANTA_ID)
+
+    assert resultado.costo_estimado_habilitado is False
+    assert resultado.motivo_costo_no_disponible == "estructura tarifaria en revisión"
+
+
+def test_esquema_por_franja_mantiene_el_costo_habilitado():
+    use_case = _use_case([_factura_energia("2026-08", valor_kwh_promedio=2.0)], [_nodo_tgbt()])
+
+    with patch(
+        "src.application.use_cases.consultar_costo_estimado.calcular_resumen",
+        return_value=_mockear_kwh_mes_actual(500.0),
+    ):
+        resultado = use_case.ejecutar(planta_id=PLANTA_ID)
+
+    assert resultado.costo_estimado_habilitado is True
+    assert resultado.motivo_costo_no_disponible is None
+    assert resultado.costo_energia_ars == 1000.0
