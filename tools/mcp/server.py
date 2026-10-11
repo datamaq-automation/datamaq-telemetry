@@ -140,7 +140,12 @@ async def _ejecutar_peticion(
 
 @mcp.tool()
 async def datamaq_listar_plantas(ctx: Context | None = None) -> list[dict[str, Any]]:
-    """Retorna las plantas industriales a las que el usuario autenticado tiene acceso en DataMaq."""
+    """Retorna las plantas industriales a las que el usuario autenticado tiene acceso en DataMaq.
+
+    Las plantas agrupan uno o más medidores de energía eléctrica (tableros generales,
+    trafos o celdas de media tensión). Toda la analítica y diagnósticos posteriores se
+    agregan a nivel planta sumando vectorialmente las mediciones de sus dispositivos.
+    """
     token = _resolver_token(ctx)
     resultado = await _ejecutar_peticion("GET", "/api/v1/plantas", token=token)
     if isinstance(resultado, list):
@@ -154,7 +159,14 @@ async def datamaq_consultar_alertas(
     solo_abiertas: bool = True,
     ctx: Context | None = None,
 ) -> list[dict[str, Any]]:
-    """Lista las alertas eléctricas y operativas recientes para la planta especificada.
+    """Lista las alertas eléctricas y operativas aisladas para la planta especificada.
+
+    Aisla y enriquece las alertas correspondientes a los medidores de la planta con
+    `planta_id` y `dispositivo_tag`. Discrimina alertas por bajo factor de potencia según
+    los criterios normativos:
+    - Umbral tarifario clásico de distribuidoras (FP < 0.85): penalizaciones severas y recargos.
+    - Umbral normativo regulatorio vigente ENRE 85/2024 (FP < 0.95): requerimiento federal
+      de eficiencia y base de dimensionamiento de bancos de capacitores.
 
     Args:
         planta_id: Identificador de la planta industrial.
@@ -200,6 +212,11 @@ async def datamaq_analizar_capacitores(
 ) -> dict[str, Any]:
     """Ejecuta la analítica SSOT de banco de capacitores y recomendación de compensación en kVAr.
 
+    Calcula la potencia reactiva necesaria para alcanzar el factor de potencia objetivo normativo
+    ENRE 85/2024 (FP >= 0.95, típicamente objetivo 0.96) a partir de la integración vectorial
+    de potencia activa (kW) y reactiva (kVAr) de todos los medidores de la planta en la ventana.
+    Distingue la compensación regulatoria (meta 0.95) del límite de recargos tarifarios (0.85).
+
     Args:
         planta_id: Identificador único de la planta industrial.
         periodo_dias: Ventana de análisis en días (por defecto 30, mínimo según ISO 50001).
@@ -226,9 +243,14 @@ async def datamaq_consultar_penalizaciones(
 ) -> dict[str, Any]:
     """Obtiene el acumulado estimado de recargos y multas por bajo factor de potencia (cos phi).
 
+    Evalúa los intervalos donde el factor de potencia global de la planta desciende por debajo
+    del umbral tarifario contractual (0.85), a partir de mediciones reales agregadas a nivel planta.
+    Permite parametrizar la ventana de análisis (`periodo_dias`, 1 a 30 días, por defecto 7).
+    Distingue el umbral tarifario de penalización (0.85) del estándar normativo ENRE 85/2024 (0.95).
+
     Args:
         planta_id: Identificador único de la planta industrial.
-        periodo_dias: Ventana de análisis en días (por defecto 7).
+        periodo_dias: Ventana de análisis en días (por defecto 7, de 1 a 30 días).
         ctx: Contexto de ejecución FastMCP inyectado automáticamente.
     """
     token = _resolver_token(ctx)
@@ -300,11 +322,14 @@ async def datamaq_consultar_potencia_reciente(
     horas: int = 24,
     ctx: Context | None = None,
 ) -> dict[str, Any]:
-    """Consulta el resumen de demanda activa (kW) y reactiva (kVAr) de una planta en una ventana de horas reciente.
+    """Consulta el resumen de demanda activa (kW) y reactiva (kVAr) de una planta en una ventana reciente.
 
-    Recorre los dispositivos de la planta y consulta la serie instantánea de cada uno; la planta se
-    arma sumando P y Q por bucket de 5 min. Los dispositivos que fallan se listan en
-    `dispositivos_con_error` sin cortar la consulta.
+    Recorre los medidores de la planta agregando vectorialmente las potencias activa (P) y
+    reactiva (Q) por bucket de 5 min (S = sqrt(P^2 + Q^2), FP = |P| / S). El factor de potencia
+    promedio del período se calcula sobre las sumas acumuladas vectoriales conforme a la regulación
+    ENRE/CAMMESA, evitando distorsiones aritméticas en plantas multi-medidor.
+    Incluye porcentaje de cobertura de mediciones y advertencia si es menor al 80%.
+    Permite evaluar el desempeño frente al umbral tarifario (0.85) y normativo ENRE 85/2024 (0.95).
 
     Args:
         planta_id: Identificador único de la planta industrial.
