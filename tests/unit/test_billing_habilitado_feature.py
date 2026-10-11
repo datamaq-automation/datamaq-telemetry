@@ -105,7 +105,7 @@ class TestConsultarTelemetriaConBillingDisabled:
 
         assert es_pro is False, "Sin PRO vigente debe retornar es_pro=False"
         assert retencion_dias == 7, "Free debe retornar retencion_dias=7"
-        assert min_intervalo == 3600, "Free debe retornar min_intervalo=3600 (1 hora)"
+        assert min_intervalo == 900, "Free debe retornar min_intervalo=900 (15 min, decisión 2026-10-11)"
 
 
 class TestAutenticarUsuarioConBillingDisabled:

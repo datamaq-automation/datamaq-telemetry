@@ -24,11 +24,15 @@ class PoliticaRetencionService:
         return ahora - timedelta(days=dias)
 
 
+# Piso de granularidad del plan Free (decisión 2026-10-11, opción A: bloques de 15 min igual que PRO).
+INTERVALO_MINIMO_FREE_SEGUNDOS = 900
+
+
 class PoliticaSuscripcionService:
     """Reglas de vigencia del plan pago único y de la política Free por defecto.
 
     Sin PRO vigente, la organización opera en modo Free: 7 días de retención,
-    granularidad mínima de 1 hora, sin notificaciones.
+    granularidad mínima de 15 minutos, sin notificaciones.
     """
 
     @staticmethod
@@ -55,4 +59,4 @@ class PoliticaSuscripcionService:
 
     @staticmethod
     def resolver_intervalo_minimo_segundos(es_pro: bool, modo_free: ModoFreeTier) -> int:
-        return 0 if es_pro else 3600
+        return 0 if es_pro else INTERVALO_MINIMO_FREE_SEGUNDOS

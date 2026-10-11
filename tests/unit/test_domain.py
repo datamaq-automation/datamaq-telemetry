@@ -474,7 +474,8 @@ def test_politica_suscripcion_retencion_y_vigencia_pro():
     assert PoliticaSuscripcionService.resolver_intervalo_minimo_segundos(True, ModoFreeTier.PRIVADO_BASICO) == 0
 
     assert PoliticaSuscripcionService.resolver_retencion_dias(False, ModoFreeTier.PRIVADO_BASICO) == 7
-    assert PoliticaSuscripcionService.resolver_intervalo_minimo_segundos(False, ModoFreeTier.PRIVADO_BASICO) == 3600
+    # Free: piso de 15 min (decisión 2026-10-11, opción A). PRO sin piso.
+    assert PoliticaSuscripcionService.resolver_intervalo_minimo_segundos(False, ModoFreeTier.PRIVADO_BASICO) == 900
 
 
 def test_politica_suscripcion_compatibilidad_naive_aware_timezone():
