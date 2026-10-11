@@ -44,6 +44,17 @@ class ModoFreeTier(str, Enum):
     PRIVADO_BASICO = "PRIVADO_BASICO"
 
 
+class EsquemaPotencia(str, Enum):
+    """Cómo la distribuidora cobra la potencia de una acometida (estructura tarifaria, M-1).
+
+    POR_FRANJA: contrato discriminado en punta y fuera de punta (p. ej. EDELAP T5M12).
+    CAPACIDAD_UNICA: una capacidad convenida única más la máxima demanda registrada (p. ej. Edesur T3 MT).
+    """
+
+    POR_FRANJA = "por_franja"
+    CAPACIDAD_UNICA = "capacidad_unica"
+
+
 class TipoNodoUnifilar(str, Enum):
     ACOMETIDA = "acometida"
     TRANSFORMADOR = "transformador"

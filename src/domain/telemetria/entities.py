@@ -14,6 +14,7 @@ from src.domain.telemetria.value_objects import (
     DiagnosticoInstalacion,
     EnergiaActiva,
     EnergiaReactiva,
+    EsquemaPotencia,
     EstadoDispositivo,
     FactorPotencia,
     InterruptorCabecera,
@@ -137,6 +138,10 @@ class NodoUnifilar:
     categoria_tarifaria: str | None = None
     potencia_contratada_punta_kw: float | None = None
     potencia_contratada_fuera_punta_kw: float | None = None
+    # Estructura tarifaria de la potencia (M-1). Default por_franja: los nodos sin declarar se comportan como antes.
+    esquema_potencia: EsquemaPotencia = EsquemaPotencia.POR_FRANJA
+    # Solo con esquema capacidad_unica: capacidad convenida única que reemplaza punta y fuera de punta.
+    capacidad_convenida_kw: float | None = None
     penalizacion_reactiva_aplica: bool | None = None
     fuente_dato: str | None = None
     notas_metrologicas: str | None = None
