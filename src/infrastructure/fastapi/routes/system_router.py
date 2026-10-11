@@ -19,8 +19,38 @@ from src.infrastructure.sqlalchemy.database import (
     verificar_estado_migraciones,
 )
 from src.infrastructure.yaml.loaders import cargar_organizaciones_completas
+from src.version import __version__
 
 router = APIRouter(tags=["Sistema"])
+
+_FECHA_INICIO_PROCESO = datetime.now(timezone.utc).isoformat()
+
+
+def _obtener_fecha_despliegue() -> str:
+    return os.getenv("DEPLOY_DATE") or os.getenv("FECHA_DESPLIEGUE") or _FECHA_INICIO_PROCESO
+
+
+def _obtener_commit() -> str:
+    env_commit = os.getenv("GIT_COMMIT") or os.getenv("COMMIT_SHA")
+    if env_commit:
+        return env_commit[:7]
+    try:
+        raiz_repo = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../"))
+        git_dir = os.path.join(raiz_repo, ".git")
+        head_file = os.path.join(git_dir, "HEAD")
+        if os.path.exists(head_file):
+            with open(head_file, encoding="utf-8") as f:
+                ref = f.read().strip()
+            if ref.startswith("ref: "):
+                ref_path = os.path.join(git_dir, ref[5:])
+                if os.path.exists(ref_path):
+                    with open(ref_path, encoding="utf-8") as rf:
+                        return rf.read().strip()[:7]
+            else:
+                return ref[:7]
+    except Exception:
+        pass
+    return "unknown"
 
 
 def _validar_datamaq_data() -> dict:
@@ -65,26 +95,35 @@ def readiness_check(response: Response):
     db_ok = verificar_conexion_db()
     migraciones = verificar_estado_migraciones()
     data_ok = _validar_datamaq_data()
+    mqtt_ok = listener.esta_conectado() if listener else False
 
     esta_listo = db_ok and migraciones.get("sincronizado", False) and data_ok.get("valido", False)
     if not esta_listo:
         response.status_code = 503
         return {
             "status": "not_ready",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "version": __version__,
+            "commit": _obtener_commit(),
+            "fecha_despliegue": _obtener_fecha_despliegue(),
+            "mysql_conectado": db_ok,
+            "mqtt_conectado": mqtt_ok,
             "database_conectada": db_ok,
             "migraciones": migraciones,
-            "mqtt_conectado": listener.esta_conectado() if listener else False,
             "datamaq_data": data_ok,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
     return {
         "status": "ready",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "version": __version__,
+        "commit": _obtener_commit(),
+        "fecha_despliegue": _obtener_fecha_despliegue(),
+        "mysql_conectado": db_ok,
+        "mqtt_conectado": mqtt_ok,
         "database_conectada": db_ok,
         "migraciones": migraciones,
-        "mqtt_conectado": listener.esta_conectado() if listener else False,
         "datamaq_data": data_ok,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -92,6 +131,23 @@ def readiness_check(response: Response):
 def health_check(response: Response):
     """Chequeo general de salud (compatibilidad con monitores heredados)."""
     return readiness_check(response)
+
+
+@router.get("/version")
+def version_info():
+    """Devuelve metadatos de versión, commit y estado operativo de servicios."""
+    listener = get_mqtt_listener()
+    db_ok = verificar_conexion_db()
+    mqtt_ok = listener.esta_conectado() if listener else False
+    return {
+        "version": __version__,
+        "commit": _obtener_commit(),
+        "fecha_despliegue": _obtener_fecha_despliegue(),
+        "mysql_conectado": db_ok,
+        "mqtt_conectado": mqtt_ok,
+        "status": "ready" if db_ok else "degraded",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
 
 
 @router.get("/api/v1/system/ws-status")
