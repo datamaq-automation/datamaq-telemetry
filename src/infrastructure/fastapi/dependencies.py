@@ -1,6 +1,5 @@
 """src/infrastructure/fastapi/dependencies.py."""
 
-import json
 from datetime import datetime, timezone
 from functools import lru_cache
 from typing import Annotated, Any
@@ -50,7 +49,7 @@ from src.domain.auth.services import HashContrasenaService, RateLimiterService, 
 from src.domain.oauth.ports import OAuthRepositoryPort
 from src.domain.telemetria.ports import RepositorioDispositivosPort
 from src.infrastructure.auth.email_service import SmtpEmailService
-from src.infrastructure.auth.jwt_token_service import JwtTokenService, _b64url_decode
+from src.infrastructure.auth.jwt_token_service import JwtTokenService
 from src.infrastructure.paho_mqtt.mqtt_listener import MQTTListener
 from src.infrastructure.settings.config import Settings, get_settings
 from src.infrastructure.settings.logger import get_logger
@@ -348,28 +347,14 @@ def get_consultar_auditoria_use_case(
 
 @lru_cache(maxsize=1)
 def get_email_service_singleton(
-    host: str,
-    port: int,
-    user: str,
-    password: str,
-    use_tls: bool,
-    from_email: str,
-    app_env: str,
+    host: str, port: int, user: str, password: str, use_tls: bool, from_email: str, app_env: str
 ) -> SmtpEmailService:
     return SmtpEmailService(
-        host=host,
-        port=port,
-        user=user,
-        password=password,
-        use_tls=use_tls,
-        from_email=from_email,
-        app_env=app_env,
+        host=host, port=port, user=user, password=password, use_tls=use_tls, from_email=from_email, app_env=app_env
     )
 
 
-def get_email_service(
-    settings: Annotated[Settings, Depends(get_settings_dep)],
-) -> ServicioEmailPort:
+def get_email_service(settings: Annotated[Settings, Depends(get_settings_dep)]) -> ServicioEmailPort:
     return get_email_service_singleton(
         settings.SMTP_HOST,
         settings.SMTP_PORT,
@@ -443,6 +428,31 @@ def token_valido(
     return JwtTokenService(secreto).verificar(token, adicionales) is not None
 
 
+def _verificar_revocaciones(claims: dict[str, Any], repo_usuarios: RepositorioUsuariosPort | None) -> None:
+    sub = str(claims.get("sub", ""))
+    iat = int(claims.get("iat", 0))
+    if get_token_revocation_service().esta_revocado(sub, iat):
+        raise HTTPException(
+            status_code=401,
+            detail="credenciales_invalidas",
+            headers={"WWW-Authenticate": 'Bearer error="invalid_token", error_description="Sesion o token revocado"'},
+        )
+    if repo_usuarios is not None and sub:
+        usuario = repo_usuarios.obtener_por_id(sub)
+        if usuario is not None and usuario.sesiones_revocadas_antes_de is not None:
+            rev_dt = usuario.sesiones_revocadas_antes_de
+            if rev_dt.tzinfo is None:
+                rev_dt = rev_dt.replace(tzinfo=timezone.utc)
+            if datetime.fromtimestamp(iat, tz=timezone.utc) < rev_dt:
+                raise HTTPException(
+                    status_code=401,
+                    detail="credenciales_invalidas",
+                    headers={
+                        "WWW-Authenticate": 'Bearer error="invalid_token", error_description="Sesion revocada por cambio de seguridad"'
+                    },
+                )
+
+
 def get_usuario_actual(
     authorization: Annotated[str | None, Header()] = None,
     datamaq_token: Annotated[str | None, Cookie()] = None,
@@ -451,16 +461,16 @@ def get_usuario_actual(
     settings = get_settings()
     if not settings.AUTH_REQUIRED:
         return {"sub": "anon", "rol": "admin"}
+    if authorization is None and datamaq_token is None:
+        raise HTTPException(
+            status_code=401,
+            detail="credenciales_invalidas",
+            headers={
+                "WWW-Authenticate": 'Bearer error="missing_token", error_description="Token de autenticacion no provisto"'
+            },
+        )
     token = extraer_token(datamaq_token, authorization)
     if token is None:
-        if authorization is None and datamaq_token is None:
-            raise HTTPException(
-                status_code=401,
-                detail="credenciales_invalidas",
-                headers={
-                    "WWW-Authenticate": 'Bearer error="missing_token", error_description="Token de autenticacion no provisto"'
-                },
-            )
         raise HTTPException(
             status_code=401,
             detail="credenciales_invalidas",
@@ -472,55 +482,14 @@ def get_usuario_actual(
     adicionales = [settings.API_SECRET_KEY_ANTERIOR] if settings.API_SECRET_KEY_ANTERIOR else None
     claims = token_service.verificar(token, adicionales)
     if claims is None:
-        motivo_error = "invalid_token"
-        desc = "Token invalido o firma no verificada"
-        try:
-            partes = token.split(".")
-            if len(partes) == 3:
-                payload_raw = json.loads(_b64url_decode(partes[1]).decode("utf-8"))
-                exp = payload_raw.get("exp")
-                if isinstance(exp, (int, float)) and exp <= datetime.now(timezone.utc).timestamp():
-                    desc = "Token expirado"
-            else:
-                desc = "Token malformado"
-        except Exception:
-            pass
-
+        motivo_error, desc = token_service.diagnosticar_falla(token)
         raise HTTPException(
             status_code=401,
             detail="credenciales_invalidas",
             headers={"WWW-Authenticate": f'Bearer error="{motivo_error}", error_description="{desc}"'},
         )
 
-    sub = str(claims.get("sub", ""))
-    iat = int(claims.get("iat", 0))
-
-    # Verificación de revocación de sesión por cambio de contraseña o logout en memoria
-    revocation = get_token_revocation_service()
-    if revocation.esta_revocado(sub, iat):
-        raise HTTPException(
-            status_code=401,
-            detail="credenciales_invalidas",
-            headers={"WWW-Authenticate": 'Bearer error="invalid_token", error_description="Sesion o token revocado"'},
-        )
-
-    # Verificación de revocación global persistida en base de datos (ISO 27001 A.5.15)
-    if repo_usuarios is not None and sub:
-        usuario = repo_usuarios.obtener_por_id(sub)
-        if usuario is not None and usuario.sesiones_revocadas_antes_de is not None:
-            rev_dt = usuario.sesiones_revocadas_antes_de
-            if rev_dt.tzinfo is None:
-                rev_dt = rev_dt.replace(tzinfo=timezone.utc)
-            token_iat = datetime.fromtimestamp(iat, tz=timezone.utc)
-            if token_iat < rev_dt:
-                raise HTTPException(
-                    status_code=401,
-                    detail="credenciales_invalidas",
-                    headers={
-                        "WWW-Authenticate": 'Bearer error="invalid_token", error_description="Sesion revocada por cambio de seguridad"'
-                    },
-                )
-
+    _verificar_revocaciones(claims, repo_usuarios)
     return claims
 
 

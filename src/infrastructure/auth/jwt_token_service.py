@@ -126,6 +126,20 @@ class JwtTokenService(GeneradorTokenPort):
                 return payload
         return None
 
+    def diagnosticar_falla(self, token: str) -> tuple[str, str]:
+        """Diagnostica la causa de fallo de verificación de un token según RFC 6750."""
+        try:
+            partes = token.split(".")
+            if len(partes) != 3:
+                return "invalid_token", "Token malformado"
+            payload_raw = json.loads(_b64url_decode(partes[1]).decode("utf-8"))
+            exp = payload_raw.get("exp")
+            if isinstance(exp, (int, float)) and exp <= datetime.now(timezone.utc).timestamp():
+                return "invalid_token", "Token expirado"
+            return "invalid_token", "Token invalido o firma no verificada"
+        except Exception:
+            return "invalid_token", "Token malformado"
+
     def verificar_mfa(self, token: str) -> dict[str, Any] | None:
         payload = self._verificar_con_secreto(token, self.secreto)
         if payload is not None and payload.get("mfa_pending") is True:

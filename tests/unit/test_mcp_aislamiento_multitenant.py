@@ -90,13 +90,15 @@ def _decodificar_token(token: str) -> dict[str, Any] | None:
 
 
 @pytest.fixture(autouse=True)
-def limpiar_cliente_mcp():
+def limpiar_cliente_mcp(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.delenv("DATAMAQ_AUTH_TOKEN", raising=False)
     yield
     set_client(None)
+    monkeypatch.delenv("DATAMAQ_AUTH_TOKEN", raising=False)
 
 
 @pytest.mark.asyncio
-async def test_aislamiento_multitenant_listar_plantas():
+async def test_aislamiento_multitenant_listar_plantas(monkeypatch: pytest.MonkeyPatch):
     """Valida que un superadmin ve todas las plantas pero tokens de organizaciones específicas solo ven la suya."""
     token_superadmin = _crear_token("usr-super", "super@datamaq.com", rol="superadmin")
     token_durax = _crear_token("usr-durax", "operador@durax.com", rol="operador", organizacion_id=ORG_DURAX)
@@ -131,23 +133,21 @@ async def test_aislamiento_multitenant_listar_plantas():
     set_client(mock_client)
 
     # 1. Caso Superadmin: ve 4 plantas (comportamiento observado en H1 del reporte técnico)
-    import os
-
-    os.environ["DATAMAQ_AUTH_TOKEN"] = token_superadmin
+    monkeypatch.setenv("DATAMAQ_AUTH_TOKEN", token_superadmin)
     plantas_super = await datamaq_listar_plantas()
     assert len(plantas_super) == 4
     orgs_vistas = {p["organizacion_id"] for p in plantas_super}
     assert orgs_vistas == {ORG_DURAX, ORG_SAN_MARTIN, ORG_UPP, ORG_CASA}
 
     # 2. Caso Organización Durax: SOLO ve Planta Durax
-    os.environ["DATAMAQ_AUTH_TOKEN"] = token_durax
+    monkeypatch.setenv("DATAMAQ_AUTH_TOKEN", token_durax)
     plantas_durax = await datamaq_listar_plantas()
     assert len(plantas_durax) == 1
     assert plantas_durax[0]["id"] == "planta-durax"
     assert plantas_durax[0]["organizacion_id"] == ORG_DURAX
 
     # 3. Caso Organización San Martín: SOLO ve Planta San Martín
-    os.environ["DATAMAQ_AUTH_TOKEN"] = token_san_martin
+    monkeypatch.setenv("DATAMAQ_AUTH_TOKEN", token_san_martin)
     plantas_sm = await datamaq_listar_plantas()
     assert len(plantas_sm) == 1
     assert plantas_sm[0]["id"] == "planta-san-martin"
@@ -155,7 +155,7 @@ async def test_aislamiento_multitenant_listar_plantas():
 
 
 @pytest.mark.asyncio
-async def test_aislamiento_multitenant_idor_acceso_cruzado_bloqueado():
+async def test_aislamiento_multitenant_idor_acceso_cruzado_bloqueado(monkeypatch: pytest.MonkeyPatch):
     """Valida que un token de Durax no puede consultar analítica o alertas de San Martín (mitigación IDOR)."""
     token_durax = _crear_token("usr-durax", "operador@durax.com", rol="operador", organizacion_id=ORG_DURAX)
     token_san_martin = _crear_token("usr-sm", "admin@sanmartin.com", rol="admin", organizacion_id=ORG_SAN_MARTIN)
@@ -207,9 +207,7 @@ async def test_aislamiento_multitenant_idor_acceso_cruzado_bloqueado():
     )
     set_client(mock_client)
 
-    import os
-
-    os.environ["DATAMAQ_AUTH_TOKEN"] = token_durax
+    monkeypatch.setenv("DATAMAQ_AUTH_TOKEN", token_durax)
 
     # 1. Consulta de su propia planta (Durax): exitosa
     analisis_propio = await datamaq_analizar_capacitores(planta_id="planta-durax", periodo_dias=30)
@@ -223,7 +221,7 @@ async def test_aislamiento_multitenant_idor_acceso_cruzado_bloqueado():
     assert "no pertenece a la organización del token" in str(exc_info.value)
 
     # 3. Intento de acceso cruzado inverso desde San Martín a Durax: falla con 404
-    os.environ["DATAMAQ_AUTH_TOKEN"] = token_san_martin
+    monkeypatch.setenv("DATAMAQ_AUTH_TOKEN", token_san_martin)
     with pytest.raises(RuntimeError) as exc_info_sm:
         await datamaq_analizar_capacitores(planta_id="planta-durax", periodo_dias=30)
 
