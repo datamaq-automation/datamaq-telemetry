@@ -90,6 +90,28 @@ class PuntoPotencia:
     potencia_reactiva_total_var: float | None = None
     potencia_aparente_total_va: float | None = None
     factor_desplazamiento_total: float | None = None
+    # Pico de muestras dentro del bloque (W). Es el máximo, no la demanda de 15 min (promedio).
+    demanda_max_w: float | None = None
+
+
+def _punto_potencia(
+    bucket_ts: int,
+    p: float | None,
+    q: float | None,
+    s: float | None,
+    fp: float | None,
+    sin_dato: list[str],
+    demanda_max_w: float | None,
+) -> PuntoPotencia:
+    return PuntoPotencia(
+        momento=datetime.fromtimestamp(bucket_ts, tz=timezone.utc),
+        potencia_activa_total_w=p,
+        dispositivos_sin_dato=sin_dato,
+        potencia_reactiva_total_var=q,
+        potencia_aparente_total_va=s,
+        factor_desplazamiento_total=fp,
+        demanda_max_w=round(demanda_max_w, 2) if demanda_max_w is not None else None,
+    )
 
 
 def _recomponer_s_y_cos_fi(p_w: float | None, q_var: float | None) -> tuple[float | None, float | None]:
@@ -229,6 +251,7 @@ class AgregadorDispositivosService:
 
         totales_p_por_bucket = _sumar_promedios_por_bucket(muestras_p)
         totales_q_por_bucket = _sumar_promedios_por_bucket(muestras_q)
+        maximos_por_bucket = _maximo_potencia_por_bucket(lecturas_por_dispositivo, intervalo_segundos)
 
         todos_los_dispositivos = set(lecturas_por_dispositivo.keys())
         resultado = []
@@ -242,16 +265,9 @@ class AgregadorDispositivosService:
                 else None
             )
             s, fp = _recomponer_s_y_cos_fi(p, q)
-            resultado.append(
-                PuntoPotencia(
-                    momento=datetime.fromtimestamp(bucket_ts, tz=timezone.utc),
-                    potencia_activa_total_w=p,
-                    dispositivos_sin_dato=sorted(todos_los_dispositivos - con_dato),
-                    potencia_reactiva_total_var=q,
-                    potencia_aparente_total_va=s,
-                    factor_desplazamiento_total=fp,
-                )
-            )
+            demanda_max = maximos_por_bucket[bucket_ts] if hubo_dato else None
+            sin_dato = sorted(todos_los_dispositivos - con_dato)
+            resultado.append(_punto_potencia(bucket_ts, p, q, s, fp, sin_dato, demanda_max))
         return resultado
 
     @staticmethod
@@ -305,6 +321,42 @@ class AgregadorDispositivosService:
             tension_linea_st_V=v_st,
             tension_linea_tr_V=v_tr,
         )
+
+
+def _maximo_potencia_por_bucket(
+    lecturas_por_dispositivo: dict[str, list[tuple]],
+    intervalo_segundos: int,
+) -> dict[int, float]:
+    """Pico de la potencia activa sumada dentro de cada bucket (máximo de muestras, no promedio).
+
+    Los medidores no muestrean sincronizados: en cada muestra se suma la última potencia conocida de
+    cada medidor **dentro del mismo bucket**. Así un medidor sin muestras en el bloque no arrastra un
+    valor de un bloque anterior.
+    """
+    eventos: list[tuple[float, str, float]] = []
+    for dispositivo_id, lecturas in lecturas_por_dispositivo.items():
+        for lectura in lecturas:
+            potencia_w = lectura[1]
+            if potencia_w is None:
+                continue
+            momento = lectura[0]
+            m = momento if momento.tzinfo is not None else momento.replace(tzinfo=timezone.utc)
+            eventos.append((m.timestamp(), dispositivo_id, potencia_w))
+    eventos.sort()
+
+    maximos: dict[int, float] = {}
+    bucket_actual: int | None = None
+    ultimos: dict[str, float] = {}
+    for ts, dispositivo_id, potencia_w in eventos:
+        bucket_ts = int(ts // intervalo_segundos) * intervalo_segundos
+        if bucket_ts != bucket_actual:
+            bucket_actual = bucket_ts
+            ultimos = {}
+        ultimos[dispositivo_id] = potencia_w
+        total = sum(ultimos.values())
+        if bucket_ts not in maximos or total > maximos[bucket_ts]:
+            maximos[bucket_ts] = total
+    return maximos
 
 
 def _sumar_promedios_por_bucket(muestras: dict[tuple[int, str], list[float]]) -> dict[int, float]:

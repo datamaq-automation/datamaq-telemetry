@@ -296,6 +296,8 @@ class LecturaInstantanea:
     thd_v_promedio_pct: float | None = None
     thd_i_total_pct: float | None = None
     diagnostico_instalacion: DiagnosticoInstalacion | None = None
+    # Pico (W) de las muestras del bloque agregado. None en lecturas crudas.
+    demanda_max_w: float | None = None
 
 
 @dataclass(frozen=True)

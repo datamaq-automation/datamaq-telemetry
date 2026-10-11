@@ -159,6 +159,13 @@ class AgregadorLecturasService:
 
         return thd_v_prom, thd_i_tot
 
+    @staticmethod
+    def _pico_potencia_activa(items: list[LecturaInstantanea]) -> float | None:
+        """Máximo de la potencia activa total de las muestras del bloque (W)."""
+        valores = [it.potencia_activa_total.vatios for it in items if it.potencia_activa_total is not None]
+        valores = [v for v in valores if v is not None]
+        return max(valores) if valores else None
+
     @classmethod
     def _agregar_grupo_lecturas(
         cls,
@@ -195,6 +202,7 @@ class AgregadorLecturasService:
             tension_neutro_estimada=v_neutro,
             thd_v_promedio_porcentaje=thd_v_prom,
             thd_i_total_porcentaje=thd_i_tot,
+            demanda_max_w=cls._pico_potencia_activa(items),
         )
 
     @classmethod
