@@ -137,6 +137,77 @@ async def test_datamaq_consultar_alertas():
     assert alertas[0]["planta_id"] == "planta-pacheco"
     assert alertas[0]["dispositivo_tag"] == "TGBT General"
     assert alertas[0]["version"] == "1.5.0"
+    assert alertas[0]["ocurrencias_count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_datamaq_consultar_alertas_agrupamiento_recurrentes_y_organizacion():
+    """Prueba enriquecimiento con organizacion_id y agrupamiento de alertas reiteradas."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/v1/plantas/planta-pacheco":
+            return httpx.Response(
+                200,
+                json={"id": "planta-pacheco", "organizacion_id": "org-auto-001", "nombre": "Pacheco"},
+            )
+        if request.url.path == "/api/v1/dispositivos":
+            return httpx.Response(
+                200,
+                json=[
+                    {
+                        "id": "medidor-01",
+                        "ubicacion_tag": "TGBT General",
+                        "planta_id": "planta-pacheco",
+                    }
+                ],
+            )
+        if request.url.path == "/api/v1/alertas":
+            return httpx.Response(
+                200,
+                json=[
+                    {
+                        "id": 1,
+                        "dispositivo_id": "medidor-01",
+                        "tipo_alerta": "BAJO_FACTOR_POTENCIA",
+                        "severidad": "WARNING",
+                        "mensaje": "FP bajo 0.82",
+                        "disparada_en": "2026-10-10T10:00:00Z",
+                    },
+                    {
+                        "id": 2,
+                        "dispositivo_id": "medidor-01",
+                        "tipo_alerta": "BAJO_FACTOR_POTENCIA",
+                        "severidad": "CRITICAL",
+                        "mensaje": "FP crítico 0.75",
+                        "disparada_en": "2026-10-10T12:00:00Z",
+                    },
+                ],
+            )
+        return httpx.Response(404, json={"detail": "Not found"})
+
+    mock_client = httpx.AsyncClient(
+        transport=httpx.MockTransport(handler),
+        base_url="http://datamaq.local",
+    )
+    set_client(mock_client)
+
+    # 1. Con agrupar=True (por defecto)
+    alertas_agrupadas = await datamaq_consultar_alertas(planta_id="planta-pacheco", solo_abiertas=True, agrupar=True)
+    assert len(alertas_agrupadas) == 1
+    alerta = alertas_agrupadas[0]
+    assert alerta["organizacion_id"] == "org-auto-001"
+    assert alerta["planta_id"] == "planta-pacheco"
+    assert alerta["ocurrencias_count"] == 2
+    assert alerta["primera_ocurrencia"] == "2026-10-10T10:00:00Z"
+    assert alerta["ultima_ocurrencia"] == "2026-10-10T12:00:00Z"
+    assert alerta["severidad"] == "CRITICAL"
+    assert alerta["mensaje"] == "FP crítico 0.75"
+
+    # 2. Con agrupar=False
+    alertas_planas = await datamaq_consultar_alertas(planta_id="planta-pacheco", solo_abiertas=True, agrupar=False)
+    assert len(alertas_planas) == 2
+    assert alertas_planas[0]["organizacion_id"] == "org-auto-001"
+    assert alertas_planas[1]["organizacion_id"] == "org-auto-001"
 
 
 @pytest.mark.asyncio
@@ -179,6 +250,9 @@ async def test_datamaq_analizar_capacitores():
     assert resultado["escalones_sugeridos_kvar"] == [10.0, 15.0]
     assert resultado["fp_promedio"] == 0.88
     assert resultado["version"] == "1.5.0"
+    assert "criterio_regulatorio" in resultado
+    assert resultado["criterio_regulatorio"]["umbral_penalizacion_tarifaria"] == 0.85
+    assert resultado["criterio_regulatorio"]["umbral_normativo_enre_85_2024"] == 0.95
 
 
 @pytest.mark.asyncio
@@ -214,6 +288,8 @@ async def test_datamaq_consultar_penalizaciones():
     assert penalizaciones["penalizacion_estimada_ars"] == 45200.50
     assert penalizaciones["horas_bajo_fp"] == 14.5
     assert penalizaciones["version"] == "1.5.0"
+    assert "criterio_regulatorio" in penalizaciones
+    assert penalizaciones["criterio_regulatorio"]["fp_objetivo_compensacion"] == 0.96
 
 
 @pytest.mark.asyncio

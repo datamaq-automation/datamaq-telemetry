@@ -29,6 +29,13 @@ mcp.settings.streamable_http_path = "/"
 
 _custom_client: httpx.AsyncClient | None = None
 
+_CRITERIO_REGULATORIO: dict[str, Any] = {
+    "umbral_penalizacion_tarifaria": 0.85,
+    "umbral_normativo_enre_85_2024": 0.95,
+    "fp_objetivo_compensacion": 0.96,
+    "metodo_fp": "vectorial (|P| / sqrt(P^2 + Q^2))",
+}
+
 
 def set_client(client: httpx.AsyncClient | None) -> None:
     """Inyecta un cliente httpx personalizado (utilizado en pruebas con MockTransport)."""
@@ -164,20 +171,25 @@ async def datamaq_listar_plantas(ctx: Context | None = None) -> list[dict[str, A
 async def datamaq_consultar_alertas(
     planta_id: str,
     solo_abiertas: bool = True,
+    agrupar: bool = True,
     ctx: Context | None = None,
 ) -> list[dict[str, Any]]:
     """Lista las alertas eléctricas y operativas aisladas para la planta especificada.
 
     Aisla y enriquece las alertas correspondientes a los medidores de la planta con
-    `planta_id` y `dispositivo_tag`. Discrimina alertas por bajo factor de potencia según
+    `planta_id`, `organizacion_id` y `dispositivo_tag`. Discrimina alertas por bajo factor de potencia según
     los criterios normativos:
     - Umbral tarifario clásico de distribuidoras (FP < 0.85): penalizaciones severas y recargos.
     - Umbral normativo regulatorio vigente ENRE 85/2024 (FP < 0.95): requerimiento federal
       de eficiencia y base de dimensionamiento de bancos de capacitores.
 
+    Permite agrupar alertas recurrentes para evitar eventos duplicados consolidando por
+    dispositivo y tipo de alerta con conteo de ocurrencias.
+
     Args:
         planta_id: Identificador de la planta industrial.
         solo_abiertas: Si es True, solo retorna alertas no resueltas.
+        agrupar: Si es True, agrupa alertas reiteradas por (dispositivo_id, tipo_alerta).
         ctx: Contexto de ejecución FastMCP inyectado automáticamente.
     """
     token = _resolver_token(ctx)
@@ -189,6 +201,14 @@ async def datamaq_consultar_alertas(
         for d in dispositivos_resp:
             if isinstance(d, dict) and d.get("id"):
                 dispositivos_map[d["id"]] = d.get("ubicacion_tag") or d.get("nombre") or d["id"]
+
+    organizacion_id: str | None = None
+    try:
+        planta_resp = await _ejecutar_peticion("GET", f"/api/v1/plantas/{planta_id}", token=token)
+        if isinstance(planta_resp, dict):
+            organizacion_id = planta_resp.get("organizacion_id")
+    except Exception:
+        organizacion_id = None
 
     parametros: dict[str, Any] = {
         "planta_id": planta_id,
@@ -205,11 +225,42 @@ async def datamaq_consultar_alertas(
         if dev_id and dev_id in dispositivos_map:
             alerta_enriquecida = dict(a)
             alerta_enriquecida["planta_id"] = planta_id
+            alerta_enriquecida["organizacion_id"] = organizacion_id
             alerta_enriquecida["dispositivo_tag"] = dispositivos_map[dev_id]
             alerta_enriquecida["version"] = MCP_VERSION
             alertas_filtradas.append(alerta_enriquecida)
 
-    return alertas_filtradas
+    if not agrupar:
+        return alertas_filtradas
+
+    # Agrupar por (dispositivo_id, tipo_alerta)
+    grupos: dict[tuple[str, str], dict[str, Any]] = {}
+    for a in alertas_filtradas:
+        clave = (str(a.get("dispositivo_id")), str(a.get("tipo_alerta")))
+        disparada = str(a.get("disparada_en") or "")
+        if clave not in grupos:
+            grupos[clave] = {
+                **a,
+                "ocurrencias_count": 1,
+                "primera_ocurrencia": disparada,
+                "ultima_ocurrencia": disparada,
+            }
+        else:
+            grupo = grupos[clave]
+            grupo["ocurrencias_count"] += 1
+            if disparada:
+                if not grupo["primera_ocurrencia"] or disparada < grupo["primera_ocurrencia"]:
+                    grupo["primera_ocurrencia"] = disparada
+                if not grupo["ultima_ocurrencia"] or disparada >= grupo["ultima_ocurrencia"]:
+                    grupo["ultima_ocurrencia"] = disparada
+                    if a.get("severidad"):
+                        grupo["severidad"] = a["severidad"]
+                    if a.get("mensaje"):
+                        grupo["mensaje"] = a["mensaje"]
+                    if a.get("valor_medido") is not None:
+                        grupo["valor_medido"] = a["valor_medido"]
+
+    return list(grupos.values())
 
 
 @mcp.tool()
@@ -240,6 +291,7 @@ async def datamaq_analizar_capacitores(
     )
     resp = dict(resultado) if isinstance(resultado, dict) else {"resultado": resultado}
     resp["version"] = MCP_VERSION
+    resp["criterio_regulatorio"] = _CRITERIO_REGULATORIO
     return resp
 
 
@@ -271,6 +323,7 @@ async def datamaq_consultar_penalizaciones(
     )
     resp = dict(resultado) if isinstance(resultado, dict) else {"resultado": resultado}
     resp["version"] = MCP_VERSION
+    resp["criterio_regulatorio"] = _CRITERIO_REGULATORIO
     return resp
 
 
