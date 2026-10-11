@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Any, ClassVar
 
 from src.application.mappers.alerta_mapper import AlertaMapper
+from src.application.use_cases.ingesta.deduplicacion_alertas import existe_alerta_abierta
 from src.domain.telemetria.entities import (
     AlertaDispositivo,
     Dispositivo,
@@ -244,7 +245,7 @@ def _evaluar_fp_fn(
     alerta_sc = ProcesadorAlertasIngesta._filtro_persistencia.procesar_alerta(
         dispositivo.id, alerta_sc_raw, categoria="SOBRECOMPENSACION_REACTIVA", ahora=recorded_at
     )
-    if alerta_sc:
+    if alerta_sc and not existe_alerta_abierta(repo, dispositivo.id, "SOBRECOMPENSACION_REACTIVA"):
         _despachar_alerta_fn(alerta_sc, mac_raw, repo, pub, log, dispositivo)
 
     return alerta_fp_raw, alerta_sc_raw
