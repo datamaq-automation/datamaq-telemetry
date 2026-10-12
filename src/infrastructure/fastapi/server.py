@@ -19,6 +19,7 @@ from src.application.use_cases.caracterizar_carga import CaracterizarCargaUseCas
 from src.application.use_cases.ingesta.registro_campanas import registro_campanas_activas
 from src.application.use_cases.ingesta.resolvedor_dispositivo import ResolvedorDispositivoIngesta
 from src.domain.telemetria.services import debe_recibir_evento
+from src.domain.telemetria.servicios.alcance_tiempo_real import alcance_de_clientes
 from src.domain.telemetria.value_objects import MacAddress
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
 from src.infrastructure.fastapi.auth_cookies import ORIGENES_CORS_CYBERSYN
@@ -33,6 +34,7 @@ from src.infrastructure.fastapi.duracion_requests import DuracionRequestMiddlewa
 from src.infrastructure.fastapi.error_handler import manejar_404
 from src.infrastructure.fastapi.headers_historico import HEADER_DATOS_DESDE, HEADER_POTENCIA_REFERENCIA
 from src.infrastructure.fastapi.middleware import RequestIdMiddleware
+from src.infrastructure.fastapi.renovacion_tiempo_real import marca_renovacion, renovar_modo_tiempo_real_medidores
 from src.infrastructure.fastapi.routes.admin_router import router as admin_router
 from src.infrastructure.fastapi.routes.alertas_router import router as alertas_router
 from src.infrastructure.fastapi.routes.analitica_router import router as analitica_router
@@ -236,21 +238,10 @@ def websocket_broadcast_callback(topico: str, datos: dict):
     )
 
 
-def _renovar_modo_tiempo_real_medidores(listener: Any) -> None:
-    try:
-        session_factory = get_session_factory()
-        db = session_factory()
-        try:
-            repo = MySQLDispositivosRepository(db)
-            dispositivos = repo.listar()
-            for disp in dispositivos:
-                if disp.device_uid and disp.device_uid.valor:
-                    listener.activar_tiempo_real_dispositivo(disp.device_uid.valor, segundos=120)
-            logger.info("realtime_mode_auto_renovado", total_dispositivos=len(dispositivos))
-        finally:
-            db.close()
-    except Exception as e:
-        logger.warning("realtime_mode_auto_renovacion_fallida", error=str(e))
+def _renovar_modo_tiempo_real_medidores(listener: Any, clientes: list[ConnectedClient]) -> None:
+    renovar_modo_tiempo_real_medidores(
+        listener, alcance_de_clientes((c.es_superadmin, c.organizacion_id) for c in clientes)
+    )
 
 
 INTERVALO_SOSTEN_CAMPANAS_S = 45.0
@@ -306,7 +297,6 @@ async def _loop_campanas_activas() -> None:
 async def _ws_heartbeat_loop() -> None:
     """Mantiene activa la conexión a través de Cloudflare o Nginx ante períodos de inactividad
     y renueva el modo de tiempo real en medidores mientras haya clientes WebSocket conectados."""
-    ultimo_sync_realtime: float = 0.0
     while True:
         try:
             await asyncio.sleep(25)
@@ -322,15 +312,15 @@ async def _ws_heartbeat_loop() -> None:
 
                 # Renovación periódica de sampleo rápido (cada 60 segundos si hay clientes activos)
                 ahora_ts = time.time()
-                if ahora_ts - ultimo_sync_realtime >= 60.0:
-                    ultimo_sync_realtime = ahora_ts
+                if marca_renovacion.vencida(ahora_ts):
+                    marca_renovacion.registrar(ahora_ts)
                     listener = get_mqtt_listener()
                     if listener and listener.esta_conectado():
-                        _renovar_modo_tiempo_real_medidores(listener)
+                        _renovar_modo_tiempo_real_medidores(listener, list(active_websockets))
         except asyncio.CancelledError:
             break
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("ws_heartbeat_fallido", error=str(e))
 
 
 @asynccontextmanager
@@ -418,6 +408,7 @@ async def _autenticar_cliente_ws(websocket: WebSocket, settings: Settings, clien
 
 
 def _registrar_cliente_ws(cliente: ConnectedClient, client_host: str) -> None:
+    alcance_previo = alcance_de_clientes((c.es_superadmin, c.organizacion_id) for c in active_websockets)
     active_websockets.append(cliente)
     ws_metrics.total_conexiones += 1
     logger.info(
@@ -427,10 +418,15 @@ def _registrar_cliente_ws(cliente: ConnectedClient, client_host: str) -> None:
         organizacion_id=cliente.organizacion_id,
         es_superadmin=cliente.es_superadmin,
     )
-    if len(active_websockets) == 1:
+    # Sin esperar al heartbeat (hasta ~85 s) si el cliente nuevo mira medidores que nadie estaba mirando.
+    alcance_nuevo = alcance_de_clientes([(cliente.es_superadmin, cliente.organizacion_id)])
+    if not alcance_previo.cubre(alcance_nuevo):
         listener = get_mqtt_listener()
         if listener and listener.esta_conectado():
-            _renovar_modo_tiempo_real_medidores(listener)
+            _renovar_modo_tiempo_real_medidores(listener, [cliente])
+            # Solo si renovó todo lo conectado: correr la marca dejaría sin renovar a los demás más de 120 s.
+            if alcance_nuevo.cubre(alcance_previo):
+                marca_renovacion.registrar()
 
 
 async def _bucle_recepcion_ws(websocket: WebSocket) -> None:
