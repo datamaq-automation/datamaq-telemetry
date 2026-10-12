@@ -29,6 +29,7 @@ Cambios en el heredoc remoto:
 | Rotación | `find -printf` + `sort` en vez de `ls -t \| tail`, que con `pipefail` abortaba si no había archivos. |
 | `abortar_con_rollback` | Una función para todos los rollbacks. Empieza con `trap - ERR` y `set +e`: si una parte del propio rollback falla, no re-entra, hace el resto y avisa **"ROLLBACK INCOMPLETO"**. Siempre sale con `exit 1`: un deploy revertido nunca deja el CD en verde. Con `con_base` (migración o health): stop, restaurar el dump, código, deps y start. |
 | `trap ERR` | Armado entre el guardado de `PREVIOUS_COMMIT` y el `systemctl stop`: un fallo de git, pip, `data/` o del dump revierte el código y las dependencias. La base no se tocó y el servicio sigue corriendo con el código anterior en memoria. |
+| Credenciales fuera de argv | Con `-p"$DB_PASSWORD"`, cualquier usuario local veía la contraseña en `ps` mientras corrían `mysqldump` o `mysql`. Ahora, después de cargar `.env`: `MYCNF=$(mktemp)` (600 por el `umask 077`), con `[client]` user, password y host entre comillas y escapados, y `trap 'rm -f "$MYCNF"' EXIT`, que también corre con el `exit 1` del rollback. `mysqldump` y `mysql` reciben `--defaults-file="$MYCNF"` como **primera** opción, sin `-u`/`-p`/`-h`. El escape está verificado con `my_print_defaults --show`: una contraseña con `\`, `"`, `#`, `$` y espacio final se lee idéntica. |
 | Rutas sobreescribibles | `DEPLOY_BACKUP_DIR` y `DEPLOY_DEPS_FILE`, solo para el test (por ssh no se pasan: rigen los defaults de `/tmp`). |
 
 **Documentado, no resuelto en este bloque:**
@@ -42,6 +43,11 @@ Cambios en el heredoc remoto:
 - **Fallos inesperados después del stop** (por ejemplo, `systemctl start` falla fuera del camino de migración o de
   health): cortan sin rollback, como antes de #17.
 - El health check solo mira `/health`.
+- **`--defaults-file` en vez de `--defaults-extra-file`:** con `-extra-file`, un `~/.my.cnf` del usuario del deploy se
+  lee **después** y pisaría estos valores (el 2026-10-11 pasó con el de `root`). `--defaults-file` lee solo nuestro
+  archivo, pero tampoco lee la configuración global (`/etc/mysql/…`). Si `DB_HOST` es `localhost`, el cliente usa el
+  socket por defecto compilado. Antes del primer deploy con esta rama conviene verificar en solo lectura que
+  `DB_HOST` sea `127.0.0.1` (TCP) o que `/etc/mysql` no cambie el `socket` de `[client]`.
 
 ## 4. Matriz de Pruebas (RED Suite)
 
@@ -56,10 +62,11 @@ mysqldump, mysql, sudo, sleep). No toca ninguna base, servicio ni repo.
 | `pip` falla / `git` falla | exit ≠ 0, rollback de código, sin systemctl |
 | el rollback falla | `ROLLBACK INCOMPLETO`, exit ≠ 0, un solo `git reset` (no re-entra) |
 | migración falla / health falla | restaura base y código, start al final, exit ≠ 0 |
+| credenciales | `mysqldump` y `mysql` (stubs) fallan si reciben `-p`/`-u`/`-h` en argv o si `--defaults-file` no es la primera opción; el archivo tiene modo 600 y la contraseña, y no existe después del deploy, ni del feliz ni del que sale con `exit 1` por la migración |
 | con token | `fetch … main:refs/remotes/origin/main` y `merge --ff-only` (#16) |
 | `set -u` | sin `GITHUB_TOKEN` o sin `GITHUB_REPOSITORY` definidos, el fallback `git pull` funciona |
 
-Con el script anterior (solo con las rutas parametrizadas) fallan 7 de los 11 tests.
+Con el script de `main` (solo con las rutas parametrizadas) fallaban 7 de 11. Con el de `d7f1b15`, que todavía pasaba la contraseña en argv, fallan 9 de los 13 actuales.
 
 ## 5. Criterios del Gauntlet
 
