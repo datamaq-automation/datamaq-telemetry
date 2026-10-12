@@ -119,6 +119,13 @@ class AcumuladoEnergiaDTO(BaseModel):
 class EnergiaAgregadaDTO(BaseModel):
     periodo: date
     energia_activa_neta_kwh: float | None = None
+    periodos_sin_datos_previos: int = Field(
+        default=0,
+        description=(
+            "Periodos completos sin datos que absorbe este delta: si es > 0, la barra incluye el consumo "
+            "de esos periodos y no es el consumo de un solo día o mes."
+        ),
+    )
     model_config = ConfigDict(from_attributes=True)
 
 

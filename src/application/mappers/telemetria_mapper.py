@@ -219,6 +219,7 @@ class TelemetriaMapper:
         return EnergiaAgregadaDTO(
             periodo=agregada.periodo,
             energia_activa_neta_kwh=agregada.energia_activa_neta_kwh,
+            periodos_sin_datos_previos=agregada.periodos_sin_datos_previos,
         )
 
     @staticmethod

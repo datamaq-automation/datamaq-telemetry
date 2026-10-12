@@ -157,8 +157,13 @@ class AgregadorDispositivosService:
     ) -> list[EnergiaAgregada]:
         totales_por_periodo: dict[date, float] = {}
         hubo_dato_por_periodo: dict[date, bool] = {}
+        # Si un medidor absorbe un hueco en un periodo, la suma de ese periodo también lo absorbe.
+        sin_datos_por_periodo: dict[date, int] = {}
         for agregados in agregados_por_dispositivo.values():
             for item in agregados:
+                sin_datos_por_periodo[item.periodo] = max(
+                    sin_datos_por_periodo.get(item.periodo, 0), item.periodos_sin_datos_previos
+                )
                 if item.energia_activa_neta_kwh is None:
                     totales_por_periodo.setdefault(item.periodo, 0.0)
                     hubo_dato_por_periodo.setdefault(item.periodo, False)
@@ -174,6 +179,7 @@ class AgregadorDispositivosService:
                 energia_activa_neta_kwh=round(totales_por_periodo[periodo], 4)
                 if hubo_dato_por_periodo.get(periodo)
                 else None,
+                periodos_sin_datos_previos=sin_datos_por_periodo.get(periodo, 0),
             )
             for periodo in sorted(totales_por_periodo)
         ]

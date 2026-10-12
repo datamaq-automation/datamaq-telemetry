@@ -104,12 +104,32 @@ class AgregacionEnergiaService:
 
         resultado: list[EnergiaAgregada] = []
         anterior: float | None = None
+        periodo_anterior: date | None = None
         for periodo in sorted(ultimos):
             kwh = ultimos[periodo]
             delta = None if anterior is None else round(kwh - anterior, 3)
-            resultado.append(EnergiaAgregada(periodo=periodo, energia_activa_neta_kwh=delta))
+            sin_datos = (
+                0
+                if periodo_anterior is None
+                else AgregacionEnergiaService._periodos_entre(periodo_anterior, periodo, granularidad)
+            )
+            resultado.append(
+                EnergiaAgregada(periodo=periodo, energia_activa_neta_kwh=delta, periodos_sin_datos_previos=sin_datos)
+            )
             anterior = kwh
+            periodo_anterior = periodo
         return resultado
+
+    @staticmethod
+    def _periodos_entre(anterior: date, actual: date, granularidad: GranularidadEnergia) -> int:
+        """Periodos completos estrictamente entre ``anterior`` y ``actual`` (0 si son consecutivos).
+
+        Con un acumulado por periodo (el último), un hueco que no cubre un periodo entero no se
+        puede detectar: solo se marcan los periodos sin ningún dato.
+        """
+        if granularidad == GranularidadEnergia.DIA:
+            return max(0, (actual - anterior).days - 1)
+        return max(0, (actual.year - anterior.year) * 12 + actual.month - anterior.month - 1)
 
 
 class FiltroDeduplicacionService:
