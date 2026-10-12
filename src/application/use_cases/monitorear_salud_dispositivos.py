@@ -41,12 +41,16 @@ class MonitorearSaludDispositivosUseCase:
         publicador: PublicadorEventosPort | None = None,
         logger: LoggerPort | None = None,
         regla: ReglaAlertaConectividad | None = None,
+        generar_alerta: bool = True,
     ):
+        """`generar_alerta=False` solo marca OFFLINE, sin abrir la alerta PÉRDIDA_COMUNICACIÓN (#19: su texto y su
+        activación los decide el dueño; en producción la controla DISPOSITIVO_OFFLINE_ALERTA_HABILITADA)."""
         self._repo_dispositivos = repo_dispositivos
         self._repo_telemetria = repo_telemetria
         self._publicador = publicador
         self._logger = logger
         self._regla = regla or ReglaAlertaConectividad()
+        self._generar_alerta = generar_alerta
 
     @classmethod
     def configurar_notificador(
@@ -67,7 +71,18 @@ class MonitorearSaludDispositivosUseCase:
 
         if dev.estado == EstadoDispositivo.ONLINE:
             dev.marcar_offline()
-            self._repo_dispositivos.guardar(dev)
+            # Solo estado y última recepción: `guardar` reescribía el dispositivo entero con lo que trajo `listar`.
+            self._repo_dispositivos.actualizar_heartbeat(dev.id, dev.estado, dev.visto_por_ultima_vez)
+            if self._logger:
+                self._logger.info(
+                    "dispositivo_marcado_offline",
+                    dispositivo_id=dev.id,
+                    mac=dev.device_uid.valor,
+                    segundos_inactivo=round(segundos_inactivo),
+                )
+
+        if not self._generar_alerta:
+            return None
 
         alertas_abiertas = self._repo_telemetria.listar_alertas(
             dispositivo_id=dev.id, solo_abiertas=True, severidad=SeveridadAlerta.CRITICAL.value
