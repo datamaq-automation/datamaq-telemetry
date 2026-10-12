@@ -14,6 +14,17 @@ SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "deploy-server.sh"
 INICIO_HEREDOC = "    bash <<'EOF'\n"
 FIN_HEREDOC = "\nEOF\n"
 
+# La contraseña en argv la ve cualquier usuario local con `ps` (#17): el stub falla si la recibe por ahí. Exige el
+# archivo de credenciales como primera opción y registra su modo, si tiene la contraseña y su ruta.
+_CREDENCIALES_FUERA_DE_ARGV = """
+for a in "$@"; do
+    case "$a" in -p*|--password*|-u*|--user*|-h*|--host*) echo "credencial en argv: $a" >> "$LOG"; exit 9 ;; esac
+done
+case "$1" in --defaults-file=*) cnf=${1#--defaults-file=} ;; *) echo "sin --defaults-file primero" >> "$LOG"; exit 9 ;; esac
+echo "cnf $(stat -c %a "$cnf") $(grep -c '^password="p"$' "$cnf")" >> "$LOG"
+echo "cnfpath $cnf" >> "$LOG"
+"""
+
 STUBS = {
     "git": """
 echo "git $*" >> "$LOG"
@@ -23,7 +34,8 @@ case "$1" in
 esac
 exit 0
 """,
-    "mysqldump": """
+    "mysqldump": _CREDENCIALES_FUERA_DE_ARGV
+    + """
 echo "mysqldump" >> "$LOG"
 if [ -n "${MYSQLDUMP_FALLA:-}" ]; then echo "-- parcial"; exit 2; fi
 # Más grande que el buffer de un pipe: el pie se lee bajo pipefail sin abortar por SIGPIPE.
@@ -31,7 +43,7 @@ for i in $(seq 1 20000); do echo "INSERT INTO t VALUES ($i,'xxxxxxxxxxxxxxxxxxxx
 [ -z "${SIN_PIE:-}" ] && echo "-- Dump completed on 2026-10-11 21:40:27"
 exit 0
 """,
-    "mysql": 'echo "mysql restaurar" >> "$LOG"; cat > /dev/null',
+    "mysql": _CREDENCIALES_FUERA_DE_ARGV + 'echo "mysql restaurar" >> "$LOG"; cat > /dev/null',
     "sudo": 'echo "sudo $*" >> "$LOG"',
     "sleep": "exit 0",
 }
@@ -211,3 +223,26 @@ def test_set_u_tolera_variables_del_fallback_sin_definir(deploy, sin):
     r = deploy.correr()
     assert r.returncode == 0, r.stdout + r.stderr
     assert "git pull --ff-only" in deploy.llamadas
+
+
+def _rutas_cnf(deploy: _Deploy) -> list[Path]:
+    return [Path(c.removeprefix("cnfpath ")) for c in deploy.llamadas if c.startswith("cnfpath ")]
+
+
+def test_la_contrasena_de_la_base_va_en_un_archivo_600_y_no_en_argv(deploy):
+    r = deploy.correr()
+
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "cnf 600 1" in deploy.llamadas
+    assert not any(c.startswith(("credencial en argv", "sin --defaults-file")) for c in deploy.llamadas)
+    assert _rutas_cnf(deploy) and not any(p.exists() for p in _rutas_cnf(deploy))
+
+
+def test_el_rollback_con_base_tambien_usa_el_archivo_y_lo_borra_al_salir_con_error(deploy):
+    """El `exit 1` de abortar_con_rollback tiene que disparar el trap EXIT que borra el archivo."""
+    r = deploy.correr(ALEMBIC_FALLA="1")
+
+    assert r.returncode != 0
+    assert "mysql restaurar" in deploy.llamadas
+    assert deploy.llamadas.count("cnf 600 1") == 2  # mysqldump y mysql
+    assert not any(p.exists() for p in _rutas_cnf(deploy))

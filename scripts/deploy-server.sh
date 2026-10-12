@@ -72,7 +72,7 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
         if [ "${2:-}" = con_base ]; then
             sudo systemctl stop "$DEPLOY_SERVICE_NAME" || completo=false
             echo "==> Restaurando base desde $BACKUP_FILE..."
-            gunzip -c "$BACKUP_FILE" | mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" || completo=false
+            gunzip -c "$BACKUP_FILE" | mysql --defaults-file="$MYCNF" "$DB_NAME" || completo=false
         fi
         echo "==> Rollback de código y dependencias a $PREVIOUS_COMMIT..."
         git reset --hard "$PREVIOUS_COMMIT" || completo=false
@@ -137,13 +137,21 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
     set -u
     : "${DB_HOST:?falta DB_HOST en .env}" "${DB_USER:?falta DB_USER en .env}" "${DB_NAME:?falta DB_NAME en .env}"
     : "${DB_PASSWORD?falta DB_PASSWORD en .env}"
+    # Credenciales de la base en un archivo 600 (umask 077), no en argv: con -p"$DB_PASSWORD" cualquier usuario local
+    # la veía en `ps` mientras corrían mysqldump o mysql (#17). --defaults-file (no -extra-file) para que un
+    # ~/.my.cnf del usuario del deploy no pise estos valores; a cambio, no se lee la configuración global de MySQL.
+    MYCNF=$(mktemp)
+    trap 'rm -f "$MYCNF"' EXIT
+    escapar_cnf() { local v=${1//\\/\\\\}; printf '"%s"' "${v//\"/\\\"}"; }
+    printf '[client]\nuser=%s\npassword=%s\nhost=%s\n' \
+        "$(escapar_cnf "$DB_USER")" "$(escapar_cnf "$DB_PASSWORD")" "$(escapar_cnf "$DB_HOST")" > "$MYCNF"
     BACKUP_DIR="${DEPLOY_BACKUP_DIR:-/tmp/datamaq-telemetry-pre-migracion}"
     # Cada dump es la base completa (usuarios, hashes, tokens OAuth) y el VPS tiene otros usuarios locales (#17).
     # `install -d -m` también corrige el modo de un directorio que ya existía en 755.
     install -d -m 700 "$BACKUP_DIR"
     find "$BACKUP_DIR" -maxdepth 1 -name 'pre_migracion_*.sql.gz' -exec chmod 600 {} +
     BACKUP_FILE="$BACKUP_DIR/pre_migracion_$(date +%Y%m%d_%H%M%S).sql.gz"
-    mysqldump --add-drop-table --no-tablespaces -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" | gzip > "$BACKUP_FILE"
+    mysqldump --defaults-file="$MYCNF" --add-drop-table --no-tablespaces "$DB_NAME" | gzip > "$BACKUP_FILE"
     # Un dump vacío o truncado restaurado con --add-drop-table borraría tablas: validar antes de detener nada.
     # `|| true` en el pie: con pipefail, un SIGPIPE de gzip no debe abortar; la integridad ya la probó `gzip -t`.
     PIE_DUMP=""
