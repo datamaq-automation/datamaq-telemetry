@@ -4,6 +4,8 @@ Corre el heredoc remoto (lo que el deploy ejecuta por ssh en el VPS) con bash re
 mysqldump, mysql, sudo y sleep. No toca ninguna base, servicio ni repo: los stubs registran las llamadas en un log.
 """
 
+import os
+import shutil
 import stat
 import subprocess
 from pathlib import Path
@@ -11,6 +13,8 @@ from pathlib import Path
 import pytest
 
 SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "deploy-server.sh"
+# git real: el stub de `git` delega `ls-files` aquí, así la normalización de permisos ve los archivos trackeados.
+GIT_REAL = shutil.which("git") or "/usr/bin/git"
 INICIO_HEREDOC = "    bash <<'EOF'\n"
 FIN_HEREDOC = "\nEOF\n"
 
@@ -30,7 +34,11 @@ STUBS = {
 echo "git $*" >> "$LOG"
 case "$1" in
     rev-parse) echo "commitanterior" ;;
-    pull|merge) [ -n "${GIT_FALLA:-}" ] && exit 1 ;;
+    ls-files) exec "$GIT_REAL" "$@" ;;
+    pull|merge)
+        [ -n "${GIT_FALLA:-}" ] && exit 1
+        [ -n "${GIT_CREA:-}" ] && echo "x" > nuevo.py
+        ;;
 esac
 exit 0
 """,
@@ -99,6 +107,7 @@ class _Deploy:
             "GITHUB_REPOSITORY": "",
             "DEPLOY_BACKUP_DIR": str(self.backups),
             "DEPLOY_DEPS_FILE": str(base / "deps.txt"),
+            "GIT_REAL": GIT_REAL,
         }
 
     def correr(self, **fallas: str) -> subprocess.CompletedProcess[str]:
@@ -223,6 +232,63 @@ def test_set_u_tolera_variables_del_fallback_sin_definir(deploy, sin):
     r = deploy.correr()
     assert r.returncode == 0, r.stdout + r.stderr
     assert "git pull --ff-only" in deploy.llamadas
+
+
+def test_el_codigo_que_escribe_git_queda_legible_para_el_servicio(deploy):
+    """#15: con umask 077 el archivo que escribe git salía 0600 y el servicio (otro usuario) no podía leerlo."""
+    r = deploy.correr(GIT_CREA="1")
+
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert _modo(deploy.remoto / "nuevo.py") & 0o004
+
+
+def _repo_con_archivos(deploy: _Deploy, *rutas: str) -> None:
+    """Repo git real en el remoto con esas rutas trackeadas (sin commit: basta el índice para ls-files).
+
+    Sin GIT_DIR/GIT_INDEX_FILE del entorno: bajo `git push` el hook los exporta y apuntan al repo real. Sin esto, el
+    `git add` del test caía en el índice del worktree.
+    """
+    entorno = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    subprocess.run([GIT_REAL, "init", "-q"], cwd=deploy.remoto, check=True, env=entorno)
+    subprocess.run([GIT_REAL, "add", *rutas], cwd=deploy.remoto, check=True, env=entorno)
+
+
+def test_normaliza_permisos_de_lectura_antes_de_reiniciar(deploy):
+    """Archivos 0600 trackeados de un deploy anterior no pueden bloquear el próximo: se normalizan y el deploy sigue."""
+    src = deploy.remoto / "src"
+    src.mkdir(mode=0o700)
+    codigo = src / "server.py"
+    codigo.write_text("x", encoding="utf-8")
+    codigo.chmod(0o600)
+    _repo_con_archivos(deploy, "src/server.py")
+
+    r = deploy.correr()
+
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert _modo(codigo) & 0o004
+    assert _modo(src) & 0o005 == 0o005
+
+
+def test_no_afloja_el_modo_de_env_ni_de_backups_sin_trackear(deploy):
+    """Un .env (640) o un .env.bak (600) no trackeados conservan su modo: no pueden quedar legibles para todos."""
+    src = deploy.remoto / "src"
+    src.mkdir(mode=0o755)
+    codigo = src / "server.py"
+    codigo.write_text("x", encoding="utf-8")
+    codigo.chmod(0o600)
+    env = deploy.remoto / ".env"
+    env.chmod(0o640)
+    bak = deploy.remoto / ".env.bak-20260818-003347"
+    bak.write_text("DB_PASSWORD=p\n", encoding="utf-8")
+    bak.chmod(0o600)
+    _repo_con_archivos(deploy, "src/server.py")
+
+    r = deploy.correr()
+
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert _modo(codigo) & 0o004
+    assert _modo(env) == 0o640
+    assert _modo(bak) == 0o600
 
 
 def _rutas_cnf(deploy: _Deploy) -> list[Path]:
