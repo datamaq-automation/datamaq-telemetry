@@ -29,6 +29,7 @@ from src.infrastructure.fastapi.dependencies import (
     global_telemetria_buffer,
     registrar_mqtt_listener,
 )
+from src.infrastructure.fastapi.duracion_requests import DuracionRequestMiddleware
 from src.infrastructure.fastapi.error_handler import manejar_404
 from src.infrastructure.fastapi.headers_historico import HEADER_DATOS_DESDE, HEADER_POTENCIA_REFERENCIA
 from src.infrastructure.fastapi.middleware import RequestIdMiddleware
@@ -498,6 +499,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.add_middleware(NormalizarMcpRutaMiddleware)
     app.add_middleware(SecurityHeadersMiddleware, settings=settings)
+    app.add_middleware(DuracionRequestMiddleware)  # Por dentro de RequestId: ya tiene el request_id.
     app.add_middleware(RequestIdMiddleware)
     app.add_exception_handler(Exception, manejar_excepcion_no_mapeada)
     app.add_exception_handler(StarletteHTTPException, manejar_404)
