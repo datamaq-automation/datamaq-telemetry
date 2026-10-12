@@ -59,8 +59,15 @@ Sin DTOs nuevos. Causas encontradas y cambios:
   diagnóstico de cada punto agregado (~30 % del tiempo restante en el perfil). Si el p95 de producción no baja de 3 s,
   los siguientes pasos son, en orden: (1) leer una sola vez las filas crudas por medidor para la compensación y la
   demanda; (2) que `calcular_historico` pida solo `(momento, P, Q)` sin construir el DTO completo con diagnóstico.
-- La caché de YAML comparte los dicts entre requests: los consumidores los leen y copian antes de modificar
-  (`dict(...)`). Un consumidor nuevo que mute el resultado contaminaría la caché.
+- **Aislamiento de la caché (pedido del padre):** `_cargar_con_cache` devuelve `copy.deepcopy` del resultado (~0,5 ms con
+  el `data/` real, contra ~165 ms de un parseo). Auditoría de los callers en `src/`:
+  `YamlOrganizacionesRepository._cargar_organizaciones_raw` (9 métodos de lectura), `obtener_facturas_planta`
+  (`cargar_facturas_distribuidora`) y `system_router._validar_datamaq_data`. Ninguno muta el resultado; el único
+  `append` (`listar_plantas`) es sobre una lista local. Pero `obtener_instalacion_medidor` pasaba la lista
+  `orden_fases` cacheada por referencia a la entidad. La copia profunda cierra esa clase de error para los
+  consumidores actuales y los futuros. Tests: `test_mutar_el_resultado_no_corrompe_la_cache`,
+  `test_una_lista_que_escapa_a_una_entidad_no_es_la_de_la_cache` y `test_facturas_mutadas_no_corrompen_la_cache`.
+  Los tres fallan con la copia superficial anterior.
 - `server.py` sube de 530 a 532 líneas en esta rama (límite 550). La rama de #15 lo baja a 526. Las dos ramas tocan
   líneas distintas.
 - El middleware loguea todos los requests HTTP, incluido `/health`: una línea por request en el journal.
