@@ -45,19 +45,55 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
     GITHUB_TOKEN="$GITHUB_TOKEN" \
     GITHUB_REPOSITORY="$GITHUB_REPOSITORY" \
     bash <<'EOF'
-    set -e
+    # -E: el trap ERR también corre dentro de funciones. pipefail: un `mysqldump` que falla no queda tapado por
+    # el `| gzip` que termina bien (#17). umask 077: los dumps y el freeze de pip solo los lee este usuario.
+    set -Eeuo pipefail
+    umask 077
 
     echo "==> Cambiando a $DEPLOY_REMOTE_DIR"
     cd "$DEPLOY_REMOTE_DIR" || { echo "Error: no se pudo entrar a $DEPLOY_REMOTE_DIR"; exit 1; }
 
     echo "==> Guardando commit actual para posible rollback..."
     PREVIOUS_COMMIT=$(git rev-parse HEAD)
+    # DEPLOY_DEPS_FILE y DEPLOY_BACKUP_DIR (abajo) se sobreescriben solo en tests/unit/test_deploy_server.py.
+    DEPS_ANTERIORES="${DEPLOY_DEPS_FILE:-/tmp/telemetry-deps.txt}"
 
     echo "==> Respaldando dependencias actuales (para rollback)..."
-    ./.venv/bin/pip freeze > /tmp/telemetry-deps.txt
+    ./.venv/bin/pip freeze > "$DEPS_ANTERIORES"
+
+    # Rollback común (#17). Sale SIEMPRE con exit 1: un deploy revertido nunca puede dejar el CD en verde. Si una
+    # parte del propio rollback falla, no re-entra ni corta a mitad: hace el resto y avisa "ROLLBACK INCOMPLETO".
+    #   $1: motivo. $2: "con_base" si la base ya pudo cambiar (después del stop) y hay que restaurar el dump.
+    abortar_con_rollback() {
+        trap - ERR
+        set +e
+        local completo=true
+        echo "ERROR: $1"
+        if [ "${2:-}" = con_base ]; then
+            sudo systemctl stop "$DEPLOY_SERVICE_NAME" || completo=false
+            echo "==> Restaurando base desde $BACKUP_FILE..."
+            gunzip -c "$BACKUP_FILE" | mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" || completo=false
+        fi
+        echo "==> Rollback de código y dependencias a $PREVIOUS_COMMIT..."
+        git reset --hard "$PREVIOUS_COMMIT" || completo=false
+        ./.venv/bin/pip install -r "$DEPS_ANTERIORES" || completo=false
+        if [ "${2:-}" = con_base ]; then
+            sudo systemctl start "$DEPLOY_SERVICE_NAME" || completo=false
+        fi
+        if [ "$completo" = true ]; then
+            echo "ERROR: Deploy fallido. Rollback ejecutado${2:+ (base, código y dependencias)}."
+        else
+            echo "ERROR: ROLLBACK INCOMPLETO. Revisar el VPS a mano: servicio, base, código y .venv."
+        fi
+        exit 1
+    }
+
+    # Desde acá hasta el `systemctl stop`, cualquier fallo (git, pip, data/, dump) revierte el código. La base todavía
+    # no se tocó y el servicio sigue corriendo con el código anterior cargado en memoria.
+    trap 'abortar_con_rollback "falló la línea $LINENO antes de detener el servicio; la base no se tocó."' ERR
 
     echo "==> Actualizando código (fast-forward only)..."
-    if [ -n "$GITHUB_TOKEN" ] && [ -n "$GITHUB_REPOSITORY" ]; then
+    if [ -n "${GITHUB_TOKEN:-}" ] && [ -n "${GITHUB_REPOSITORY:-}" ]; then
         AUTH=$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)
         # fetch a refs/remotes/origin/main + merge, no `pull <URL> main`: un pull por URL deja origin/main
         # congelado en el VPS y `git status` miente sobre lo desplegado (#16). Mismo token efímero.
@@ -95,28 +131,48 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
     fi
 
     echo "==> Backup de la base antes de migrar (D-5)..."
+    set +u  # .env es de terceros: no exigirle que no use variables sin definir.
+    # shellcheck disable=SC1091
     source .env
-    BACKUP_DIR="/tmp/datamaq-telemetry-pre-migracion"
-    mkdir -p "$BACKUP_DIR"
+    set -u
+    : "${DB_HOST:?falta DB_HOST en .env}" "${DB_USER:?falta DB_USER en .env}" "${DB_NAME:?falta DB_NAME en .env}"
+    : "${DB_PASSWORD?falta DB_PASSWORD en .env}"
+    BACKUP_DIR="${DEPLOY_BACKUP_DIR:-/tmp/datamaq-telemetry-pre-migracion}"
+    # Cada dump es la base completa (usuarios, hashes, tokens OAuth) y el VPS tiene otros usuarios locales (#17).
+    # `install -d -m` también corrige el modo de un directorio que ya existía en 755.
+    install -d -m 700 "$BACKUP_DIR"
+    find "$BACKUP_DIR" -maxdepth 1 -name 'pre_migracion_*.sql.gz' -exec chmod 600 {} +
     BACKUP_FILE="$BACKUP_DIR/pre_migracion_$(date +%Y%m%d_%H%M%S).sql.gz"
     mysqldump --add-drop-table --no-tablespaces -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" | gzip > "$BACKUP_FILE"
+    # Un dump vacío o truncado restaurado con --add-drop-table borraría tablas: validar antes de detener nada.
+    # `|| true` en el pie: con pipefail, un SIGPIPE de gzip no debe abortar; la integridad ya la probó `gzip -t`.
+    PIE_DUMP=""
+    if [ -s "$BACKUP_FILE" ] && gzip -t "$BACKUP_FILE"; then
+        PIE_DUMP=$(gzip -dc "$BACKUP_FILE" | tail -n 1 || true)
+    fi
+    case "$PIE_DUMP" in
+        *"Dump completed"*) ;;
+        *)
+            rm -f -- "$BACKUP_FILE"
+            abortar_con_rollback "el dump $BACKUP_FILE está vacío, corrupto o incompleto (sin '-- Dump completed')."
+            ;;
+    esac
     echo "Backup: $BACKUP_FILE ($(du -h "$BACKUP_FILE" | cut -f1))"
     # Retención corta: solo para el rollback inmediato de este deploy, no reemplaza
     # el backup diario con retención larga fuera del VPS (D-6).
-    ls -t "$BACKUP_DIR"/pre_migracion_*.sql.gz 2>/dev/null | tail -n +6 | xargs -r rm --
+    find "$BACKUP_DIR" -maxdepth 1 -name 'pre_migracion_*.sql.gz' -printf '%T@ %p\n' \
+        | sort -rn | tail -n +6 | cut -d' ' -f2- | xargs -r rm --
+
+    # Desde acá la base puede cambiar: los fallos de migración y de health llaman al rollback con la base. Un fallo
+    # inesperado de systemctl corta sin rollback, como antes de #17 (ver la spec).
+    trap - ERR
 
     echo "==> Deteniendo servicio antes de migrar (evita escrituras concurrentes durante el ALTER)..."
     sudo systemctl stop "$DEPLOY_SERVICE_NAME"
 
     echo "==> Aplicando migraciones de base de datos (Alembic)..."
     if ! ./.venv/bin/alembic upgrade head; then
-        echo "ERROR: la migración falló. Restaurando base ($BACKUP_FILE) y código anterior..."
-        gunzip -c "$BACKUP_FILE" | mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASSWORD" "$DB_NAME"
-        git reset --hard "$PREVIOUS_COMMIT"
-        ./.venv/bin/pip install -r /tmp/telemetry-deps.txt
-        sudo systemctl start "$DEPLOY_SERVICE_NAME"
-        echo "ERROR: Deploy fallido en la migración. Rollback de base y código ejecutado."
-        exit 1
+        abortar_con_rollback "la migración falló." con_base
     fi
 
     echo "==> Iniciando servicio $DEPLOY_SERVICE_NAME..."
@@ -140,14 +196,7 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
     done
 
     if [ "$HEALTH_OK" != true ]; then
-        echo "ERROR: El health-check falló después de ${MAX_WAIT}s. Ejecutando rollback completo (base + código) a $PREVIOUS_COMMIT..."
-        sudo systemctl stop "$DEPLOY_SERVICE_NAME"
-        gunzip -c "$BACKUP_FILE" | mysql -h"$DB_HOST" -u"$DB_USER" -p"$DB_PASSWORD" "$DB_NAME"
-        git reset --hard "$PREVIOUS_COMMIT"
-        ./.venv/bin/pip install -r /tmp/telemetry-deps.txt
-        sudo systemctl start "$DEPLOY_SERVICE_NAME"
-        echo "ERROR: Deploy fallido. Rollback ejecutado (base, código y dependencias)."
-        exit 1
+        abortar_con_rollback "el health-check falló después de ${MAX_WAIT}s." con_base
     fi
 
     echo "==> Verificando estado del servicio..."
