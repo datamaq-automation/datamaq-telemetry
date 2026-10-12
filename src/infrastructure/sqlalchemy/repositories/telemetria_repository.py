@@ -28,6 +28,7 @@ from src.infrastructure.sqlalchemy.models import (
     TelemetryInstantaneousModel,
 )
 from src.infrastructure.sqlalchemy.repositories.telemetria_mappers import (
+    alerta_a_modelo,
     alerta_to_entity,
     energia_to_entity,
     instantanea_to_entity,
@@ -177,41 +178,14 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
         self.db.commit()
 
     def guardar_alerta(self, alerta: AlertaDispositivo) -> None:
-        if alerta.id is not None:
-            model = self.db.query(DeviceAlertModel).filter(DeviceAlertModel.id == alerta.id).first()
-            if model:
-                model.device_id = alerta.dispositivo_id
-                model.alert_type = alerta.tipo_alerta
-                model.severity = alerta.severidad.value
-                model.message = alerta.mensaje
-                model.is_resolved = alerta.esta_resuelta
-                model.triggered_at = alerta.disparada_en
-                model.resolved_at = alerta.resuelta_en
-                model.phase = alerta.fase
-                model.measured_value = Decimal(str(alerta.valor_medido)) if alerta.valor_medido is not None else None
-                model.threshold_value = Decimal(str(alerta.valor_umbral)) if alerta.valor_umbral is not None else None
-                model.unit = alerta.unidad
-                model.category = alerta.categoria
-                model.notes = alerta.observaciones
-                self.db.commit()
-                return
-
-        model = DeviceAlertModel(
-            device_id=alerta.dispositivo_id,
-            alert_type=alerta.tipo_alerta,
-            severity=alerta.severidad.value,
-            message=alerta.mensaje,
-            is_resolved=alerta.esta_resuelta,
-            triggered_at=alerta.disparada_en,
-            resolved_at=alerta.resuelta_en,
-            phase=alerta.fase,
-            measured_value=Decimal(str(alerta.valor_medido)) if alerta.valor_medido is not None else None,
-            threshold_value=Decimal(str(alerta.valor_umbral)) if alerta.valor_umbral is not None else None,
-            unit=alerta.unidad,
-            category=alerta.categoria,
-            notes=alerta.observaciones,
+        existente = (
+            self.db.query(DeviceAlertModel).filter(DeviceAlertModel.id == alerta.id).first()
+            if alerta.id is not None
+            else None
         )
-        self.db.add(model)
+        model = alerta_a_modelo(alerta, existente or DeviceAlertModel())
+        if existente is None:
+            self.db.add(model)
         self.db.commit()
         if alerta.id is None:
             alerta.id = model.id

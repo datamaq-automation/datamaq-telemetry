@@ -57,6 +57,7 @@ from src.infrastructure.fastapi.routes.system_router import router as system_rou
 from src.infrastructure.fastapi.routes.telemetria_router import router as telemetria_router
 from src.infrastructure.fastapi.routes.usuarios_router import router as usuarios_router
 from src.infrastructure.fastapi.security_headers import SecurityHeadersMiddleware
+from src.infrastructure.fastapi.vigilancia_conectividad import loop_vigilancia_conectividad
 from src.infrastructure.paho_mqtt.mqtt_listener import MQTTListener
 from src.infrastructure.settings.config import Settings, get_settings
 from src.infrastructure.settings.logger import get_logger
@@ -360,6 +361,7 @@ async def lifespan(app: FastAPI):
     # Iniciar heartbeat para Cloudflare / proxies
     heartbeat_task = asyncio.create_task(_ws_heartbeat_loop())
     campanas_task = asyncio.create_task(_loop_campanas_activas())
+    conectividad_task = asyncio.create_task(loop_vigilancia_conectividad())
 
     logger.info("servidor_datamaq_listo", websockets_route="/ws/live", docs_route="/docs")
 
@@ -372,9 +374,9 @@ async def lifespan(app: FastAPI):
 
     # Clean shutdown
     logger.info("deteniendo_servidor_datamaq")
-    heartbeat_task.cancel()
-    campanas_task.cancel()
-    for tarea in (heartbeat_task, campanas_task):
+    for tarea in (heartbeat_task, campanas_task, conectividad_task):
+        tarea.cancel()
+    for tarea in (heartbeat_task, campanas_task, conectividad_task):
         try:
             await tarea
         except asyncio.CancelledError:

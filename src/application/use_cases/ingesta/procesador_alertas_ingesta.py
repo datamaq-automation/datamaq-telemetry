@@ -40,6 +40,15 @@ def _notificar_alerta_si_corresponde(
             cd.registrar_notificacion(alerta.dispositivo_id, alerta.tipo_alerta)
 
 
+def _alerta_abierta_equivalente(
+    alerta: AlertaDispositivo, repo_telemetria: RepositorioTelemetriaPort
+) -> AlertaDispositivo | None:
+    """La más antigua de las abiertas del mismo dispositivo, tipo y fase, si hay alguna."""
+    abiertas = repo_telemetria.listar_alertas(dispositivo_id=alerta.dispositivo_id, solo_abiertas=True)
+    equivalentes = [a for a in abiertas if a.es_equivalente(alerta)]
+    return min(equivalentes, key=lambda a: a.disparada_en) if equivalentes else None
+
+
 def _despachar_alerta_fn(
     alerta: AlertaDispositivo,
     mac_raw: str,
@@ -48,6 +57,26 @@ def _despachar_alerta_fn(
     logger: LoggerPort | None,
     dispositivo: Dispositivo | None = None,
 ) -> None:
+    # Si la misma condición ya tiene una alerta abierta, se actualiza esa en vez de abrir otra (#19: un medidor
+    # acumulaba 116 SOBRECOMPENSACION_REACTIVA abiertas). Tampoco se vuelve a notificar: es la misma alerta.
+    abierta = _alerta_abierta_equivalente(alerta, repo_telemetria)
+    if abierta is not None:
+        abierta.registrar_reincidencia(alerta)
+        repo_telemetria.guardar_alerta(abierta)
+        if publicador:
+            publicador.publicar_telemetria_en_vivo(
+                f"m/wifi/{mac_raw}/alertas",
+                AlertaMapper.to_dto(abierta).model_dump(mode="json"),
+            )
+        if logger:
+            logger.info(
+                "alerta_reincidente_actualizada",
+                dispositivo_id=abierta.dispositivo_id,
+                tipo=abierta.tipo_alerta,
+                alerta_id=abierta.id,
+                ocurrencias=abierta.ocurrencias,
+            )
+        return
     repo_telemetria.guardar_alerta(alerta)
     if publicador:
         publicador.publicar_telemetria_en_vivo(

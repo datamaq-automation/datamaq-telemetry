@@ -257,6 +257,8 @@ class DeviceAlertModel(Base):
     unit: Mapped[str | None] = mapped_column(String(20), nullable=True)
     category: Mapped[str | None] = mapped_column(String(50), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    last_detected_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+    occurrences: Mapped[int] = mapped_column(default=1, server_default="1", nullable=False)
 
     device: Mapped["DeviceModel"] = relationship(back_populates="alerts")
 

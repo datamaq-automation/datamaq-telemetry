@@ -126,6 +126,8 @@ erDiagram
         string unit
         string category
         string notes
+        datetime last_detected_at
+        int occurrences
     }
 
     DEVICE_STATUS_LOGS {
@@ -568,6 +570,8 @@ erDiagram
 | `unit` | `VARCHAR(20)` | - | Sí |
 | `category` | `VARCHAR(50)` | - | Sí |
 | `notes` | `TEXT` | - | Sí |
+| `last_detected_at` | `DATETIME` | - | Sí |
+| `occurrences` | `INTEGER` | - | No |
 
 **Índices:**
 - `idx_alerts_dev_resolved`: (`device_id`, `is_resolved`)

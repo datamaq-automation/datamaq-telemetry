@@ -1,5 +1,7 @@
 """src/infrastructure/sqlalchemy/repositories/telemetria_mappers.py."""
 
+from decimal import Decimal
+
 from src.domain.telemetria.entities import (
     AcumuladoEnergia,
     AlertaDispositivo,
@@ -170,4 +172,26 @@ def alerta_to_entity(m: DeviceAlertModel) -> AlertaDispositivo:
         unidad=m.unit,
         categoria=m.category,
         observaciones=m.notes,
+        ultima_deteccion_en=m.last_detected_at,
+        ocurrencias=m.occurrences or 1,
     )
+
+
+def alerta_a_modelo(alerta: AlertaDispositivo, model: DeviceAlertModel) -> DeviceAlertModel:
+    """Copia la alerta al modelo (alta o actualización): un solo lugar para los dos caminos de guardar_alerta."""
+    model.device_id = alerta.dispositivo_id
+    model.alert_type = alerta.tipo_alerta
+    model.severity = alerta.severidad.value
+    model.message = alerta.mensaje
+    model.is_resolved = alerta.esta_resuelta
+    model.triggered_at = alerta.disparada_en
+    model.resolved_at = alerta.resuelta_en
+    model.phase = alerta.fase
+    model.measured_value = Decimal(str(alerta.valor_medido)) if alerta.valor_medido is not None else None
+    model.threshold_value = Decimal(str(alerta.valor_umbral)) if alerta.valor_umbral is not None else None
+    model.unit = alerta.unidad
+    model.category = alerta.categoria
+    model.notes = alerta.observaciones
+    model.last_detected_at = alerta.ultima_deteccion_en
+    model.occurrences = alerta.ocurrencias
+    return model
