@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     MQTT_TLS_KEYFILE: str = ""
     MQTT_MAX_PAYLOAD_BYTES: int = 65536
     MQTT_AUTO_REGISTER_DEVICES: bool = True
+    # Sin datos durante este lapso, un dispositivo activo pasa a OFFLINE (#19). 3 x el intervalo normal de 300 s,
+    # para no oscilar ONLINE/OFFLINE con un mensaje demorado.
+    DISPOSITIVO_OFFLINE_TIMEOUT_S: int = 900
+    # Abre además la alerta PÉRDIDA_COMUNICACIÓN. Apagada hasta que el dueño apruebe su texto y su activación.
+    DISPOSITIVO_OFFLINE_ALERTA_HABILITADA: bool = False
     MQTT_CLEAN_SESSION: bool = False
     MQTT_RECONNECT_MIN_DELAY_SEG: int = 1
     MQTT_RECONNECT_MAX_DELAY_SEG: int = 60
