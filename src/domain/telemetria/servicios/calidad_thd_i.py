@@ -5,8 +5,8 @@ da valores sin significado (992,5 % con 0,022 A en un backup). Solo es represent
 de la fase supera un porcentaje de la corriente nominal real del TI declarada en el YAML.
 """
 
-# Umbral interno, provisional y configurable. No es normativo: no hay norma ni decisión que lo
-# fundamente más allá de la decisión del dueño del 2026-10-09 (confirmar con datos reales).
+# Umbral interno y configurable. No es normativo: no hay norma que lo fundamente; lo aprobó el dueño
+# (decisión del 2026-10-09, confirmado 2026-10-11).
 UMBRAL_FIABILIDAD_THD_I_PCT_DE_NOMINAL: float = 10.0
 
 

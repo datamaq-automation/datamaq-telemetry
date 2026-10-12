@@ -13,6 +13,7 @@ from typing import Any
 from src.application.use_cases.ingestar_harmonics_thd import (
     MARGEN_VENTANA_THD_S,
     IngestarHarmonicsThdUseCase,
+    claves_primer_nivel,
     ventana_thd_s,
 )
 from src.application.use_cases.ingestar_telemetria import IngestarTelemetriaUseCase
@@ -125,6 +126,58 @@ def test_sin_fila_en_la_ventana_devuelve_false_sin_lanzar():
     repo = _RepoTelem(resultado_actualizar=False)
     resultado = IngestarHarmonicsThdUseCase(repo, granularidad_segundos=300).ejecutar("dev-1", _payload_fixture(), "M")
     assert resultado is False
+
+
+class _LoggerFalso:
+    def __init__(self) -> None:
+        self.registros: list[tuple[str, str, dict[str, Any]]] = []
+
+    def debug(self, evento: str, **campos: Any) -> None:
+        self.registros.append(("debug", evento, campos))
+
+    def info(self, evento: str, **campos: Any) -> None:
+        self.registros.append(("info", evento, campos))
+
+
+def test_descarte_por_parser_loguea_en_info_con_motivo_y_solo_las_claves():
+    logger = _LoggerFalso()
+    payload = {"thd_v": "secreto", "f": "roto"}
+    IngestarHarmonicsThdUseCase(_RepoTelem(), granularidad_segundos=300, logger=logger).ejecutar("dev-1", payload, "M")
+    assert logger.registros == [
+        (
+            "info",
+            "harmonics_sin_thd_valido",
+            {"dispositivo_id": "dev-1", "motivo": "payload_sin_thd_parseable", "claves_payload": ["f", "thd_v"]},
+        )
+    ]
+    assert "secreto" not in repr(logger.registros)
+
+
+def test_descarte_por_ventana_loguea_en_info_con_motivo_y_ventana():
+    logger = _LoggerFalso()
+    repo = _RepoTelem(resultado_actualizar=False)
+    IngestarHarmonicsThdUseCase(repo, granularidad_segundos=300, logger=logger).ejecutar(
+        "dev-1", _payload_fixture(), "M"
+    )
+    assert logger.registros == [
+        (
+            "info",
+            "harmonics_sin_fila_en_ventana",
+            {"dispositivo_id": "dev-1", "motivo": "sin_fila_persistida_en_ventana", "ventana_s": 360},
+        )
+    ]
+
+
+def test_thd_guardado_no_loguea_descarte():
+    logger = _LoggerFalso()
+    IngestarHarmonicsThdUseCase(_RepoTelem(), granularidad_segundos=300, logger=logger).ejecutar(
+        "dev-1", _payload_fixture(), "M"
+    )
+    assert logger.registros == []
+
+
+def test_claves_primer_nivel_de_un_payload_que_no_es_dict_informa_el_tipo():
+    assert claves_primer_nivel(["a", "b"]) == ["<list>"]
 
 
 # --- Despacho desde IngestarTelemetriaUseCase ---

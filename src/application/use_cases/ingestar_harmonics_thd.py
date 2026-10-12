@@ -24,6 +24,14 @@ def ventana_thd_s(granularidad_segundos: int) -> int:
     return granularidad_segundos + MARGEN_VENTANA_THD_S
 
 
+def claves_primer_nivel(payload: object) -> list[str]:
+    """Claves de primer nivel del payload, sin valores: alcanzan para contrastar el formato del firmware
+    contra `parsear_thd_harmonics` sin volcar el payload completo al journal."""
+    if not isinstance(payload, dict):
+        return [f"<{type(payload).__name__}>"]
+    return sorted(str(clave) for clave in payload)
+
+
 class IngestarHarmonicsThdUseCase:
     def __init__(
         self,
@@ -39,9 +47,19 @@ class IngestarHarmonicsThdUseCase:
         thd = parsear_thd_harmonics(payload)
         if not thd:
             if self._logger:
-                self._logger.debug("harmonics_sin_thd_valido", dispositivo_id=dispositivo_id)
+                self._logger.info(
+                    "harmonics_sin_thd_valido",
+                    dispositivo_id=dispositivo_id,
+                    motivo="payload_sin_thd_parseable",
+                    claves_payload=claves_primer_nivel(payload),
+                )
             return False
         guardado = self._repo.actualizar_thd_instantanea(dispositivo_id, momento, self._ventana_s, thd)
         if not guardado and self._logger:
-            self._logger.debug("harmonics_sin_fila_en_ventana", dispositivo_id=dispositivo_id)
+            self._logger.info(
+                "harmonics_sin_fila_en_ventana",
+                dispositivo_id=dispositivo_id,
+                motivo="sin_fila_persistida_en_ventana",
+                ventana_s=self._ventana_s,
+            )
         return guardado
