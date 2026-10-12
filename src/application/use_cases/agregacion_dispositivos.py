@@ -71,7 +71,12 @@ def calcular_resumen(
     for dispositivo_id in dispositivos_ids:
         agregados_dto = consultar_telemetria.listar_energia_agregada(dispositivo_id, granularidad, zona, dias)
         agregados_por_dispositivo[dispositivo_id] = [
-            EnergiaAgregada(periodo=a.periodo, energia_activa_neta_kwh=a.energia_activa_neta_kwh) for a in agregados_dto
+            EnergiaAgregada(
+                periodo=a.periodo,
+                energia_activa_neta_kwh=a.energia_activa_neta_kwh,
+                periodos_sin_datos_previos=a.periodos_sin_datos_previos,
+            )
+            for a in agregados_dto
         ]
     energia_sumada = AgregadorDispositivosService.sumar_energia_agregada(agregados_por_dispositivo)
     return potencia_sumada, energia_sumada
