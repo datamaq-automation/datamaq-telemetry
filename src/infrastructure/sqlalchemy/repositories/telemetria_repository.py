@@ -44,6 +44,7 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
 
     def __init__(self, db: Session):
         self.db = db
+        self._zonas_tz_verificadas: set[str] = set()  # Una sonda de CONVERT_TZ por zona y request (#14).
 
     def guardar_instantanea(self, lectura: LecturaInstantanea) -> None:
         model = TelemetryInstantaneousModel(
@@ -347,13 +348,14 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
         cualquier zona IANA y se pierde la partición por periodo local, así
         que se falla explícito en vez de agregar en silencio por UTC.
         """
-        prueba_tz = self.db.execute(select(func.convert_tz(func.now(), "UTC", zona))).scalar()
-        if prueba_tz is None:
-            raise RuntimeError(
-                f"CONVERT_TZ devolvió NULL para la zona {zona!r}: las tablas de zona horaria de "
-                "MySQL no están cargadas. Ejecutar `mysql_tzinfo_to_sql /usr/share/zoneinfo | "
-                "mysql mysql` en el servidor antes de agregar energía por periodo."
-            )
+        if zona not in self._zonas_tz_verificadas:
+            if self.db.execute(select(func.convert_tz(func.now(), "UTC", zona))).scalar() is None:
+                raise RuntimeError(
+                    f"CONVERT_TZ devolvió NULL para la zona {zona!r}: las tablas de zona horaria de "
+                    "MySQL no están cargadas. Ejecutar `mysql_tzinfo_to_sql /usr/share/zoneinfo | "
+                    "mysql mysql` en el servidor antes de agregar energía por periodo."
+                )
+            self._zonas_tz_verificadas.add(zona)
 
         recorded_at_local = func.convert_tz(TelemetryEnergyModel.recorded_at, "UTC", zona)
         periodo_expr = (
