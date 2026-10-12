@@ -1,4 +1,5 @@
 # src/infrastructure/yaml/loaders.py
+import copy
 import glob
 import os
 import threading
@@ -29,17 +30,17 @@ def _cargar_con_cache(clave: str, data_dir: str, cargar: Callable[[str], Any]) -
     """Parsea una sola vez mientras los YAML no cambien (#14: cada request del unifilar parseaba data/ ~40 veces).
 
     Se invalida por mtime, no por la vida del proceso: data/ se actualiza con `git pull` sin reiniciar el servicio.
-    El resultado se comparte entre requests y hilos: los consumidores lo leen y copian antes de modificar.
+    Devuelve una copia profunda (~0,5 ms contra ~165 ms de un parseo): un consumidor que mute el resultado, o una
+    lista que escape por referencia a una entidad (p. ej. `orden_fases`), no puede corromper la caché compartida.
     """
     firma = _firma_yaml(data_dir)
     indice = (clave, os.path.realpath(data_dir))
     with _cache_lock:
         cacheado = _cache_por_firma.get(indice)
-        if cacheado is not None and cacheado[0] == firma:
-            return cacheado[1]
-        resultado = cargar(data_dir)
-        _cache_por_firma[indice] = (firma, resultado)
-        return resultado
+        if cacheado is None or cacheado[0] != firma:
+            cacheado = (firma, cargar(data_dir))
+            _cache_por_firma[indice] = cacheado
+    return copy.deepcopy(cacheado[1])
 
 
 def limpiar_cache_yaml() -> None:
@@ -226,17 +227,17 @@ def _parsear_organizaciones_completas(data_dir: str) -> list[dict]:
 
 
 def cargar_organizaciones_completas(data_dir: str) -> list[dict]:
-    """Carga organizaciones combinando estructura modular y archivos planos. Cacheado por mtime: no mutar."""
-    return list(_cargar_con_cache("organizaciones", data_dir, _parsear_organizaciones_completas))
+    """Carga organizaciones combinando estructura modular y archivos planos. Cacheado por mtime."""
+    return _cargar_con_cache("organizaciones", data_dir, _parsear_organizaciones_completas)
 
 
 def cargar_facturas_distribuidora(data_dir: str) -> list[dict]:
     """Carga el histórico de facturas de la distribuidora (`{data_dir}/facturas_distribuidora.yml`).
 
     Archivo único, sin merge modular/plano: no hay necesidad, es un solo documento por repo.
-    Cacheado por mtime: no mutar.
+    Cacheado por mtime.
     """
-    return list(_cargar_con_cache("facturas", data_dir, _parsear_facturas_distribuidora))
+    return _cargar_con_cache("facturas", data_dir, _parsear_facturas_distribuidora)
 
 
 def _parsear_facturas_distribuidora(data_dir: str) -> list[dict]:
