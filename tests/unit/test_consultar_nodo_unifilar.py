@@ -94,6 +94,21 @@ def test_nodo_medido_devuelve_solo_su_medidor(use_case):
     assert resumen.potencia_activa_total_w == 300_000.0
 
 
+def test_resumen_de_nodo_propaga_periodos_sin_datos_previos(use_case):
+    """El hueco de datos (#18) tiene que llegar a la vista del nodo, no solo al endpoint de energía del medidor."""
+    use_case.consultar_telemetria.listar_energia_agregada.side_effect = lambda dev_id, *a, **k: [
+        EnergiaAgregadaDTO(
+            periodo=date(2026, 9, 14),
+            energia_activa_neta_kwh=19_780.5,
+            periodos_sin_datos_previos=1,
+        )
+    ]
+
+    resumen = use_case.resumen(PLANTA_ID, "trafo-1", organizacion_id=ORG_ID)
+
+    assert resumen.energia_agregada[0].periodos_sin_datos_previos == 1
+
+
 def test_superadmin_sin_org_accede(use_case):
     assert use_case.resumen(PLANTA_ID, "mt", organizacion_id=None).nodo_id == "mt"
 

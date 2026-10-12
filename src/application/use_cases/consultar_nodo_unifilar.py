@@ -113,7 +113,11 @@ def _construir_resumen_nodo_dto(
         registrado_en=potencia_sumada.registrado_en,
         agregado_por_fase=_mapear_agregado_por_fase(potencia_sumada.agregado_por_fase),
         energia_agregada=[
-            EnergiaAgregadaDTO(periodo=e.periodo, energia_activa_neta_kwh=e.energia_activa_neta_kwh)
+            EnergiaAgregadaDTO(
+                periodo=e.periodo,
+                energia_activa_neta_kwh=e.energia_activa_neta_kwh,
+                periodos_sin_datos_previos=e.periodos_sin_datos_previos,
+            )
             for e in energia_sumada
         ],
         compensacion_historica=compensacion_hist,
