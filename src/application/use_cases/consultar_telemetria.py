@@ -1,6 +1,8 @@
 """src/application/use_cases/consultar_telemetria.py."""
 
+from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
+from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from src.application.dtos.telemetria_dto import (
@@ -38,6 +40,12 @@ from src.domain.telemetria.value_objects import GranularidadEnergia, MacAddress,
 _THROTTLE_PERSISTENCIA_SEGUNDOS = 300
 
 
+def _memo(cache: dict[tuple, Any], clave: tuple, calcular: Callable[[], Any]) -> Any:
+    if clave not in cache:
+        cache[clave] = calcular()
+    return cache[clave]
+
+
 class ConsultarTelemetriaUseCase:
     def __init__(
         self,
@@ -56,9 +64,15 @@ class ConsultarTelemetriaUseCase:
         self.buffer_en_vivo = buffer_en_vivo
         self.repo_suscripciones = repo_suscripciones
         self.billing_habilitado = billing_habilitado
+        # La instancia vive un request (dependencies.py): un nodo del unifilar resolvía el mismo dispositivo,
+        # suscripción y plan en cada llamada por medidor (#14). Memo acotada al request, nunca entre requests.
+        self._memo_request: dict[tuple, Any] = {}
 
     def _suscripcion_de_dispositivo(self, dev: Dispositivo) -> Suscripcion | None:
         """Suscripción de la organización del dispositivo; None si no se puede resolver la organización."""
+        return _memo(self._memo_request, ("suscripcion", dev.planta_id), lambda: self._buscar_suscripcion(dev))
+
+    def _buscar_suscripcion(self, dev: Dispositivo) -> Suscripcion | None:
         if not self.repo_organizaciones or not dev.planta_id:
             return None
         planta = self.repo_organizaciones.obtener_planta_por_id(dev.planta_id)
@@ -74,6 +88,9 @@ class ConsultarTelemetriaUseCase:
         return sus or Suscripcion.por_defecto(planta.organizacion_id)
 
     def _resolver_dispositivo(self, id_o_uid: str) -> Dispositivo:
+        return _memo(self._memo_request, ("dispositivo", id_o_uid), lambda: self._buscar_dispositivo(id_o_uid))
+
+    def _buscar_dispositivo(self, id_o_uid: str) -> Dispositivo:
         # Check by UUID first
         dev = self.repo_dispositivos.obtener_por_id(id_o_uid)
         if dev:
@@ -117,8 +134,9 @@ class ConsultarTelemetriaUseCase:
         ahora = datetime.now(timezone.utc)
         sus = self._suscripcion_de_dispositivo(dev)
         if sus is not None:
-            if self.repo_planes and sus.plan_id:
-                plan = self.repo_planes.obtener_por_id(sus.plan_id)
+            repo_planes, plan_id = self.repo_planes, sus.plan_id
+            if repo_planes and plan_id:
+                plan = _memo(self._memo_request, ("plan", plan_id), lambda: repo_planes.obtener_por_id(plan_id))
                 if plan:
                     return PoliticaRetencionService.ventana_consulta(plan, ahora)
             es_pro = PoliticaSuscripcionService.es_pro_vigente(sus.pro_vence_en, ahora)
