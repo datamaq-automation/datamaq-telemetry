@@ -320,10 +320,15 @@ class EnergiaAgregada:
 
     ``energia_activa_neta_kwh`` es ``None`` en el primer periodo, que no tiene un
     periodo anterior como referencia: la UI omite esa barra en vez de inventar un valor.
+
+    ``periodos_sin_datos_previos`` cuenta los periodos completos sin ningún acumulado entre el
+    anterior con dato y este: el delta de este periodo incluye también el consumo de esos periodos
+    (#18: el 14/09 de Durax sumó 19 780 kWh de 41,5 h sin datos). 0 en el caso normal.
     """
 
     periodo: date
     energia_activa_neta_kwh: float | None = None
+    periodos_sin_datos_previos: int = 0
 
 
 @dataclass(frozen=True)
