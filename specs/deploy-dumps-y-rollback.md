@@ -46,8 +46,10 @@ Cambios en el heredoc remoto:
 - **`--defaults-file` en vez de `--defaults-extra-file`:** con `-extra-file`, un `~/.my.cnf` del usuario del deploy se
   lee **después** y pisaría estos valores (el 2026-10-11 pasó con el de `root`). `--defaults-file` lee solo nuestro
   archivo, pero tampoco lee la configuración global (`/etc/mysql/…`). Si `DB_HOST` es `localhost`, el cliente usa el
-  socket por defecto compilado. Antes del primer deploy con esta rama conviene verificar en solo lectura que
-  `DB_HOST` sea `127.0.0.1` (TCP) o que `/etc/mysql` no cambie el `socket` de `[client]`.
+  socket por defecto compilado. **Verificado (2026-10-11, sesión padre, solo lectura, sin leer `.env`):** ni
+  `/etc/my.cnf` ni `/etc/my.cnf.d/` definen `socket` en `[client]`, y el usuario `datamaq` no tiene `~/.my.cnf`. El
+  servidor escucha en `/var/lib/mysql/mysql.sock`. `--defaults-file` no pierde nada que el deploy use hoy: con
+  `DB_HOST=localhost` ya se usa el socket compilado, antes y después del cambio.
 
 ## 4. Matriz de Pruebas (RED Suite)
 
