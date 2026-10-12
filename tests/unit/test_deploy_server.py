@@ -4,6 +4,7 @@ Corre el heredoc remoto (lo que el deploy ejecuta por ssh en el VPS) con bash re
 mysqldump, mysql, sudo y sleep. No toca ninguna base, servicio ni repo: los stubs registran las llamadas en un log.
 """
 
+import os
 import shutil
 import stat
 import subprocess
@@ -242,9 +243,14 @@ def test_el_codigo_que_escribe_git_queda_legible_para_el_servicio(deploy):
 
 
 def _repo_con_archivos(deploy: _Deploy, *rutas: str) -> None:
-    """Repo git real en el remoto con esas rutas trackeadas (sin commit: basta el índice para ls-files)."""
-    subprocess.run([GIT_REAL, "init", "-q"], cwd=deploy.remoto, check=True)
-    subprocess.run([GIT_REAL, "add", *rutas], cwd=deploy.remoto, check=True)
+    """Repo git real en el remoto con esas rutas trackeadas (sin commit: basta el índice para ls-files).
+
+    Sin GIT_DIR/GIT_INDEX_FILE del entorno: bajo `git push` el hook los exporta y apuntan al repo real. Sin esto, el
+    `git add` del test caía en el índice del worktree.
+    """
+    entorno = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    subprocess.run([GIT_REAL, "init", "-q"], cwd=deploy.remoto, check=True, env=entorno)
+    subprocess.run([GIT_REAL, "add", *rutas], cwd=deploy.remoto, check=True, env=entorno)
 
 
 def test_normaliza_permisos_de_lectura_antes_de_reiniciar(deploy):
