@@ -23,4 +23,6 @@ class AlertaMapper:
             categoria=entity.categoria,
             duracion_segundos=entity.duracion_segundos,
             observaciones=entity.observaciones,
+            ultima_deteccion_en=entity.ultima_deteccion_en,
+            ocurrencias=entity.ocurrencias,
         )
