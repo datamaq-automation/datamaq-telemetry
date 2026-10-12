@@ -359,6 +359,22 @@ class AlertaDispositivo:
     unidad: str | None = None
     categoria: str | None = None
     observaciones: str | None = None
+    # Una alerta abierta se actualiza en cada nueva detección en vez de abrir otra (#19).
+    ultima_deteccion_en: datetime | None = None
+    ocurrencias: int = 1
+
+    def es_equivalente(self, otra: "AlertaDispositivo") -> bool:
+        """Misma condición del mismo medidor: dispositivo, tipo y fase (BAJA_TENSION en R y en S son distintas)."""
+        return (self.dispositivo_id, self.tipo_alerta, self.fase) == (otra.dispositivo_id, otra.tipo_alerta, otra.fase)
+
+    def registrar_reincidencia(self, nueva: "AlertaDispositivo") -> None:
+        """Absorbe una nueva detección de la misma condición: conserva el inicio y actualiza los valores."""
+        self.ocurrencias += 1
+        self.ultima_deteccion_en = nueva.disparada_en
+        self.mensaje = nueva.mensaje
+        self.severidad = nueva.severidad
+        self.valor_medido = nueva.valor_medido
+        self.valor_umbral = nueva.valor_umbral
 
     @property
     def duracion_segundos(self) -> float | None:
