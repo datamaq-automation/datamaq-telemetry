@@ -107,19 +107,6 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
         git pull --ff-only
     fi
 
-    echo "==> Verificando permisos de lectura del código para el usuario del servicio..."
-    # El servicio corre con otro usuario (drop-in user.conf): código y datos tienen que ser legibles para todos.
-    # Normaliza lo que quedó sin lectura para otros (0600 de un deploy anterior) y aborta si algo sigue sin lectura.
-    # Va antes de tocar la base y el servicio, así el rollback no necesita restaurar nada.
-    find . \( -path ./.git -o -path ./.venv -o -path ./data/.git \) -prune -o -type f ! -perm -o=r -exec chmod o+r {} +
-    find . \( -path ./.git -o -path ./.venv -o -path ./data/.git \) -prune -o -type d ! -perm -o=rx -exec chmod o+rx {} +
-    PERMISOS_MALOS=$(find . \( -path ./.git -o -path ./.venv -o -path ./data/.git \) -prune -o \
-        \( \( -type f ! -perm -o=r \) -o \( -type d ! -perm -o=rx \) \) -print)
-    if [ -n "$PERMISOS_MALOS" ]; then
-        echo "$PERMISOS_MALOS"
-        abortar_con_rollback "hay archivos o directorios sin lectura para el usuario del servicio (listados arriba)."
-    fi
-
     echo "==> Instalando dependencias..."
     # Versiones exactas del lockfile (D1), las mismas que probó CI.
     ./.venv/bin/pip install -r requirements.lock
@@ -146,6 +133,42 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
         fi
     fi
 
+    echo "==> Verificando permisos de lectura del código y datos para el usuario del servicio..."
+    # El servicio corre con otro usuario (drop-in user.conf). Solo se normaliza lo que trackea git (código y datos
+    # maestros) y sus directorios: .env, backups y lo no trackeado conservan su modo, porque ahí hay credenciales.
+    # Va antes del backup y del stop: si algo sigue sin lectura, el rollback de código corre sin tocar la base.
+    ancestros_trackeados() {
+        git ls-files | awk -F/ 'NF > 1 { p = ""; for (i = 1; i < NF; i++) { p = (p == "" ? $i : p "/" $i); print p } }'
+    }
+    normalizar_permisos() {
+        git ls-files -z | xargs -0 -r chmod o+r -- || true
+        { echo .; ancestros_trackeados; } | sort -u | xargs -r -d '\n' chmod o+rx -- || true
+    }
+    sin_lectura() {
+        local ruta
+        while IFS= read -r -d '' ruta; do find "$ruta" -maxdepth 0 ! -perm -o=r -print || true; done < <(git ls-files -z)
+        while IFS= read -r ruta; do find "$ruta" -maxdepth 0 ! -perm -o=rx -print || true; done < <({ echo .; ancestros_trackeados; } | sort -u)
+        return 0
+    }
+    for raiz in . data; do
+        if [ -d "$raiz/.git" ]; then
+            (cd "$raiz" && normalizar_permisos)
+        fi
+    done
+    PERMISOS_MALOS=""
+    for raiz in . data; do
+        if [ -d "$raiz/.git" ]; then
+            SIN_LECTURA=$(cd "$raiz" && sin_lectura)
+            if [ -n "$SIN_LECTURA" ]; then
+                PERMISOS_MALOS+="$(printf '%s\n' "$SIN_LECTURA" | sed "s#^#$raiz/#")"$'\n'
+            fi
+        fi
+    done
+    if [ -n "$PERMISOS_MALOS" ]; then
+        printf '%s' "$PERMISOS_MALOS"
+        abortar_con_rollback "hay archivos o directorios trackeados sin lectura para el usuario del servicio (listados arriba)."
+    fi
+
     echo "==> Backup de la base antes de migrar (D-5)..."
     set +u  # .env es de terceros: no exigirle que no use variables sin definir.
     # shellcheck disable=SC1091
@@ -153,7 +176,7 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
     set -u
     : "${DB_HOST:?falta DB_HOST en .env}" "${DB_USER:?falta DB_USER en .env}" "${DB_NAME:?falta DB_NAME en .env}"
     : "${DB_PASSWORD?falta DB_PASSWORD en .env}"
-    # Credenciales de la base en un archivo 600 (umask 077), no en argv: con -p"$DB_PASSWORD" cualquier usuario local
+    # Credenciales de la base en un archivo 600 (mktemp lo crea 600 con cualquier umask), no en argv: con -p"$DB_PASSWORD" cualquier usuario local
     # la veía en `ps` mientras corrían mysqldump o mysql (#17). --defaults-file (no -extra-file) para que un
     # ~/.my.cnf del usuario del deploy no pise estos valores; a cambio, no se lee la configuración global de MySQL.
     MYCNF=$(mktemp)
