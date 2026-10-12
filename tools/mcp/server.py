@@ -269,23 +269,43 @@ async def datamaq_consultar_penalizaciones(
 _BUCKET_SEGUNDOS = 300  # Serie de planta en buckets de 5 min (misma granularidad que el backend)
 
 
+def _promedios_por_bucket(lecturas: list[dict[str, Any]]) -> dict[int, tuple[float | None, float | None]]:
+    """P y Q promedio de UN dispositivo por bucket de 5 min."""
+    acumulado: dict[int, tuple[list[float], list[float]]] = {}
+    for lectura in lecturas:
+        marca = lectura.get("registrado_en")
+        if not isinstance(marca, str):
+            continue
+        instante = datetime.fromisoformat(marca.replace("Z", "+00:00"))
+        ps, qs = acumulado.setdefault(int(instante.timestamp()) // _BUCKET_SEGUNDOS, ([], []))
+        p_w = lectura.get("potencia_activa_total_W")
+        q_var = lectura.get("potencia_reactiva_total_VAR")
+        if p_w is not None:
+            ps.append(float(p_w))
+        if q_var is not None:
+            qs.append(float(q_var))
+    return {
+        clave: (sum(ps) / len(ps) if ps else None, sum(qs) / len(qs) if qs else None)
+        for clave, (ps, qs) in acumulado.items()
+    }
+
+
 def _agregar_serie_planta(lecturas_por_dispositivo: list[list[dict[str, Any]]]) -> list[dict[str, float | None]]:
-    """Suma algebraicamente P y Q de todos los dispositivos por bucket de 5 min y calcula FP vectorial (|P|/S)."""
+    """Promedia P y Q de cada dispositivo por bucket de 5 min, los suma entre dispositivos y calcula FP vectorial.
+
+    El promedio por dispositivo es necesario: /instantaneous antepone las lecturas crudas del buffer en vivo (una cada
+    pocos segundos en modo tiempo real), que caen todas en el último bucket. Sumarlas tal cual multiplicaba la potencia
+    por la cantidad de lecturas: el "pico" de 22 811 kW de Durax eran ~40 lecturas de ~570 kW (#18). Es el mismo
+    criterio que AgregadorDispositivosService en el backend (40d9dda).
+    """
     buckets: dict[int, dict[str, Any]] = {}
     for lecturas in lecturas_por_dispositivo:
-        for lectura in lecturas:
-            marca = lectura.get("registrado_en")
-            if not isinstance(marca, str):
-                continue
-            instante = datetime.fromisoformat(marca.replace("Z", "+00:00"))
-            clave = int(instante.timestamp()) // _BUCKET_SEGUNDOS
+        for clave, (p_w, q_var) in _promedios_por_bucket(lecturas).items():
             bucket = buckets.setdefault(clave, {"p_w": None, "q_var": None})
-            p_w = lectura.get("potencia_activa_total_W")
-            q_var = lectura.get("potencia_reactiva_total_VAR")
             if p_w is not None:
-                bucket["p_w"] = (bucket["p_w"] or 0.0) + float(p_w)
+                bucket["p_w"] = (bucket["p_w"] or 0.0) + p_w
             if q_var is not None:
-                bucket["q_var"] = (bucket["q_var"] or 0.0) + float(q_var)
+                bucket["q_var"] = (bucket["q_var"] or 0.0) + q_var
 
     resultado = []
     for _, b in sorted(buckets.items()):
@@ -374,7 +394,7 @@ async def datamaq_consultar_potencia_reciente(
     respuesta: dict[str, Any] = {
         "planta_id": planta_id,
         "horas": horas,
-        "metodo": "suma por bucket de 5 min de los dispositivos de la planta",
+        "metodo": "promedio por dispositivo y suma entre dispositivos, por bucket de 5 min",
         "dispositivos_consultados": len(ids),
         "dispositivos_con_error": con_error,
         "puntos_medicion_count": puntos_count,

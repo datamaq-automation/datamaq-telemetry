@@ -290,6 +290,57 @@ async def test_datamaq_consultar_potencia_reciente_suma_dispositivos_por_bucket(
     assert resumen["advertencia_datos"] == "Datos incompletos (<80% de cobertura)"
 
 
+def _rafaga(desde_seg: int, n: int, p_w: float, q_var: float) -> list[dict[str, Any]]:
+    """Lecturas crudas del buffer en vivo (modo tiempo real: una cada ~7 s) dentro del bucket de las 12:05."""
+    return [_lectura(f"2026-10-10T12:05:{(desde_seg + 7 * i) % 60:02d}Z", p_w, q_var, 0.95) for i in range(n)]
+
+
+@pytest.mark.asyncio
+async def test_datamaq_consultar_potencia_reciente_no_suma_las_lecturas_del_mismo_medidor_en_un_bucket():
+    """#18: /instantaneous antepone las lecturas crudas del buffer en vivo, que caen todas en el último bucket.
+    Sumarlas multiplicaba la potencia por la cantidad de lecturas: 40 x 570,28 kW = 22 811 kW, el "pico" de Durax."""
+    lecturas = {
+        "d1": [_lectura("2026-10-10T12:00:00Z", 570_280.0, 180_000.0, 0.95), *_rafaga(0, 40, 570_280.0, 180_000.0)]
+    }
+    set_client(
+        httpx.AsyncClient(transport=httpx.MockTransport(_handler_potencia(lecturas)), base_url="http://datamaq.local")
+    )
+    resumen = await datamaq_consultar_potencia_reciente(planta_id="planta-pacheco", horas=24)
+    assert resumen["potencia_activa_max_kw"] == 570.28
+    assert resumen["potencia_activa_promedio_kw"] == 570.28
+    assert resumen["potencia_reactiva_max_kvar"] == 180.0
+
+
+@pytest.mark.asyncio
+async def test_datamaq_consultar_potencia_reciente_promedia_por_medidor_y_suma_entre_medidores():
+    """Dos medidores con distinta cantidad de lecturas en el bucket: el promedio va por medidor, la suma entre ellos.
+    d1: 40 lecturas (100 y 200 kW alternadas, promedio 150) + d2: 1 lectura de 50 kW → 200 kW, no 6 050 kW."""
+    d1 = [_lectura(f"2026-10-10T12:05:{i % 60:02d}Z", 100_000.0 if i % 2 else 200_000.0, 0.0, 1.0) for i in range(40)]
+    lecturas = {"d1": d1, "d2": [_lectura("2026-10-10T12:05:30Z", 50_000.0, 0.0, 1.0)]}
+    set_client(
+        httpx.AsyncClient(transport=httpx.MockTransport(_handler_potencia(lecturas)), base_url="http://datamaq.local")
+    )
+    resumen = await datamaq_consultar_potencia_reciente(planta_id="planta-pacheco", horas=24)
+    assert resumen["puntos_medicion_count"] == 1
+    assert resumen["potencia_activa_max_kw"] == 200.0
+
+
+@pytest.mark.asyncio
+async def test_datamaq_consultar_potencia_reciente_fp_del_bucket_no_se_distorsiona_por_la_cantidad_de_lecturas():
+    """Q se sumaba igual que P: con 40 lecturas de un medidor que solo tiene P y 1 de otro que solo tiene Q, el FP
+    vectorial daba ~1,0 (20 000 kW contra 500 kvar). Promediando por medidor: 500 kW y 500 kvar → 0,707."""
+    lecturas = {
+        "m1": _rafaga(0, 40, 500_000.0, 0.0),
+        "m2": [_lectura("2026-10-10T12:05:30Z", 0.0, 500_000.0, 0.0)],
+    }
+    set_client(
+        httpx.AsyncClient(transport=httpx.MockTransport(_handler_potencia(lecturas)), base_url="http://datamaq.local")
+    )
+    resumen = await datamaq_consultar_potencia_reciente(planta_id="planta-pacheco", horas=24)
+    assert resumen["potencia_reactiva_max_kvar"] == 500.0
+    assert resumen["factor_potencia_promedio"] == pytest.approx(0.707, abs=1e-3)
+
+
 @pytest.mark.asyncio
 async def test_datamaq_consultar_potencia_reciente_calculo_vectorial_fp():
     """Un bucket con Medidor 1 (P=100kW, Q=0kvar, FP=1.0) y Medidor 2 (P=0kW, Q=100kvar, FP=0.0).
