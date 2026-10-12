@@ -1,8 +1,50 @@
 # src/infrastructure/yaml/loaders.py
 import glob
 import os
+import threading
+from collections.abc import Callable
+from typing import Any
 
 import yaml
+
+_cache_por_firma: dict[tuple[str, str], tuple[tuple, Any]] = {}
+_cache_lock = threading.Lock()
+
+
+def _firma_yaml(data_dir: str) -> tuple:
+    """Huella barata (solo `os.stat`) de los YAML bajo `data_dir`: ruta, mtime y tamaño de cada archivo, más el
+    mtime de cada directorio para detectar archivos agregados o borrados. Cambia con cualquier `git pull` de data/."""
+    huella: list[tuple] = []
+    for raiz, dirs, archivos in os.walk(data_dir):
+        dirs[:] = sorted(d for d in dirs if not d.startswith("."))
+        huella.append((raiz, os.stat(raiz).st_mtime_ns))
+        for nombre in sorted(archivos):
+            if nombre.endswith((".yml", ".yaml")):
+                st = os.stat(os.path.join(raiz, nombre))
+                huella.append((raiz, nombre, st.st_mtime_ns, st.st_size))
+    return tuple(huella)
+
+
+def _cargar_con_cache(clave: str, data_dir: str, cargar: Callable[[str], Any]) -> Any:
+    """Parsea una sola vez mientras los YAML no cambien (#14: cada request del unifilar parseaba data/ ~40 veces).
+
+    Se invalida por mtime, no por la vida del proceso: data/ se actualiza con `git pull` sin reiniciar el servicio.
+    El resultado se comparte entre requests y hilos: los consumidores lo leen y copian antes de modificar.
+    """
+    firma = _firma_yaml(data_dir)
+    indice = (clave, os.path.realpath(data_dir))
+    with _cache_lock:
+        cacheado = _cache_por_firma.get(indice)
+        if cacheado is not None and cacheado[0] == firma:
+            return cacheado[1]
+        resultado = cargar(data_dir)
+        _cache_por_firma[indice] = (firma, resultado)
+        return resultado
+
+
+def limpiar_cache_yaml() -> None:
+    with _cache_lock:
+        _cache_por_firma.clear()
 
 
 def cargar_yaml_seguro(file_path: str) -> dict | list | None:
@@ -177,18 +219,27 @@ def cargar_organizaciones_planas(data_dir: str, cargadas_por_id: dict[str, dict]
                 cargadas_por_id[item_id] = item
 
 
-def cargar_organizaciones_completas(data_dir: str) -> list[dict]:
-    """Carga organizaciones combinando estructura modular y archivos planos."""
+def _parsear_organizaciones_completas(data_dir: str) -> list[dict]:
     cargadas_por_id = cargar_organizaciones_modulares(data_dir)
     cargar_organizaciones_planas(data_dir, cargadas_por_id)
     return list(cargadas_por_id.values())
+
+
+def cargar_organizaciones_completas(data_dir: str) -> list[dict]:
+    """Carga organizaciones combinando estructura modular y archivos planos. Cacheado por mtime: no mutar."""
+    return list(_cargar_con_cache("organizaciones", data_dir, _parsear_organizaciones_completas))
 
 
 def cargar_facturas_distribuidora(data_dir: str) -> list[dict]:
     """Carga el histórico de facturas de la distribuidora (`{data_dir}/facturas_distribuidora.yml`).
 
     Archivo único, sin merge modular/plano: no hay necesidad, es un solo documento por repo.
+    Cacheado por mtime: no mutar.
     """
+    return list(_cargar_con_cache("facturas", data_dir, _parsear_facturas_distribuidora))
+
+
+def _parsear_facturas_distribuidora(data_dir: str) -> list[dict]:
     contenido = cargar_yaml_seguro(os.path.join(data_dir, "facturas_distribuidora.yml"))
     if isinstance(contenido, dict) and isinstance(contenido.get("facturas"), list):
         return [x for x in contenido["facturas"] if isinstance(x, dict)]
