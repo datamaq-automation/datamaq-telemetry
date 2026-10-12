@@ -46,9 +46,11 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
     GITHUB_REPOSITORY="$GITHUB_REPOSITORY" \
     bash <<'EOF'
     # -E: el trap ERR también corre dentro de funciones. pipefail: un `mysqldump` que falla no queda tapado por
-    # el `| gzip` que termina bien (#17). umask 077: los dumps y el freeze de pip solo los lee este usuario.
+    # el `| gzip` que termina bien (#17). umask 022: el código que escribe git tiene que quedar legible por el usuario
+    # del servicio (#15: con 077, server.py quedó 0600 y el servicio no arrancó). Los dumps y el freeze de pip se
+    # crean con modo 600 explícito (install -m 600), no con umask.
     set -Eeuo pipefail
-    umask 077
+    umask 022
 
     echo "==> Cambiando a $DEPLOY_REMOTE_DIR"
     cd "$DEPLOY_REMOTE_DIR" || { echo "Error: no se pudo entrar a $DEPLOY_REMOTE_DIR"; exit 1; }
@@ -59,6 +61,7 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
     DEPS_ANTERIORES="${DEPLOY_DEPS_FILE:-/tmp/telemetry-deps.txt}"
 
     echo "==> Respaldando dependencias actuales (para rollback)..."
+    install -m 600 /dev/null "$DEPS_ANTERIORES"
     ./.venv/bin/pip freeze > "$DEPS_ANTERIORES"
 
     # Rollback común (#17). Sale SIEMPRE con exit 1: un deploy revertido nunca puede dejar el CD en verde. Si una
@@ -102,6 +105,19 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
         git merge --ff-only origin/main
     else
         git pull --ff-only
+    fi
+
+    echo "==> Verificando permisos de lectura del código para el usuario del servicio..."
+    # El servicio corre con otro usuario (drop-in user.conf): código y datos tienen que ser legibles para todos.
+    # Normaliza lo que quedó sin lectura para otros (0600 de un deploy anterior) y aborta si algo sigue sin lectura.
+    # Va antes de tocar la base y el servicio, así el rollback no necesita restaurar nada.
+    find . \( -path ./.git -o -path ./.venv -o -path ./data/.git \) -prune -o -type f ! -perm -o=r -exec chmod o+r {} +
+    find . \( -path ./.git -o -path ./.venv -o -path ./data/.git \) -prune -o -type d ! -perm -o=rx -exec chmod o+rx {} +
+    PERMISOS_MALOS=$(find . \( -path ./.git -o -path ./.venv -o -path ./data/.git \) -prune -o \
+        \( \( -type f ! -perm -o=r \) -o \( -type d ! -perm -o=rx \) \) -print)
+    if [ -n "$PERMISOS_MALOS" ]; then
+        echo "$PERMISOS_MALOS"
+        abortar_con_rollback "hay archivos o directorios sin lectura para el usuario del servicio (listados arriba)."
     fi
 
     echo "==> Instalando dependencias..."
@@ -151,6 +167,7 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
     install -d -m 700 "$BACKUP_DIR"
     find "$BACKUP_DIR" -maxdepth 1 -name 'pre_migracion_*.sql.gz' -exec chmod 600 {} +
     BACKUP_FILE="$BACKUP_DIR/pre_migracion_$(date +%Y%m%d_%H%M%S).sql.gz"
+    install -m 600 /dev/null "$BACKUP_FILE"
     mysqldump --defaults-file="$MYCNF" --add-drop-table --no-tablespaces "$DB_NAME" | gzip > "$BACKUP_FILE"
     # Un dump vacío o truncado restaurado con --add-drop-table borraría tablas: validar antes de detener nada.
     # `|| true` en el pie: con pipefail, un SIGPIPE de gzip no debe abortar; la integridad ya la probó `gzip -t`.

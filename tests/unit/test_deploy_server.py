@@ -30,7 +30,10 @@ STUBS = {
 echo "git $*" >> "$LOG"
 case "$1" in
     rev-parse) echo "commitanterior" ;;
-    pull|merge) [ -n "${GIT_FALLA:-}" ] && exit 1 ;;
+    pull|merge)
+        [ -n "${GIT_FALLA:-}" ] && exit 1
+        [ -n "${GIT_CREA:-}" ] && echo "x" > nuevo.py
+        ;;
 esac
 exit 0
 """,
@@ -223,6 +226,29 @@ def test_set_u_tolera_variables_del_fallback_sin_definir(deploy, sin):
     r = deploy.correr()
     assert r.returncode == 0, r.stdout + r.stderr
     assert "git pull --ff-only" in deploy.llamadas
+
+
+def test_el_codigo_que_escribe_git_queda_legible_para_el_servicio(deploy):
+    """#15: con umask 077 el archivo que escribe git salía 0600 y el servicio (otro usuario) no podía leerlo."""
+    r = deploy.correr(GIT_CREA="1")
+
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert _modo(deploy.remoto / "nuevo.py") & 0o004
+
+
+def test_normaliza_permisos_de_lectura_antes_de_reiniciar(deploy):
+    """Archivos 0600 de un deploy anterior no pueden bloquear el próximo: se normalizan y el deploy sigue."""
+    src = deploy.remoto / "src"
+    src.mkdir(mode=0o700)
+    codigo = src / "server.py"
+    codigo.write_text("x", encoding="utf-8")
+    codigo.chmod(0o600)
+
+    r = deploy.correr()
+
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert _modo(codigo) & 0o004
+    assert _modo(src) & 0o005 == 0o005
 
 
 def _rutas_cnf(deploy: _Deploy) -> list[Path]:
