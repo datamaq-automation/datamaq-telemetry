@@ -59,8 +59,11 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
     echo "==> Actualizando código (fast-forward only)..."
     if [ -n "$GITHUB_TOKEN" ] && [ -n "$GITHUB_REPOSITORY" ]; then
         AUTH=$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)
+        # fetch a refs/remotes/origin/main + merge, no `pull <URL> main`: un pull por URL deja origin/main
+        # congelado en el VPS y `git status` miente sobre lo desplegado (#16). Mismo token efímero.
         git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $AUTH" \
-            pull --ff-only "https://github.com/${GITHUB_REPOSITORY}.git" main
+            fetch "https://github.com/${GITHUB_REPOSITORY}.git" main:refs/remotes/origin/main
+        git merge --ff-only origin/main
     else
         git pull --ff-only
     fi
