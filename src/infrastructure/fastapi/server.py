@@ -14,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from src.adapters.gateways.in_memory_event_broadcaster import InMemoryEventBroadcaster
 from src.adapters.gateways.mqtt_comando_rafaga import MqttComandoRafagaGateway
 from src.application.use_cases.caracterizar_carga import CaracterizarCargaUseCase
 from src.application.use_cases.ingesta.registro_campanas import registro_campanas_activas
@@ -326,6 +327,17 @@ async def _ws_heartbeat_loop() -> None:
             logger.warning("ws_heartbeat_fallido", error=str(e))
 
 
+def _iniciar_mqtt_si_habilitado(habilitado: bool, broadcaster: InMemoryEventBroadcaster) -> MQTTListener | None:
+    """Arranca el listener MQTT solo si está habilitado. Con False no se crea, registra ni conecta nada."""
+    if not habilitado:
+        logger.info("mqtt_deshabilitado", motivo="MQTT_HABILITADO=false")
+        return None
+    listener = MQTTListener(publicador_eventos=broadcaster)
+    registrar_mqtt_listener(listener)
+    listener.start()
+    return listener
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global async_loop
@@ -355,10 +367,8 @@ async def lifespan(app: FastAPI):
     # Buffer en RAM de lecturas en vivo por dispositivo (sobrevive a un F5 del navegador)
     global_event_broadcaster.suscribir(global_telemetria_buffer.agregar)
 
-    # Start MQTT background listener
-    mqtt_listener = MQTTListener(publicador_eventos=global_event_broadcaster)
-    registrar_mqtt_listener(mqtt_listener)
-    mqtt_listener.start()
+    # Start MQTT background listener (apagable con MQTT_HABILITADO=false, p. ej. en dev)
+    _iniciar_mqtt_si_habilitado(get_settings().MQTT_HABILITADO, global_event_broadcaster)
 
     # Iniciar heartbeat para Cloudflare / proxies
     heartbeat_task = asyncio.create_task(_ws_heartbeat_loop())
@@ -383,7 +393,9 @@ async def lifespan(app: FastAPI):
             await tarea
         except asyncio.CancelledError:
             pass
-    mqtt_listener.stop()
+    listener_mqtt = get_mqtt_listener()
+    if listener_mqtt is not None:
+        listener_mqtt.stop()
     global_event_broadcaster.desuscribir(websocket_broadcast_callback)
     global_event_broadcaster.desuscribir(global_telemetria_buffer.agregar)
 
