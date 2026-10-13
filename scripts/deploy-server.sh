@@ -64,13 +64,33 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
     install -m 600 /dev/null "$DEPS_ANTERIORES"
     ./.venv/bin/pip freeze > "$DEPS_ANTERIORES"
 
+    # Health-check por HTTP: hasta MAX_WAIT segundos, un intento cada INTERVAL. Devuelve 0 si /health da 200.
+    MAX_WAIT=30
+    INTERVAL=2
+    ATTEMPTS=$((MAX_WAIT / INTERVAL))
+    esperar_health() {
+        local i HTTP_STATUS
+        for i in $(seq 1 "$ATTEMPTS"); do
+            sleep "$INTERVAL"
+            HTTP_STATUS=$(./.venv/bin/python3 -c "import urllib.request; print(urllib.request.urlopen('$HEALTH_URL', timeout=5).status)" 2>/dev/null || echo "000")
+            if [[ "$HTTP_STATUS" == "200" ]]; then
+                echo "Health-check OK (HTTP 200) en el intento $i."
+                return 0
+            fi
+            echo "Intento $i/$ATTEMPTS: servicio no responde con HTTP 200 (status: $HTTP_STATUS). Reintentando..."
+        done
+        return 1
+    }
+
     # Rollback común (#17). Sale SIEMPRE con exit 1: un deploy revertido nunca puede dejar el CD en verde. Si una
     # parte del propio rollback falla, no re-entra ni corta a mitad: hace el resto y avisa "ROLLBACK INCOMPLETO".
+    # Si la base ya se detuvo (con_base), después del rollback reinicia el servicio y repite el health-check: un
+    # rollback que deja el servicio caído avisa "ROLLBACK FALLIDO" y no "Rollback ejecutado" (#24).
     #   $1: motivo. $2: "con_base" si la base ya pudo cambiar (después del stop) y hay que restaurar el dump.
     abortar_con_rollback() {
         trap - ERR
         set +e
-        local completo=true
+        local completo=true servicio_ok=true
         echo "ERROR: $1"
         if [ "${2:-}" = con_base ]; then
             sudo systemctl stop "$DEPLOY_SERVICE_NAME" || completo=false
@@ -81,10 +101,15 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
         git reset --hard "$PREVIOUS_COMMIT" || completo=false
         ./.venv/bin/pip install -r "$DEPS_ANTERIORES" || completo=false
         if [ "${2:-}" = con_base ]; then
-            sudo systemctl start "$DEPLOY_SERVICE_NAME" || completo=false
+            echo "==> Reiniciando servicio $DEPLOY_SERVICE_NAME tras el rollback..."
+            sudo systemctl restart "$DEPLOY_SERVICE_NAME" || completo=false
+            echo "==> Verificando salud del servicio tras el rollback ($HEALTH_URL)..."
+            esperar_health || servicio_ok=false
         fi
-        if [ "$completo" = true ]; then
-            echo "ERROR: Deploy fallido. Rollback ejecutado${2:+ (base, código y dependencias)}."
+        if [ "$servicio_ok" = false ]; then
+            echo "ERROR: ROLLBACK FALLIDO: servicio caído tras el rollback (sin HTTP 200 en ${MAX_WAIT}s). Revisar el VPS a mano."
+        elif [ "$completo" = true ]; then
+            echo "ERROR: Deploy fallido. Rollback ejecutado${2:+ (base, código y dependencias); el deploy se revirtió y el servicio está OK}."
         else
             echo "ERROR: ROLLBACK INCOMPLETO. Revisar el VPS a mano: servicio, base, código y .venv."
         fi
@@ -227,23 +252,7 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
     sudo systemctl start "$DEPLOY_SERVICE_NAME"
 
     echo "==> Verificando salud del servicio vía HTTP ($HEALTH_URL)..."
-    MAX_WAIT=30
-    INTERVAL=2
-    ATTEMPTS=$((MAX_WAIT / INTERVAL))
-    HEALTH_OK=false
-
-    for i in $(seq 1 "$ATTEMPTS"); do
-        sleep "$INTERVAL"
-        HTTP_STATUS=$(./.venv/bin/python3 -c "import urllib.request; print(urllib.request.urlopen('$HEALTH_URL', timeout=5).status)" 2>/dev/null || echo "000")
-        if [[ "$HTTP_STATUS" == "200" ]]; then
-            HEALTH_OK=true
-            echo "Health-check OK (HTTP 200) en el intento $i."
-            break
-        fi
-        echo "Intento $i/$ATTEMPTS: servicio no responde con HTTP 200 (status: $HTTP_STATUS). Reintentando..."
-    done
-
-    if [ "$HEALTH_OK" != true ]; then
+    if ! esperar_health; then
         abortar_con_rollback "el health-check falló después de ${MAX_WAIT}s." con_base
     fi
 

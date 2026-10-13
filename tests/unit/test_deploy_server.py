@@ -66,7 +66,17 @@ case "$1 ${3:-}" in
 esac
 exit 0
 """,
-    "python3": 'if [ -n "${HEALTH_FALLA:-}" ]; then echo 500; else echo 200; fi',
+    # HEALTH_FALLA: /health responde 500 siempre. HEALTH_FALLA_PRIMERAS=N: responde 500 los primeros N intentos y
+    # después 200 (simula un servicio que se recupera tras el rollback). El contador vive en $LOG.health.
+    "python3": """
+if [ -n "${HEALTH_FALLA:-}" ]; then echo 500; exit 0; fi
+if [ -n "${HEALTH_FALLA_PRIMERAS:-}" ]; then
+    n=$(cat "$LOG.health" 2>/dev/null || echo 0)
+    echo $((n + 1)) > "$LOG.health"
+    [ "$n" -lt "$HEALTH_FALLA_PRIMERAS" ] && { echo 500; exit 0; }
+fi
+echo 200
+""",
     "alembic": '[ -n "${ALEMBIC_FALLA:-}" ] && exit 1; exit 0',
 }
 
@@ -204,7 +214,7 @@ def test_migracion_que_falla_restaura_base_y_codigo_y_sale_con_error(deploy):
     llamadas = deploy.llamadas
     assert "mysql restaurar" in llamadas
     assert "git reset --hard commitanterior" in llamadas
-    assert llamadas[-1] == "sudo systemctl start svc"
+    assert llamadas[-1] == "sudo systemctl restart svc"
     assert "Rollback ejecutado (base, código y dependencias)" in r.stdout
 
 
@@ -214,6 +224,25 @@ def test_health_que_falla_restaura_y_sale_con_error(deploy):
     assert r.returncode != 0
     assert "mysql restaurar" in deploy.llamadas
     assert "git reset --hard commitanterior" in deploy.llamadas
+
+
+def test_health_que_tambien_falla_tras_el_rollback_avisa_rollback_fallido(deploy):
+    r = deploy.correr(HEALTH_FALLA="1")
+
+    assert r.returncode != 0
+    assert "ROLLBACK FALLIDO: servicio caído" in r.stdout
+    assert "Rollback ejecutado" not in r.stdout
+    assert deploy.llamadas.count("sudo systemctl restart svc") == 1
+
+
+def test_health_que_se_recupera_tras_el_rollback_informa_servicio_ok(deploy):
+    # 15 = ATTEMPTS del health-check del deploy: falla todo el primer intento y el de después del rollback responde 200.
+    r = deploy.correr(HEALTH_FALLA_PRIMERAS="15")
+
+    assert r.returncode != 0
+    assert "Rollback ejecutado (base, código y dependencias); el deploy se revirtió y el servicio está OK" in r.stdout
+    assert "ROLLBACK FALLIDO" not in r.stdout
+    assert deploy.llamadas.count("sudo systemctl restart svc") == 1
 
 
 def test_con_token_hace_fetch_a_origin_main_y_merge(deploy):
