@@ -336,6 +336,86 @@ def _promedio(valores: list[float]) -> float | None:
     return sum(valores) / len(valores) if valores else None
 
 
+# Compuerta de calidad de datos (#31). Los umbrales siguen a los del backend para que el MCP no contradiga las alertas.
+_UMBRAL_P_NEGATIVA_W = -100.0  # evaluador_potencia_negativa.py:22
+_FRACCION_BUCKETS_NEGATIVOS = 0.5  # sostenida: la mitad o más de los buckets con dato
+_COBERTURA_MEDIDOR_MINIMA_PCT = 80.0  # mismo criterio que la advertencia de planta (abajo, en potencia_reciente)
+_FASES_TRIFASICAS = ("R", "S", "T")
+_CATEGORIAS_POLARIDAD = frozenset({"POLARIDAD_TI", "TI_INVERTIDO"})
+_CODIGOS_BLOQUEANTES = frozenset({"S1", "S2"})
+
+
+def _fases_desde_config(fases_con_ti: str | None) -> tuple[list[str], list[str]]:
+    """Fases medidas y faltantes a partir de `fases_con_ti` ('R,S', 'R,S,T'...). Sin dato, se asume trifásico."""
+    if not fases_con_ti:
+        return list(_FASES_TRIFASICAS), []
+    medidas = [f.strip().upper() for f in fases_con_ti.split(",") if f.strip().upper() in _FASES_TRIFASICAS]
+    faltantes = [f for f in _FASES_TRIFASICAS if f not in medidas]
+    return medidas, faltantes
+
+
+def _evaluar_medidor(
+    dispositivo: dict[str, Any],
+    lecturas: list[dict[str, Any]],
+    alertas_abiertas: list[dict[str, Any]],
+    puntos_esperados: int,
+) -> dict[str, Any]:
+    """Evalúa un medidor con los códigos de sospecha S1 a S4 (ver spec-issue-31.md, sección 2)."""
+    dispositivo_id = dispositivo.get("id")
+    tipo = (dispositivo.get("tipo_instalacion") or "CONSUMO").upper()
+    medidas, faltantes = _fases_desde_config(dispositivo.get("fases_con_ti"))
+    codigos: list[str] = []
+
+    polaridad_abierta = any(
+        a.get("dispositivo_id") == dispositivo_id
+        and (a.get("tipo_alerta") in _CATEGORIAS_POLARIDAD or a.get("categoria") in _CATEGORIAS_POLARIDAD)
+        for a in alertas_abiertas
+    )
+    if polaridad_abierta:
+        codigos.append("S1")
+
+    # Se mira el signo de P antes de cualquier abs(): con `abs`, una P invertida daría un FP plausible.
+    p_por_bucket = [p for p, _ in _promedios_por_bucket(lecturas).values() if p is not None]
+    if tipo == "CONSUMO" and p_por_bucket:
+        negativos = sum(1 for p in p_por_bucket if p < _UMBRAL_P_NEGATIVA_W)
+        if negativos / len(p_por_bucket) >= _FRACCION_BUCKETS_NEGATIVOS:
+            codigos.append("S2")
+
+    cobertura_pct = round(len(p_por_bucket) / puntos_esperados * 100, 1) if puntos_esperados > 0 else 0.0
+    if cobertura_pct < _COBERTURA_MEDIDOR_MINIMA_PCT:
+        codigos.append("S3")
+    if faltantes:
+        codigos.append("S4")
+
+    return {
+        "dispositivo_id": dispositivo_id,
+        "ubicacion_tag": dispositivo.get("ubicacion_tag") or dispositivo_id,
+        "tipo_instalacion": tipo,
+        "fases_medidas": medidas,
+        "fases_faltantes": faltantes,
+        "cobertura_puntos_pct": cobertura_pct,
+        "codigos": codigos,
+    }
+
+
+def _resumen_calidad(evaluaciones: list[dict[str, Any]]) -> dict[str, Any]:
+    """Medidores sospechosos y cobertura trifásica de la planta. Una fase faltante nunca cuenta como cero."""
+    sospechosos = [e for e in evaluaciones if e["codigos"]]
+    no_trifasicos = [e for e in evaluaciones if e["fases_faltantes"]]
+    return {
+        "medidores_sospechosos": sospechosos,
+        "total_trifasico_completo": not no_trifasicos,
+        "dispositivos_no_trifasicos": [
+            {"dispositivo_id": e["dispositivo_id"], "fases_faltantes": e["fases_faltantes"]} for e in no_trifasicos
+        ],
+    }
+
+
+def _bloquea_calculo(evaluaciones: list[dict[str, Any]]) -> bool:
+    """S1 o S2 en algún medidor: el signo de P no es confiable y el cálculo de kVAr o importes no se entrega."""
+    return any(_CODIGOS_BLOQUEANTES & set(e["codigos"]) for e in evaluaciones)
+
+
 @mcp.tool()
 async def datamaq_consultar_potencia_reciente(
     planta_id: str,
