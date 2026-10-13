@@ -6,6 +6,7 @@ from datetime import datetime
 
 from src.domain.sge.entities import FacturaDistribuidora
 from src.domain.telemetria.entities import (
+    ActivoUnifilar,
     AcumuladoEnergia,
     AlertaDispositivo,
     Dispositivo,
@@ -351,4 +352,33 @@ class NotificadorAlertasPort(ABC):
         dispositivo: Dispositivo,
         destinatarios: list[str],
     ) -> bool:
+        pass
+
+
+class RepositorioActivosUnifilarPort(ABC):
+    """Puerto de persistencia para la capa relacional mutable del árbol unifilar (MySQL)."""
+
+    @abstractmethod
+    def guardar(self, activo: ActivoUnifilar) -> ActivoUnifilar:
+        """Guarda o actualiza un activo unifilar mutable."""
+        pass
+
+    @abstractmethod
+    def obtener_por_id(self, activo_id: str) -> ActivoUnifilar | None:
+        """Obtiene un activo unifilar por su identificador único."""
+        pass
+
+    @abstractmethod
+    def listar_por_planta(self, planta_id: str) -> list[ActivoUnifilar]:
+        """Lista todos los activos unifilares de una planta ordenados."""
+        pass
+
+    @abstractmethod
+    def eliminar(self, activo_id: str) -> bool:
+        """Elimina un activo unifilar mutable. Retorna True si existía y fue eliminado."""
+        pass
+
+    @abstractmethod
+    def guardar_lote(self, activos: list[ActivoUnifilar]) -> list[ActivoUnifilar]:
+        """Guarda un lote de activos unifilares de forma atómica."""
         pass

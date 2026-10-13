@@ -26,6 +26,7 @@ from src.domain.telemetria.value_objects import (
     PotenciaReactiva,
     SeveridadAlerta,
     Tension,
+    TipoActivoUnifilar,
     TipoNodoUnifilar,
     VisibilidadPlan,
 )
@@ -387,3 +388,27 @@ class AlertaDispositivo:
         self.resuelta_en = timestamp or ahora_utc()
         if observaciones is not None:
             self.observaciones = observaciones
+
+
+@dataclass
+class ActivoUnifilar:
+    """Nodo intermedio o activo del diagrama unifilar (arquitectura híbrida, persistido en MySQL)."""
+
+    id: str
+    planta_id: str
+    nombre: str
+    tipo: TipoActivoUnifilar
+    tension_nominal_v: float
+    parent_id: str | None = None
+    device_id: str | None = None
+    potencia_nominal_kw: float | None = None
+    capacidad_nominal_kva: float | None = None
+    categoria_uso: str | None = None
+    uso_significativo: bool = False
+    posicion_x: float | None = None
+    posicion_y: float | None = None
+    ancho: float | None = None
+    alto: float | None = None
+    orden: int = 0
+    creado_en: datetime = field(default_factory=ahora_utc)
+    actualizado_en: datetime = field(default_factory=ahora_utc)

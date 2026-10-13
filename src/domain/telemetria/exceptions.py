@@ -83,3 +83,7 @@ class OrganizacionNoEncontradaError(DominioTelemetriaException):
 
 class FacturaDistribuidoraIlegibleError(DominioTelemetriaException):
     """Lanzada cuando el parser de PDF no puede extraer un campo obligatorio de la factura."""
+
+
+class ActivoUnifilarNoEncontradoError(DominioTelemetriaException):
+    """Lanzada cuando se intenta operar con un activo unifilar mutable que no existe."""

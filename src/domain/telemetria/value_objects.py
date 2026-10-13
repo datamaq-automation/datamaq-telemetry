@@ -350,3 +350,14 @@ class CandidatoTI:
         for fase in self.orden_fases:
             if fase not in ("R", "S", "T"):
                 raise ValueError(f"Fase inválida (debe ser R, S o T): {fase}")
+
+
+class TipoActivoUnifilar(str, Enum):
+    """Tipos de activos del diagrama unifilar persistidos en MySQL (arquitectura híbrida)."""
+
+    TRANSFORMADOR = "TRANSFORMADOR"
+    TGBT = "TGBT"
+    TABLERO_SECCIONAL = "TABLERO_SECCIONAL"
+    LINEA = "LINEA"
+    MAQUINA = "MAQUINA"
+    CARGA_VIRTUAL = "CARGA_VIRTUAL"
