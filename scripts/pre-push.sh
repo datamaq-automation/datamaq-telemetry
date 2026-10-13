@@ -88,7 +88,7 @@ fi
 
 ES_SOLO_CONFIG=false
 if [ -n "$CHANGED_FILES" ]; then
-    if ! echo "$CHANGED_FILES" | grep -qvE "^data/|^docs/|\.md$|^tests/unit/test_yaml_|^tests/unit/test_verificador_unifilar"; then
+    if ! echo "$CHANGED_FILES" | grep -qvE "^data/|^docs/|\.md$"; then
         ES_SOLO_CONFIG=true
     fi
 fi
