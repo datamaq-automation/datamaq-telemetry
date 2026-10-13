@@ -223,6 +223,9 @@ async def datamaq_analizar_capacitores(
         ctx: Contexto de ejecución FastMCP inyectado automáticamente.
     """
     token = _resolver_token(ctx)
+    evaluaciones, verificada = await _evaluar_calidad_planta(planta_id, min(periodo_dias * 24, _HORAS_MAXIMAS), token)
+    if verificada and _bloquea_calculo(evaluaciones):
+        return _respuesta_bloqueada(planta_id, evaluaciones)
     parametros: dict[str, Any] = {
         "planta_id": planta_id,
         "periodo_dias": periodo_dias,
@@ -230,9 +233,9 @@ async def datamaq_analizar_capacitores(
     resultado = await _ejecutar_peticion(
         "GET", "/api/v1/analitica/banco-capacitores/planta", token=token, params=parametros
     )
-    if isinstance(resultado, dict):
-        return resultado
-    return {"resultado": resultado}
+    if not isinstance(resultado, dict):
+        resultado = {"resultado": resultado}
+    return _con_calidad(resultado, evaluaciones, verificada)
 
 
 @mcp.tool()
@@ -254,6 +257,9 @@ async def datamaq_consultar_penalizaciones(
         ctx: Contexto de ejecución FastMCP inyectado automáticamente.
     """
     token = _resolver_token(ctx)
+    evaluaciones, verificada = await _evaluar_calidad_planta(planta_id, min(periodo_dias * 24, _HORAS_MAXIMAS), token)
+    if verificada and _bloquea_calculo(evaluaciones):
+        return _respuesta_bloqueada(planta_id, evaluaciones)
     parametros: dict[str, Any] = {
         "planta_id": planta_id,
         "periodo_dias": periodo_dias,
@@ -261,9 +267,9 @@ async def datamaq_consultar_penalizaciones(
     resultado = await _ejecutar_peticion(
         "GET", "/api/v1/analitica/penalizaciones/planta", token=token, params=parametros
     )
-    if isinstance(resultado, dict):
-        return resultado
-    return {"resultado": resultado}
+    if not isinstance(resultado, dict):
+        resultado = {"resultado": resultado}
+    return _con_calidad(resultado, evaluaciones, verificada)
 
 
 _BUCKET_SEGUNDOS = 300  # Serie de planta en buckets de 5 min (misma granularidad que el backend)
@@ -416,6 +422,81 @@ def _bloquea_calculo(evaluaciones: list[dict[str, Any]]) -> bool:
     return any(_CODIGOS_BLOQUEANTES & set(e["codigos"]) for e in evaluaciones)
 
 
+_LIMITE_LECTURAS = 5000  # tope de `limit` en /api/v1/telemetria/instantaneous (telemetria_router.py:84)
+_HORAS_MAXIMAS = 720  # tope de `hours` en ese mismo endpoint (telemetria_router.py:85)
+
+
+async def _alertas_abiertas(planta_id: str, token: str | None) -> list[dict[str, Any]]:
+    """Alertas abiertas de la planta. Si el backend no responde, la compuerta sigue sin alertas y la respuesta lo dice."""
+    try:
+        alertas = await _ejecutar_peticion(
+            "GET", "/api/v1/alertas", token=token, params={"planta_id": planta_id, "solo_abiertas": True}
+        )
+    except RuntimeError:
+        return []
+    return [a for a in alertas if isinstance(a, dict)] if isinstance(alertas, list) else []
+
+
+async def _evaluar_calidad_planta(planta_id: str, horas: int, token: str | None) -> tuple[list[dict[str, Any]], bool]:
+    """Evalúa cada medidor de la planta. Devuelve (evaluaciones, verificada).
+
+    `verificada` es False si no se pudieron listar medidores: el cálculo sigue, pero sin compuerta, y la respuesta lo dice.
+    La cobertura se mide contra lo que el endpoint puede devolver (tope de `limit`), no contra la ventana completa.
+    """
+    try:
+        dispositivos = await _ejecutar_peticion(
+            "GET", "/api/v1/dispositivos", token=token, params={"planta_id": planta_id}
+        )
+    except RuntimeError:
+        return [], False
+    if not isinstance(dispositivos, list):
+        return [], False
+    alertas_abiertas = await _alertas_abiertas(planta_id, token)
+    puntos_ventana = min(horas * 3600 // 300, _LIMITE_LECTURAS)
+
+    evaluaciones: list[dict[str, Any]] = []
+    for dispositivo in dispositivos:
+        if not isinstance(dispositivo, dict) or not dispositivo.get("id"):
+            continue
+        try:
+            lecturas = await _ejecutar_peticion(
+                "GET",
+                f"/api/v1/telemetria/instantaneous/{dispositivo['id']}",
+                token=token,
+                params={"hours": horas, "granularity": "5m", "limit": _LIMITE_LECTURAS},
+            )
+        except RuntimeError:
+            lecturas = []
+        filas = [x for x in lecturas if isinstance(x, dict)] if isinstance(lecturas, list) else []
+        evaluaciones.append(_evaluar_medidor(dispositivo, filas, alertas_abiertas, puntos_ventana))
+    return evaluaciones, True
+
+
+def _con_calidad(resultado: dict[str, Any], evaluaciones: list[dict[str, Any]], verificada: bool) -> dict[str, Any]:
+    """Agrega el bloque `calidad_datos` a la respuesta. No pisa claves que ya devuelve el backend."""
+    if not verificada:
+        resultado["calidad_datos"] = {
+            "verificada": False,
+            "advertencia": "No se pudieron listar los medidores: el resultado no pasó la compuerta de calidad.",
+        }
+        return resultado
+    resultado["calidad_datos"] = {"verificada": True, **_resumen_calidad(evaluaciones)}
+    return resultado
+
+
+def _respuesta_bloqueada(planta_id: str, evaluaciones: list[dict[str, Any]]) -> dict[str, Any]:
+    """Respuesta de bloqueo: sin kVAr ni importes, solo los medidores que dispararon S1 o S2."""
+    return {
+        "estado": "bloqueado_por_calidad_de_datos",
+        "planta_id": planta_id,
+        "medidores": [e for e in evaluaciones if _CODIGOS_BLOQUEANTES & set(e["codigos"])],
+        "motivo": (
+            "Medidor con signo de potencia activa invertido o alerta de polaridad abierta (S1/S2). "
+            "El kVAr y los importes no se calculan hasta corregir el medidor."
+        ),
+    }
+
+
 @mcp.tool()
 async def datamaq_consultar_potencia_reciente(
     planta_id: str,
@@ -443,6 +524,7 @@ async def datamaq_consultar_potencia_reciente(
     )
 
     lecturas_por_dispositivo: list[list[dict[str, Any]]] = []
+    lecturas_por_id: dict[str, list[dict[str, Any]]] = {}
     con_error: list[str] = []
     for dispositivo_id in ids:
         try:
@@ -457,6 +539,7 @@ async def datamaq_consultar_potencia_reciente(
             continue
         if isinstance(lecturas, list):
             lecturas_por_dispositivo.append([x for x in lecturas if isinstance(x, dict)])
+            lecturas_por_id[dispositivo_id] = lecturas_por_dispositivo[-1]
 
     serie = _agregar_serie_planta(lecturas_por_dispositivo)
     p_kw = [b["p_kw"] for b in serie if b["p_kw"] is not None]
@@ -488,7 +571,17 @@ async def datamaq_consultar_potencia_reciente(
     if cobertura_puntos_pct < 80.0:
         respuesta["advertencia_datos"] = "Datos incompletos (<80% de cobertura)"
 
-    return respuesta
+    # Esta tool nunca bloquea: entrega los agregados y marca los medidores sospechosos (#31).
+    alertas_abiertas = await _alertas_abiertas(planta_id, token)
+    puntos_ventana = min(puntos_esperados, _LIMITE_LECTURAS)
+    dispositivos_validos = (
+        [d for d in dispositivos if isinstance(d, dict) and d.get("id")] if isinstance(dispositivos, list) else []
+    )
+    evaluaciones = [
+        _evaluar_medidor(d, lecturas_por_id.get(d["id"], []), alertas_abiertas, puntos_ventana)
+        for d in dispositivos_validos
+    ]
+    return _con_calidad(respuesta, evaluaciones, verificada=isinstance(dispositivos, list))
 
 
 def main() -> None:

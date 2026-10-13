@@ -141,6 +141,8 @@ async def test_datamaq_analizar_capacitores():
     """Prueba datamaq_analizar_capacitores retornando cálculo SSOT de compensación."""
 
     def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path in ("/api/v1/dispositivos", "/api/v1/alertas"):
+            return httpx.Response(200, json=[])  # consultas de la compuerta de calidad (#31)
         assert request.url.path == "/api/v1/analitica/banco-capacitores/planta"
         assert request.url.params.get("planta_id") == "planta-pacheco"
         assert request.url.params.get("periodo_dias") == "30"
@@ -182,6 +184,8 @@ async def test_datamaq_consultar_penalizaciones():
     """Prueba datamaq_consultar_penalizaciones con recargos calculados."""
 
     def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path in ("/api/v1/dispositivos", "/api/v1/alertas"):
+            return httpx.Response(200, json=[])  # consultas de la compuerta de calidad (#31)
         assert request.url.path == "/api/v1/analitica/penalizaciones/planta"
         assert request.url.params.get("planta_id") == "planta-pacheco"
         assert request.url.params.get("periodo_dias") == "7"
@@ -216,6 +220,8 @@ async def test_datamaq_consultar_penalizaciones_periodo_personalizado():
     """Prueba que el parámetro periodo_dias sea enviado correctamente a la API."""
 
     def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path in ("/api/v1/dispositivos", "/api/v1/alertas"):
+            return httpx.Response(200, json=[])  # consultas de la compuerta de calidad (#31)
         assert request.url.path == "/api/v1/analitica/penalizaciones/planta"
         assert request.url.params.get("planta_id") == "planta-pacheco"
         assert request.url.params.get("periodo_dias") == "14"
@@ -243,6 +249,8 @@ def _handler_potencia(lecturas_por_id: dict[str, Any], errores: set[str] | None 
             assert request.url.params.get("planta_id") == "planta-pacheco"
             return httpx.Response(200, json=[{"id": dev} for dev in lecturas_por_id])
         prefijo = "/api/v1/telemetria/instantaneous/"
+        if request.url.path == "/api/v1/alertas":
+            return httpx.Response(200, json=[])  # consulta de la compuerta de calidad (#31)
         assert request.url.path.startswith(prefijo)
         dev = request.url.path[len(prefijo) :]
         assert request.url.params.get("granularity") == "5m"
