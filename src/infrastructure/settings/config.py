@@ -38,6 +38,8 @@ class Settings(BaseSettings):
     DISPOSITIVO_OFFLINE_TIMEOUT_S: int = 900
     # Abre además la alerta PÉRDIDA_COMUNICACIÓN. Apagada hasta que el dueño apruebe su texto y su activación.
     DISPOSITIVO_OFFLINE_ALERTA_HABILITADA: bool = False
+    # Ingesta MQTT. En dev se apaga con false: el listener no se crea ni se conecta.
+    MQTT_HABILITADO: bool = True
     MQTT_CLEAN_SESSION: bool = False
     MQTT_RECONNECT_MIN_DELAY_SEG: int = 1
     MQTT_RECONNECT_MAX_DELAY_SEG: int = 60
