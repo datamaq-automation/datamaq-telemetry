@@ -9,6 +9,7 @@
 ```mermaid
 erDiagram
     CHARACTERIZATION_CAMPAIGNS ||--o{ CAMPAIGN_SAMPLES : "FK_campaign_id"
+    DEVICES ||--o{ ACTIVOS_UNIFILAR : "FK_device_id"
     DEVICES ||--o{ AUDITORIA_CAMBIOS_TI : "FK_device_id"
     DEVICES ||--o{ CHARACTERIZATION_CAMPAIGNS : "FK_device_id"
     DEVICES ||--o{ DEVICE_ALERTS : "FK_device_id"
@@ -20,6 +21,7 @@ erDiagram
     DEVICES ||--o{ TELEMETRIA_ANOMALIAS : "FK_device_id"
     DEVICES ||--o{ TELEMETRY_ENERGY : "FK_device_id"
     DEVICES ||--o{ TELEMETRY_INSTANTANEOUS : "FK_device_id"
+    FACILITIES ||--o{ ACTIVOS_UNIFILAR : "FK_planta_id"
     FACILITIES ||--o{ DEVICES : "FK_facility_id"
     LOADS ||--o{ CHARACTERIZATION_CAMPAIGNS : "FK_load_id"
     LOADS ||--o{ LOAD_ACTIVITY_INTERVALS : "FK_load_id"
@@ -34,6 +36,27 @@ erDiagram
     USERS ||--o{ OAUTH_CODES : "FK_user_id"
     USERS ||--o{ OAUTH_REFRESH_TOKENS : "FK_user_id"
     USERS ||--o{ USER_FACILITY_ACCESS : "FK_user_id"
+
+    ACTIVOS_UNIFILAR {
+        string id PK
+        string planta_id FK
+        string nombre
+        string tipo
+        string parent_id
+        string device_id FK
+        float tension_nominal_v
+        float potencia_nominal_kw
+        float capacidad_nominal_kva
+        string categoria_uso
+        boolean uso_significativo
+        float posicion_x
+        float posicion_y
+        float ancho
+        float alto
+        int orden
+        datetime creado_en
+        datetime actualizado_en
+    }
 
     AUDIT_LOGS {
         string id PK
@@ -442,6 +465,34 @@ erDiagram
 ```
 
 ## 2. Detalle de Tablas e Índices
+
+### Tabla `activos_unifilar`
+
+| Columna | Tipo SQL | Clave / Restricción | Nullable |
+| :--- | :--- | :--- | :--- |
+| `id` | `VARCHAR(64)` | **PRIMARY KEY** | No |
+| `planta_id` | `VARCHAR(64)` | FK -> `facilities.id` | No |
+| `nombre` | `VARCHAR(128)` | - | No |
+| `tipo` | `VARCHAR(17)` | - | No |
+| `parent_id` | `VARCHAR(64)` | - | Sí |
+| `device_id` | `VARCHAR(64)` | FK -> `devices.id` | Sí |
+| `tension_nominal_v` | `FLOAT` | - | No |
+| `potencia_nominal_kw` | `FLOAT` | - | Sí |
+| `capacidad_nominal_kva` | `FLOAT` | - | Sí |
+| `categoria_uso` | `VARCHAR(64)` | - | Sí |
+| `uso_significativo` | `BOOLEAN` | - | No |
+| `posicion_x` | `FLOAT` | - | Sí |
+| `posicion_y` | `FLOAT` | - | Sí |
+| `ancho` | `FLOAT` | - | Sí |
+| `alto` | `FLOAT` | - | Sí |
+| `orden` | `INTEGER` | - | No |
+| `creado_en` | `DATETIME` | - | No |
+| `actualizado_en` | `DATETIME` | - | No |
+
+**Índices:**
+- `idx_activos_unifilar_device`: (`device_id`)
+- `idx_activos_unifilar_parent`: (`parent_id`)
+- `idx_activos_unifilar_planta`: (`planta_id`)
 
 ### Tabla `audit_logs`
 

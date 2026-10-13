@@ -529,7 +529,10 @@ class AuditoriaChangeContraseniaModel(Base):
     usuario: Mapped["UserModel"] = relationship()
 
 
-# Reexportación de modelos OAuth 2.0 PKCE para compatibilidad y registro en Base.metadata
+# Reexportación de modelos para compatibilidad y registro en Base.metadata
+from src.infrastructure.sqlalchemy.activos_unifilar_models import (  # noqa: E402, F401
+    ActivoUnifilarModel,
+)
 from src.infrastructure.sqlalchemy.oauth_models import (  # noqa: E402, F401
     OAuthClientModel,
     OAuthCodeModel,
