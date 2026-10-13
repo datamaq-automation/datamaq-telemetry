@@ -59,7 +59,11 @@ jobs:
           DEPLOY_HEALTH_URL: ${{ vars.DEPLOY_HEALTH_URL || 'http://localhost:8000/health/ready' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-        run: ./scripts/deploy-server.sh
+        # tee guarda la salida del script para que el aviso de Telegram distinga el estado real (#24). pipefail
+        # conserva el exit code del script: un deploy fallido sigue dejando el CD en rojo.
+        run: |
+          set -o pipefail
+          ./scripts/deploy-server.sh 2>&1 | tee "$RUNNER_TEMP/deploy.log"
 
       - name: "Setup Python para smoke tests"
         uses: actions/setup-python@v5
@@ -92,7 +96,18 @@ jobs:
           SHA_CORTO: ${{ github.sha }}
           ACTOR: ${{ github.actor }}
         run: |
-          MSG="🔴 CD Deploy falló — datamaq-telemetry
+          # El estado sale de la salida real del deploy (deploy-server.sh), no de un texto fijo (#24).
+          LOG="$RUNNER_TEMP/deploy.log"
+          if [ -f "$LOG" ] && grep -q "ROLLBACK FALLIDO" "$LOG"; then
+            TITULO="🚨 ROLLBACK FALLIDO: servicio CAÍDO en producción"
+          elif [ -f "$LOG" ] && grep -q "ROLLBACK INCOMPLETO" "$LOG"; then
+            TITULO="🚨 ROLLBACK INCOMPLETO: servicio en estado desconocido"
+          elif [ -f "$LOG" ] && grep -q "el servicio está OK" "$LOG"; then
+            TITULO="↩️ Deploy revertido, servicio OK"
+          else
+            TITULO="🔴 CD Deploy falló"
+          fi
+          MSG="$TITULO — datamaq-telemetry
           Commit: ${SHA_CORTO:0:7} (disparado por ${ACTOR})
           Run: ${RUN_URL}"
           curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
