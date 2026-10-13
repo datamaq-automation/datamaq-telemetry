@@ -284,15 +284,17 @@ def test_obtener_instalacion_medidor_los_constituyentes():
     assert inst_mac is not None
     assert inst_mac.correccion_angular_fases == "R:-60,S:60"
 
-    # Trafo 2 (2do medidor): R:0,S:15 y fases R,S
+    # Trafo 2 (2do medidor): R:180,S:-120 y fases R,S.
+    # Revertido desde R:0,S:15 por decisión del dueño (2026-10-13, hallazgo #29).
+    # Ver #28: los scripts de diagnóstico no validan esta corrección.
     inst_trafo2 = repo.obtener_instalacion_medidor("c91713f1-0621-4a33-9279-c5327a317d96")
     assert inst_trafo2 is not None
-    assert inst_trafo2.correccion_angular_fases == "R:0,S:15"
+    assert inst_trafo2.correccion_angular_fases == "R:180,S:-120"
     assert inst_trafo2.fases_con_ti == "R,S"
 
     inst_trafo2_alias = repo.obtener_instalacion_medidor("369")
     assert inst_trafo2_alias is not None
-    assert inst_trafo2_alias.correccion_angular_fases == "R:0,S:15"
+    assert inst_trafo2_alias.correccion_angular_fases == "R:180,S:-120"
 
 
 def test_obtener_instalacion_medidor_clientes_industriales_y_hogar():
