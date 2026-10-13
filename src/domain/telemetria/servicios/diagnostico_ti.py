@@ -60,7 +60,7 @@ class DiagnosticoTIService:
 
         Delegado a RotacionFasorial para centralizar lógica fasorial.
         """
-        rotacion = RotacionFasorial(orden_fases=orden, invertida=invertido)
+        rotacion = RotacionFasorial(asociacion_tension_corriente=orden, polaridad_ti=invertido)
         mediciones_map = {"R": med_r, "S": med_s, "T": med_t}
 
         resultado: dict[str, MedicionFase] = {}

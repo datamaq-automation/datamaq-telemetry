@@ -288,13 +288,13 @@ class RotacionFasorial:
     - Simulación de rotaciones en análisis metrológico
     """
 
-    orden_fases: tuple[str, ...] = ("R", "S", "T")
-    invertida: bool = False
+    asociacion_tension_corriente: tuple[str, ...] = ("R", "S", "T")
+    polaridad_ti: bool = False
 
     def __post_init__(self) -> None:
-        if not (1 <= len(self.orden_fases) <= 3):
-            raise ValueError(f"Orden de fases debe tener 1-3 elementos: {self.orden_fases}")
-        for fase in self.orden_fases:
+        if not (1 <= len(self.asociacion_tension_corriente) <= 3):
+            raise ValueError(f"Orden de fases debe tener 1-3 elementos: {self.asociacion_tension_corriente}")
+        for fase in self.asociacion_tension_corriente:
             if fase not in ("R", "S", "T"):
                 raise ValueError(f"Fase inválida (debe ser R, S o T): {fase}")
 
@@ -308,20 +308,20 @@ class RotacionFasorial:
         Returns:
             MedicionFase con Q invertida si aplica, resto sin cambios
         """
-        if indice >= len(self.orden_fases):
-            raise ValueError(f"Índice {indice} fuera de rango para {len(self.orden_fases)} fases")
+        if indice >= len(self.asociacion_tension_corriente):
+            raise ValueError(f"Índice {indice} fuera de rango para {len(self.asociacion_tension_corriente)} fases")
 
         p, q, s, fp = medicion.p, medicion.q, medicion.s, medicion.fp
 
-        if self.invertida and q is not None:
+        if self.polaridad_ti and q is not None:
             q = -q
 
         return MedicionFase(p=p, q=q, s=s, fp=fp)
 
     def posicion_legible(self) -> str:
-        """Representación legible: orden + (INV) si aplica."""
-        inv_str = " (INV)" if self.invertida else ""
-        return f"{','.join(self.orden_fases)}{inv_str}"
+        """Representación legible: asociación + (INV) si aplica."""
+        inv_str = " (INV)" if self.polaridad_ti else ""
+        return f"{','.join(self.asociacion_tension_corriente)}{inv_str}"
 
 
 @dataclass(frozen=True)
@@ -332,21 +332,21 @@ class CandidatoTI:
     deben estar ordenadas las fases y si la polaridad está invertida.
     """
 
-    orden_fases: tuple[str, ...]
-    invertido: bool
+    asociacion_tension_corriente: tuple[str, ...]
+    polaridad_ti: bool
     score: float
     justificacion: str
 
     def posicion(self) -> str:
-        """Representación legible: orden + (INV) si aplica."""
-        inv_str = " (INV)" if self.invertido else ""
-        return f"{','.join(self.orden_fases)}{inv_str}"
+        """Representación legible: asociación + (INV) si aplica."""
+        inv_str = " (INV)" if self.polaridad_ti else ""
+        return f"{','.join(self.asociacion_tension_corriente)}{inv_str}"
 
     def __post_init__(self) -> None:
         if self.score < 0.0 or self.score > 1.0:
             raise ValueError(f"Score fuera de rango [0.0, 1.0]: {self.score}")
-        if not (1 <= len(self.orden_fases) <= 3):
-            raise ValueError(f"Orden de fases debe tener 1-3 elementos: {self.orden_fases}")
-        for fase in self.orden_fases:
+        if not (1 <= len(self.asociacion_tension_corriente) <= 3):
+            raise ValueError(f"Orden de fases debe tener 1-3 elementos: {self.asociacion_tension_corriente}")
+        for fase in self.asociacion_tension_corriente:
             if fase not in ("R", "S", "T"):
                 raise ValueError(f"Fase inválida (debe ser R, S o T): {fase}")
