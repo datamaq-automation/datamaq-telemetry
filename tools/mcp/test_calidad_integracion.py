@@ -172,15 +172,49 @@ def _cliente_crudo(
 
 
 @pytest.mark.asyncio
-async def test_error_al_listar_medidores_se_propaga_y_no_entrega_numero() -> None:
-    """Un 500 al listar medidores es un error, no un número: la tool falla y el backend no se consulta."""
+async def test_500_al_listar_medidores_devuelve_no_verificable_sin_kvar() -> None:
+    """Revisión de #31: un 500 al listar medidores es 'no se pudo listar'. No hay kVAr ni importes."""
     llamadas: list[str] = []
     set_client(_cliente(dispositivos=None, lecturas={}, dispositivos_status=500, llamadas=llamadas))
 
-    with pytest.raises(RuntimeError):
-        await datamaq_analizar_capacitores("planta-x", periodo_dias=1)
+    resultado = await datamaq_analizar_capacitores("planta-x", periodo_dias=1)
 
+    assert resultado["estado"] == "no_verificable"
+    assert "kvar_recomendados" not in resultado
     assert "/api/v1/analitica/banco-capacitores/planta" not in llamadas
+
+
+@pytest.mark.asyncio
+async def test_error_de_conexion_al_listar_medidores_devuelve_no_verificable() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("sin red", request=request)
+
+    set_client(httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="http://datamaq.local"))
+
+    resultado = await datamaq_consultar_penalizaciones("planta-x", periodo_dias=1)
+
+    assert resultado["estado"] == "no_verificable"
+    assert "penalizacion_estimada_ars" not in resultado
+
+
+@pytest.mark.asyncio
+async def test_404_al_listar_medidores_sigue_propagando_el_error() -> None:
+    """Un 404 es un pedido mal hecho (planta inexistente), no un dato no verificable."""
+    set_client(_cliente_crudo(httpx.Response(404, json={"detail": "Planta inexistente"})))
+
+    with pytest.raises(RuntimeError, match="Planta inexistente"):
+        await datamaq_analizar_capacitores("planta-fantasma", periodo_dias=1)
+
+
+@pytest.mark.asyncio
+async def test_potencia_reciente_con_500_al_listar_no_corta_y_marca_cobertura_no_verificable() -> None:
+    set_client(_cliente_crudo(httpx.Response(500, json={"detail": "error"})))
+
+    resultado = await datamaq_consultar_potencia_reciente("planta-x", horas=24)
+
+    assert "estado" not in resultado
+    assert resultado["cobertura_verificable"] is False
+    assert resultado["calidad_datos"]["verificada"] is False
 
 
 @pytest.mark.asyncio

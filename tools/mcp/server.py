@@ -95,6 +95,10 @@ async def _obtener_cliente_http() -> AsyncIterator[httpx.AsyncClient]:
         yield client
 
 
+class ErrorDisponibilidadDatamaq(RuntimeError):
+    """El backend no respondió o respondió 5xx: la consulta no se pudo hacer. No es un pedido mal hecho (404, 401, 403)."""
+
+
 async def _ejecutar_peticion(
     metodo: str,
     ruta: str,
@@ -133,9 +137,11 @@ async def _ejecutar_peticion(
             else:
                 mensaje = f"Error HTTP {codigo} al consultar {ruta}: {detalle}"
 
+            if codigo >= 500:
+                raise ErrorDisponibilidadDatamaq(mensaje) from exc
             raise RuntimeError(mensaje) from exc
         except httpx.RequestError as exc:
-            raise RuntimeError(f"Error de conexión con DataMaq API ({ruta}): {exc}") from exc
+            raise ErrorDisponibilidadDatamaq(f"Error de conexión con DataMaq API ({ruta}): {exc}") from exc
 
 
 @mcp.tool()
@@ -468,14 +474,20 @@ async def _alertas_abiertas(planta_id: str, token: str | None) -> list[dict[str,
 async def _evaluar_calidad_planta(planta_id: str, horas: int, token: str | None) -> tuple[list[dict[str, Any]], bool]:
     """Evalúa cada medidor de la planta. Devuelve (evaluaciones, verificada).
 
-    `verificada` es False si la respuesta de medidores no es una lista: no hay compuerta y el llamador bloquea como
-    no verificable. Un error HTTP se propaga, para que mensajes como "planta inexistente" no se pierdan.
+    `verificada` es False si no se pudo verificar la calidad: la respuesta de medidores no es una lista, o falla la
+    disponibilidad (5xx, timeout, conexión) al listar medidores, alertas o lecturas. El llamador bloquea como
+    `no_verificable`. Un 404 o un 4xx se propaga como error: es un pedido mal hecho, no un dato no verificable.
     La cobertura se mide contra lo que el endpoint puede devolver (tope de `limit`), no contra la ventana completa.
     """
-    dispositivos = await _ejecutar_peticion("GET", "/api/v1/dispositivos", token=token, params={"planta_id": planta_id})
+    try:
+        dispositivos = await _ejecutar_peticion(
+            "GET", "/api/v1/dispositivos", token=token, params={"planta_id": planta_id}
+        )
+        alertas_abiertas = await _alertas_abiertas(planta_id, token)
+    except ErrorDisponibilidadDatamaq:
+        return [], False
     if not isinstance(dispositivos, list):
         return [], False
-    alertas_abiertas = await _alertas_abiertas(planta_id, token)
     puntos_ventana = min(horas * 3600 // 300, _LIMITE_LECTURAS)
 
     evaluaciones: list[dict[str, Any]] = []
@@ -489,6 +501,8 @@ async def _evaluar_calidad_planta(planta_id: str, horas: int, token: str | None)
                 token=token,
                 params={"hours": horas, "granularity": "5m", "limit": _LIMITE_LECTURAS},
             )
+        except ErrorDisponibilidadDatamaq:
+            return [], False
         except RuntimeError:
             lecturas = []
         filas = [x for x in lecturas if isinstance(x, dict)] if isinstance(lecturas, list) else []
@@ -552,7 +566,12 @@ async def datamaq_consultar_potencia_reciente(
         ctx: Contexto de ejecución FastMCP inyectado automáticamente.
     """
     token = _resolver_token(ctx)
-    dispositivos = await _ejecutar_peticion("GET", "/api/v1/dispositivos", token=token, params={"planta_id": planta_id})
+    try:
+        dispositivos = await _ejecutar_peticion(
+            "GET", "/api/v1/dispositivos", token=token, params={"planta_id": planta_id}
+        )
+    except ErrorDisponibilidadDatamaq:
+        dispositivos = None  # sin listado no hay medidores: la respuesta sale sin calidad verificada (#31)
     ids = (
         [d["id"] for d in dispositivos if isinstance(d, dict) and d.get("id")] if isinstance(dispositivos, list) else []
     )
@@ -560,6 +579,7 @@ async def datamaq_consultar_potencia_reciente(
     lecturas_por_dispositivo: list[list[dict[str, Any]]] = []
     lecturas_por_id: dict[str, list[dict[str, Any]]] = {}
     con_error: list[str] = []
+    lecturas_disponibles = True
     for dispositivo_id in ids:
         try:
             lecturas = await _ejecutar_peticion(
@@ -568,6 +588,10 @@ async def datamaq_consultar_potencia_reciente(
                 token=token,
                 params={"hours": horas, "granularity": "5m", "limit": 5000},
             )
+        except ErrorDisponibilidadDatamaq:
+            con_error.append(dispositivo_id)
+            lecturas_disponibles = False
+            continue
         except RuntimeError:
             con_error.append(dispositivo_id)
             continue
@@ -622,10 +646,10 @@ async def datamaq_consultar_potencia_reciente(
     ]
     # Con el tope de `limit` la ventana pedida puede no estar completa: se declara, y la cobertura del total no es verificable.
     truncada = any(e["ventana_truncada"] for e in evaluaciones)
+    verificada = isinstance(dispositivos, list) and alertas_disponibles and lecturas_disponibles
     respuesta["ventana_truncada"] = truncada
-    if truncada:
-        respuesta["cobertura_verificable"] = False
-    return _con_calidad(respuesta, evaluaciones, verificada=isinstance(dispositivos, list) and alertas_disponibles)
+    respuesta["cobertura_verificable"] = not (truncada or not verificada)
+    return _con_calidad(respuesta, evaluaciones, verificada=verificada)
 
 
 def main() -> None:
