@@ -14,6 +14,7 @@ API FastAPI y Worker MQTT para la ingesta y persistencia de telemetría de medid
 - Verificación de arquitectura y tamaño: `.venv/bin/python scripts/verify_architecture.py && .venv/bin/python scripts/verify_code_size.py`
 - Linter: `.venv/bin/ruff check .`
 - LSP de OpenCode: habilitado vía `opencode.json` (servidor `pyright` → `.venv/bin/pyright-langserver --stdio`); da feedback de diagnósticos de tipos de `src/` al agente. La verificación autoritativa de tipos sigue siendo `.venv/bin/pyright` (etapa 3 del Gauntlet).
+- **`gh` en este repo:** el remoto es SSH y `gh` sin `-R` falla con «none of the git remotes ... known GitHub host». Usar siempre `gh <cmd> -R datamaq-automation/datamaq-telemetry`. `gh run watch --exit-status` no es confiable como verificación: confirmar con `gh run list` después.
 
 ## Entornos (Development vs Producción)
 
@@ -22,6 +23,11 @@ API FastAPI y Worker MQTT para la ingesta y persistencia de telemetría de medid
 - **Producción (VPS, acceso via `ssh vps`):** Datos reales desde 2026-09. Script: `./scripts/logs.sh` (solo lectura de logs). Para queries SQL directas: `ssh vps` → `mysql -u ... -p...` (credenciales en VPS).
 
 **Regla:** Antes de queryar datos históricos/reales de medidores, validar: ¿esto es fixture de test (dev) o datos de producción? Si es producción, usar `ssh vps`.
+
+## Datos maestros (`data/`, repo `datamaq-data`)
+
+- **Cambios que tocan valores testeados:** un cambio en `datamaq-data` que toque un valor testeado (`correccion_angular_fases`, `potencia_contratada`, etc.) debe actualizar en el mismo flujo los tests que lo hardcodean (`tests/unit/test_yaml_organizaciones_repository.py`, `tests/unit/test_nodo_unifilar_potencia_contratada.py`). Si no, el CI de `main` queda en rojo.
+- **Despliegue de datos en el VPS:** el pull `--ff-only` trae todo `origin/main` de `datamaq-data`, no solo el commit propio. Antes de pullear, revisar `git log origin/main` contra el VPS. El pull no recarga el servicio: un cambio de datos necesita reinicio para que el proceso lo tome, con autorización explícita.
 
 ## Mapeo de IDs: YAML vs Base de Datos
 
