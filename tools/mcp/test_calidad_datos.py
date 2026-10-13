@@ -3,6 +3,7 @@
 Fixtures en memoria: sin base real ni HTTP. Los casos siguen la matriz del spec-issue-31.md (sección 6).
 """
 
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from tools.mcp.server import (
@@ -125,3 +126,34 @@ def test_bloquea_solo_con_s1_o_s2() -> None:
 
     assert _bloquea_calculo([solo_cobertura, solo_fases]) is False
     assert _bloquea_calculo([con_inversion]) is True
+
+
+def test_muestra_truncada_no_calcula_s3_y_queda_no_verificable() -> None:
+    """Ajuste de #31: 5000 lecturas (tope de limit) no son la ventana pedida. No se marca S3 ni 'sano'."""
+    potencias = [30_000.0] * 5_000
+    ev = _evaluar_medidor(_medidor(), _lecturas_largas(potencias), [], 8_640)
+
+    assert ev["ventana_truncada"] is True
+    assert ev["cobertura_estado"] == "no_verificable"
+    assert ev["cobertura_puntos_pct"] is None
+    assert "S3" not in ev["codigos"]
+
+
+def test_muestra_completa_con_baja_cobertura_sigue_activando_s3() -> None:
+    ev = _evaluar_medidor(_medidor(), _lecturas([30_000.0] * 6), [], PUNTOS_5_MIN_EN_UNA_HORA)
+
+    assert ev["ventana_truncada"] is False
+    assert ev["cobertura_estado"] == "verificada"
+    assert "S3" in ev["codigos"]
+
+
+def _lecturas_largas(potencias_w: list[float]) -> list[dict[str, Any]]:
+    """Como _lecturas, pero sin límite de horas: una lectura cada 5 min desde 2026-10-01."""
+    inicio = datetime(2026, 10, 1, tzinfo=timezone.utc)
+    return [
+        {
+            "registrado_en": (inicio + timedelta(minutes=5 * i)).isoformat().replace("+00:00", "Z"),
+            "potencia_activa_total_W": p,
+        }
+        for i, p in enumerate(potencias_w)
+    ]

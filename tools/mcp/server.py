@@ -224,7 +224,9 @@ async def datamaq_analizar_capacitores(
     """
     token = _resolver_token(ctx)
     evaluaciones, verificada = await _evaluar_calidad_planta(planta_id, min(periodo_dias * 24, _HORAS_MAXIMAS), token)
-    if verificada and _bloquea_calculo(evaluaciones):
+    if not verificada:
+        return _respuesta_no_verificable(planta_id)
+    if _bloquea_calculo(evaluaciones):
         return _respuesta_bloqueada(planta_id, evaluaciones)
     parametros: dict[str, Any] = {
         "planta_id": planta_id,
@@ -258,7 +260,9 @@ async def datamaq_consultar_penalizaciones(
     """
     token = _resolver_token(ctx)
     evaluaciones, verificada = await _evaluar_calidad_planta(planta_id, min(periodo_dias * 24, _HORAS_MAXIMAS), token)
-    if verificada and _bloquea_calculo(evaluaciones):
+    if not verificada:
+        return _respuesta_no_verificable(planta_id)
+    if _bloquea_calculo(evaluaciones):
         return _respuesta_bloqueada(planta_id, evaluaciones)
     parametros: dict[str, Any] = {
         "planta_id": planta_id,
@@ -387,9 +391,16 @@ def _evaluar_medidor(
         if negativos / len(p_por_bucket) >= _FRACCION_BUCKETS_NEGATIVOS:
             codigos.append("S2")
 
-    cobertura_pct = round(len(p_por_bucket) / puntos_esperados * 100, 1) if puntos_esperados > 0 else 0.0
-    if cobertura_pct < _COBERTURA_MEDIDOR_MINIMA_PCT:
-        codigos.append("S3")
+    # Si el endpoint llegó al tope de `limit`, la muestra no es la ventana pedida: no se calcula S3 sobre ella.
+    truncada = len(lecturas) >= _LIMITE_LECTURAS
+    if truncada:
+        cobertura: float | None = None
+        cobertura_estado = "no_verificable"
+    else:
+        cobertura = round(len(p_por_bucket) / puntos_esperados * 100, 1) if puntos_esperados > 0 else 0.0
+        cobertura_estado = "verificada"
+        if cobertura < _COBERTURA_MEDIDOR_MINIMA_PCT:
+            codigos.append("S3")
     if faltantes:
         codigos.append("S4")
 
@@ -399,13 +410,28 @@ def _evaluar_medidor(
         "tipo_instalacion": tipo,
         "fases_medidas": medidas,
         "fases_faltantes": faltantes,
-        "cobertura_puntos_pct": cobertura_pct,
+        "cobertura_puntos_pct": cobertura,
+        "cobertura_estado": cobertura_estado,
+        "ventana_truncada": truncada,
+        "horas_cubiertas": _horas_cubiertas(lecturas),
         "codigos": codigos,
     }
 
 
+def _horas_cubiertas(lecturas: list[dict[str, Any]]) -> float:
+    """Horas entre la primera y la última lectura recibida: la ventana real de la muestra."""
+    marcas = [
+        datetime.fromisoformat(x["registrado_en"].replace("Z", "+00:00"))
+        for x in lecturas
+        if isinstance(x.get("registrado_en"), str)
+    ]
+    if len(marcas) < 2:
+        return 0.0
+    return round((max(marcas) - min(marcas)).total_seconds() / 3600, 2)
+
+
 def _resumen_calidad(evaluaciones: list[dict[str, Any]]) -> dict[str, Any]:
-    """Medidores sospechosos y cobertura trifásica de la planta. Una fase faltante nunca cuenta como cero."""
+    """Medidores sospechosos, cobertura trifásica y cobertura no verificable. Una fase faltante nunca cuenta como cero."""
     sospechosos = [e for e in evaluaciones if e["codigos"]]
     no_trifasicos = [e for e in evaluaciones if e["fases_faltantes"]]
     return {
@@ -413,6 +439,11 @@ def _resumen_calidad(evaluaciones: list[dict[str, Any]]) -> dict[str, Any]:
         "total_trifasico_completo": not no_trifasicos,
         "dispositivos_no_trifasicos": [
             {"dispositivo_id": e["dispositivo_id"], "fases_faltantes": e["fases_faltantes"]} for e in no_trifasicos
+        ],
+        "cobertura_no_verificable": [
+            {"dispositivo_id": e["dispositivo_id"], "horas_cubiertas": e["horas_cubiertas"]}
+            for e in evaluaciones
+            if e["cobertura_estado"] == "no_verificable"
         ],
     }
 
@@ -427,28 +458,21 @@ _HORAS_MAXIMAS = 720  # tope de `hours` en ese mismo endpoint (telemetria_router
 
 
 async def _alertas_abiertas(planta_id: str, token: str | None) -> list[dict[str, Any]]:
-    """Alertas abiertas de la planta. Si el backend no responde, la compuerta sigue sin alertas y la respuesta lo dice."""
-    try:
-        alertas = await _ejecutar_peticion(
-            "GET", "/api/v1/alertas", token=token, params={"planta_id": planta_id, "solo_abiertas": True}
-        )
-    except RuntimeError:
-        return []
+    """Alertas abiertas de la planta. Un error HTTP se propaga: sin alertas no se puede descartar S1."""
+    alertas = await _ejecutar_peticion(
+        "GET", "/api/v1/alertas", token=token, params={"planta_id": planta_id, "solo_abiertas": True}
+    )
     return [a for a in alertas if isinstance(a, dict)] if isinstance(alertas, list) else []
 
 
 async def _evaluar_calidad_planta(planta_id: str, horas: int, token: str | None) -> tuple[list[dict[str, Any]], bool]:
     """Evalúa cada medidor de la planta. Devuelve (evaluaciones, verificada).
 
-    `verificada` es False si no se pudieron listar medidores: el cálculo sigue, pero sin compuerta, y la respuesta lo dice.
+    `verificada` es False si la respuesta de medidores no es una lista: no hay compuerta y el llamador bloquea como
+    no verificable. Un error HTTP se propaga, para que mensajes como "planta inexistente" no se pierdan.
     La cobertura se mide contra lo que el endpoint puede devolver (tope de `limit`), no contra la ventana completa.
     """
-    try:
-        dispositivos = await _ejecutar_peticion(
-            "GET", "/api/v1/dispositivos", token=token, params={"planta_id": planta_id}
-        )
-    except RuntimeError:
-        return [], False
+    dispositivos = await _ejecutar_peticion("GET", "/api/v1/dispositivos", token=token, params={"planta_id": planta_id})
     if not isinstance(dispositivos, list):
         return [], False
     alertas_abiertas = await _alertas_abiertas(planta_id, token)
@@ -482,6 +506,16 @@ def _con_calidad(resultado: dict[str, Any], evaluaciones: list[dict[str, Any]], 
         return resultado
     resultado["calidad_datos"] = {"verificada": True, **_resumen_calidad(evaluaciones)}
     return resultado
+
+
+def _respuesta_no_verificable(planta_id: str) -> dict[str, Any]:
+    """Sin listado de medidores no hay compuerta: un número sin verificar es peor que ninguno."""
+    return {
+        "estado": "no_verificable",
+        "planta_id": planta_id,
+        "motivo": "No se pudieron listar los medidores de la planta: la calidad de datos no se pudo verificar. "
+        "El kVAr y los importes no se calculan sin esa verificación.",
+    }
 
 
 def _respuesta_bloqueada(planta_id: str, evaluaciones: list[dict[str, Any]]) -> dict[str, Any]:
@@ -572,7 +606,12 @@ async def datamaq_consultar_potencia_reciente(
         respuesta["advertencia_datos"] = "Datos incompletos (<80% de cobertura)"
 
     # Esta tool nunca bloquea: entrega los agregados y marca los medidores sospechosos (#31).
-    alertas_abiertas = await _alertas_abiertas(planta_id, token)
+    try:
+        alertas_abiertas = await _alertas_abiertas(planta_id, token)
+        alertas_disponibles = True
+    except RuntimeError:
+        alertas_abiertas = []
+        alertas_disponibles = False
     puntos_ventana = min(puntos_esperados, _LIMITE_LECTURAS)
     dispositivos_validos = (
         [d for d in dispositivos if isinstance(d, dict) and d.get("id")] if isinstance(dispositivos, list) else []
@@ -581,7 +620,12 @@ async def datamaq_consultar_potencia_reciente(
         _evaluar_medidor(d, lecturas_por_id.get(d["id"], []), alertas_abiertas, puntos_ventana)
         for d in dispositivos_validos
     ]
-    return _con_calidad(respuesta, evaluaciones, verificada=isinstance(dispositivos, list))
+    # Con el tope de `limit` la ventana pedida puede no estar completa: se declara, y la cobertura del total no es verificable.
+    truncada = any(e["ventana_truncada"] for e in evaluaciones)
+    respuesta["ventana_truncada"] = truncada
+    if truncada:
+        respuesta["cobertura_verificable"] = False
+    return _con_calidad(respuesta, evaluaciones, verificada=isinstance(dispositivos, list) and alertas_disponibles)
 
 
 def main() -> None:

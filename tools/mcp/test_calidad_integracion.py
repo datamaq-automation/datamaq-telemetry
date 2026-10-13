@@ -150,12 +150,91 @@ async def test_potencia_reciente_nunca_bloquea_y_marca_el_medidor_sospechoso() -
     assert [m["dispositivo_id"] for m in sospechosos] == ["dev-369"]
 
 
+def _cliente_crudo(
+    respuesta_dispositivos: httpx.Response,
+    respuesta_alertas: httpx.Response | None = None,
+    llamadas: list[str] | None = None,
+) -> httpx.AsyncClient:
+    """Cliente con respuestas controladas para medidores y alertas (errores y formas inesperadas)."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if llamadas is not None:
+            llamadas.append(request.url.path)
+        if request.url.path == "/api/v1/dispositivos":
+            return respuesta_dispositivos
+        if request.url.path == "/api/v1/alertas":
+            return respuesta_alertas or httpx.Response(200, json=[])
+        if request.url.path.startswith("/api/v1/telemetria/instantaneous/"):
+            return httpx.Response(200, json=_serie(30_000.0))
+        return httpx.Response(200, json={"kvar_recomendados": 120.0})
+
+    return httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="http://datamaq.local")
+
+
 @pytest.mark.asyncio
-async def test_sin_listado_de_medidores_no_bloquea_y_lo_declara() -> None:
-    """Si no se pueden listar medidores, la compuerta no puede verificar: el cálculo sale con la marca."""
-    set_client(_cliente(dispositivos=None, lecturas={}, dispositivos_status=500))
+async def test_error_al_listar_medidores_se_propaga_y_no_entrega_numero() -> None:
+    """Un 500 al listar medidores es un error, no un número: la tool falla y el backend no se consulta."""
+    llamadas: list[str] = []
+    set_client(_cliente(dispositivos=None, lecturas={}, dispositivos_status=500, llamadas=llamadas))
+
+    with pytest.raises(RuntimeError):
+        await datamaq_analizar_capacitores("planta-x", periodo_dias=1)
+
+    assert "/api/v1/analitica/banco-capacitores/planta" not in llamadas
+
+
+@pytest.mark.asyncio
+async def test_respuesta_de_medidores_que_no_es_lista_bloquea_como_no_verificable() -> None:
+    """Ajuste de #31: sin listado de medidores no hay compuerta. Capacitores no entrega kVAr sin verificar."""
+    llamadas: list[str] = []
+    set_client(_cliente_crudo(httpx.Response(200, json={"detail": "formato inesperado"}), llamadas=llamadas))
 
     resultado = await datamaq_analizar_capacitores("planta-x", periodo_dias=1)
 
-    assert resultado["kvar_recomendados"] == 120.0
+    assert resultado["estado"] == "no_verificable"
+    assert "kvar_recomendados" not in resultado
+    assert "/api/v1/analitica/banco-capacitores/planta" not in llamadas
+
+
+@pytest.mark.asyncio
+async def test_penalizaciones_sin_listado_valido_bloquea_como_no_verificable() -> None:
+    set_client(_cliente_crudo(httpx.Response(200, json={"detail": "formato inesperado"})))
+
+    resultado = await datamaq_consultar_penalizaciones("planta-x", periodo_dias=1)
+
+    assert resultado["estado"] == "no_verificable"
+
+
+@pytest.mark.asyncio
+async def test_potencia_reciente_sin_alertas_baja_la_verificacion_sin_cortar() -> None:
+    """Si las alertas fallan, potencia reciente sigue entregando el resultado y marca calidad no verificada."""
+    set_client(_cliente_crudo(httpx.Response(200, json=[_dispositivo("dev-1")]), httpx.Response(500, json={})))
+
+    resultado = await datamaq_consultar_potencia_reciente("planta-x", horas=24)
+
+    assert "estado" not in resultado
+    assert resultado["potencia_activa_promedio_kw"] is not None
     assert resultado["calidad_datos"]["verificada"] is False
+
+
+@pytest.mark.asyncio
+async def test_lectura_truncada_no_calcula_cobertura_y_lo_declara() -> None:
+    """Ajuste de #31: 5000 lecturas (tope de limit) es una muestra truncada. No se calcula S3 sobre ella."""
+    inicio = datetime(2026, 10, 1, tzinfo=timezone.utc)
+    truncada = [
+        {
+            "registrado_en": (inicio + timedelta(minutes=5 * i)).isoformat().replace("+00:00", "Z"),
+            "potencia_activa_total_W": 30_000.0,
+        }
+        for i in range(5000)
+    ]
+    set_client(_cliente(dispositivos=[_dispositivo("dev-1")], lecturas={"dev-1": truncada}))
+
+    resultado = await datamaq_consultar_potencia_reciente("planta-x", horas=720)
+
+    assert resultado["ventana_truncada"] is True
+    assert resultado["cobertura_verificable"] is False
+    cobertura = resultado["calidad_datos"]["cobertura_no_verificable"]
+    assert [m["dispositivo_id"] for m in cobertura] == ["dev-1"]
+    assert cobertura[0]["horas_cubiertas"] == pytest.approx(416.58, abs=0.01)  # 4999 intervalos de 5 min
+    assert all("S3" not in m["codigos"] for m in resultado["calidad_datos"]["medidores_sospechosos"])
