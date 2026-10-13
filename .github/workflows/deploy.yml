@@ -100,6 +100,8 @@ jobs:
           LOG="$RUNNER_TEMP/deploy.log"
           if [ -f "$LOG" ] && grep -q "ROLLBACK FALLIDO" "$LOG"; then
             TITULO="🚨 ROLLBACK FALLIDO: servicio CAÍDO en producción"
+          elif [ -f "$LOG" ] && grep -q "ROLLBACK INCOMPLETO" "$LOG"; then
+            TITULO="🚨 ROLLBACK INCOMPLETO: servicio en estado desconocido"
           elif [ -f "$LOG" ] && grep -q "el servicio está OK" "$LOG"; then
             TITULO="↩️ Deploy revertido, servicio OK"
           else
