@@ -311,7 +311,7 @@ class EvaluadorAnomaliasFasesService:
                 valor_umbral=umbral_q_capacitiva_var,
                 unidad="var",
                 categoria="FACTOR_POTENCIA",
-                observaciones="Banco de capacitores sobrecompensado o resonancia capacitiva. Desconectar escalones fijos.",
+                observaciones="Banco de capacitores sobredimensionado o con pasos encendidos en vacío.",
             )
 
         return None
