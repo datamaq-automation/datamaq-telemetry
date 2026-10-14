@@ -13,6 +13,8 @@ import pytest
 from mcp.server.fastmcp import Context
 
 from tools.mcp.server import (
+    _advertencias_calidad,
+    _cobertura_fases,
     datamaq_analizar_capacitores,
     datamaq_consultar_alertas,
     datamaq_consultar_penalizaciones,
@@ -232,6 +234,45 @@ async def test_datamaq_consultar_penalizaciones_periodo_personalizado():
 
     res = await datamaq_consultar_penalizaciones(planta_id="planta-pacheco", periodo_dias=14)
     assert res["periodo_dias"] == 14
+
+
+def test_advertencias_calidad_solo_marca_alertas_de_ti_y_signo_abiertas_de_la_planta():
+    """#31: TI_INVERTIDO, TI_DESCONECTADO y POTENCIA_NEGATIVA invalidan el agregado. Otras alertas y medidores ajenos no."""
+    alertas = [
+        {"dispositivo_id": "m369", "tipo_alerta": "POTENCIA_NEGATIVA", "mensaje": "P negativa"},
+        {"dispositivo_id": "m1", "tipo_alerta": "BAJO_FACTOR_POTENCIA", "mensaje": "FP bajo"},
+        {"dispositivo_id": "ajeno", "tipo_alerta": "TI_INVERTIDO", "mensaje": "otra planta"},
+    ]
+    advertencias = _advertencias_calidad(alertas, {"m369": "TGBT Trafo 2", "m1": "TGBT General"})
+    assert advertencias == [
+        {
+            "dispositivo_id": "m369",
+            "dispositivo_tag": "TGBT Trafo 2",
+            "tipo_alerta": "POTENCIA_NEGATIVA",
+            "mensaje": "P negativa",
+        }
+    ]
+
+
+def test_cobertura_fases_no_cuenta_la_fase_sin_medir_como_cero():
+    """#31: un medidor de dos fases (R y S) informa T como faltante con 0 % de cobertura, sin contarla dentro de las medidas."""
+    lecturas = [
+        {
+            "fase_r": {"net_active_power_W": 10_000.0},
+            "fase_s": {"net_active_power_W": 9_000.0},
+            "fase_t": {"net_active_power_W": None},
+        },
+        {
+            "fase_r": {"net_active_power_W": 11_000.0},
+            "fase_s": {"net_active_power_W": None},
+            "fase_t": {"net_active_power_W": None},
+        },
+    ]
+    cobertura = _cobertura_fases(lecturas)
+    assert cobertura["muestras"] == 2
+    assert cobertura["cobertura_fase_pct"] == {"R": 100.0, "S": 50.0, "T": 0.0}
+    assert cobertura["fases_medidas"] == ["R", "S"]
+    assert cobertura["fases_faltantes"] == ["T"]
 
 
 def _handler_potencia(lecturas_por_id: dict[str, Any], errores: set[str] | None = None):

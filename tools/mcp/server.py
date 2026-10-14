@@ -336,6 +336,47 @@ def _promedio(valores: list[float]) -> float | None:
     return sum(valores) / len(valores) if valores else None
 
 
+# Alertas que invalidan el número agregado: TI mal cableado o signo invertido (ver #31, caso del medidor 369).
+TIPOS_ALERTA_CALIDAD_TI = frozenset({"TI_INVERTIDO", "TI_DESCONECTADO", "POTENCIA_NEGATIVA"})
+_CAMPOS_FASE = {"R": "fase_r", "S": "fase_s", "T": "fase_t"}
+
+
+def _advertencias_calidad(alertas: list[dict[str, Any]], dispositivos_map: dict[str, str]) -> list[dict[str, Any]]:
+    """Alertas abiertas de TI o de signo de los medidores de la planta. Si hay alguna, el agregado no es confiable."""
+    advertencias: list[dict[str, Any]] = []
+    for alerta in alertas:
+        dev_id = alerta.get("dispositivo_id")
+        if alerta.get("tipo_alerta") in TIPOS_ALERTA_CALIDAD_TI and dev_id in dispositivos_map:
+            advertencias.append(
+                {
+                    "dispositivo_id": dev_id,
+                    "dispositivo_tag": dispositivos_map[dev_id],
+                    "tipo_alerta": alerta["tipo_alerta"],
+                    "mensaje": alerta.get("mensaje"),
+                }
+            )
+    return advertencias
+
+
+def _cobertura_fases(lecturas: list[dict[str, Any]]) -> dict[str, Any]:
+    """Fases con potencia activa medida en las lecturas de UN medidor. Una fase sin dato no cuenta como cero."""
+    total = len(lecturas)
+    cobertura: dict[str, float] = {}
+    for fase, campo in _CAMPOS_FASE.items():
+        con_dato = sum(
+            1
+            for lectura in lecturas
+            if isinstance(lectura.get(campo), dict) and lectura[campo].get("net_active_power_W") is not None
+        )
+        cobertura[fase] = round(100.0 * con_dato / total, 1) if total else 0.0
+    return {
+        "muestras": total,
+        "cobertura_fase_pct": cobertura,
+        "fases_medidas": [fase for fase, pct in cobertura.items() if pct > 0],
+        "fases_faltantes": [fase for fase, pct in cobertura.items() if pct == 0],
+    }
+
+
 @mcp.tool()
 async def datamaq_consultar_potencia_reciente(
     planta_id: str,
