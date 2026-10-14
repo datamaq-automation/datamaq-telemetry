@@ -377,27 +377,9 @@ def _cobertura_fases(lecturas: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-@mcp.tool()
-async def datamaq_consultar_potencia_reciente(
-    planta_id: str,
-    horas: int = 24,
-    ctx: Context | None = None,
-) -> dict[str, Any]:
-    """Consulta el resumen de demanda activa (kW) y reactiva (kVAr) de una planta en una ventana reciente.
-
-    Recorre los medidores de la planta agregando vectorialmente las potencias activa (P) y
-    reactiva (Q) por bucket de 5 min (S = sqrt(P^2 + Q^2), FP = |P| / S). El factor de potencia
-    promedio del período se calcula sobre las sumas acumuladas vectoriales conforme a la regulación
-    ENRE/CAMMESA, evitando distorsiones aritméticas en plantas multi-medidor.
-    Incluye porcentaje de cobertura de mediciones y advertencia si es menor al 80%.
-    Permite evaluar el desempeño frente al umbral tarifario (0.85) y normativo ENRE 85/2024 (0.95).
-
-    Args:
-        planta_id: Identificador único de la planta industrial.
-        horas: Cantidad de horas recientes a consultar (por defecto 24, máximo 720).
-        ctx: Contexto de ejecución FastMCP inyectado automáticamente.
-    """
-    token = _resolver_token(ctx)
+async def _recolectar_planta(planta_id: str, horas: int, token: str | None) -> dict[str, Any]:
+    """Lecturas instantáneas de cada medidor de la planta en las últimas `horas`, con su cobertura por fase y las
+    alertas abiertas de TI o de signo. Base común de las herramientas que agregan a nivel planta (#31)."""
     dispositivos = await _ejecutar_peticion("GET", "/api/v1/dispositivos", token=token, params={"planta_id": planta_id})
     ids = (
         [d["id"] for d in dispositivos if isinstance(d, dict) and d.get("id")] if isinstance(dispositivos, list) else []
@@ -436,9 +418,43 @@ async def datamaq_consultar_potencia_reciente(
     alertas = await _ejecutar_peticion(
         "GET", "/api/v1/alertas", token=token, params={"planta_id": planta_id, "solo_abiertas": True}
     )
-    advertencias_calidad = _advertencias_calidad(alertas if isinstance(alertas, list) else [], dispositivos_map)
+    return {
+        "ids": ids,
+        "con_error": con_error,
+        "medidores": medidores,
+        "lecturas_por_dispositivo": lecturas_por_dispositivo,
+        "advertencias_calidad": _advertencias_calidad(alertas if isinstance(alertas, list) else [], dispositivos_map),
+    }
 
-    serie = _agregar_serie_planta(lecturas_por_dispositivo)
+
+@mcp.tool()
+async def datamaq_consultar_potencia_reciente(
+    planta_id: str,
+    horas: int = 24,
+    ctx: Context | None = None,
+) -> dict[str, Any]:
+    """Consulta el resumen de demanda activa (kW) y reactiva (kVAr) de una planta en una ventana reciente.
+
+    Recorre los medidores de la planta agregando vectorialmente las potencias activa (P) y
+    reactiva (Q) por bucket de 5 min (S = sqrt(P^2 + Q^2), FP = |P| / S). El factor de potencia
+    promedio del período se calcula sobre las sumas acumuladas vectoriales conforme a la regulación
+    ENRE/CAMMESA, evitando distorsiones aritméticas en plantas multi-medidor.
+    Incluye porcentaje de cobertura de mediciones y advertencia si es menor al 80%.
+    Permite evaluar el desempeño frente al umbral tarifario (0.85) y normativo ENRE 85/2024 (0.95).
+
+    Args:
+        planta_id: Identificador único de la planta industrial.
+        horas: Cantidad de horas recientes a consultar (por defecto 24, máximo 720).
+        ctx: Contexto de ejecución FastMCP inyectado automáticamente.
+    """
+    token = _resolver_token(ctx)
+    recoleccion = await _recolectar_planta(planta_id, horas, token)
+    ids = recoleccion["ids"]
+    con_error = recoleccion["con_error"]
+    medidores = recoleccion["medidores"]
+    advertencias_calidad = recoleccion["advertencias_calidad"]
+
+    serie = _agregar_serie_planta(recoleccion["lecturas_por_dispositivo"])
     p_kw = [b["p_kw"] for b in serie if b["p_kw"] is not None]
     q_kvar = [b["q_kvar"] for b in serie if b["q_kvar"] is not None]
 
