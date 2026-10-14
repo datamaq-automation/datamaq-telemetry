@@ -402,8 +402,14 @@ async def datamaq_consultar_potencia_reciente(
     ids = (
         [d["id"] for d in dispositivos if isinstance(d, dict) and d.get("id")] if isinstance(dispositivos, list) else []
     )
+    dispositivos_map: dict[str, str] = {
+        d["id"]: d.get("ubicacion_tag") or d.get("nombre") or d["id"]
+        for d in (dispositivos if isinstance(dispositivos, list) else [])
+        if isinstance(d, dict) and d.get("id")
+    }
 
     lecturas_por_dispositivo: list[list[dict[str, Any]]] = []
+    medidores: list[dict[str, Any]] = []
     con_error: list[str] = []
     for dispositivo_id in ids:
         try:
@@ -417,7 +423,20 @@ async def datamaq_consultar_potencia_reciente(
             con_error.append(dispositivo_id)
             continue
         if isinstance(lecturas, list):
-            lecturas_por_dispositivo.append([x for x in lecturas if isinstance(x, dict)])
+            lista = [x for x in lecturas if isinstance(x, dict)]
+            lecturas_por_dispositivo.append(lista)
+            medidores.append(
+                {
+                    "dispositivo_id": dispositivo_id,
+                    "dispositivo_tag": dispositivos_map.get(dispositivo_id, dispositivo_id),
+                    **_cobertura_fases(lista),
+                }
+            )
+
+    alertas = await _ejecutar_peticion(
+        "GET", "/api/v1/alertas", token=token, params={"planta_id": planta_id, "solo_abiertas": True}
+    )
+    advertencias_calidad = _advertencias_calidad(alertas if isinstance(alertas, list) else [], dispositivos_map)
 
     serie = _agregar_serie_planta(lecturas_por_dispositivo)
     p_kw = [b["p_kw"] for b in serie if b["p_kw"] is not None]
@@ -438,6 +457,8 @@ async def datamaq_consultar_potencia_reciente(
         "metodo": "promedio por dispositivo y suma entre dispositivos, por bucket de 5 min",
         "dispositivos_consultados": len(ids),
         "dispositivos_con_error": con_error,
+        "advertencias_calidad": advertencias_calidad,
+        "medidores": medidores,
         "puntos_medicion_count": puntos_count,
         "cobertura_puntos_pct": cobertura_puntos_pct,
         "potencia_activa_promedio_kw": round(_promedio(p_kw), 2) if p_kw else None,

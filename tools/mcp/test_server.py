@@ -275,14 +275,21 @@ def test_cobertura_fases_no_cuenta_la_fase_sin_medir_como_cero():
     assert cobertura["fases_faltantes"] == ["T"]
 
 
-def _handler_potencia(lecturas_por_id: dict[str, Any], errores: set[str] | None = None):
-    """Mock de la API: lista de dispositivos de la planta y serie instantánea por dispositivo."""
+def _handler_potencia(
+    lecturas_por_id: dict[str, Any],
+    errores: set[str] | None = None,
+    alertas: list[dict[str, Any]] | None = None,
+):
+    """Mock de la API: dispositivos, alertas abiertas de la planta y serie instantánea por dispositivo."""
     errores = errores or set()
 
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/api/v1/dispositivos":
             assert request.url.params.get("planta_id") == "planta-pacheco"
             return httpx.Response(200, json=[{"id": dev} for dev in lecturas_por_id])
+        if request.url.path == "/api/v1/alertas":
+            assert request.url.params.get("solo_abiertas") == "true"
+            return httpx.Response(200, json=alertas or [])
         prefijo = "/api/v1/telemetria/instantaneous/"
         assert request.url.path.startswith(prefijo)
         dev = request.url.path[len(prefijo) :]
@@ -329,6 +336,61 @@ async def test_datamaq_consultar_potencia_reciente_suma_dispositivos_por_bucket(
     assert resumen["factor_potencia_promedio"] == pytest.approx(0.888, abs=1e-3)
     assert resumen["cobertura_puntos_pct"] == 0.7
     assert resumen["advertencia_datos"] == "Datos incompletos (<80% de cobertura)"
+
+
+@pytest.mark.asyncio
+async def test_potencia_reciente_advierte_medidor_en_signo_invertido():
+    """#31 criterio 1: un medidor con alerta POTENCIA_NEGATIVA abierta aparece en advertencias_calidad.
+    El 369 de Los Constituyentes tuvo P negativa del 6 al 13 de octubre; la respuesta no debe entregar solo el número."""
+    lecturas = {
+        "m369": [_lectura("2026-10-10T12:00:00Z", -33_000.0, 0.0, 0.0)],
+        "m1": [_lectura("2026-10-10T12:00:00Z", 50_000.0, 20_000.0, 0.93)],
+    }
+    alertas = [
+        {
+            "id": 7,
+            "dispositivo_id": "m369",
+            "tipo_alerta": "POTENCIA_NEGATIVA",
+            "mensaje": "Potencia activa negativa sostenida",
+            "esta_resuelta": False,
+        }
+    ]
+    set_client(
+        httpx.AsyncClient(
+            transport=httpx.MockTransport(_handler_potencia(lecturas, alertas=alertas)), base_url="http://datamaq.local"
+        )
+    )
+    resumen = await datamaq_consultar_potencia_reciente(planta_id="planta-pacheco", horas=24)
+    assert [a["dispositivo_id"] for a in resumen["advertencias_calidad"]] == ["m369"]
+    assert resumen["advertencias_calidad"][0]["tipo_alerta"] == "POTENCIA_NEGATIVA"
+
+
+@pytest.mark.asyncio
+async def test_potencia_reciente_informa_la_fase_faltante_de_un_medidor_de_dos_fases():
+    """#31 criterio 2: Trafo 2 mide solo R y S. El detalle por medidor marca T como faltante con 0 %, sin contarla como cero."""
+
+    def lectura_bifasica(registrado_en: str) -> dict[str, Any]:
+        return {
+            "registrado_en": registrado_en,
+            "potencia_activa_total_W": 40_000.0,
+            "potencia_reactiva_total_VAR": 10_000.0,
+            "factor_potencia_total": 0.97,
+            "fase_r": {"net_active_power_W": 20_000.0},
+            "fase_s": {"net_active_power_W": 20_000.0},
+            "fase_t": {"net_active_power_W": None},
+        }
+
+    lecturas = {"m369": [lectura_bifasica("2026-10-10T12:00:00Z"), lectura_bifasica("2026-10-10T12:05:00Z")]}
+    set_client(
+        httpx.AsyncClient(transport=httpx.MockTransport(_handler_potencia(lecturas)), base_url="http://datamaq.local")
+    )
+    resumen = await datamaq_consultar_potencia_reciente(planta_id="planta-pacheco", horas=24)
+    (medidor,) = resumen["medidores"]
+    assert medidor["dispositivo_id"] == "m369"
+    assert medidor["fases_medidas"] == ["R", "S"]
+    assert medidor["fases_faltantes"] == ["T"]
+    assert medidor["cobertura_fase_pct"] == {"R": 100.0, "S": 100.0, "T": 0.0}
+    assert resumen["advertencias_calidad"] == []
 
 
 def _rafaga(desde_seg: int, n: int, p_w: float, q_var: float) -> list[dict[str, Any]]:
