@@ -1,9 +1,16 @@
 """Endpoint /analitica/penalizaciones/planta por período de facturación (sin ventana de telemetría)."""
 
+from datetime import datetime, timezone
+from unittest.mock import MagicMock
+
 from fastapi.testclient import TestClient
 
+from src.application.dtos.analitica_dto import AnaliticaPenalizacionesPlantaDTO
 from src.domain.telemetria.penalizacion_periodo import MOTIVO_PERIODO_SIN_TARIFA
-from src.infrastructure.fastapi.dependencies import get_usuario_actual
+from src.infrastructure.fastapi.dependencies import (
+    get_consultar_analitica_planta_use_case,
+    get_usuario_actual,
+)
 from src.infrastructure.fastapi.planta_ownership import resolver_planta_permitida
 from src.infrastructure.fastapi.server import create_app
 from src.infrastructure.settings.config import get_settings
@@ -70,11 +77,22 @@ def test_periodo_con_formato_invalido_responde_422():
     assert response.status_code == 422
 
 
-def test_sin_periodo_facturacion_la_respuesta_por_ventana_no_cambia():
-    response = _cliente().get(f"{RUTA}?planta_id={PLANTA_DURAX}&periodo_dias=7")
+def test_sin_periodo_facturacion_el_router_delega_la_ventana_sin_periodo():
+    # Sin base de telemetría (CI): se simula el caso de uso y se verifica que el router no
+    # le pasa periodo_facturacion, así la respuesta por ventana queda como antes.
+
+    caso_uso = MagicMock()
+    caso_uso.obtener_penalizaciones.return_value = AnaliticaPenalizacionesPlantaDTO(
+        planta_id=PLANTA_DURAX, timestamp_calculo=datetime.now(timezone.utc)
+    )
+    app = create_app(get_settings())
+    app.dependency_overrides[get_usuario_actual] = lambda: {"user_id": "u", "organizacion_id": "o", "sub": "u"}
+    app.dependency_overrides[resolver_planta_permitida] = lambda planta_id=None: planta_id
+    app.dependency_overrides[get_consultar_analitica_planta_use_case] = lambda: caso_uso
+
+    response = TestClient(app).get(f"{RUTA}?planta_id={PLANTA_DURAX}&periodo_dias=7")
 
     assert response.status_code == 200
-    data = response.json()
-    assert data["periodo_facturacion"] is None
-    assert data["concepto"] is None
-    assert data["penalizacion_estimada_ars"] is None
+    llamada = caso_uso.obtener_penalizaciones.call_args.kwargs
+    assert llamada["periodo_facturacion"] is None
+    assert llamada["periodo_dias"] == 7
