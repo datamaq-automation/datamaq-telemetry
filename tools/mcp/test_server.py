@@ -13,6 +13,8 @@ import pytest
 from mcp.server.fastmcp import Context
 
 from tools.mcp.server import (
+    _advertencias_calidad,
+    _cobertura_fases,
     datamaq_analizar_capacitores,
     datamaq_consultar_alertas,
     datamaq_consultar_penalizaciones,
@@ -139,9 +141,12 @@ async def test_datamaq_consultar_alertas():
 @pytest.mark.asyncio
 async def test_datamaq_analizar_capacitores():
     """Prueba datamaq_analizar_capacitores retornando cálculo SSOT de compensación."""
+    base = _handler_potencia({})
 
     def handler(request: httpx.Request) -> httpx.Response:
-        assert request.url.path == "/api/v1/analitica/banco-capacitores/planta"
+        # Las rutas de medidores (dispositivos, alertas, instantáneas) las responde el mock común (#31).
+        if request.url.path != "/api/v1/analitica/banco-capacitores/planta":
+            return base(request)
         assert request.url.params.get("planta_id") == "planta-pacheco"
         assert request.url.params.get("periodo_dias") == "30"
         return httpx.Response(
@@ -175,6 +180,66 @@ async def test_datamaq_analizar_capacitores():
     assert resultado["banco_comercial_sugerido_kvar"] == 25.0
     assert resultado["escalones_sugeridos_kvar"] == [10.0, 15.0]
     assert resultado["fp_promedio"] == 0.88
+
+
+def _handler_banco(lecturas: dict[str, Any], alertas: list[dict[str, Any]] | None = None):
+    """Mock del análisis de banco de capacitores (kVAr fijo) sobre la planta de _handler_potencia (#31)."""
+    base = _handler_potencia(lecturas, alertas=alertas)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path != "/api/v1/analitica/banco-capacitores/planta":
+            return base(request)
+        return httpx.Response(200, json={"planta_id": "planta-pacheco", "qc_necesaria_kvar": 21.6})
+
+    return handler
+
+
+@pytest.mark.asyncio
+async def test_analizar_capacitores_advierte_medidor_en_signo_invertido():
+    """#31 criterio 1: el kVAr recomendado llega con la advertencia si un medidor tiene POTENCIA_NEGATIVA abierta.
+    Sin esto, el caso del 369 (P negativa del 6 al 13 de octubre) alimentaría una recomendación de capacitores."""
+    lecturas = {"m369": [_lectura("2026-10-10T12:00:00Z", -33_000.0, 0.0, 0.0)]}
+    alertas = [
+        {
+            "id": 7,
+            "dispositivo_id": "m369",
+            "tipo_alerta": "POTENCIA_NEGATIVA",
+            "mensaje": "Potencia activa negativa sostenida",
+            "esta_resuelta": False,
+        }
+    ]
+    set_client(
+        httpx.AsyncClient(
+            transport=httpx.MockTransport(_handler_banco(lecturas, alertas)), base_url="http://datamaq.local"
+        )
+    )
+    resultado = await datamaq_analizar_capacitores(planta_id="planta-pacheco", periodo_dias=30)
+    assert resultado["qc_necesaria_kvar"] == 21.6
+    assert [a["dispositivo_id"] for a in resultado["advertencias_calidad"]] == ["m369"]
+
+
+@pytest.mark.asyncio
+async def test_analizar_capacitores_informa_la_fase_faltante_de_un_medidor_de_dos_fases():
+    """#31 criterio 2: el detalle por medidor de analizar_capacitores marca la fase T como faltante, sin contarla como cero."""
+    lectura = {
+        "registrado_en": "2026-10-10T12:00:00Z",
+        "potencia_activa_total_W": 40_000.0,
+        "potencia_reactiva_total_VAR": 10_000.0,
+        "factor_potencia_total": 0.97,
+        "fase_r": {"net_active_power_W": 20_000.0},
+        "fase_s": {"net_active_power_W": 20_000.0},
+        "fase_t": {"net_active_power_W": None},
+    }
+    set_client(
+        httpx.AsyncClient(
+            transport=httpx.MockTransport(_handler_banco({"m369": [lectura]})), base_url="http://datamaq.local"
+        )
+    )
+    resultado = await datamaq_analizar_capacitores(planta_id="planta-pacheco", periodo_dias=30)
+    (medidor,) = resultado["medidores"]
+    assert medidor["fases_medidas"] == ["R", "S"]
+    assert medidor["fases_faltantes"] == ["T"]
+    assert resultado["qc_necesaria_kvar"] == 21.6
 
 
 @pytest.mark.asyncio
@@ -234,14 +299,60 @@ async def test_datamaq_consultar_penalizaciones_periodo_personalizado():
     assert res["periodo_dias"] == 14
 
 
-def _handler_potencia(lecturas_por_id: dict[str, Any], errores: set[str] | None = None):
-    """Mock de la API: lista de dispositivos de la planta y serie instantánea por dispositivo."""
+def test_advertencias_calidad_solo_marca_alertas_de_ti_y_signo_abiertas_de_la_planta():
+    """#31: TI_INVERTIDO, TI_DESCONECTADO y POTENCIA_NEGATIVA invalidan el agregado. Otras alertas y medidores ajenos no."""
+    alertas = [
+        {"dispositivo_id": "m369", "tipo_alerta": "POTENCIA_NEGATIVA", "mensaje": "P negativa"},
+        {"dispositivo_id": "m1", "tipo_alerta": "BAJO_FACTOR_POTENCIA", "mensaje": "FP bajo"},
+        {"dispositivo_id": "ajeno", "tipo_alerta": "TI_INVERTIDO", "mensaje": "otra planta"},
+    ]
+    advertencias = _advertencias_calidad(alertas, {"m369": "TGBT Trafo 2", "m1": "TGBT General"})
+    assert advertencias == [
+        {
+            "dispositivo_id": "m369",
+            "dispositivo_tag": "TGBT Trafo 2",
+            "tipo_alerta": "POTENCIA_NEGATIVA",
+            "mensaje": "P negativa",
+        }
+    ]
+
+
+def test_cobertura_fases_no_cuenta_la_fase_sin_medir_como_cero():
+    """#31: un medidor de dos fases (R y S) informa T como faltante con 0 % de cobertura, sin contarla dentro de las medidas."""
+    lecturas = [
+        {
+            "fase_r": {"net_active_power_W": 10_000.0},
+            "fase_s": {"net_active_power_W": 9_000.0},
+            "fase_t": {"net_active_power_W": None},
+        },
+        {
+            "fase_r": {"net_active_power_W": 11_000.0},
+            "fase_s": {"net_active_power_W": None},
+            "fase_t": {"net_active_power_W": None},
+        },
+    ]
+    cobertura = _cobertura_fases(lecturas)
+    assert cobertura["muestras"] == 2
+    assert cobertura["cobertura_fase_pct"] == {"R": 100.0, "S": 50.0, "T": 0.0}
+    assert cobertura["fases_medidas"] == ["R", "S"]
+    assert cobertura["fases_faltantes"] == ["T"]
+
+
+def _handler_potencia(
+    lecturas_por_id: dict[str, Any],
+    errores: set[str] | None = None,
+    alertas: list[dict[str, Any]] | None = None,
+):
+    """Mock de la API: dispositivos, alertas abiertas de la planta y serie instantánea por dispositivo."""
     errores = errores or set()
 
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/api/v1/dispositivos":
             assert request.url.params.get("planta_id") == "planta-pacheco"
             return httpx.Response(200, json=[{"id": dev} for dev in lecturas_por_id])
+        if request.url.path == "/api/v1/alertas":
+            assert request.url.params.get("solo_abiertas") == "true"
+            return httpx.Response(200, json=alertas or [])
         prefijo = "/api/v1/telemetria/instantaneous/"
         assert request.url.path.startswith(prefijo)
         dev = request.url.path[len(prefijo) :]
@@ -288,6 +399,61 @@ async def test_datamaq_consultar_potencia_reciente_suma_dispositivos_por_bucket(
     assert resumen["factor_potencia_promedio"] == pytest.approx(0.888, abs=1e-3)
     assert resumen["cobertura_puntos_pct"] == 0.7
     assert resumen["advertencia_datos"] == "Datos incompletos (<80% de cobertura)"
+
+
+@pytest.mark.asyncio
+async def test_potencia_reciente_advierte_medidor_en_signo_invertido():
+    """#31 criterio 1: un medidor con alerta POTENCIA_NEGATIVA abierta aparece en advertencias_calidad.
+    El 369 de Los Constituyentes tuvo P negativa del 6 al 13 de octubre; la respuesta no debe entregar solo el número."""
+    lecturas = {
+        "m369": [_lectura("2026-10-10T12:00:00Z", -33_000.0, 0.0, 0.0)],
+        "m1": [_lectura("2026-10-10T12:00:00Z", 50_000.0, 20_000.0, 0.93)],
+    }
+    alertas = [
+        {
+            "id": 7,
+            "dispositivo_id": "m369",
+            "tipo_alerta": "POTENCIA_NEGATIVA",
+            "mensaje": "Potencia activa negativa sostenida",
+            "esta_resuelta": False,
+        }
+    ]
+    set_client(
+        httpx.AsyncClient(
+            transport=httpx.MockTransport(_handler_potencia(lecturas, alertas=alertas)), base_url="http://datamaq.local"
+        )
+    )
+    resumen = await datamaq_consultar_potencia_reciente(planta_id="planta-pacheco", horas=24)
+    assert [a["dispositivo_id"] for a in resumen["advertencias_calidad"]] == ["m369"]
+    assert resumen["advertencias_calidad"][0]["tipo_alerta"] == "POTENCIA_NEGATIVA"
+
+
+@pytest.mark.asyncio
+async def test_potencia_reciente_informa_la_fase_faltante_de_un_medidor_de_dos_fases():
+    """#31 criterio 2: Trafo 2 mide solo R y S. El detalle por medidor marca T como faltante con 0 %, sin contarla como cero."""
+
+    def lectura_bifasica(registrado_en: str) -> dict[str, Any]:
+        return {
+            "registrado_en": registrado_en,
+            "potencia_activa_total_W": 40_000.0,
+            "potencia_reactiva_total_VAR": 10_000.0,
+            "factor_potencia_total": 0.97,
+            "fase_r": {"net_active_power_W": 20_000.0},
+            "fase_s": {"net_active_power_W": 20_000.0},
+            "fase_t": {"net_active_power_W": None},
+        }
+
+    lecturas = {"m369": [lectura_bifasica("2026-10-10T12:00:00Z"), lectura_bifasica("2026-10-10T12:05:00Z")]}
+    set_client(
+        httpx.AsyncClient(transport=httpx.MockTransport(_handler_potencia(lecturas)), base_url="http://datamaq.local")
+    )
+    resumen = await datamaq_consultar_potencia_reciente(planta_id="planta-pacheco", horas=24)
+    (medidor,) = resumen["medidores"]
+    assert medidor["dispositivo_id"] == "m369"
+    assert medidor["fases_medidas"] == ["R", "S"]
+    assert medidor["fases_faltantes"] == ["T"]
+    assert medidor["cobertura_fase_pct"] == {"R": 100.0, "S": 100.0, "T": 0.0}
+    assert resumen["advertencias_calidad"] == []
 
 
 def _rafaga(desde_seg: int, n: int, p_w: float, q_var: float) -> list[dict[str, Any]]:
