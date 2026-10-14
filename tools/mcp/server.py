@@ -230,9 +230,14 @@ async def datamaq_analizar_capacitores(
     resultado = await _ejecutar_peticion(
         "GET", "/api/v1/analitica/banco-capacitores/planta", token=token, params=parametros
     )
-    if isinstance(resultado, dict):
-        return resultado
-    return {"resultado": resultado}
+    # La recomendación de kVAr se calcula sobre el agregado de la planta: si un medidor tiene TI o signo abierto,
+    # se declara junto al número para no recomendar compensación a partir de un dato malo (#31).
+    recoleccion = await _recolectar_planta(planta_id, periodo_dias * 24, token)
+    respuesta: dict[str, Any] = dict(resultado) if isinstance(resultado, dict) else {"resultado": resultado}
+    respuesta["advertencias_calidad"] = recoleccion["advertencias_calidad"]
+    respuesta["dispositivos_con_error"] = recoleccion["con_error"]
+    respuesta["medidores"] = recoleccion["medidores"]
+    return respuesta
 
 
 @mcp.tool()
