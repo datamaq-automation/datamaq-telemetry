@@ -66,6 +66,50 @@ def obtener_tarifa_capacidad(distribuidora: str, periodo: str) -> TarifaCapacida
     return None
 
 
+# Régimen de energía reactiva 1992 (decisions/2026-10-14_regimen-reactiva-edelap.md): recargo solo
+# con tg phi > 0,62. El Subanexo A provincial no se modela: queda como riesgo documentado.
+LIMITE_TG_FI_REGIMEN_1992 = Decimal("0.62")
+MOTIVO_REACTIVA_NO_VERIFICADA = "tarifa reactiva no verificada"
+
+
+@dataclass(frozen=True)
+class PenalizacionReactiva:
+    """Penalización por energía reactiva. importe_ars None = sin precio verificado, con motivo."""
+
+    distribuidora: str
+    tarifa: str
+    periodo: str
+    fuente_archivo: str
+    regimen: str
+    tg_fi_maximo: Decimal
+    importe_ars: Decimal | None
+    motivo_sin_precio: str | None
+
+
+def calcular_penalizacion_reactiva_edelap(
+    periodo: str,
+    fuente_archivo: str,
+    tg_fi_por_bloque: tuple[Decimal, ...],
+) -> PenalizacionReactiva:
+    """Penalización reactiva de EDELAP T5M12 con el régimen 1992.
+
+    Se evalúa con el tg phi máximo de los bloques (punta, valle, resto): si ninguno supera 0,62,
+    la penalización es 0. Si alguno lo supera, no hay precio verificado y queda sin importe.
+    """
+    tg_fi_maximo = max(tg_fi_por_bloque)
+    base = {
+        "distribuidora": "EDELAP",
+        "tarifa": "T5M12",
+        "periodo": periodo,
+        "fuente_archivo": fuente_archivo,
+        "regimen": "contrato nacional 1992 (tg phi <= 0,62)",
+        "tg_fi_maximo": tg_fi_maximo,
+    }
+    if tg_fi_maximo <= LIMITE_TG_FI_REGIMEN_1992:
+        return PenalizacionReactiva(importe_ars=Decimal("0.00"), motivo_sin_precio=None, **base)
+    return PenalizacionReactiva(importe_ars=None, motivo_sin_precio=MOTIVO_REACTIVA_NO_VERIFICADA, **base)
+
+
 def calcular_recargo_exceso_potencia(
     csc_kw: Decimal,
     adquirida_kw: Decimal,
