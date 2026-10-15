@@ -9,6 +9,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from starlette.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
 
 from src.domain.oauth.services import calcular_code_challenge
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
@@ -520,6 +521,31 @@ def test_oauth_falla_cerrada_si_el_repositorio_oauth_lanza():
         res = client.get("/api/v1/usuarios/integraciones", headers=_headers_bearer(access_token))
         assert res.status_code == 401
         assert res.json()["detail"] == "credenciales_invalidas"
+
+
+def test_ws_live_rechaza_el_access_token_de_una_integracion_desconectada():
+    """/ws/live valida el JWT por su cuenta: también debe cerrar con 4401 si la integración fue desconectada."""
+    app, user_id = _crear_app_test()
+    login_headers = _headers_login(user_id)
+
+    with TestClient(app) as client:
+        access_token = _emitir_tokens_oauth(client, login_headers)["access_token"]
+
+        # Con la integración conectada, el stream acepta el access token y sigue abierto.
+        with client.websocket_connect("/ws/live", headers=_headers_bearer(access_token)) as ws:
+            ws.send_text("ping")
+
+        client.delete("/api/v1/usuarios/integraciones/claude-ai", headers=login_headers)
+
+        with client.websocket_connect("/ws/live", headers=_headers_bearer(access_token)) as ws:
+            with pytest.raises(WebSocketDisconnect) as exc:
+                ws.receive_text()
+        assert exc.value.code == 4401
+        assert exc.value.reason == "token_invalido"
+
+        # El token de login normal (sin client_id) sigue conectando.
+        with client.websocket_connect("/ws/live", headers=login_headers) as ws:
+            ws.send_text("ping")
 
 
 def test_oauth_desconectar_un_cliente_no_corta_a_otro_del_mismo_usuario():

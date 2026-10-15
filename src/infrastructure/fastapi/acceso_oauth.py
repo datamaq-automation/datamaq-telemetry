@@ -7,8 +7,12 @@ Un access token OAuth (el JWT lleva `client_id`) vale solo mientras la integraci
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from fastapi import FastAPI
+
 from src.domain.oauth.ports import OAuthRepositoryPort
 from src.infrastructure.settings.logger import get_logger
+from src.infrastructure.sqlalchemy.database import get_db_session
+from src.infrastructure.sqlalchemy.repositories.oauth_repository import MySQLOAuthRepository
 
 logger = get_logger("acceso_oauth")
 
@@ -36,4 +40,25 @@ def integracion_oauth_vigente(claims: dict[str, Any], repo_oauth: OAuthRepositor
         return repo_oauth.tiene_integracion_activa(sub, str(client_id), emitido + TOLERANCIA_EMISION)
     except Exception as exc:
         logger.warning("oauth_chequeo_integracion_fallo", client_id=str(client_id), error=str(exc))
+        return False
+
+
+def integracion_oauth_vigente_ws(app: FastAPI, claims: dict[str, Any]) -> bool:
+    """Igual que `integracion_oauth_vigente`, para /ws/live, que no pasa por `get_usuario_actual`.
+
+    Abre una sesión de vida corta y la cierra al terminar: con `Depends` quedaría tomada toda la vida del
+    WebSocket. Respeta `app.dependency_overrides[get_db_session]`, como el resto de la app. Bloqueante:
+    llamarla con `asyncio.to_thread`. Falla cerrada.
+    """
+    if not claims.get("client_id"):
+        return True
+    try:
+        proveedor = app.dependency_overrides.get(get_db_session, get_db_session)
+        generador = proveedor()
+        try:
+            return integracion_oauth_vigente(claims, MySQLOAuthRepository(next(generador)))
+        finally:
+            generador.close()
+    except Exception as exc:
+        logger.warning("oauth_chequeo_integracion_ws_fallo", client_id=str(claims.get("client_id")), error=str(exc))
         return False
