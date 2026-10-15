@@ -19,7 +19,14 @@ from src.infrastructure.fastapi.dependencies import (
     get_usuario_actual,
 )
 from src.infrastructure.fastapi.device_ownership import verificar_propiedad_dispositivo
-from src.infrastructure.fastapi.routes.cargas_router import verificar_acceso_a_campana, verificar_acceso_a_carga
+from src.infrastructure.fastapi.routes.cargas_router import (
+    verificar_acceso_a_campana,
+    verificar_acceso_a_carga,
+    verificar_acceso_a_intervalo,
+    verificar_alta_de_campana,
+    verificar_alta_de_carga,
+    verificar_correccion_de_intervalo,
+)
 from src.infrastructure.fastapi.server import create_app
 
 MEDIDOR_PRUEBA = "d48c49f0-3564-4000-8000-000000000001"
@@ -32,6 +39,10 @@ def _cliente_atribucion(use_case: MagicMock, rol: str = "admin") -> TestClient:
     app.dependency_overrides[verificar_propiedad_dispositivo] = lambda: None
     app.dependency_overrides[verificar_acceso_a_carga] = lambda: None
     app.dependency_overrides[verificar_acceso_a_campana] = lambda: None
+    app.dependency_overrides[verificar_alta_de_carga] = lambda: None
+    app.dependency_overrides[verificar_alta_de_campana] = lambda: None
+    app.dependency_overrides[verificar_correccion_de_intervalo] = lambda: None
+    app.dependency_overrides[verificar_acceso_a_intervalo] = lambda: None
     app.dependency_overrides[get_atribucion_use_case] = lambda: use_case
     app.dependency_overrides[get_usuario_actual] = lambda: {
         "sub": "usr-test-1",

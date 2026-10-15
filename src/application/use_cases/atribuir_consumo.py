@@ -257,6 +257,13 @@ class AtribuirConsumoUseCase:
             intervalos = intervalos[:limite]
         return [IntervaloActividadMapper.to_dto(i) for i in intervalos]
 
+    def dispositivo_de_intervalo(self, intervalo_id: int) -> str:
+        """Medidor al que pertenece un intervalo. Lo usa el filtro de organización de las escrituras (#42)."""
+        intervalo = self.repo_intervalos.obtener_por_id(intervalo_id)
+        if intervalo is None:
+            raise IntervaloActividadNoEncontradoError(f"Intervalo de actividad {intervalo_id} no encontrado.")
+        return intervalo.dispositivo_id
+
     def corregir_intervalo(
         self, intervalo_id: int, dto: CorregirIntervaloRequestDTO, usuario_id: str
     ) -> IntervaloActividadResponseDTO:
