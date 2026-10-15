@@ -301,6 +301,53 @@ def test_canjear_codigo_exitoso_y_refrescar(repo, token_service, usuario_repo):
         token_uc.ejecutar(refresh_dto)
 
 
+class _RepoQueMideHuecos(InMemoryOAuthRepository):
+    """Registra si la integración queda sin refresh activo después de cada escritura."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.hubo_hueco = False
+
+    def _medir(self) -> None:
+        if not self.tiene_integracion_activa("u123", "claude-ai"):
+            self.hubo_hueco = True
+
+    def guardar_refresh_token(self, refresh_token: OAuthRefreshToken) -> None:
+        super().guardar_refresh_token(refresh_token)
+        self._medir()
+
+    def revocar_refresh_token(self, token_hash: str, ahora: datetime) -> bool:
+        revocado = super().revocar_refresh_token(token_hash, ahora)
+        self._medir()
+        return revocado
+
+
+def test_rotacion_de_refresh_nunca_deja_la_integracion_sin_token_activo(token_service, usuario_repo):
+    """Issue #33: get_usuario_actual consulta la integración activa; un hueco en la rotación daría 401 espurio."""
+    repo_medido = _RepoQueMideHuecos()
+    token_uc = CanjearTokenOAuthUseCase(repo_medido, token_service, usuario_repo)
+    ahora = datetime.now(timezone.utc)
+    repo_medido.guardar_refresh_token(
+        OAuthRefreshToken(
+            token_hash=hash_token("refresh-viejo"),
+            client_id="claude-ai",
+            user_id="u123",
+            organization_id="org-durax",
+            scope="read:telemetria",
+            expires_at=ahora + timedelta(days=30),
+            revoked_at=None,
+            created_at=ahora,
+        )
+    )
+
+    token_uc.ejecutar(
+        OAuthTokenRequestDTO(grant_type="refresh_token", client_id="claude-ai", refresh_token="refresh-viejo")
+    )
+
+    assert repo_medido.hubo_hueco is False
+    assert repo_medido.tiene_integracion_activa("u123", "claude-ai") is True
+
+
 def test_canjear_codigo_verifier_invalido(repo, token_service, usuario_repo):
     auth_uc = AutorizarConsentimientoUseCase(repo)
     token_uc = CanjearTokenOAuthUseCase(repo, token_service, usuario_repo)
