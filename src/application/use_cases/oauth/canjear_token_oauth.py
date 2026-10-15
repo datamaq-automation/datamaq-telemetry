@@ -144,7 +144,11 @@ class CanjearTokenOAuthUseCase:
             created_at=ahora,
         )
         self.oauth_repo.guardar_refresh_token(nuevo_entidad)
-        self.oauth_repo.revocar_refresh_token(token_hash, ahora)
+        if not self.oauth_repo.revocar_refresh_token(token_hash, ahora):
+            # El viejo ya estaba revocado (desconexión o canje concurrente entre la lectura y acá):
+            # el nuevo no puede quedar activo ni resucitar la integración.
+            self.oauth_repo.revocar_refresh_token(nuevo_hash, ahora)
+            raise InvalidGrantError("Refresh token inexistente o revocado")
 
         usuario = self.usuario_repo.obtener_por_id(token_entidad.user_id) if self.usuario_repo else None
         username = usuario.usuario if usuario else token_entidad.user_id
