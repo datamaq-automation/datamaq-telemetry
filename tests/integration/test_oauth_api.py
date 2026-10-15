@@ -1,6 +1,7 @@
 """tests/integration/test_oauth_api.py — Pruebas de integración de la API para OAuth 2.0 PKCE."""
 
 import uuid
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy import create_engine
@@ -9,9 +10,12 @@ from sqlalchemy.pool import StaticPool
 from starlette.testclient import TestClient
 
 from src.domain.oauth.services import calcular_code_challenge
+from src.infrastructure.auth.jwt_token_service import JwtTokenService
 from src.infrastructure.fastapi.dependencies import get_db_session, get_usuario_actual
 from src.infrastructure.fastapi.server import create_app
+from src.infrastructure.settings.config import get_settings
 from src.infrastructure.sqlalchemy.models import Base, UserModel
+from src.infrastructure.sqlalchemy.oauth_models import OAuthRefreshTokenModel
 from src.infrastructure.sqlalchemy.repositories.oauth_repository import sembrar_clientes_oauth
 
 
@@ -295,6 +299,107 @@ def test_oauth_revocar_integracion_por_cliente():
         list_res = client.get("/api/v1/usuarios/integraciones")
         assert list_res.status_code == 200
         assert len([i for i in list_res.json() if i["client_id"] == "claude-ai"]) == 0
+
+
+def _token_login(user_id: str) -> str:
+    """JWT de login normal (sin client_id), firmado con la clave de la app bajo test."""
+    return JwtTokenService(get_settings().API_SECRET_KEY).generar(
+        usuario_id=user_id,
+        usuario="oauth_test@datamaq.com",
+        expira_en=datetime.now(timezone.utc) + timedelta(hours=1),
+        rol="ingeniero",
+        organizacion_id="org_durax_1",
+    )
+
+
+def _emitir_access_token_oauth(client: TestClient, login_headers: dict[str, str]) -> str:
+    """Recorre authorize + token con PKCE y devuelve el access token OAuth de claude-ai."""
+    verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+    auth_res = client.post(
+        "/api/v1/oauth/authorize",
+        headers=login_headers,
+        json={
+            "client_id": "claude-ai",
+            "redirect_uri": "https://claude.ai/api/mcp/oauth_callback",
+            "code_challenge": calcular_code_challenge(verifier),
+            "code_challenge_method": "S256",
+        },
+    )
+    assert auth_res.status_code == 200
+    token_res = client.post(
+        "/oauth/token",
+        data={
+            "grant_type": "authorization_code",
+            "client_id": "claude-ai",
+            "code": auth_res.json()["code"],
+            "code_verifier": verifier,
+            "redirect_uri": "https://claude.ai/api/mcp/oauth_callback",
+        },
+    )
+    assert token_res.status_code == 200
+    return token_res.json()["access_token"]
+
+
+def test_oauth_access_token_deja_de_valer_al_desconectar_integracion():
+    """Issue #33: tras DELETE /integraciones/{client_id} el access token emitido a ese cliente da 401."""
+    app, user_id = _crear_app_test()
+    login_headers = {"Authorization": f"Bearer {_token_login(user_id)}"}
+
+    with TestClient(app) as client:
+        access_token = _emitir_access_token_oauth(client, login_headers)
+        oauth_headers = {"Authorization": f"Bearer {access_token}"}
+
+        # Mientras la integración está conectada, el access token se acepta.
+        assert client.get("/api/v1/usuarios/integraciones", headers=oauth_headers).status_code == 200
+
+        # El usuario desconecta la integración desde su sesión normal.
+        del_res = client.delete("/api/v1/usuarios/integraciones/claude-ai", headers=login_headers)
+        assert del_res.status_code == 200
+        assert del_res.json()["revocados"] >= 1
+
+        # El access token (24 h) ya no debe aceptarse, aunque no haya vencido.
+        rechazado = client.get("/api/v1/usuarios/integraciones", headers=oauth_headers)
+        assert rechazado.status_code == 401
+        assert rechazado.json()["detail"] == "credenciales_invalidas"
+
+        # La sesión de login normal (sin client_id) no se ve afectada.
+        assert client.get("/api/v1/usuarios/integraciones", headers=login_headers).status_code == 200
+
+
+def test_oauth_access_token_sigue_valiendo_tras_rotar_refresh():
+    """La rotación del refresh no debe invalidar el access token vigente de la misma integración."""
+    app, user_id = _crear_app_test()
+    login_headers = {"Authorization": f"Bearer {_token_login(user_id)}"}
+
+    with TestClient(app) as client:
+        access_token = _emitir_access_token_oauth(client, login_headers)
+        oauth_headers = {"Authorization": f"Bearer {access_token}"}
+        assert client.get("/api/v1/usuarios/integraciones", headers=oauth_headers).status_code == 200
+
+        # Reconectar (otro authorize) deja un refresh activo nuevo; el access previo sigue valiendo.
+        _emitir_access_token_oauth(client, login_headers)
+        assert client.get("/api/v1/usuarios/integraciones", headers=oauth_headers).status_code == 200
+
+
+def test_oauth_refresh_vencido_sin_revocar_no_corta_access_token_vigente():
+    """Decisión: el chequeo mira solo revoked_at. El refresh (30 d) vive más que el access (1 d) emitido con él."""
+    app, user_id = _crear_app_test()
+    login_headers = {"Authorization": f"Bearer {_token_login(user_id)}"}
+
+    with TestClient(app) as client:
+        access_token = _emitir_access_token_oauth(client, login_headers)
+        oauth_headers = {"Authorization": f"Bearer {access_token}"}
+
+        # Forzamos el caso límite: refresh vencido pero no revocado.
+        override = app.dependency_overrides[get_db_session]
+        db = next(override())
+        db.query(OAuthRefreshTokenModel).filter(OAuthRefreshTokenModel.user_id == user_id).update(
+            {"expires_at": datetime.now(timezone.utc) - timedelta(hours=1)}
+        )
+        db.commit()
+        db.close()
+
+        assert client.get("/api/v1/usuarios/integraciones", headers=oauth_headers).status_code == 200
 
 
 def test_oauth_consent_info_y_consent_flow():

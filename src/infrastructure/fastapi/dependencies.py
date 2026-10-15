@@ -446,6 +446,7 @@ def get_usuario_actual(
     authorization: Annotated[str | None, Header()] = None,
     datamaq_token: Annotated[str | None, Cookie()] = None,
     repo_usuarios: Annotated[RepositorioUsuariosPort | None, Depends(get_usuarios_repository)] = None,
+    repo_oauth: Annotated[OAuthRepositoryPort | None, Depends(get_oauth_repository)] = None,
 ) -> dict[str, Any]:
     settings = get_settings()
     if not settings.AUTH_REQUIRED:
@@ -477,6 +478,11 @@ def get_usuario_actual(
             token_iat = datetime.fromtimestamp(iat, tz=timezone.utc)
             if token_iat < rev_dt:
                 raise HTTPException(status_code=401, detail="credenciales_invalidas")
+
+    # Access token OAuth (lleva client_id): vale solo mientras la integración siga conectada (Issue #33).
+    client_id = claims.get("client_id")
+    if client_id and sub and repo_oauth is not None and not repo_oauth.tiene_integracion_activa(sub, str(client_id)):
+        raise HTTPException(status_code=401, detail="credenciales_invalidas")
 
     return claims
 
