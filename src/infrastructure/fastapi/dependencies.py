@@ -50,6 +50,7 @@ from src.domain.oauth.ports import OAuthRepositoryPort
 from src.domain.telemetria.ports import RepositorioDispositivosPort
 from src.infrastructure.auth.email_service import SmtpEmailService
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
+from src.infrastructure.fastapi.acceso_oauth import integracion_oauth_vigente
 from src.infrastructure.paho_mqtt.mqtt_listener import MQTTListener
 from src.infrastructure.settings.config import Settings, get_settings
 from src.infrastructure.settings.logger import get_logger
@@ -480,8 +481,7 @@ def get_usuario_actual(
                 raise HTTPException(status_code=401, detail="credenciales_invalidas")
 
     # Access token OAuth (lleva client_id): vale solo mientras la integración siga conectada (Issue #33).
-    client_id = claims.get("client_id")
-    if client_id and sub and repo_oauth is not None and not repo_oauth.tiene_integracion_activa(sub, str(client_id)):
+    if not integracion_oauth_vigente(claims, repo_oauth):
         raise HTTPException(status_code=401, detail="credenciales_invalidas")
 
     return claims

@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -11,7 +12,7 @@ from starlette.testclient import TestClient
 
 from src.domain.oauth.services import calcular_code_challenge
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
-from src.infrastructure.fastapi.dependencies import get_db_session, get_usuario_actual
+from src.infrastructure.fastapi.dependencies import get_db_session, get_oauth_repository, get_usuario_actual
 from src.infrastructure.fastapi.server import create_app
 from src.infrastructure.settings.config import get_settings
 from src.infrastructure.sqlalchemy.models import Base, UserModel
@@ -301,6 +302,13 @@ def test_oauth_revocar_integracion_por_cliente():
         assert len([i for i in list_res.json() if i["client_id"] == "claude-ai"]) == 0
 
 
+REDIRECT_URIS = {
+    "claude-ai": "https://claude.ai/api/mcp/oauth_callback",
+    "datamaq-mcp-client": "http://localhost:8000/callback",
+}
+VERIFIER = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+
+
 def _token_login(user_id: str) -> str:
     """JWT de login normal (sin client_id), firmado con la clave de la app bajo test."""
     return JwtTokenService(get_settings().API_SECRET_KEY).generar(
@@ -312,16 +320,26 @@ def _token_login(user_id: str) -> str:
     )
 
 
-def _emitir_access_token_oauth(client: TestClient, login_headers: dict[str, str]) -> str:
-    """Recorre authorize + token con PKCE y devuelve el access token OAuth de claude-ai."""
-    verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+def _headers_login(user_id: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {_token_login(user_id)}"}
+
+
+def _headers_bearer(access_token: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {access_token}"}
+
+
+def _emitir_tokens_oauth(
+    client: TestClient, login_headers: dict[str, str], client_id: str = "claude-ai"
+) -> dict[str, Any]:
+    """Recorre authorize + token con PKCE y devuelve la respuesta de /oauth/token (access y refresh)."""
+    redirect_uri = REDIRECT_URIS[client_id]
     auth_res = client.post(
         "/api/v1/oauth/authorize",
         headers=login_headers,
         json={
-            "client_id": "claude-ai",
-            "redirect_uri": "https://claude.ai/api/mcp/oauth_callback",
-            "code_challenge": calcular_code_challenge(verifier),
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+            "code_challenge": calcular_code_challenge(VERIFIER),
             "code_challenge_method": "S256",
         },
     )
@@ -330,27 +348,64 @@ def _emitir_access_token_oauth(client: TestClient, login_headers: dict[str, str]
         "/oauth/token",
         data={
             "grant_type": "authorization_code",
-            "client_id": "claude-ai",
+            "client_id": client_id,
             "code": auth_res.json()["code"],
-            "code_verifier": verifier,
-            "redirect_uri": "https://claude.ai/api/mcp/oauth_callback",
+            "code_verifier": VERIFIER,
+            "redirect_uri": redirect_uri,
         },
     )
     assert token_res.status_code == 200
-    return token_res.json()["access_token"]
+    return token_res.json()
+
+
+class _RelojAtrasado(datetime):
+    """`datetime` cuyo `now()` marca una hora antes: los tokens emitidos con él nacen "hace una hora"."""
+
+    @classmethod
+    def now(cls, tz: Any = None) -> datetime:
+        return datetime.now(tz) - timedelta(hours=1)
+
+
+def _atrasar_reloj(m: pytest.MonkeyPatch) -> None:
+    """Hace que el canje y la firma del JWT usen la hora atrasada (el iat y el created_at del refresh)."""
+    m.setattr("src.application.use_cases.oauth.canjear_token_oauth.datetime", _RelojAtrasado)
+    m.setattr("src.infrastructure.auth.jwt_token_service.datetime", _RelojAtrasado)
+
+
+def _estado(client: TestClient, access_token: str) -> int:
+    return client.get("/api/v1/usuarios/integraciones", headers=_headers_bearer(access_token)).status_code
+
+
+def _crear_usuario(app: Any) -> str:
+    """Agrega otro usuario a la base de test (la misma que usa la app vía dependency_overrides)."""
+    generador = app.dependency_overrides[get_db_session]()
+    db = next(generador)
+    user_id = str(uuid.uuid4())
+    db.add(
+        UserModel(
+            id=user_id,
+            username=f"otro_{user_id[:8]}@datamaq.com",
+            password_hash="hash",
+            role="ingeniero",
+            organization_id=None,
+            is_active=True,
+        )
+    )
+    db.commit()
+    generador.close()
+    return user_id
 
 
 def test_oauth_access_token_deja_de_valer_al_desconectar_integracion():
     """Issue #33: tras DELETE /integraciones/{client_id} el access token emitido a ese cliente da 401."""
     app, user_id = _crear_app_test()
-    login_headers = {"Authorization": f"Bearer {_token_login(user_id)}"}
+    login_headers = _headers_login(user_id)
 
     with TestClient(app) as client:
-        access_token = _emitir_access_token_oauth(client, login_headers)
-        oauth_headers = {"Authorization": f"Bearer {access_token}"}
+        access_token = _emitir_tokens_oauth(client, login_headers)["access_token"]
 
         # Mientras la integración está conectada, el access token se acepta.
-        assert client.get("/api/v1/usuarios/integraciones", headers=oauth_headers).status_code == 200
+        assert _estado(client, access_token) == 200
 
         # El usuario desconecta la integración desde su sesión normal.
         del_res = client.delete("/api/v1/usuarios/integraciones/claude-ai", headers=login_headers)
@@ -358,7 +413,7 @@ def test_oauth_access_token_deja_de_valer_al_desconectar_integracion():
         assert del_res.json()["revocados"] >= 1
 
         # El access token (24 h) ya no debe aceptarse, aunque no haya vencido.
-        rechazado = client.get("/api/v1/usuarios/integraciones", headers=oauth_headers)
+        rechazado = client.get("/api/v1/usuarios/integraciones", headers=_headers_bearer(access_token))
         assert rechazado.status_code == 401
         assert rechazado.json()["detail"] == "credenciales_invalidas"
 
@@ -366,40 +421,147 @@ def test_oauth_access_token_deja_de_valer_al_desconectar_integracion():
         assert client.get("/api/v1/usuarios/integraciones", headers=login_headers).status_code == 200
 
 
-def test_oauth_access_token_sigue_valiendo_tras_rotar_refresh():
-    """La rotación del refresh no debe invalidar el access token vigente de la misma integración."""
+def test_oauth_access_token_viejo_no_revive_al_reconectar_el_mismo_cliente(monkeypatch):
+    """El access token emitido antes de desconectar no vuelve a valer cuando se reconecta el mismo client_id."""
     app, user_id = _crear_app_test()
-    login_headers = {"Authorization": f"Bearer {_token_login(user_id)}"}
+    login_headers = _headers_login(user_id)
 
     with TestClient(app) as client:
-        access_token = _emitir_access_token_oauth(client, login_headers)
-        oauth_headers = {"Authorization": f"Bearer {access_token}"}
-        assert client.get("/api/v1/usuarios/integraciones", headers=oauth_headers).status_code == 200
+        with monkeypatch.context() as m:
+            _atrasar_reloj(m)
+            viejo = _emitir_tokens_oauth(client, login_headers)["access_token"]
+        assert _estado(client, viejo) == 200
 
-        # Reconectar (otro authorize) deja un refresh activo nuevo; el access previo sigue valiendo.
-        _emitir_access_token_oauth(client, login_headers)
-        assert client.get("/api/v1/usuarios/integraciones", headers=oauth_headers).status_code == 200
+        client.delete("/api/v1/usuarios/integraciones/claude-ai", headers=login_headers)
+        assert _estado(client, viejo) == 401
+
+        # Reconexión del mismo cliente: el refresh nuevo es posterior al access viejo.
+        nuevo = _emitir_tokens_oauth(client, login_headers)["access_token"]
+        assert _estado(client, nuevo) == 200
+        assert _estado(client, viejo) == 401
+
+
+def test_oauth_autorizar_de_nuevo_sin_desconectar_no_corta_el_access_vigente(monkeypatch):
+    """Autorizar otra vez el mismo cliente sin desconectar deja activo el refresh original: el access sigue valiendo."""
+    app, user_id = _crear_app_test()
+    login_headers = _headers_login(user_id)
+
+    with TestClient(app) as client:
+        with monkeypatch.context() as m:
+            _atrasar_reloj(m)
+            viejo = _emitir_tokens_oauth(client, login_headers)["access_token"]
+
+        _emitir_tokens_oauth(client, login_headers)
+        assert _estado(client, viejo) == 200
+
+
+def test_oauth_rotar_refresh_emite_access_nuevo_y_reemplaza_al_anterior(monkeypatch):
+    """Rotación real (POST /oauth/token grant_type=refresh_token): el access nuevo vale y el emitido antes deja de valer.
+
+    Decisión (Issue #33): el access solo vale mientras exista un refresh sin revocar creado hasta su emisión.
+    Rotar revoca el viejo y crea uno posterior, así que el access anterior queda reemplazado por el nuevo.
+    """
+    app, user_id = _crear_app_test()
+    login_headers = _headers_login(user_id)
+
+    with TestClient(app) as client:
+        with monkeypatch.context() as m:
+            _atrasar_reloj(m)
+            emitidos = _emitir_tokens_oauth(client, login_headers)
+        assert _estado(client, emitidos["access_token"]) == 200
+
+        rotado = client.post(
+            "/oauth/token",
+            data={
+                "grant_type": "refresh_token",
+                "client_id": "claude-ai",
+                "refresh_token": emitidos["refresh_token"],
+            },
+        )
+        assert rotado.status_code == 200
+        assert rotado.json()["refresh_token"] != emitidos["refresh_token"]
+
+        assert _estado(client, rotado.json()["access_token"]) == 200
+        assert _estado(client, emitidos["access_token"]) == 401
 
 
 def test_oauth_refresh_vencido_sin_revocar_no_corta_access_token_vigente():
     """Decisión: el chequeo mira solo revoked_at. El refresh (30 d) vive más que el access (1 d) emitido con él."""
     app, user_id = _crear_app_test()
-    login_headers = {"Authorization": f"Bearer {_token_login(user_id)}"}
+    login_headers = _headers_login(user_id)
 
     with TestClient(app) as client:
-        access_token = _emitir_access_token_oauth(client, login_headers)
-        oauth_headers = {"Authorization": f"Bearer {access_token}"}
+        access_token = _emitir_tokens_oauth(client, login_headers)["access_token"]
 
         # Forzamos el caso límite: refresh vencido pero no revocado.
-        override = app.dependency_overrides[get_db_session]
-        db = next(override())
+        generador = app.dependency_overrides[get_db_session]()
+        db = next(generador)
         db.query(OAuthRefreshTokenModel).filter(OAuthRefreshTokenModel.user_id == user_id).update(
             {"expires_at": datetime.now(timezone.utc) - timedelta(hours=1)}
         )
         db.commit()
-        db.close()
+        generador.close()
 
-        assert client.get("/api/v1/usuarios/integraciones", headers=oauth_headers).status_code == 200
+        assert _estado(client, access_token) == 200
+
+
+def test_oauth_falla_cerrada_si_el_repositorio_oauth_lanza():
+    """Si el chequeo de la integración falla, el access token OAuth no pasa (ni como 200 ni sin respuesta de error)."""
+    app, user_id = _crear_app_test()
+    login_headers = _headers_login(user_id)
+
+    class _RepoQueFalla:
+        def tiene_integracion_activa(self, *args: Any, **kwargs: Any) -> bool:
+            raise RuntimeError("base caída")
+
+    with TestClient(app) as client:
+        access_token = _emitir_tokens_oauth(client, login_headers)["access_token"]
+        app.dependency_overrides[get_oauth_repository] = lambda: _RepoQueFalla()
+        res = client.get("/api/v1/usuarios/integraciones", headers=_headers_bearer(access_token))
+        assert res.status_code == 401
+        assert res.json()["detail"] == "credenciales_invalidas"
+
+
+def test_oauth_desconectar_un_cliente_no_corta_a_otro_del_mismo_usuario():
+    app, user_id = _crear_app_test()
+    login_headers = _headers_login(user_id)
+
+    with TestClient(app) as client:
+        claude = _emitir_tokens_oauth(client, login_headers, "claude-ai")["access_token"]
+        conector = _emitir_tokens_oauth(client, login_headers, "datamaq-mcp-client")["access_token"]
+
+        client.delete("/api/v1/usuarios/integraciones/claude-ai", headers=login_headers)
+
+        assert _estado(client, claude) == 401
+        assert _estado(client, conector) == 200
+
+
+def test_oauth_desconectar_no_corta_a_otro_usuario_con_el_mismo_client_id():
+    app, user_id = _crear_app_test()
+    otro_usuario = _crear_usuario(app)
+
+    with TestClient(app) as client:
+        propio = _emitir_tokens_oauth(client, _headers_login(user_id))["access_token"]
+        ajeno = _emitir_tokens_oauth(client, _headers_login(otro_usuario))["access_token"]
+
+        client.delete("/api/v1/usuarios/integraciones/claude-ai", headers=_headers_login(user_id))
+
+        assert _estado(client, propio) == 401
+        assert _estado(client, ajeno) == 200
+
+
+def test_oauth_desconectar_un_client_id_inexistente_no_falla_ni_corta_nada():
+    app, user_id = _crear_app_test()
+    login_headers = _headers_login(user_id)
+
+    with TestClient(app) as client:
+        access_token = _emitir_tokens_oauth(client, login_headers)["access_token"]
+
+        res = client.delete("/api/v1/usuarios/integraciones/no-existe", headers=login_headers)
+
+        assert res.status_code == 200
+        assert res.json()["revocados"] == 0
+        assert _estado(client, access_token) == 200
 
 
 def test_oauth_consent_info_y_consent_flow():
