@@ -51,11 +51,17 @@ class OAuthRepositoryPort(ABC):
         pass
 
     @abstractmethod
-    def tiene_integracion_activa(self, user_id: str, client_id: str) -> bool:
+    def tiene_integracion_activa(
+        self, user_id: str, client_id: str, refresh_creado_hasta: datetime | None = None
+    ) -> bool:
         """True si el usuario conserva algún refresh token del cliente sin revocar.
 
         Cuenta solo `revoked_at`, no `expires_at`: el refresh (30 d) se emite junto con el access (1 d)
         y lo sobrevive, así que mirar el vencimiento solo podría cortar a un usuario aún conectado.
+
+        Si se indica `refresh_creado_hasta`, solo cuentan los refresh creados hasta ese instante. Así un
+        access token emitido antes de una desconexión no revive cuando el usuario reconecta el mismo cliente
+        (el refresh nuevo es posterior a ese access token).
         """
         pass
 

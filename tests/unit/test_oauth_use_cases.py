@@ -96,9 +96,14 @@ class InMemoryOAuthRepository(OAuthRepositoryPort):
                 count += 1
         return count
 
-    def tiene_integracion_activa(self, user_id: str, client_id: str) -> bool:
+    def tiene_integracion_activa(
+        self, user_id: str, client_id: str, refresh_creado_hasta: datetime | None = None
+    ) -> bool:
         return any(
-            t.user_id == user_id and t.client_id == client_id and t.revoked_at is None
+            t.user_id == user_id
+            and t.client_id == client_id
+            and t.revoked_at is None
+            and (refresh_creado_hasta is None or t.created_at <= refresh_creado_hasta)
             for t in self.refresh_tokens.values()
         )
 
