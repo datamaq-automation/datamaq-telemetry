@@ -152,3 +152,39 @@ def test_cambiar_rol_usuario_exitoso_y_auditoria():
     assert evento.resultado == "EXITO"
     assert evento.metadatos["rol_anterior"] == "operador"
     assert evento.metadatos["rol_nuevo"] == "mantenimiento"
+
+
+def _baja_de_superadmin(rol_actor: str) -> tuple[TestClient, MagicMock, MagicMock]:
+    from src.infrastructure.fastapi.dependencies import get_usuarios_repository
+
+    app = create_app()
+    repo = MagicMock()
+    usuario = MagicMock()
+    usuario.id = "user-x"
+    usuario.usuario = "root_2"
+    usuario.rol = "superadmin"
+    usuario.organizacion_id = "org-1"
+    usuario.esta_activo = True
+    repo.obtener_por_id.return_value = usuario
+    app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "actor", "rol": rol_actor, "org": "org-1"}
+    app.dependency_overrides[get_usuarios_repository] = lambda: repo
+    return TestClient(app), repo, usuario
+
+
+def test_admin_no_da_de_baja_a_un_superadmin_403_sin_desactivar():
+    client, repo, usuario = _baja_de_superadmin("admin")
+
+    response = client.delete("/api/v1/usuarios/user-x")
+
+    assert response.status_code == 403
+    assert usuario.esta_activo is True
+    repo.guardar.assert_not_called()
+
+
+def test_superadmin_da_de_baja_a_otro_superadmin_204():
+    client, _repo, usuario = _baja_de_superadmin("superadmin")
+
+    response = client.delete("/api/v1/usuarios/user-x")
+
+    assert response.status_code == 204
+    assert usuario.esta_activo is False

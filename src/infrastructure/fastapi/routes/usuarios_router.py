@@ -129,6 +129,7 @@ def dar_baja_usuario(
     if not usuario:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado.")
 
+    _verificar_baja_permitida(claims, usuario)
     usuario.esta_activo = False
     repo_usuarios.guardar(usuario)
 
@@ -195,6 +196,12 @@ def cambiar_rol_usuario(
         organizacion_id=guardado.organizacion_id,
         esta_activo=guardado.esta_activo,
     )
+
+
+def _verificar_baja_permitida(claims: dict, usuario: UsuarioAuth) -> None:
+    """Solo un superadmin da de baja a otro superadmin (#39, decisión del dueño)."""
+    if claims.get("rol") != "superadmin" and usuario.rol == "superadmin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
 
 
 def _verificar_misma_organizacion(claims: dict, usuario_id: str, repo_usuarios: RepositorioUsuariosPort) -> None:
