@@ -165,28 +165,6 @@ def login(
         manejar_error_http(e)
 
 
-@router.post("/guest", response_model=LoginResponseDTO)
-def guest(
-    request: Request,
-    response: Response,
-    use_case: Annotated[AutenticarUsuarioUseCase, Depends(get_auth_use_case)],
-    settings: Annotated[Settings, Depends(get_settings_dep)],
-) -> LoginResponseDTO:
-    try:
-        ip = request.client.host if request.client else "desconocida"
-        resultado = use_case.guest(clave_limite=f"ip:{ip}")
-        logger.info(
-            "login_exitoso",
-            usuario="invitado",
-            request_id=structlog.contextvars.get_contextvars().get("request_id"),
-        )
-        if resultado.token:
-            _fijar_cookie(response, settings, resultado.token, request=request)
-        return resultado
-    except Exception as e:
-        manejar_error_http(e)
-
-
 @router.post("/logout")
 def logout(
     response: Response,

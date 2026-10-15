@@ -48,7 +48,6 @@ class AutenticarUsuarioUseCase:
         token_service: GeneradorTokenPort,
         minutos_validez: int,
         rate_limiter: RateLimiterService | None = None,
-        guest_organizacion_id: str | None = None,
         repo_dispositivos: RepositorioDispositivosConfiablesPort | None = None,
         acceso_plantas: GestionarAccesoPlantasUseCase | None = None,
         repo_suscripciones: RepositorioSuscripcionesPort | None = None,
@@ -61,7 +60,6 @@ class AutenticarUsuarioUseCase:
         self.token_service = token_service
         self.minutos_validez = minutos_validez
         self.rate_limiter = rate_limiter
-        self.guest_organizacion_id = guest_organizacion_id
         self.repo_dispositivos = repo_dispositivos
         self.acceso_plantas = acceso_plantas
         self.repo_suscripciones = repo_suscripciones
@@ -137,22 +135,6 @@ class AutenticarUsuarioUseCase:
             usuario.id, usuario.usuario, expira_en, rol=usuario.rol, organizacion_id=usuario.organizacion_id
         )
         return LoginResponseDTO(token=token, expira_en=expira_en, require_2fa=False)
-
-    def guest(self, clave_limite: str) -> LoginResponseDTO:
-        if self.rate_limiter is not None:
-            if not self.rate_limiter.permitir(clave_limite):
-                raise DemasiadosIntentosError(
-                    "Demasiados intentos de inicio de sesión. Intente más tarde.",
-                    usuario="invitado",
-                    retry_after_seg=self.rate_limiter.segundos_restantes(clave_limite),
-                )
-            self.rate_limiter.registrar_intento(clave_limite)
-
-        expira_en = PoliticaExpiracionService.calcular_expiracion(ahora_utc(), self.minutos_validez)
-        token = self.token_service.generar(
-            "invitado", "invitado", expira_en, rol="invitado", organizacion_id=self.guest_organizacion_id
-        )
-        return LoginResponseDTO(token=token, expira_en=expira_en)
 
     def me(self, claims: dict[str, Any]) -> MeResponseDTO:
         rol = claims.get("rol")
