@@ -198,6 +198,18 @@ class MySQLOAuthRepository(OAuthRepositoryPort):
         self.db.commit()
         return filas
 
+    def tiene_integracion_activa(self, user_id: str, client_id: str) -> bool:
+        return (
+            self.db.query(OAuthRefreshTokenModel.id)
+            .filter(
+                OAuthRefreshTokenModel.user_id == user_id,
+                OAuthRefreshTokenModel.client_id == client_id,
+                OAuthRefreshTokenModel.revoked_at.is_(None),
+            )
+            .first()
+            is not None
+        )
+
     def listar_integraciones_usuario(self, user_id: str) -> list[dict[str, Any]]:
         ahora = datetime.now(timezone.utc)
         tokens = (

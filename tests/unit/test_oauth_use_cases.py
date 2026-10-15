@@ -96,6 +96,12 @@ class InMemoryOAuthRepository(OAuthRepositoryPort):
                 count += 1
         return count
 
+    def tiene_integracion_activa(self, user_id: str, client_id: str) -> bool:
+        return any(
+            t.user_id == user_id and t.client_id == client_id and t.revoked_at is None
+            for t in self.refresh_tokens.values()
+        )
+
     def listar_integraciones_usuario(self, user_id: str) -> list[dict[str, Any]]:
         activas: dict[str, dict[str, Any]] = {}
         for t in self.refresh_tokens.values():

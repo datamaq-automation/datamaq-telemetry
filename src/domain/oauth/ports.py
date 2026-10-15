@@ -51,6 +51,15 @@ class OAuthRepositoryPort(ABC):
         pass
 
     @abstractmethod
+    def tiene_integracion_activa(self, user_id: str, client_id: str) -> bool:
+        """True si el usuario conserva algún refresh token del cliente sin revocar.
+
+        Cuenta solo `revoked_at`, no `expires_at`: el refresh (30 d) se emite junto con el access (1 d)
+        y lo sobrevive, así que mirar el vencimiento solo podría cortar a un usuario aún conectado.
+        """
+        pass
+
+    @abstractmethod
     def listar_integraciones_usuario(self, user_id: str) -> list[dict[str, Any]]:
         """Lista las integraciones autorizadas activas para la vista de perfil del usuario."""
         pass
