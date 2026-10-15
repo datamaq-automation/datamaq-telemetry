@@ -18,6 +18,8 @@ from src.infrastructure.fastapi.dependencies import (
     get_atribucion_use_case,
     get_usuario_actual,
 )
+from src.infrastructure.fastapi.device_ownership import verificar_propiedad_dispositivo
+from src.infrastructure.fastapi.routes.cargas_router import verificar_acceso_a_campana, verificar_acceso_a_carga
 from src.infrastructure.fastapi.server import create_app
 
 MEDIDOR_PRUEBA = "d48c49f0-3564-4000-8000-000000000001"
@@ -26,6 +28,10 @@ AHORA = datetime(2026, 9, 7, 10, 0, tzinfo=timezone.utc)
 
 def _cliente_atribucion(use_case: MagicMock, rol: str = "admin") -> TestClient:
     app = create_app()
+    # La propiedad del medidor (#41) tiene sus propios tests; acá se prueba el comportamiento de cargas.
+    app.dependency_overrides[verificar_propiedad_dispositivo] = lambda: None
+    app.dependency_overrides[verificar_acceso_a_carga] = lambda: None
+    app.dependency_overrides[verificar_acceso_a_campana] = lambda: None
     app.dependency_overrides[get_atribucion_use_case] = lambda: use_case
     app.dependency_overrides[get_usuario_actual] = lambda: {
         "sub": "usr-test-1",
