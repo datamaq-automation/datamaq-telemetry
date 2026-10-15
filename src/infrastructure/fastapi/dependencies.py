@@ -201,8 +201,10 @@ def get_alertas_use_case(
     )
 
 
+
 def get_procesar_pregunta_asistente_use_case(
     db: Annotated[Session, Depends(get_db_session)],
+    settings: Annotated[Settings, Depends(get_settings_dep)],
 ) -> ProcesarPreguntaAsistenteUseCase:
     from src.infrastructure.asistente.clasificador_reglas import (
         ClasificadorIntencionReglasAdapter,
@@ -218,6 +220,7 @@ def get_procesar_pregunta_asistente_use_case(
         repo_conversaciones=MySQLConversacionesAsistenteRepository(db),
         gestor_alertas=get_alertas_use_case(db),
         gestor_dispositivos=get_dispositivos_use_case(db),
+        consultar_telemetria=get_telemetria_use_case(db, settings),
     )
 
 

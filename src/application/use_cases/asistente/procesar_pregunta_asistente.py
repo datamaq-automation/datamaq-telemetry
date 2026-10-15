@@ -7,6 +7,7 @@ from src.application.dtos.alerta_dto import AlertaResponseDTO
 from src.application.dtos.dispositivo_dto import DispositivoResponseDTO
 from src.application.use_cases.gestionar_alertas import GestionarAlertasUseCase
 from src.application.use_cases.gestionar_dispositivos import GestionarDispositivosUseCase
+from src.application.use_cases.consultar_telemetria import ConsultarTelemetriaUseCase
 from src.domain.asistente.entities import (
     MensajeAsistente,
     RegistroClasificacionIntencion,
@@ -43,12 +44,14 @@ class ProcesarPreguntaAsistenteUseCase:
         repo_conversaciones: RepositorioConversacionesAsistentePort,
         gestor_alertas: GestionarAlertasUseCase,
         gestor_dispositivos: GestionarDispositivosUseCase,
+        consultar_telemetria: ConsultarTelemetriaUseCase | None = None,
     ):
         self._clasificador = clasificador
         self._generador = generador
         self._repo_conversaciones = repo_conversaciones
         self._gestor_alertas = gestor_alertas
         self._gestor_dispositivos = gestor_dispositivos
+        self._consultar_telemetria = consultar_telemetria
 
     def _construir_prompt_contexto(
         self,
@@ -59,6 +62,7 @@ class ProcesarPreguntaAsistenteUseCase:
             "intencion_detectada": contexto.intencion.value,
             "alertas_recientes": contexto.datos_alertas or [],
             "estado_dispositivos": contexto.datos_dispositivos or [],
+            "telemetria": contexto.datos_telemetria or {},
         }
         return (
             "Eres el asistente oficial de DataMaq Telemetry. "
@@ -81,6 +85,41 @@ class ProcesarPreguntaAsistenteUseCase:
         )
         return [a.model_dump(mode="json") for a in alertas], [d.model_dump(mode="json") for d in dispositivos]
 
+    def _recopilar_telemetria(
+        self,
+        intencion: IntencionUsuario,
+        organizacion_id: str,
+    ) -> dict:
+        """Obtiene las últimas lecturas de los dispositivos de la organización."""
+        if (
+            intencion != IntencionUsuario.RESUMEN_TELEMETRIA
+            or self._consultar_telemetria is None
+        ):
+            return {}
+
+        dispositivos = self._gestor_dispositivos.listar_dispositivos(
+            organizacion_id=organizacion_id
+        )
+
+        resultados = {}
+
+        for dispositivo in dispositivos[:20]:
+            datos_dispositivo = dispositivo.model_dump(mode="json")
+            device_id = datos_dispositivo.get("id") or datos_dispositivo.get("device_uid")
+            if not device_id:
+                continue
+
+
+            try:
+                lectura = self._consultar_telemetria.obtener_ultima_telemetria(
+                    device_id
+                )
+                resultados[device_id] = lectura.model_dump(mode="json")
+            except Exception:
+                continue
+
+        return resultados
+
     def ejecutar(
         self,
         pregunta: str,
@@ -94,18 +133,41 @@ class ProcesarPreguntaAsistenteUseCase:
 
         # 1. Obtener o crear conversación multi-tenant
         if conversacion_id:
-            conv = self._repo_conversaciones.obtener_conversacion(conversacion_id, organizacion_id)
+            conv = self._repo_conversaciones.obtener_conversacion(
+                conversacion_id,
+                organizacion_id,
+            )
             if conv is None:
-                conv = self._repo_conversaciones.crear_conversacion(organizacion_id, usuario_id)
+                conv = self._repo_conversaciones.crear_conversacion(
+                    organizacion_id,
+                    usuario_id,
+                )
         else:
-            conv = self._repo_conversaciones.crear_conversacion(organizacion_id, usuario_id)
+            conv = self._repo_conversaciones.crear_conversacion(
+                organizacion_id,
+                usuario_id,
+            )
 
-        # 2. Clasificar intención
+        # 2. Clasificar la pregunta
         clasificacion = self._clasificador.clasificar(pregunta)
-        intencion_enum = self._intencion_mapeo.get(clasificacion.nombre, IntencionUsuario.DESCONOCIDO)
+        intencion_enum = self._intencion_mapeo.get(
+            clasificacion.nombre,
+            IntencionUsuario.DESCONOCIDO,
+        )
+
+
 
         # 3. Recopilar datos reales según la intención (Aislamiento Multi-tenant)
-        datos_alertas, datos_dispositivos = self._recopilar_datos(intencion_enum, organizacion_id)
+        datos_alertas, datos_dispositivos = self._recopilar_datos(
+            intencion_enum,
+            organizacion_id,
+        )
+
+        datos_telemetria = self._recopilar_telemetria(
+            intencion_enum,
+            organizacion_id,
+        )
+
 
         # 4. Construir contexto y generar respuesta
         contexto = ContextoPreguntaAsistente(
@@ -114,7 +176,10 @@ class ProcesarPreguntaAsistenteUseCase:
             intencion=intencion_enum,
             datos_alertas=datos_alertas,
             datos_dispositivos=datos_dispositivos,
+            datos_telemetria=datos_telemetria,
         )
+
+
 
         prompt = self._construir_prompt_contexto(contexto)
         iterador_respuesta = self._generador.generar(pregunta, prompt)

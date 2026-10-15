@@ -8,8 +8,6 @@ class IntencionUsuario(str, Enum):
     SALUD_DISPOSITIVOS = "SALUD_DISPOSITIVOS"
     RESUMEN_TELEMETRIA = "RESUMEN_TELEMETRIA"
     DESCONOCIDO = "DESCONOCIDO"
-
-
 @dataclass(frozen=True)
 class ContextoPreguntaAsistente:
     organizacion_id: str
