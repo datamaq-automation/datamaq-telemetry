@@ -144,7 +144,7 @@ def test_banco_capacitores_respeta_q_reactiva_negativa():
     assert resultado.sobrecompensacion_sostenida is True
     assert resultado.banco_comercial_sugerido_kvar is None
     assert resultado.razon_no_recomendacion is not None
-    assert "Sobrecompensación reactiva sostenida" in resultado.razon_no_recomendacion
+    assert resultado.razon_no_recomendacion == "Banco de capacitores sobredimensionado o con pasos encendidos en vacío."
 
 
 def test_banco_capacitores_sobrecompensacion_con_fp_bajo():
@@ -162,7 +162,7 @@ def test_banco_capacitores_sobrecompensacion_con_fp_bajo():
     assert resultado.sobrecompensacion_sostenida is True
     assert resultado.banco_comercial_sugerido_kvar is None
     assert resultado.escalones_sugeridos_kvar == []
-    assert resultado.razon_no_recomendacion == "Sobrecompensación reactiva sostenida (régimen capacitivo)"
+    assert resultado.razon_no_recomendacion == "Banco de capacitores sobredimensionado o con pasos encendidos en vacío."
 
 
 def test_obtener_banco_capacitores_sin_datos():

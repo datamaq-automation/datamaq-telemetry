@@ -120,7 +120,7 @@ class ConsultarAnaliticaPlantaUseCase:
         if sobrecompensacion:
             banco_sugerido = None
             escalones = []
-            razon_no_recomendacion = "Sobrecompensación reactiva sostenida (régimen capacitivo)"
+            razon_no_recomendacion = "Banco de capacitores sobredimensionado o con pasos encendidos en vacío."
         elif fp_prom is not None and fp_prom > 0.95:
             banco_sugerido = None
             escalones = []
