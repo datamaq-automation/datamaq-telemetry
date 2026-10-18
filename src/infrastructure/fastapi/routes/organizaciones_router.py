@@ -28,7 +28,7 @@ def list_organizaciones(
 ):
     rol = claims.get("rol")
     orgs = use_case.listar_organizaciones()
-    if rol in ("superadmin", "invitado_global"):
+    if rol == "superadmin":
         return orgs
     claim_org = claims.get("org")
     if claim_org is None:
@@ -43,7 +43,7 @@ def list_plantas(
     organizacion_id: str | None = None,
 ):
     rol = claims.get("rol")
-    if rol in ("superadmin", "invitado_global"):
+    if rol == "superadmin":
         target_org = organizacion_id
     else:
         claim_org = claims.get("org")
