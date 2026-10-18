@@ -24,10 +24,11 @@ def _dependencias(ruta) -> set:
     return {d.dependency for d in getattr(ruta, "dependencies", [])}
 
 
-# P1 — requiere_rol_escritura rechaza invitado
-def test_requiere_rol_escritura_rechaza_invitado():
+# P1 — requiere_rol_escritura rechaza roles retirados (invitado, invitado_global)
+@pytest.mark.parametrize("rol", ["invitado", "invitado_global"])
+def test_requiere_rol_escritura_rechaza_roles_retirados(rol):
     with pytest.raises(HTTPException) as e:
-        deps.requiere_rol_escritura({"rol": "invitado"})
+        deps.requiere_rol_escritura({"rol": rol})
 
     assert e.value.status_code == 403
     assert e.value.detail == "forbidden"

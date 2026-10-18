@@ -86,7 +86,7 @@ def test_listado_solo_trae_alertas_de_la_organizacion_del_usuario(cliente):
     assert _tipos(client.get("/api/v1/alertas?device_id=dev-b")) == set()
 
 
-@pytest.mark.parametrize("rol", ["superadmin", "invitado_global"])
+@pytest.mark.parametrize("rol", ["superadmin"])
 def test_roles_globales_listan_todas(cliente, rol):
     assert _tipos(cliente({"sub": "u-g", "rol": rol}).get("/api/v1/alertas")) == {"ALERTA_A", "ALERTA_B"}
 

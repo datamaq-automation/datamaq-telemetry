@@ -74,9 +74,9 @@ def test_politica_superadmin_ve_todas_las_plantas_y_puede_cambiar():
     assert all(puede for _, puede in resultado)
 
 
-def test_politica_invitado_global_ignora_asignaciones_explicitas():
+def test_politica_superadmin_ignora_asignaciones_explicitas():
     accesos = [AccesoPlantaUsuario("u-1", "planta-garin", puede_cambiar=False)]
-    resultado = PoliticaAccesoPlantasService.resolver("invitado_global", "org-a", PLANTAS, accesos)
+    resultado = PoliticaAccesoPlantasService.resolver("superadmin", "org-a", PLANTAS, accesos)
     assert len(resultado) == 3
     assert all(puede for _, puede in resultado)
 
@@ -138,7 +138,7 @@ def test_planta_permitida_con_asignaciones_rechaza_la_no_asignada_de_su_org():
     assert use_case.resolver_planta_permitida("u-1", "operador", "org-a", None) == "planta-pilar"
 
 
-@pytest.mark.parametrize("rol", ["superadmin", "invitado_global"])
+@pytest.mark.parametrize("rol", ["superadmin"])
 def test_planta_permitida_roles_globales_acceden_a_cualquier_planta(rol):
     use_case = GestionarAccesoPlantasUseCase(RepoAccesosEnMemoria(), _repo_org())
     assert use_case.resolver_planta_permitida("u-1", rol, "org-a", "planta-ajena") == "planta-ajena"

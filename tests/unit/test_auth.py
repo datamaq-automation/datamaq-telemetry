@@ -427,16 +427,15 @@ def test_me_rol_admin():
     assert dto.rol == "admin"
 
 
-def test_me_roles_operador_invitado_y_superadmin():
+def test_me_roles_operador_y_superadmin():
     use_case = _use_case_me()
     assert use_case.me({"usuario": "u1", "rol": "operador"}).rol == "operador"
-    assert use_case.me({"usuario": "u1", "rol": "invitado"}).rol == "invitado"
     assert use_case.me({"usuario": "u1", "rol": "superadmin"}).rol == "superadmin"
 
 
 def test_me_rol_ausente_o_invalido():
     use_case = _use_case_me()
-    for claims in ({"usuario": "u1"}, {"usuario": "u1", "rol": "root"}):
+    for claims in ({"usuario": "u1"}, {"usuario": "u1", "rol": "root"}, {"usuario": "u1", "rol": "invitado"}):
         try:
             use_case.me(claims)
             raise AssertionError("Se esperaba CredencialesInvalidasError")
@@ -471,3 +470,27 @@ def test_me_handler_rol_invalido():
     except HTTPException as e:
         assert e.status_code == 401
         assert e.detail == "credenciales_invalidas"
+
+
+@pytest.mark.parametrize("rol", ["invitado", "invitado_global"])
+def test_cuenta_con_rol_retirado_sigue_logueando_pero_me_la_rechaza(rol):
+    """Fija el efecto de retirar los roles invitado/invitado_global sobre cuentas que ya existen en la base.
+
+    1. El login no valida el rol: sigue emitiendo token a la cuenta.
+    2. /me y ROLES_VALIDOS la rechazan: la cuenta queda bloqueada de hecho.
+    Decisión pendiente del dueño antes de mergear el PR de #43 (estudiantes@ está en uso en producción).
+    """
+    usuario = UsuarioAuth(
+        id=f"legacy-{rol}",
+        usuario=f"{rol}@datamaq.com.ar",
+        hash_contrasena=HashContrasenaService.generar_hash("secreto123"),
+        esta_activo=True,
+        rol=rol,
+    )
+    use_case, _ = _use_case_login(MockRepositorioUsuarios([usuario]))
+
+    respuesta = use_case.login(LoginRequestDTO(usuario=usuario.usuario, contrasena="secreto123"))
+
+    assert respuesta.token == f"token-legacy-{rol}"
+    with pytest.raises(CredencialesInvalidasError, match="Rol inválido"):
+        _use_case_me().me({"usuario": usuario.usuario, "sub": usuario.id, "rol": rol})
