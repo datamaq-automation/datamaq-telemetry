@@ -12,7 +12,13 @@ from src.infrastructure.settings.config import Settings
 
 # APP_ENV y DEBUG explícitos: el entorno del proceso (CI exporta APP_ENV=test) no debe decidir la postura.
 _PERFIL_PROD = {"APP_ENV": "production", "DEBUG": False}
-_BASE_PROD = {**_PERFIL_PROD, "API_SECRET_KEY": "secreto-fuerte-123456", "DB_PASSWORD": "clave-segura"}
+# MP_WEBHOOK_SECRET cargado: con BILLING_HABILITADO (default True) su ausencia loguea CRITICAL de MP.
+_BASE_PROD = {
+    **_PERFIL_PROD,
+    "API_SECRET_KEY": "secreto-fuerte-123456",
+    "DB_PASSWORD": "clave-segura",
+    "MP_WEBHOOK_SECRET": "secreto-mp-produccion",
+}
 
 
 def _settings(monkeypatch, **overrides):
