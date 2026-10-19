@@ -18,6 +18,7 @@ from src.application.dtos.oauth_dtos import (
     OAuthTokenRequestDTO,
     OAuthTokenResponseDTO,
 )
+from src.application.use_cases.gestionar_acceso_plantas import GestionarAccesoPlantasUseCase
 from src.application.use_cases.oauth.autorizar_consentimiento import AutorizarConsentimientoUseCase
 from src.application.use_cases.oauth.canjear_token_oauth import CanjearTokenOAuthUseCase
 from src.application.use_cases.oauth.gestionar_integraciones_usuario import (
@@ -27,7 +28,9 @@ from src.application.use_cases.oauth.revocar_token_oauth import RevocarTokenOAut
 from src.domain.auth.ports import RepositorioUsuariosPort
 from src.domain.oauth.exceptions import OAuthError
 from src.domain.oauth.ports import OAuthRepositoryPort
+from src.domain.oauth.services import resolver_scopes
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
+from src.infrastructure.fastapi.auth_dependencies import get_acceso_plantas_use_case
 from src.infrastructure.fastapi.dependencies import (
     get_jwt_token_service,
     get_oauth_repository,
@@ -132,9 +135,13 @@ def obtener_consent_info_oauth(
     client_id: str,
     claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
     repo_oauth: Annotated[OAuthRepositoryPort, Depends(get_oauth_repository)],
+    acceso_plantas: Annotated[GestionarAccesoPlantasUseCase, Depends(get_acceso_plantas_use_case)],
     scope: str = "read:telemetria",
 ) -> Any:
-    """Retorna información institucional del cliente y permisos para la pantalla de consentimiento."""
+    """Retorna información institucional del cliente y permisos para la pantalla de consentimiento.
+
+    La planta activa es la misma que `planta_activa_id` de `/auth/me`; sin plantas permitidas va en null.
+    Los scopes desconocidos se descartan igual que al autorizar: no se describen como de lectura."""
     cliente = repo_oauth.obtener_cliente(client_id)
     if cliente is None:
         return JSONResponse(
@@ -143,29 +150,20 @@ def obtener_consent_info_oauth(
         )
 
     icon = "anthropic" if ("claude" in client_id.lower() or "anthropic" in cliente.client_name.lower()) else "datamaq"
-    scopes_solicitados = [s.strip() for s in scope.replace(",", " ").split() if s.strip()]
-    if not scopes_solicitados:
-        scopes_solicitados = ["read:telemetria"]
+    scope_otorgado, _ = resolver_scopes(scope.replace(",", " "))
+    lista_scopes = [OAuthScopeDetalleDTO(scope=s, descripcion=DESCRIPCIONES_SCOPES[s]) for s in scope_otorgado.split()]
 
-    lista_scopes = [
-        OAuthScopeDetalleDTO(
-            scope=s,
-            descripcion=DESCRIPCIONES_SCOPES.get(s, "Acceso de lectura autorizado"),
-        )
-        for s in scopes_solicitados
-    ]
-
-    org_id = claims.get("org")
-    planta_id = f"planta-{org_id}" if org_id else "planta-principal"
-    planta_nombre = f"Planta {org_id.replace('org-', '').title()}" if org_id else "Planta Principal"
+    # Planta activa real: la primera permitida al usuario, igual que /auth/me. Sin plantas, null (nunca un nombre inventado).
+    plantas = acceso_plantas.resolver(str(claims.get("sub") or ""), str(claims.get("rol") or ""), claims.get("org"))
+    activa = plantas[0] if plantas else None
 
     return OAuthConsentInfoResponseDTO(
         client_id=cliente.client_id,
         client_name=cliente.client_name,
         client_icon=icon,
-        organizacion_id=org_id,
-        planta_activa_id=planta_id,
-        planta_activa_nombre=planta_nombre,
+        organizacion_id=claims.get("org"),
+        planta_activa_id=activa.id if activa else None,
+        planta_activa_nombre=activa.nombre if activa else None,
         scopes=lista_scopes,
     )
 
