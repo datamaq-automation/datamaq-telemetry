@@ -9,6 +9,27 @@ import secrets
 # RFC 7636 §4.1: [A-Z] / [a-z] / [0-9] / "-" / "." / "_" / "~", longitud de 43 a 128
 REGEX_CODE_VERIFIER = re.compile(r"^[A-Za-z0-9\-._~]{43,128}$")
 
+# Scopes que el servidor OAuth conoce (scopes_supported del discovery y descripciones de consent-info).
+SCOPES_CONOCIDOS: frozenset[str] = frozenset({"read:telemetria", "read:analitica", "read:alertas"})
+
+
+# Lo que se otorga cuando el pedido no trae ningún scope conocido (RFC 6749 §3.3: el servidor puede reducir el scope).
+SCOPES_POR_DEFECTO = ("read:telemetria", "read:analitica", "read:alertas")
+
+
+def resolver_scopes(solicitados: str) -> tuple[str, tuple[str, ...]]:
+    """Scope otorgado y los desconocidos descartados.
+
+    Se otorga la intersección con SCOPES_CONOCIDOS, normalizada (sin duplicados). Si no queda ninguno, se
+    otorgan los SCOPES_POR_DEFECTO. Los desconocidos se devuelven aparte para registrarlos.
+    """
+    pedidos = list(dict.fromkeys(solicitados.split()))
+    conocidos = [s for s in pedidos if s in SCOPES_CONOCIDOS]
+    descartados = tuple(s for s in pedidos if s not in SCOPES_CONOCIDOS)
+    if not conocidos:
+        conocidos = list(SCOPES_POR_DEFECTO)
+    return " ".join(conocidos), descartados
+
 
 def calcular_code_challenge(code_verifier: str) -> str:
     """Calcula el code_challenge S256 para un code_verifier según RFC 7636 §4.2."""
