@@ -69,6 +69,10 @@ class Settings(BaseSettings):
     LOGIN_MAX_INTENTOS: int = 5
     LOGIN_VENTANA_SEGUNDOS: int = 300
 
+    # Rate limiting 404 para mitigación de escaneos y sondas externas
+    RATE_LIMIT_404_MAX_INTENTOS: int = 30
+    RATE_LIMIT_404_VENTANA_SEGUNDOS: int = 60
+
     # SMTP / Email de recuperación
     SMTP_HOST: str = "127.0.0.1"
     SMTP_PORT: int = 25

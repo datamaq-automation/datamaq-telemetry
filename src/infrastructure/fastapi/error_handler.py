@@ -41,7 +41,6 @@ def es_sonda_sospechosa(path: str) -> bool:
     return any(patron.search(path_normalizado) for patron in PATRONES_SONDA_SOSPECHOSA)
 
 
-
 def _request_id() -> Any:
     return structlog.contextvars.get_contextvars().get("request_id")
 
@@ -108,4 +107,3 @@ def manejar_404(request: Request, exc: Exception) -> JSONResponse:
 
         logger.warning(evento, **extra)
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail}, headers=exc.headers)
-
