@@ -42,6 +42,9 @@ jobs:
           DEPLOY_REMOTE_DIR: /var/www/datamaq-telemetry-dev
           DEPLOY_SERVICE_NAME: datamaq-telemetry-dev.service
           DEPLOY_HEALTH_URL: http://localhost:8886/health/ready
+          # Staging publica develop (no main) y guarda sus dumps aparte: su limpieza a 5 no puede tocar los de producción.
+          DEPLOY_BRANCH: develop
+          DEPLOY_BACKUP_DIR: /tmp/datamaq-telemetry-dev-pre-migracion
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
