@@ -45,6 +45,8 @@ jobs:
           # Staging publica develop (no main) y guarda sus dumps aparte: su limpieza a 5 no puede tocar los de producción.
           DEPLOY_BRANCH: develop
           DEPLOY_BACKUP_DIR: /tmp/datamaq-telemetry-dev-pre-migracion
+          # Los pip freeze de rollback de staging no pisan los de producción (mismo /tmp compartido).
+          DEPLOY_DEPS_FILE: /tmp/telemetry-deps-dev.txt
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
