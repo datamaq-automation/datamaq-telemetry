@@ -33,7 +33,12 @@ STUBS = {
     "git": """
 echo "git $*" >> "$LOG"
 case "$1" in
-    rev-parse) echo "commitanterior" ;;
+    rev-parse)
+        case "$*" in
+            *--abbrev-ref*) echo "${GIT_RAMA_ANTERIOR:-main}" ;;
+            *) echo "commitanterior" ;;
+        esac
+        ;;
     ls-files) exec "$GIT_REAL" "$@" ;;
     pull|merge)
         [ -n "${GIT_FALLA:-}" ] && exit 1
@@ -251,6 +256,58 @@ def test_con_token_hace_fetch_a_origin_main_y_merge(deploy):
     assert r.returncode == 0, r.stdout + r.stderr
     assert any("fetch https://github.com/org/repo.git main:refs/remotes/origin/main" in c for c in deploy.llamadas)
     assert "git merge --ff-only origin/main" in deploy.llamadas
+
+
+def test_rama_por_defecto_es_main_con_checkout_y_merge(deploy):
+    """Sin DEPLOY_BRANCH, producción sigue publicando main."""
+    r = deploy.correr(GITHUB_TOKEN="tok", GITHUB_REPOSITORY="org/repo")
+
+    assert r.returncode == 0, r.stdout + r.stderr
+    llamadas = deploy.llamadas
+    assert "git checkout main" in llamadas
+    assert llamadas.index("git checkout main") < llamadas.index("git merge --ff-only origin/main")
+
+
+def test_rama_explicita_develop_hace_fetch_checkout_y_merge_de_develop(deploy):
+    r = deploy.correr(DEPLOY_BRANCH="develop", GITHUB_TOKEN="tok", GITHUB_REPOSITORY="org/repo")
+
+    assert r.returncode == 0, r.stdout + r.stderr
+    llamadas = deploy.llamadas
+    assert any("fetch https://github.com/org/repo.git develop:refs/remotes/origin/develop" in c for c in llamadas)
+    assert "git checkout develop" in llamadas
+    assert "git merge --ff-only origin/develop" in llamadas
+    assert not any("origin/main" in c for c in llamadas)
+
+
+def test_rollback_restaura_la_rama_anterior_ademas_del_commit(deploy):
+    """Si el deploy cambió de rama (main -> develop), el rollback vuelve a main y después al commit anterior."""
+    r = deploy.correr(
+        DEPLOY_BRANCH="develop",
+        GITHUB_TOKEN="tok",
+        GITHUB_REPOSITORY="org/repo",
+        GIT_RAMA_ANTERIOR="main",
+        ALEMBIC_FALLA="1",
+    )
+
+    assert r.returncode != 0
+    llamadas = deploy.llamadas
+    assert "git checkout -f main" in llamadas
+    assert llamadas.index("git checkout -f main") < llamadas.index("git reset --hard commitanterior")
+
+
+def test_rollback_desde_head_desacoplado_vuelve_al_commit_sin_rama(deploy):
+    r = deploy.correr(
+        DEPLOY_BRANCH="develop",
+        GITHUB_TOKEN="tok",
+        GITHUB_REPOSITORY="org/repo",
+        GIT_RAMA_ANTERIOR="HEAD",
+        ALEMBIC_FALLA="1",
+    )
+
+    assert r.returncode != 0
+    llamadas = deploy.llamadas
+    assert "git checkout -f --detach commitanterior" in llamadas
+    assert llamadas.index("git checkout -f --detach commitanterior") < llamadas.index("git reset --hard commitanterior")
 
 
 @pytest.mark.parametrize("sin", ["GITHUB_TOKEN", "GITHUB_REPOSITORY"])
