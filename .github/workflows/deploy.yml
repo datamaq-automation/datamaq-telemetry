@@ -11,35 +11,63 @@ on:
   workflow_dispatch:
 
 jobs:
-  deploy:
-    name: ${{ matrix.name }}
+  target:
+    name: Determinar rama y ambiente
     runs-on: ubuntu-latest
-    environment: ${{ matrix.environment }}
+    outputs:
+      branch: ${{ steps.determine.outputs.branch }}
+      name: ${{ steps.determine.outputs.name }}
+      environment: ${{ steps.determine.outputs.environment }}
+      concurrency: ${{ steps.determine.outputs.concurrency }}
+      remote_dir: ${{ steps.determine.outputs.remote_dir }}
+      service: ${{ steps.determine.outputs.service }}
+      health_url: ${{ steps.determine.outputs.health_url }}
+    steps:
+      - name: Determinar rama y ambiente
+        id: determine
+        run: |
+          # Obtener la rama según el evento
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            BRANCH="${{ github.event.workflow_run.head_branch }}"
+          else
+            BRANCH="${{ github.ref_name }}"
+          fi
+
+          # Asignar variables según la rama
+          if [ "$BRANCH" = "develop" ]; then
+            echo "branch=develop" >> "$GITHUB_OUTPUT"
+            echo "name=Deploy a Staging (api-dev, 8886)" >> "$GITHUB_OUTPUT"
+            echo "environment=staging" >> "$GITHUB_OUTPUT"
+            echo "concurrency=deploy-telemetry-staging" >> "$GITHUB_OUTPUT"
+            echo "remote_dir=/var/www/datamaq-telemetry-dev" >> "$GITHUB_OUTPUT"
+            echo "service=datamaq-telemetry-dev.service" >> "$GITHUB_OUTPUT"
+            echo "health_url=http://localhost:8886/health/ready" >> "$GITHUB_OUTPUT"
+          elif [ "$BRANCH" = "main" ]; then
+            echo "branch=main" >> "$GITHUB_OUTPUT"
+            echo "name=Deploy a Producción (api, 8885)" >> "$GITHUB_OUTPUT"
+            echo "environment=production" >> "$GITHUB_OUTPUT"
+            echo "concurrency=deploy-telemetry-production" >> "$GITHUB_OUTPUT"
+            echo "remote_dir=/var/www/datamaq-telemetry" >> "$GITHUB_OUTPUT"
+            echo "service=datamaq-telemetry.service" >> "$GITHUB_OUTPUT"
+            echo "health_url=http://localhost:8000/health/ready" >> "$GITHUB_OUTPUT"
+          else
+            echo "❌ Error: rama '$BRANCH' no está autorizada para despliegue"
+            exit 1
+          fi
+
+  deploy:
+    name: ${{ needs.target.outputs.name }}
+    needs: target
+    runs-on: ubuntu-latest
+    environment: ${{ needs.target.outputs.environment }}
     concurrency:
-      group: ${{ matrix.concurrency }}
+      group: ${{ needs.target.outputs.concurrency }}
       cancel-in-progress: false
-    strategy:
-      matrix:
-        include:
-          - branch: develop
-            name: "Deploy a Staging (api-dev, 8886)"
-            environment: staging
-            concurrency: deploy-telemetry-staging
-            remote_dir: /var/www/datamaq-telemetry-dev
-            service: datamaq-telemetry-dev.service
-            health_url: http://localhost:8886/health/ready
-          - branch: main
-            name: "Deploy a Producción (api, 8885)"
-            environment: production
-            concurrency: deploy-telemetry-production
-            remote_dir: /var/www/datamaq-telemetry
-            service: datamaq-telemetry.service
-            health_url: http://localhost:8000/health/ready
     if: |
       (github.event_name == 'workflow_dispatch') ||
       (github.event_name == 'workflow_run' &&
-       github.event.workflow_run.head_branch == "${{ matrix.branch }}" &&
-       github.event.workflow_run.conclusion == 'success')
+       github.event.workflow_run.conclusion == 'success' &&
+       needs.target.result == 'success')
     steps:
       - name: Verificar que CI pasó
         if: ${{ github.event_name != 'workflow_dispatch' }}
@@ -73,9 +101,9 @@ jobs:
           DEPLOY_SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
           DEPLOY_SSH_PORT: ${{ secrets.DEPLOY_SSH_PORT }}
           DEPLOY_SSH_USER: ${{ secrets.DEPLOY_SSH_USER }}
-          DEPLOY_REMOTE_DIR: ${{ matrix.remote_dir }}
-          DEPLOY_SERVICE_NAME: ${{ matrix.service }}
-          DEPLOY_HEALTH_URL: ${{ matrix.health_url }}
+          DEPLOY_REMOTE_DIR: ${{ needs.target.outputs.remote_dir }}
+          DEPLOY_SERVICE_NAME: ${{ needs.target.outputs.service }}
+          DEPLOY_HEALTH_URL: ${{ needs.target.outputs.health_url }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
@@ -112,7 +140,7 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           SHA_CORTO: ${{ github.sha }}
           ACTOR: ${{ github.actor }}
-          TARGET: ${{ matrix.name }}
+          TARGET: ${{ needs.target.outputs.name }}
         run: |
           LOG="$RUNNER_TEMP/deploy.log"
           if [ -f "$LOG" ] && grep -q "ROLLBACK FALLIDO" "$LOG"; then
