@@ -398,3 +398,36 @@ def test_el_rollback_con_base_tambien_usa_el_archivo_y_lo_borra_al_salir_con_err
     assert "mysql restaurar" in deploy.llamadas
     assert deploy.llamadas.count("cnf 600 1") == 2  # mysqldump y mysql
     assert not any(p.exists() for p in _rutas_cnf(deploy))
+
+
+def test_el_script_externo_reenvia_por_ssh_rama_backup_y_deps(tmp_path: Path):
+    """El remoto solo ve lo que el ssh reenvía: DEPLOY_BRANCH, DEPLOY_BACKUP_DIR y DEPLOY_DEPS_FILE tienen que llegar.
+
+    Corre scripts/deploy-server.sh (copia en tmp) con un ssh falso que registra sus argumentos y no se conecta a nada.
+    """
+    (tmp_path / "scripts").mkdir()
+    shutil.copy(SCRIPT, tmp_path / "scripts" / "deploy-server.sh")
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    registro = tmp_path / "ssh.log"
+    _escribir_stub(bin_dir / "ssh", f'echo "$*" >> "{registro}"\ncat > /dev/null')
+    env = {
+        "PATH": f"{bin_dir}:/usr/bin:/bin",
+        "DEPLOY_SSH_HOST": "vps.example",
+        "DEPLOY_SSH_PORT": "22",
+        "DEPLOY_SSH_USER": "deploy",
+        "DEPLOY_REMOTE_DIR": "/var/www/x",
+        "DEPLOY_SERVICE_NAME": "svc",
+        "DEPLOY_BRANCH": "develop",
+        "DEPLOY_BACKUP_DIR": "/tmp/dev-pre",
+        "DEPLOY_DEPS_FILE": "/tmp/telemetry-deps-dev.txt",
+    }
+
+    subprocess.run(
+        ["bash", "scripts/deploy-server.sh"], cwd=tmp_path, env=env, capture_output=True, text=True, timeout=60
+    )
+
+    llamada = registro.read_text(encoding="utf-8")
+    assert "DEPLOY_BRANCH=develop" in llamada
+    assert "DEPLOY_BACKUP_DIR=/tmp/dev-pre" in llamada
+    assert "DEPLOY_DEPS_FILE=/tmp/telemetry-deps-dev.txt" in llamada
