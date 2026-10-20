@@ -51,6 +51,7 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
     DEPLOY_SERVICE_NAME="$DEPLOY_SERVICE_NAME" \
     DEPLOY_BRANCH="$DEPLOY_BRANCH" \
     DEPLOY_BACKUP_DIR="${DEPLOY_BACKUP_DIR:-}" \
+    DEPLOY_DEPS_FILE="${DEPLOY_DEPS_FILE:-}" \
     HEALTH_URL="$HEALTH_URL" \
     GITHUB_TOKEN="$GITHUB_TOKEN" \
     GITHUB_REPOSITORY="$GITHUB_REPOSITORY" \
@@ -70,7 +71,7 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
     PREVIOUS_COMMIT=$(git rev-parse HEAD)
     # "HEAD" si el checkout estaba desacoplado: el rollback vuelve al commit sin rama.
     PREVIOUS_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-    # DEPLOY_DEPS_FILE y DEPLOY_BACKUP_DIR (abajo) se sobreescriben solo en tests/unit/test_deploy_server.py.
+    # DEPLOY_DEPS_FILE y DEPLOY_BACKUP_DIR llegan desde el comando ssh (arriba); el default aplica si vienen vacíos.
     DEPS_ANTERIORES="${DEPLOY_DEPS_FILE:-/tmp/telemetry-deps.txt}"
 
     echo "==> Respaldando dependencias actuales (para rollback)..."
