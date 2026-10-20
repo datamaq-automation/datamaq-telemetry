@@ -38,7 +38,7 @@ jobs:
     if: |
       (github.event_name == 'workflow_dispatch') ||
       (github.event_name == 'workflow_run' &&
-       github.event.workflow_run.head_branch == '${{ matrix.branch }}' &&
+       github.event.workflow_run.head_branch == "${{ matrix.branch }}" &&
        github.event.workflow_run.conclusion == 'success')
     steps:
       - name: Verificar que CI pasó
