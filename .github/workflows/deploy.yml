@@ -1,26 +1,45 @@
 name: CD Deploy
 
-# Despliegue automático del backend datamaq-telemetry al VPS en cada push a main.
+# Despliegue automático a staging (develop) y producción (main).
 # Requiere bootstrap previo en el VPS (clon, .venv, systemd, BD, mosquitto, .env).
 # También disponible de forma manual vía workflow_dispatch.
 on:
   workflow_run:
     workflows: ["CI"]
-    branches: [main]
+    branches: [develop, main]
     types: [completed]
   workflow_dispatch:
 
 jobs:
   deploy:
-    name: Desplegar al VPS
+    name: ${{ matrix.name }}
     runs-on: ubuntu-latest
-    # Dependencia explícita: deploy espera a que CI termine con éxito
-    # Protección: no corre si CI falla o está en progreso
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
-    environment: production
+    environment: ${{ matrix.environment }}
     concurrency:
-      group: deploy-telemetry
+      group: ${{ matrix.concurrency }}
       cancel-in-progress: false
+    strategy:
+      matrix:
+        include:
+          - branch: develop
+            name: "Deploy a Staging (api-dev, 8886)"
+            environment: staging
+            concurrency: deploy-telemetry-staging
+            remote_dir: /var/www/datamaq-telemetry-dev
+            service: datamaq-telemetry-dev.service
+            health_url: http://localhost:8886/health/ready
+          - branch: main
+            name: "Deploy a Producción (api, 8885)"
+            environment: production
+            concurrency: deploy-telemetry-production
+            remote_dir: /var/www/datamaq-telemetry
+            service: datamaq-telemetry.service
+            health_url: http://localhost:8000/health/ready
+    if: |
+      (github.event_name == 'workflow_dispatch') ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.head_branch == '${{ matrix.branch }}' &&
+       github.event.workflow_run.conclusion == 'success')
     steps:
       - name: Verificar que CI pasó
         if: ${{ github.event_name != 'workflow_dispatch' }}
@@ -54,13 +73,11 @@ jobs:
           DEPLOY_SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
           DEPLOY_SSH_PORT: ${{ secrets.DEPLOY_SSH_PORT }}
           DEPLOY_SSH_USER: ${{ secrets.DEPLOY_SSH_USER }}
-          DEPLOY_REMOTE_DIR: ${{ vars.DEPLOY_REMOTE_DIR || '/var/www/datamaq-telemetry' }}
-          DEPLOY_SERVICE_NAME: ${{ vars.DEPLOY_SERVICE_NAME || 'datamaq-telemetry.service' }}
-          DEPLOY_HEALTH_URL: ${{ vars.DEPLOY_HEALTH_URL || 'http://localhost:8000/health/ready' }}
+          DEPLOY_REMOTE_DIR: ${{ matrix.remote_dir }}
+          DEPLOY_SERVICE_NAME: ${{ matrix.service }}
+          DEPLOY_HEALTH_URL: ${{ matrix.health_url }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-        # tee guarda la salida del script para que el aviso de Telegram distinga el estado real (#24). pipefail
-        # conserva el exit code del script: un deploy fallido sigue dejando el CD en rojo.
         run: |
           set -o pipefail
           ./scripts/deploy-server.sh 2>&1 | tee "$RUNNER_TEMP/deploy.log"
@@ -87,7 +104,7 @@ jobs:
           fi
           echo "✓ Smoke tests pasaron — deploy válido"
 
-      - name: "Alertar por Telegram si falló (D-3)"
+      - name: "Alertar por Telegram si falló"
         if: failure()
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -95,17 +112,17 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           SHA_CORTO: ${{ github.sha }}
           ACTOR: ${{ github.actor }}
+          TARGET: ${{ matrix.name }}
         run: |
-          # El estado sale de la salida real del deploy (deploy-server.sh), no de un texto fijo (#24).
           LOG="$RUNNER_TEMP/deploy.log"
           if [ -f "$LOG" ] && grep -q "ROLLBACK FALLIDO" "$LOG"; then
-            TITULO="🚨 ROLLBACK FALLIDO: servicio CAÍDO en producción"
+            TITULO="🚨 ROLLBACK FALLIDO: servicio CAÍDO en $TARGET"
           elif [ -f "$LOG" ] && grep -q "ROLLBACK INCOMPLETO" "$LOG"; then
-            TITULO="🚨 ROLLBACK INCOMPLETO: servicio en estado desconocido"
+            TITULO="🚨 ROLLBACK INCOMPLETO: servicio en estado desconocido ($TARGET)"
           elif [ -f "$LOG" ] && grep -q "el servicio está OK" "$LOG"; then
-            TITULO="↩️ Deploy revertido, servicio OK"
+            TITULO="↩️ Deploy revertido, servicio OK ($TARGET)"
           else
-            TITULO="🔴 CD Deploy falló"
+            TITULO="🔴 CD Deploy falló ($TARGET)"
           fi
           MSG="$TITULO — datamaq-telemetry
           Commit: ${SHA_CORTO:0:7} (disparado por ${ACTOR})
