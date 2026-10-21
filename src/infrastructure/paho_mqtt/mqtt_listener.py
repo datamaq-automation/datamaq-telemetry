@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 
@@ -13,6 +14,7 @@ from src.application.use_cases.gestionar_disponibilidad import GestionarDisponib
 from src.application.use_cases.ingestar_telemetria import IngestarTelemetriaUseCase
 from src.domain.telemetria.ports import PublicadorEventosPort
 from src.domain.telemetria.services import FiltroDeduplicacionService
+from src.infrastructure.paho_mqtt.mqtt_buffer import BufferMensajesMQTT, MensajeBuffer
 from src.infrastructure.settings.config import get_settings
 from src.infrastructure.settings.logger import get_logger
 from src.infrastructure.sqlalchemy.database import get_session_factory
@@ -26,6 +28,31 @@ from src.infrastructure.sqlalchemy.mysql_repositories import (
 from src.infrastructure.yaml.repositories.organizaciones_repository import YamlOrganizacionesRepository
 
 logger = get_logger("mqtt_listener")
+
+
+def _configurar_notificador_alertas(settings, session_factory) -> None:
+    from src.application.use_cases.ingesta.procesador_alertas_ingesta import (
+        ProcesadorAlertasIngesta,
+    )
+    from src.infrastructure.auth.email_service import SmtpEmailService
+    from src.infrastructure.paho_mqtt.verificador_notificaciones import (
+        construir_verificador_notificaciones,
+    )
+
+    notificador = SmtpEmailService(
+        host=settings.SMTP_HOST,
+        port=settings.SMTP_PORT,
+        user=settings.SMTP_USER,
+        password=settings.SMTP_PASSWORD,
+        use_tls=settings.SMTP_TLS,
+        from_email=settings.SMTP_FROM,
+        app_env=settings.APP_ENV,
+    )
+    dests = [d.strip() for d in settings.ALERTAS_EMAIL_DESTINATARIOS.split(",") if d.strip()]
+    verificador_plan = construir_verificador_notificaciones(
+        session_factory, billing_habilitado=settings.BILLING_HABILITADO
+    )
+    ProcesadorAlertasIngesta.configurar_notificador(notificador, dests, verificador_plan=verificador_plan)
 
 
 class MQTTListener:
@@ -68,32 +95,17 @@ class MQTTListener:
         self._esta_conectado = False
         self.is_running = False
 
+        self._stop_reintentos = threading.Event()
+        self._hilo_reintentos: threading.Thread | None = None
+        self._buffer = BufferMensajesMQTT(
+            max_size=self.settings.MQTT_BUFFER_MAX_SIZE,
+            backoff_base_s=self.settings.MQTT_RETRY_BACKOFF_BASE_S,
+            backoff_max_s=self.settings.MQTT_RETRY_BACKOFF_MAX_S,
+            on_descarte=self._on_buffer_descarte,
+        )
+
         if self.settings.ALERTAS_EMAIL_HABILITADAS:
-            self._configurar_notificador_alertas()
-
-    def _configurar_notificador_alertas(self) -> None:
-        from src.application.use_cases.ingesta.procesador_alertas_ingesta import (
-            ProcesadorAlertasIngesta,
-        )
-        from src.infrastructure.auth.email_service import SmtpEmailService
-        from src.infrastructure.paho_mqtt.verificador_notificaciones import (
-            construir_verificador_notificaciones,
-        )
-
-        notificador = SmtpEmailService(
-            host=self.settings.SMTP_HOST,
-            port=self.settings.SMTP_PORT,
-            user=self.settings.SMTP_USER,
-            password=self.settings.SMTP_PASSWORD,
-            use_tls=self.settings.SMTP_TLS,
-            from_email=self.settings.SMTP_FROM,
-            app_env=self.settings.APP_ENV,
-        )
-        dests = [d.strip() for d in self.settings.ALERTAS_EMAIL_DESTINATARIOS.split(",") if d.strip()]
-        verificador_plan = construir_verificador_notificaciones(
-            self.session_factory, billing_habilitado=self.settings.BILLING_HABILITADO
-        )
-        ProcesadorAlertasIngesta.configurar_notificador(notificador, dests, verificador_plan=verificador_plan)
+            _configurar_notificador_alertas(self.settings, self.session_factory)
 
     def _on_connect(self, client, userdata, flags, reason_code, properties=None):
         if reason_code == 0:
@@ -165,7 +177,31 @@ class MQTTListener:
 
         self._executor.submit(self._procesar_mensaje, topic, payload)
 
-    def _procesar_mensaje(self, topic, payload):
+    def _on_buffer_descarte(self, descartado: MensajeBuffer) -> None:
+        logger.warning(
+            "mqtt_buffer_lleno_descarte",
+            topico=descartado.topic,
+            tamano_maximo=getattr(self.settings, "MQTT_BUFFER_MAX_SIZE", 1000),
+            intentos_previos=descartado.intentos,
+            timestamp_ingreso=descartado.timestamp_ingreso,
+        )
+
+    @property
+    def buffer(self) -> BufferMensajesMQTT:
+        if not hasattr(self, "_buffer"):
+            max_size = getattr(self.settings, "MQTT_BUFFER_MAX_SIZE", 1000)
+            backoff_base = getattr(self.settings, "MQTT_RETRY_BACKOFF_BASE_S", 2.0)
+            backoff_max = getattr(self.settings, "MQTT_RETRY_BACKOFF_MAX_S", 60.0)
+            self._buffer = BufferMensajesMQTT(
+                max_size=max_size,
+                backoff_base_s=backoff_base,
+                backoff_max_s=backoff_max,
+                on_descarte=self._on_buffer_descarte,
+            )
+        return self._buffer
+
+    def _ejecutar_ingesta(self, topic: str, payload: dict | list) -> None:
+        """Abre sesión de BD y ejecuta la ingesta correspondiente."""
         db = self.session_factory()
         try:
             repo_disp = DispositivosConDatosMaestrosGateway(
@@ -188,7 +224,7 @@ class MQTTListener:
                     permitir_auto_registro=self.settings.MQTT_AUTO_REGISTER_DEVICES,
                 )
                 automate_use_case.ejecutar(topic, payload)
-            else:
+            elif isinstance(payload, dict):
                 use_case = IngestarTelemetriaUseCase(
                     repo_dispositivos=repo_disp,
                     repo_telemetria=repo_telem,
@@ -198,10 +234,41 @@ class MQTTListener:
                     disponibilidad_use_case=disponibilidad_use_case,
                 )
                 use_case.ejecutar(topic, payload)
-        except Exception as e:
-            logger.error("mqtt_error_procesamiento", topico=topic, error=str(e), exc_info=True)
         finally:
             db.close()
+
+    def _procesar_mensaje(self, topic: str, payload: dict | list) -> None:
+        try:
+            self._ejecutar_ingesta(topic, payload)
+        except Exception as e:
+            logger.error("mqtt_error_procesamiento", topico=topic, error=str(e), exc_info=True)
+            self.buffer.encolar(topic, payload, error=str(e))
+            logger.warning(
+                "mqtt_mensaje_encolado_buffer",
+                topico=topic,
+                tamano_buffer=len(self.buffer),
+                error=str(e),
+            )
+
+    def _bucle_reintentos(self) -> None:
+        """Hilo de fondo que reintenta periódicamente los mensajes encolados en el buffer."""
+        stop_ev = getattr(self, "_stop_reintentos", None)
+        while stop_ev is not None and not stop_ev.wait(timeout=1.0):
+            if len(self.buffer) > 0:
+                try:
+                    recuperados = self.buffer.procesar_pendientes(self._ejecutar_ingesta)
+                    if recuperados > 0:
+                        logger.info(
+                            "mqtt_buffer_mensajes_recuperados",
+                            recuperados=recuperados,
+                            restantes=len(self.buffer),
+                        )
+                except Exception as e:
+                    logger.debug("mqtt_buffer_reintento_fallido", error=str(e))
+
+    def procesar_buffer_pendiente(self, ignorar_backoff: bool = True) -> int:
+        """Fuerza el reprocesamiento inmediato de los mensajes en el buffer."""
+        return self.buffer.procesar_pendientes(self._ejecutar_ingesta, ignorar_backoff=ignorar_backoff)
 
     def esta_conectado(self) -> bool:
         return self._esta_conectado
@@ -234,6 +301,15 @@ class MQTTListener:
     def start(self):
         logger.info("iniciando_mqtt_listener")
         self.is_running = True
+        if hasattr(self, "_stop_reintentos"):
+            self._stop_reintentos.clear()
+            self._hilo_reintentos = threading.Thread(
+                target=self._bucle_reintentos,
+                name="mqtt-buffer-retry",
+                daemon=True,
+            )
+            self._hilo_reintentos.start()
+
         try:
             self.client.connect_async(
                 self.settings.MQTT_BROKER_HOST,
@@ -247,6 +323,11 @@ class MQTTListener:
     def stop(self):
         logger.info("deteniendo_mqtt_listener")
         self.is_running = False
+        if hasattr(self, "_stop_reintentos"):
+            self._stop_reintentos.set()
+            if self._hilo_reintentos and self._hilo_reintentos.is_alive():
+                self._hilo_reintentos.join(timeout=2.0)
+
         try:
             self.client.loop_stop()
             self.client.disconnect()

@@ -44,6 +44,10 @@ class Settings(BaseSettings):
     MQTT_DEDUP_VENTANA_SEGUNDOS: int = 120
     MQTT_WORKER_MAX_THREADS: int = 2
     MQTT_LOG_LEVEL: str = "WARNING"
+    # Buffer de resiliencia MQTT ante caídas de BD (#60)
+    MQTT_BUFFER_MAX_SIZE: int = 1000
+    MQTT_RETRY_BACKOFF_BASE_S: float = 2.0
+    MQTT_RETRY_BACKOFF_MAX_S: float = 60.0
 
     # API
     API_HOST: str = "127.0.0.1"
