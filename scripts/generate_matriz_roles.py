@@ -148,7 +148,7 @@ class Endpoint:
     metodo: str
     ruta: str
     archivo: str
-    linea: int
+    handler: str
     guards: list[str] = field(default_factory=list)
     autenticacion: str = ""
     chequeo_manual: bool = False
@@ -197,11 +197,15 @@ def endpoints(roles: list[str]) -> list[Endpoint]:
                     and isinstance(decorador.args[0], ast.Constant)
                 ):
                     continue
+                try:
+                    ruta_relativa = archivo.relative_to(ROOT_DIR).as_posix()
+                except ValueError:
+                    ruta_relativa = archivo.name
                 ep = Endpoint(
                     metodo=decorador.func.attr.upper(),
                     ruta=f"{prefijo}{decorador.args[0].value}",
-                    archivo=archivo.relative_to(ROOT_DIR).as_posix(),
-                    linea=funcion.lineno,
+                    archivo=ruta_relativa,
+                    handler=funcion.name,
                 )
                 deps_decorador = [
                     n for kw in decorador.keywords if kw.arg == "dependencies" for n in nombres_de_lista(kw.value)
@@ -271,7 +275,7 @@ def generar() -> str:
     for ep in eps:
         lineas.append(
             f"| {ep.metodo} | `{ep.ruta}` | {lista(ep.guards)} | {lista(ep.roles) if ep.guards else 'todos (sin guard)'} "
-            f"| {ep.autenticacion or '—'} | {'sí' if ep.chequeo_manual else 'no'} | `{ep.archivo}:{ep.linea}` |"
+            f"| {ep.autenticacion or '—'} | {'sí' if ep.chequeo_manual else 'no'} | `{ep.archivo}:{ep.handler}` |"
         )
     return "\n".join(lineas) + "\n"
 
