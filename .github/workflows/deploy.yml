@@ -49,7 +49,7 @@ jobs:
             echo "concurrency=deploy-telemetry-production" >> "$GITHUB_OUTPUT"
             echo "remote_dir=/var/www/datamaq-telemetry" >> "$GITHUB_OUTPUT"
             echo "service=datamaq-telemetry.service" >> "$GITHUB_OUTPUT"
-            echo "health_url=http://localhost:8000/health/ready" >> "$GITHUB_OUTPUT"
+            echo "health_url=http://localhost:8885/health/ready" >> "$GITHUB_OUTPUT"
           else
             echo "❌ Error: rama '$BRANCH' no está autorizada para despliegue"
             exit 1
@@ -110,27 +110,14 @@ jobs:
           set -o pipefail
           ./scripts/deploy-server.sh 2>&1 | tee "$RUNNER_TEMP/deploy.log"
 
-      - name: "Setup Python para smoke tests"
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: "Install dependencies para smoke tests"
-        run: |
-          python3 -m pip install --upgrade pip
-          pip install -r requirements.lock
-
       - name: "Smoke Test Post-Deploy"
-        env:
-          APP_ENV: development
         run: |
-          echo "Ejecutando smoke tests..."
-          python3 -m pytest tests/e2e/test_smoke_post_deploy.py -v --tb=short
-          if [ $? -ne 0 ]; then
-            echo "✗ Smoke test falló — rollback requerido"
-            exit 1
+          if [ "${{ needs.target.outputs.environment }}" = "production" ]; then
+            URL="https://api.datamaq.com.ar/health/ready"
+          else
+            URL="https://api-dev.datamaq.com.ar/health/ready"
           fi
-          echo "✓ Smoke tests pasaron — deploy válido"
+          python3 scripts/smoke_post_deploy.py "$URL"
 
       - name: "Alertar por Telegram si falló"
         if: failure()
