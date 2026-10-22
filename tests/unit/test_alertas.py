@@ -193,3 +193,63 @@ def test_resolver_alerta_con_publicador_y_repo_dispositivos():
     publicador_mock.publicar_telemetria_en_vivo.assert_called_once()
     call_args = publicador_mock.publicar_telemetria_en_vivo.call_args
     assert "m/wifi/ECC9FFB45488/alertas" in str(call_args)
+
+
+def test_listar_alertas_filtro_planta_aislamiento_entre_plantas():
+    """Simula 2 dispositivos de distintas plantas: consultar alertas de Planta A no devuelve alertas de Planta B."""
+    from unittest.mock import MagicMock
+
+    repo_telem = MockTelemetriaRepo()
+    ahora = datetime.now(timezone.utc)
+
+    alerta_planta_a = AlertaDispositivo(
+        id=301,
+        dispositivo_id="dev-planta-a",
+        tipo_alerta="BAJO_FACTOR_POTENCIA",
+        severidad=SeveridadAlerta.WARNING,
+        mensaje="FP bajo en Planta A",
+        disparada_en=ahora - timedelta(minutes=10),
+    )
+    alerta_planta_b = AlertaDispositivo(
+        id=302,
+        dispositivo_id="dev-planta-b",
+        tipo_alerta="TENSION_ALTA",
+        severidad=SeveridadAlerta.CRITICAL,
+        mensaje="Tensión alta en Planta B",
+        disparada_en=ahora - timedelta(minutes=5),
+    )
+    repo_telem.guardar_alerta(alerta_planta_a)
+    repo_telem.guardar_alerta(alerta_planta_b)
+
+    repo_disp_mock = MagicMock()
+
+    def mock_listar(planta_id=None, **_):
+        if planta_id == "planta-a":
+            dev_a = MagicMock()
+            dev_a.id = "dev-planta-a"
+            return [dev_a]
+        if planta_id == "planta-b":
+            dev_b = MagicMock()
+            dev_b.id = "dev-planta-b"
+            return [dev_b]
+        return []
+
+    repo_disp_mock.listar.side_effect = mock_listar
+
+    use_case = GestionarAlertasUseCase(repo_telem, repo_dispositivos=repo_disp_mock)
+
+    # Consulta para Planta A: debe retornar SOLO la alerta de Planta A
+    alertas_a = use_case.listar_alertas(planta_id="planta-a")
+    assert len(alertas_a) == 1
+    assert alertas_a[0].id == 301
+    assert alertas_a[0].dispositivo_id == "dev-planta-a"
+
+    # Consulta para Planta B: debe retornar SOLO la alerta de Planta B
+    alertas_b = use_case.listar_alertas(planta_id="planta-b")
+    assert len(alertas_b) == 1
+    assert alertas_b[0].id == 302
+    assert alertas_b[0].dispositivo_id == "dev-planta-b"
+
+    # Consulta para Planta C (sin dispositivos registrados): lista vacía
+    alertas_c = use_case.listar_alertas(planta_id="planta-c")
+    assert alertas_c == []

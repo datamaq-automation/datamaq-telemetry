@@ -10,6 +10,7 @@ el cálculo de suma en sí vive en ``AgregadorDispositivosService``.
 import math
 import time
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 import structlog
 
@@ -20,6 +21,10 @@ from src.domain.telemetria.servicios.agregador_dispositivos import (
     AgregadorDispositivosService,
     PotenciaSumada,
     PuntoPotencia,
+)
+from src.domain.telemetria.servicios.calculador_demanda_cuartohoraria import (
+    CalculadorDemandaCuartohorariaService,
+    DemandaCuartohoraria,
 )
 from src.domain.telemetria.servicios.potencia_referencia import (
     potencia_referencia,
@@ -66,7 +71,12 @@ def calcular_resumen(
     for dispositivo_id in dispositivos_ids:
         agregados_dto = consultar_telemetria.listar_energia_agregada(dispositivo_id, granularidad, zona, dias)
         agregados_por_dispositivo[dispositivo_id] = [
-            EnergiaAgregada(periodo=a.periodo, energia_activa_neta_kwh=a.energia_activa_neta_kwh) for a in agregados_dto
+            EnergiaAgregada(
+                periodo=a.periodo,
+                energia_activa_neta_kwh=a.energia_activa_neta_kwh,
+                periodos_sin_datos_previos=a.periodos_sin_datos_previos,
+            )
+            for a in agregados_dto
         ]
     energia_sumada = AgregadorDispositivosService.sumar_energia_agregada(agregados_por_dispositivo)
     return potencia_sumada, energia_sumada
@@ -158,3 +168,49 @@ def calcular_potencia_referencia(
         metodo="sql_optimizado",
     )
     return referencia
+
+
+def calcular_demanda_cuartohoraria(
+    dispositivos_ids: list[str],
+    consultar_telemetria: ConsultarTelemetriaUseCase,
+    desde: datetime | None = None,
+    hasta: datetime | None = None,
+    zona: str = "America/Argentina/Buenos_Aires",
+) -> DemandaCuartohoraria:
+    """Calcula la demanda máxima en bloques de 15 minutos en el período indicado,
+
+    segregada en Horas Punta y Fuera de Punta. Si no se pasa `desde`, se asume el inicio
+    del mes en curso en la zona horaria indicada (corte de facturación mensual).
+    """
+    if not dispositivos_ids:
+        return DemandaCuartohoraria(
+            potencia_adquirida_punta_kw=None,
+            potencia_adquirida_fuera_punta_kw=None,
+        )
+
+    tz = ZoneInfo(zona)
+    ahora_local = datetime.now(tz)
+    fin_ventana = hasta or datetime.now(timezone.utc)
+    inicio_ventana = desde or ahora_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    if inicio_ventana.tzinfo is not None:
+        inicio_utc = inicio_ventana.astimezone(timezone.utc)
+    else:
+        inicio_utc = inicio_ventana.replace(tzinfo=tz).astimezone(timezone.utc)
+
+    if fin_ventana.tzinfo is not None:
+        fin_utc = fin_ventana.astimezone(timezone.utc)
+    else:
+        fin_utc = fin_ventana.replace(tzinfo=timezone.utc)
+
+    delta_segundos = max(0.0, (fin_utc - inicio_utc).total_seconds())
+    horas = max(1, math.ceil(delta_segundos / 3600.0))
+    puntos = calcular_historico(
+        dispositivos_ids=dispositivos_ids,
+        consultar_telemetria=consultar_telemetria,
+        granularidad="15m",
+        horas=horas,
+        hasta=fin_utc,
+    )
+    puntos_en_ventana = [p for p in puntos if p.momento >= inicio_utc and p.momento <= fin_utc]
+    return CalculadorDemandaCuartohorariaService.calcular_demanda(puntos_en_ventana, zona=tz)

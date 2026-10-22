@@ -7,6 +7,9 @@ from pydantic import BaseModel, Field
 class AnaliticaBancoCapacitoresPlantaDTO(BaseModel):
     planta_id: str = Field(..., description="Identificador único de la planta")
     periodo_dias: int = Field(default=30, description="Ventana de análisis en días (ISO 50001: mínimo 30)")
+    periodo_dias_analizado: int = Field(
+        default=30, description="Días analizados en la ventana histórica (ISO 50001: mínimo 30)"
+    )
     potencia_activa_promedio_kw: float | None = Field(..., description="Potencia activa promedio P (kW)")
     potencia_reactiva_promedio_kvar: float | None = Field(
         default=None, description="Potencia reactiva promedio Q (kVAr)"
@@ -41,8 +44,20 @@ class AnaliticaBancoCapacitoresPlantaDTO(BaseModel):
 class AnaliticaPenalizacionesPlantaDTO(BaseModel):
     planta_id: str = Field(..., description="Identificador único de la planta")
     periodo_dias: int = Field(default=7, description="Ventana de análisis en días")
-    intervalos_bajo_fp_count: int = Field(..., description="Cantidad de intervalos de medición con FP < 0.95")
-    horas_bajo_fp: float = Field(..., description="Horas acumuladas con bajo factor de potencia")
-    penalizacion_estimada_ars: float = Field(..., description="Penalización estimada acumulada en ARS")
+    disponible: bool = Field(
+        default=False, description="True si hubo histórico con FP y se calcularon intervalos y horas bajo FP"
+    )
+    motivo_no_disponible: str | None = Field(
+        default=None, description="Por qué falta la penalización en ARS (o por qué no hay histórico)"
+    )
+    intervalos_bajo_fp_count: int | None = Field(
+        default=None, description="Cantidad de intervalos de medición con FP < 0.95; None si no disponible"
+    )
+    horas_bajo_fp: float | None = Field(
+        default=None, description="Horas acumuladas con bajo factor de potencia; None si no disponible"
+    )
+    penalizacion_estimada_ars: float | None = Field(
+        default=None, description="Penalización estimada acumulada en ARS; None si no disponible"
+    )
     moneda: str = Field(default="ARS", description="Código de moneda")
     timestamp_calculo: datetime = Field(..., description="Fecha y hora ISO del cálculo")

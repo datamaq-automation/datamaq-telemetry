@@ -67,4 +67,4 @@ Sin cambios.
 
 ## 6. Criterios del Gauntlet
 
-`venv/bin/pytest`, `venv/bin/ruff check .`, `venv/bin/ruff format --check .`, `venv/bin/pyright src/`, `venv/bin/python scripts/verify_architecture.py`. Reglas inmutables: imports absolutos `from src...`, `__init__.py` de 0 bytes, prohibidos `# type: ignore`/`# noqa`/`cast(Any, ...)`/`@pytest.mark.skip`.
+`.venv/bin/pytest`, `.venv/bin/ruff check .`, `.venv/bin/ruff format --check .`, `.venv/bin/pyright src/`, `.venv/bin/python scripts/verify_architecture.py`. Reglas inmutables: imports absolutos `from src...`, `__init__.py` de 0 bytes, prohibidos `# type: ignore`/`# noqa`/`cast(Any, ...)`/`@pytest.mark.skip`.

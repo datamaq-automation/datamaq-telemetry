@@ -27,3 +27,5 @@ class AlertaResponseDTO(BaseModel):
     categoria: str | None = None
     duracion_segundos: float | None = None
     observaciones: str | None = None
+    ultima_deteccion_en: FechaHoraUTC | None = None
+    ocurrencias: int = 1

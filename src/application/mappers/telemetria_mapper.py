@@ -24,6 +24,7 @@ from src.domain.telemetria.services import (
     AnalizadorCalidadEnergiaService,
     DiagnosticoFasorialRed,
 )
+from src.domain.telemetria.servicios.calidad_thd_i import es_thd_i_fiable
 from src.domain.telemetria.servicios.clasificador_nivel_tension import (
     NivelTension,
     cantidad_de_fases,
@@ -40,6 +41,18 @@ def _calcular_phi_grados(p: float | None, q: float | None) -> float | None:
     if p == 0.0 and q == 0.0:
         return 0.0
     return round(-math.degrees(math.atan2(q, p)), 1)
+
+
+def _nominal_ti_de(dispositivo: object | None, fase: str) -> float | None:
+    """Corriente nominal del TI de `fase` declarada en el YAML; None si no hay dato válido.
+    El `isinstance` protege contra mocks de test y contra un dispositivo sin ese dato resuelto."""
+    nominales = getattr(dispositivo, "corriente_nominal_ti_a", None)
+    if not isinstance(nominales, dict):
+        return None
+    valor = nominales.get(fase)
+    if not isinstance(valor, (int, float)) or isinstance(valor, bool):
+        return None
+    return float(valor)
 
 
 def _referencia_tension_de(dispositivo: object | None) -> tuple[NivelTension | None, float | None, float | None]:
@@ -84,10 +97,12 @@ class TelemetriaMapper:
         )
 
     @staticmethod
-    def fase_to_dto(fase: MedicionFase) -> MedicionFaseDTO:
+    def fase_to_dto(fase: MedicionFase, corriente_nominal_ti_a: float | None = None) -> MedicionFaseDTO:
         p = fase.potencia_activa.vatios if fase.potencia_activa else None
         q = fase.potencia_reactiva.var if fase.potencia_reactiva else None
+        corriente_a = fase.corriente.amperios if fase.corriente else None
         return MedicionFaseDTO(
+            thd_i_fiable=es_thd_i_fiable(corriente_a, corriente_nominal_ti_a),
             voltage_V=fase.tension.voltios if fase.tension else None,
             current_A=fase.corriente.amperios if fase.corriente else None,
             net_active_power_W=p,
@@ -151,9 +166,9 @@ class TelemetriaMapper:
             id=lectura.id,
             dispositivo_id=lectura.dispositivo_id,
             registrado_en=lectura.registrado_en,
-            fase_r=TelemetriaMapper.fase_to_dto(lectura.fase_r),
-            fase_s=TelemetriaMapper.fase_to_dto(lectura.fase_s),
-            fase_t=TelemetriaMapper.fase_to_dto(lectura.fase_t),
+            fase_r=TelemetriaMapper.fase_to_dto(lectura.fase_r, _nominal_ti_de(dispositivo, "R")),
+            fase_s=TelemetriaMapper.fase_to_dto(lectura.fase_s, _nominal_ti_de(dispositivo, "S")),
+            fase_t=TelemetriaMapper.fase_to_dto(lectura.fase_t, _nominal_ti_de(dispositivo, "T")),
             potencia_activa_total_W=p_tot,
             potencia_reactiva_total_VAR=q_tot,
             potencia_aparente_total_VA=lectura.potencia_aparente_total.va if lectura.potencia_aparente_total else None,
@@ -204,6 +219,7 @@ class TelemetriaMapper:
         return EnergiaAgregadaDTO(
             periodo=agregada.periodo,
             energia_activa_neta_kwh=agregada.energia_activa_neta_kwh,
+            periodos_sin_datos_previos=agregada.periodos_sin_datos_previos,
         )
 
     @staticmethod

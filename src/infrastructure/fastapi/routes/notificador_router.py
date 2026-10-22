@@ -11,8 +11,11 @@ from src.infrastructure.fastapi.dependencies import (
     get_usuario_actual,
 )
 from src.infrastructure.fastapi.planta_ownership import resolver_planta_permitida
+from src.infrastructure.settings.logger import get_logger
 
 router = APIRouter(prefix="/api/v1", tags=["Notificador"])
+logger = get_logger("notificador")
+_ERROR_INTERNO = "Ocurrió un error interno en el servidor"
 
 
 @router.get(
@@ -34,9 +37,11 @@ async def estado_alarma(
     Requiere que el usuario sea propietario de la planta.
     """
     if use_case is None:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Use case no inyectado")
+        logger.error("notificador_use_case_no_inyectado", planta_id=planta_id)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=_ERROR_INTERNO)
 
     try:
         return await use_case.ejecutar(planta_id)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error al evaluar alarma: {e!s}") from e
+        logger.error("notificador_error_evaluando_alarma", exc_info=True, planta_id=planta_id, error=str(e))
+        raise HTTPException(status_code=500, detail=_ERROR_INTERNO) from e

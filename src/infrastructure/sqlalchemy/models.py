@@ -113,6 +113,9 @@ class DeviceModel(Base):
         back_populates="device", cascade="all, delete-orphan"
     )
     alerts: Mapped[list["DeviceAlertModel"]] = relationship(back_populates="device", cascade="all, delete-orphan")
+    auditoria_cambios_ti: Mapped[list["AuditoriaChangesTIModel"]] = relationship(
+        back_populates="device", cascade="all, delete-orphan"
+    )
 
 
 class TelemetryInstantaneousModel(Base):
@@ -254,6 +257,8 @@ class DeviceAlertModel(Base):
     unit: Mapped[str | None] = mapped_column(String(20), nullable=True)
     category: Mapped[str | None] = mapped_column(String(50), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    last_detected_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+    occurrences: Mapped[int] = mapped_column(default=1, server_default="1", nullable=False)
 
     device: Mapped["DeviceModel"] = relationship(back_populates="alerts")
 
@@ -467,3 +472,66 @@ class DispositivoDiagnosticoModel(Base):
     mismatch: Mapped[bool | None] = mapped_column(nullable=True, comment="true si top != actual")
     alerta_enviada: Mapped[bool] = mapped_column(nullable=False, default=False)
     creado_en: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
+
+
+class AuditoriaChangesTIModel(Base):
+    """Auditoría de cambios en configuración de TI (Transformadores de Corriente)."""
+
+    __tablename__ = "auditoria_cambios_ti"
+    __table_args__ = (
+        Index("idx_dispositivo_timestamp", "device_id", "timestamp"),
+        Index("idx_tipo_cambio", "tipo_cambio"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    device_id: Mapped[str] = mapped_column(String(36), ForeignKey("devices.id", ondelete="CASCADE"), nullable=False)
+    tipo_cambio: Mapped[str] = mapped_column(String(100), nullable=False)
+    valor_anterior: Mapped[str | None] = mapped_column(Text, nullable=True)
+    valor_nuevo: Mapped[str | None] = mapped_column(Text, nullable=True)
+    motivo: Mapped[str | None] = mapped_column(Text, nullable=True)
+    commit_git: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    usuario: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    timestamp: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
+
+    device: Mapped["DeviceModel"] = relationship(back_populates="auditoria_cambios_ti")
+
+
+class CambioContraseniaValidacionModel(Base):
+    """Validación temporal de cambio de contraseña con OTP 4 dígitos (guardado como HMAC-SHA256)."""
+
+    __tablename__ = "cambio_contrasena_validaciones"
+    __table_args__ = (Index("idx_cambio_contrasena_validaciones_usuario_creado", "usuario_id", "creado_en"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    usuario_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    codigo_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    intentos_fallidos: Mapped[int] = mapped_column(default=0, server_default="0", nullable=False)
+    ttl_expira: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    creado_en: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
+    consumido_en: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+
+    usuario: Mapped["UserModel"] = relationship()
+
+
+class AuditoriaChangeContraseniaModel(Base):
+    """Auditoría de cambios de contraseña."""
+
+    __tablename__ = "auditoria_cambio_contrasena"
+    __table_args__ = (Index("idx_auditoria_cambio_contrasena_usuario_creado", "usuario_id", "creado_en"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    usuario_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    ip: Mapped[str | None] = mapped_column(String(45), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    estado: Mapped[str] = mapped_column(String(50), nullable=False)
+    creado_en: Mapped[datetime] = mapped_column(UtcDateTime, default=ahora_utc, nullable=False)
+
+    usuario: Mapped["UserModel"] = relationship()
+
+
+# Reexportación de modelos OAuth 2.0 PKCE para compatibilidad y registro en Base.metadata
+from src.infrastructure.sqlalchemy.oauth_models import (  # noqa: E402, F401
+    OAuthClientModel,
+    OAuthCodeModel,
+    OAuthRefreshTokenModel,
+)

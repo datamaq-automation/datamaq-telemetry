@@ -45,6 +45,14 @@ def factura_to_dto(f: FacturaDistribuidora) -> FacturaDistribuidoraResponseDTO:
         energia_reactiva_resto_kvarh=f.energia_reactiva_resto_kvarh,
         energia_reactiva_valle_kvarh=f.energia_reactiva_valle_kvarh,
         valor_energia_ars_kwh_promedio=f.valor_energia_ars_kwh_promedio,
+        potencia_adquirida_mem_kw=f.potencia_adquirida_mem_kw,
+        importe_potencia_mem_ars=f.importe_potencia_mem_ars,
+        importe_adicionales_mem_ars=f.importe_adicionales_mem_ars,
+        importe_transporte_mem_ars=f.importe_transporte_mem_ars,
+        importe_otros_cargos_mem_ars=f.importe_otros_cargos_mem_ars,
+        importe_neto_ars=f.importe_neto_ars,
+        importe_impuestos_ars=f.importe_impuestos_ars,
+        valor_energia_integral_ars_kwh=f.valor_energia_integral_ars_kwh,
     )
 
 

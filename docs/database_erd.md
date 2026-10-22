@@ -9,6 +9,7 @@
 ```mermaid
 erDiagram
     CHARACTERIZATION_CAMPAIGNS ||--o{ CAMPAIGN_SAMPLES : "FK_campaign_id"
+    DEVICES ||--o{ AUDITORIA_CAMBIOS_TI : "FK_device_id"
     DEVICES ||--o{ CHARACTERIZATION_CAMPAIGNS : "FK_device_id"
     DEVICES ||--o{ DEVICE_ALERTS : "FK_device_id"
     DEVICES ||--o{ DEVICE_STATUS_LOGS : "FK_device_id"
@@ -27,7 +28,11 @@ erDiagram
     ORGANIZATIONS ||--o{ FACILITIES : "FK_organization_id"
     ORGANIZATIONS ||--o{ USERS : "FK_organization_id"
     PLANS ||--o{ ORGANIZATIONS : "FK_plan_id"
+    USERS ||--o{ AUDITORIA_CAMBIO_CONTRASENA : "FK_usuario_id"
+    USERS ||--o{ CAMBIO_CONTRASENA_VALIDACIONES : "FK_usuario_id"
     USERS ||--o{ DISPOSITIVOS_CONFIABLES : "FK_usuario_id"
+    USERS ||--o{ OAUTH_CODES : "FK_user_id"
+    USERS ||--o{ OAUTH_REFRESH_TOKENS : "FK_user_id"
     USERS ||--o{ USER_FACILITY_ACCESS : "FK_user_id"
 
     AUDIT_LOGS {
@@ -43,6 +48,37 @@ erDiagram
         string recurso_tipo
         string recurso_id
         json metadatos
+    }
+
+    AUDITORIA_CAMBIO_CONTRASENA {
+        int id PK
+        string usuario_id FK
+        string ip
+        string user_agent
+        string estado
+        datetime creado_en
+    }
+
+    AUDITORIA_CAMBIOS_TI {
+        int id PK
+        string device_id FK
+        string tipo_cambio
+        string valor_anterior
+        string valor_nuevo
+        string motivo
+        string commit_git
+        string usuario
+        datetime timestamp
+    }
+
+    CAMBIO_CONTRASENA_VALIDACIONES {
+        int id PK
+        string usuario_id FK
+        string codigo_hash
+        int intentos_fallidos
+        datetime ttl_expira
+        datetime creado_en
+        datetime consumido_en
     }
 
     CAMPAIGN_SAMPLES {
@@ -90,6 +126,8 @@ erDiagram
         string unit
         string category
         string notes
+        datetime last_detected_at
+        int occurrences
     }
 
     DEVICE_STATUS_LOGS {
@@ -232,6 +270,42 @@ erDiagram
         decimal persistence_seconds
         datetime created_at
         datetime updated_at
+    }
+
+    OAUTH_CLIENTS {
+        int id PK
+        string client_id UK
+        string client_name
+        string redirect_uris
+        boolean is_trusted
+        datetime created_at
+    }
+
+    OAUTH_CODES {
+        int id PK
+        string code_hash UK
+        string client_id
+        string user_id FK
+        string organization_id
+        string redirect_uri
+        string code_challenge
+        string code_challenge_method
+        string scope
+        datetime expires_at
+        boolean used
+        datetime created_at
+    }
+
+    OAUTH_REFRESH_TOKENS {
+        int id PK
+        string token_hash UK
+        string client_id
+        string user_id FK
+        string organization_id
+        string scope
+        datetime expires_at
+        datetime revoked_at
+        datetime created_at
     }
 
     ORGANIZATIONS {
@@ -394,6 +468,53 @@ erDiagram
 - `ix_audit_logs_categoria`: (`categoria`)
 - `ix_audit_logs_recurso_id`: (`recurso_id`)
 
+### Tabla `auditoria_cambio_contrasena`
+
+| Columna | Tipo SQL | Clave / Restricción | Nullable |
+| :--- | :--- | :--- | :--- |
+| `id` | `INTEGER` | **PRIMARY KEY** | No |
+| `usuario_id` | `VARCHAR(36)` | FK -> `users.id` | No |
+| `ip` | `VARCHAR(45)` | - | Sí |
+| `user_agent` | `VARCHAR(255)` | - | Sí |
+| `estado` | `VARCHAR(50)` | - | No |
+| `creado_en` | `DATETIME` | - | No |
+
+**Índices:**
+- `idx_auditoria_cambio_contrasena_usuario_creado`: (`usuario_id`, `creado_en`)
+
+### Tabla `auditoria_cambios_ti`
+
+| Columna | Tipo SQL | Clave / Restricción | Nullable |
+| :--- | :--- | :--- | :--- |
+| `id` | `INTEGER` | **PRIMARY KEY** | No |
+| `device_id` | `VARCHAR(36)` | FK -> `devices.id` | No |
+| `tipo_cambio` | `VARCHAR(100)` | - | No |
+| `valor_anterior` | `TEXT` | - | Sí |
+| `valor_nuevo` | `TEXT` | - | Sí |
+| `motivo` | `TEXT` | - | Sí |
+| `commit_git` | `VARCHAR(40)` | - | Sí |
+| `usuario` | `VARCHAR(100)` | - | Sí |
+| `timestamp` | `DATETIME` | - | No |
+
+**Índices:**
+- `idx_dispositivo_timestamp`: (`device_id`, `timestamp`)
+- `idx_tipo_cambio`: (`tipo_cambio`)
+
+### Tabla `cambio_contrasena_validaciones`
+
+| Columna | Tipo SQL | Clave / Restricción | Nullable |
+| :--- | :--- | :--- | :--- |
+| `id` | `INTEGER` | **PRIMARY KEY** | No |
+| `usuario_id` | `VARCHAR(36)` | FK -> `users.id` | No |
+| `codigo_hash` | `VARCHAR(64)` | - | No |
+| `intentos_fallidos` | `INTEGER` | - | No |
+| `ttl_expira` | `DATETIME` | - | No |
+| `creado_en` | `DATETIME` | - | No |
+| `consumido_en` | `DATETIME` | - | Sí |
+
+**Índices:**
+- `idx_cambio_contrasena_validaciones_usuario_creado`: (`usuario_id`, `creado_en`)
+
 ### Tabla `campaign_samples`
 
 | Columna | Tipo SQL | Clave / Restricción | Nullable |
@@ -449,6 +570,8 @@ erDiagram
 | `unit` | `VARCHAR(20)` | - | Sí |
 | `category` | `VARCHAR(50)` | - | Sí |
 | `notes` | `TEXT` | - | Sí |
+| `last_detected_at` | `DATETIME` | - | Sí |
+| `occurrences` | `INTEGER` | - | No |
 
 **Índices:**
 - `idx_alerts_dev_resolved`: (`device_id`, `is_resolved`)
@@ -638,6 +761,61 @@ erDiagram
 | `persistence_seconds` | `NUMERIC(8, 2)` | - | No |
 | `created_at` | `DATETIME` | - | No |
 | `updated_at` | `DATETIME` | - | No |
+
+### Tabla `oauth_clients`
+
+| Columna | Tipo SQL | Clave / Restricción | Nullable |
+| :--- | :--- | :--- | :--- |
+| `id` | `INTEGER` | **PRIMARY KEY** | No |
+| `client_id` | `VARCHAR(128)` | UNIQUE | No |
+| `client_name` | `VARCHAR(128)` | - | No |
+| `redirect_uris` | `TEXT` | - | No |
+| `is_trusted` | `BOOLEAN` | - | No |
+| `created_at` | `DATETIME` | - | No |
+
+**Índices:**
+- `ix_oauth_clients_client_id` (UNIQUE): (`client_id`)
+
+### Tabla `oauth_codes`
+
+| Columna | Tipo SQL | Clave / Restricción | Nullable |
+| :--- | :--- | :--- | :--- |
+| `id` | `INTEGER` | **PRIMARY KEY** | No |
+| `code_hash` | `VARCHAR(64)` | UNIQUE | No |
+| `client_id` | `VARCHAR(128)` | - | No |
+| `user_id` | `VARCHAR(36)` | FK -> `users.id` | No |
+| `organization_id` | `VARCHAR(36)` | - | Sí |
+| `redirect_uri` | `VARCHAR(512)` | - | No |
+| `code_challenge` | `VARCHAR(128)` | - | No |
+| `code_challenge_method` | `VARCHAR(16)` | - | No |
+| `scope` | `VARCHAR(256)` | - | No |
+| `expires_at` | `DATETIME` | - | No |
+| `used` | `BOOLEAN` | - | No |
+| `created_at` | `DATETIME` | - | No |
+
+**Índices:**
+- `idx_oauth_codes_client_user`: (`client_id`, `user_id`)
+- `idx_oauth_codes_expires_at`: (`expires_at`)
+- `ix_oauth_codes_code_hash` (UNIQUE): (`code_hash`)
+
+### Tabla `oauth_refresh_tokens`
+
+| Columna | Tipo SQL | Clave / Restricción | Nullable |
+| :--- | :--- | :--- | :--- |
+| `id` | `INTEGER` | **PRIMARY KEY** | No |
+| `token_hash` | `VARCHAR(64)` | UNIQUE | No |
+| `client_id` | `VARCHAR(128)` | - | No |
+| `user_id` | `VARCHAR(36)` | FK -> `users.id` | No |
+| `organization_id` | `VARCHAR(36)` | - | Sí |
+| `scope` | `VARCHAR(256)` | - | No |
+| `expires_at` | `DATETIME` | - | No |
+| `revoked_at` | `DATETIME` | - | Sí |
+| `created_at` | `DATETIME` | - | No |
+
+**Índices:**
+- `idx_oauth_refresh_tokens_client_user`: (`client_id`, `user_id`)
+- `idx_oauth_refresh_tokens_expires_at`: (`expires_at`)
+- `ix_oauth_refresh_tokens_token_hash` (UNIQUE): (`token_hash`)
 
 ### Tabla `organizations`
 

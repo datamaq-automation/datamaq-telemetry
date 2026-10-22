@@ -4,7 +4,12 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any
 
-from src.domain.auth.entities import AccesoPlantaUsuario, DispositivoConfiable, UsuarioAuth
+from src.domain.auth.entities import (
+    AccesoPlantaUsuario,
+    DispositivoConfiable,
+    UsuarioAuth,
+    ValidacionCambioContrasena,
+)
 
 
 class RepositorioUsuariosPort(ABC):
@@ -46,6 +51,8 @@ class GeneradorTokenPort(ABC):
         expira_en: datetime,
         rol: str = "operador",
         organizacion_id: str | None = None,
+        scope: str | None = None,
+        client_id: str | None = None,
     ) -> str:
         pass
 
@@ -101,6 +108,14 @@ class ServicioEmailPort(ABC):
     def enviar_email_recuperacion(self, destinatario: str, enlace_restablecimiento: str) -> bool:
         pass
 
+    @abstractmethod
+    def enviar_codigo_cambio_contrasena(self, destinatario: str, codigo: str) -> bool:
+        """Envía el OTP de 4 dígitos. El código nunca debe quedar en logs."""
+
+    @abstractmethod
+    def notificar_cambio_contrasena(self, destinatario: str, momento: datetime, ip: str | None) -> bool:
+        """Confirma que la contraseña cambió. No incluye la contraseña ni el código."""
+
 
 class RepositorioDispositivosConfiablesPort(ABC):
     @abstractmethod
@@ -117,4 +132,44 @@ class RepositorioDispositivosConfiablesPort(ABC):
 
     @abstractmethod
     def revocar_todos_de_usuario(self, usuario_id: str) -> int:
+        pass
+
+
+class RepositorioCambioContrasenaPort(ABC):
+    """Validaciones OTP de cambio de contraseña y su auditoría propia."""
+
+    @abstractmethod
+    def crear_validacion(
+        self, usuario_id: str, codigo_hash: str, ttl_expira: datetime, ahora: datetime
+    ) -> ValidacionCambioContrasena:
+        pass
+
+    @abstractmethod
+    def invalidar_vigentes(self, usuario_id: str, ahora: datetime) -> None:
+        pass
+
+    @abstractmethod
+    def contar_solicitudes_desde(self, usuario_id: str, desde: datetime) -> int:
+        pass
+
+    @abstractmethod
+    def contar_auditoria_desde(self, usuario_id: str, estado: str, desde: datetime) -> int:
+        """Cuenta eventos de auditoría de cambio de contraseña del usuario con ese estado desde `desde`."""
+
+    @abstractmethod
+    def obtener_vigente(self, usuario_id: str, ahora: datetime) -> ValidacionCambioContrasena | None:
+        pass
+
+    @abstractmethod
+    def registrar_intento_fallido(self, validacion_id: int) -> int:
+        """Incrementa intentos_fallidos y devuelve el total nuevo."""
+
+    @abstractmethod
+    def consumir(self, validacion_id: int, ahora: datetime) -> None:
+        pass
+
+    @abstractmethod
+    def registrar_auditoria(
+        self, usuario_id: str, estado: str, ip: str | None, user_agent: str | None, ahora: datetime
+    ) -> None:
         pass

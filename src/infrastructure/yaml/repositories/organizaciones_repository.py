@@ -62,9 +62,30 @@ def _parsear_factura(f: dict) -> FacturaDistribuidora:
         energia_reactiva_punta_kvarh=_float_opt(f, "energia_reactiva_punta_kvarh"),
         energia_reactiva_resto_kvarh=_float_opt(f, "energia_reactiva_resto_kvarh"),
         energia_reactiva_valle_kvarh=_float_opt(f, "energia_reactiva_valle_kvarh"),
+        potencia_adquirida_mem_kw=_float_opt(f, "potencia_adquirida_mem_kw"),
+        importe_potencia_mem_ars=_float_opt(f, "importe_potencia_mem_ars"),
+        importe_adicionales_mem_ars=_float_opt(f, "importe_adicionales_mem_ars"),
+        importe_transporte_mem_ars=_float_opt(f, "importe_transporte_mem_ars"),
+        importe_otros_cargos_mem_ars=_float_opt(f, "importe_otros_cargos_mem_ars"),
+        importe_neto_ars=_float_opt(f, "importe_neto_ars"),
+        importe_impuestos_ars=_float_opt(f, "importe_impuestos_ars"),
         fuente_archivo=f.get("fuente_archivo"),
         cargada_en=f.get("cargada_en"),
     )
+
+
+def _parsear_corriente_nominal_ti(bloque: object) -> dict[str, float] | None:
+    """`corriente_nominal_ti_a: {R: 100, S: 100, T: 150}` → dict por fase.
+    Descarta fases con valor no numérico o no positivo; sin ninguna válida devuelve None
+    (el THD_I queda sin fiabilidad determinada, nunca True)."""
+    if not isinstance(bloque, dict):
+        return None
+    valores: dict[str, float] = {}
+    for fase, valor in bloque.items():
+        if isinstance(valor, bool) or not isinstance(valor, (int, float)) or valor <= 0:
+            continue
+        valores[str(fase).strip().upper()] = float(valor)
+    return valores or None
 
 
 def _parsear_coordenadas(n: dict) -> CoordenadasNodoUnifilar | None:
@@ -156,6 +177,16 @@ def _parsear_nodo_unifilar(n: dict, planta_id: str) -> NodoUnifilar:
         variable_relevante=n.get("variable_relevante"),
         orden=int(n.get("orden", 0)),
         categoria_tarifaria=n.get("categoria_tarifaria"),
+        potencia_contratada_punta_kw=(
+            float(n["potencia_contratada_punta_kw"])
+            if n.get("potencia_contratada_punta_kw") is not None
+            else (float(n["potencia_contratada_kw"]) if n.get("potencia_contratada_kw") is not None else None)
+        ),
+        potencia_contratada_fuera_punta_kw=(
+            float(n["potencia_contratada_fuera_punta_kw"])
+            if n.get("potencia_contratada_fuera_punta_kw") is not None
+            else (float(n["potencia_contratada_kw"]) if n.get("potencia_contratada_kw") is not None else None)
+        ),
         penalizacion_reactiva_aplica=(
             bool(n["penalizacion_reactiva_aplica"]) if n.get("penalizacion_reactiva_aplica") is not None else None
         ),
@@ -313,10 +344,12 @@ class YamlOrganizacionesRepository(RepositorioOrganizacionesPort):
             for p in raw.get("plantas", []):
                 for m in p.get("medidores", []) or []:
                     m_id = str(m.get("id", ""))
+                    m_dispositivo_id = str(m.get("dispositivo_id", ""))
                     alias_ids = [str(a) for a in m.get("alias_ids", [])]
                     device_uid = str(m.get("device_uid", "")).replace(":", "").upper()
                     if (
                         str(dispositivo_id) == m_id
+                        or (m_dispositivo_id and str(dispositivo_id) == m_dispositivo_id)
                         or str(dispositivo_id) in alias_ids
                         or (disp_id_norm and disp_id_norm == device_uid)
                     ):
@@ -329,6 +362,7 @@ class YamlOrganizacionesRepository(RepositorioOrganizacionesPort):
                             correccion_angular_fases=m.get("correccion_angular_fases"),
                             invertido=m.get("invertido"),
                             orden_fases=m.get("orden_fases"),
+                            corriente_nominal_ti_a=_parsear_corriente_nominal_ti(m.get("corriente_nominal_ti_a")),
                         )
         return None
 

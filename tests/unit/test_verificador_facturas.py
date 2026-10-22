@@ -120,3 +120,11 @@ def test_documento_de_energia_con_energia_registrada_es_invalido():
     factura quien la vende (CAMMESA). Así se armó la fila falsa "2026-08"."""
     repo = _repo([_factura(tipo_dato="energia", proveedor="CAMMESA", **_REGISTRADA)])
     assert verificar_facturas_plantas(repo)["invalidas"] == 1
+
+
+def test_campos_mem_negativos_son_invalidos():
+    repo_potencia_neg = _repo([_factura(potencia_adquirida_mem_kw=-100.0)])
+    assert verificar_facturas_plantas(repo_potencia_neg)["invalidas"] == 1
+
+    repo_neto_neg = _repo([_factura(importe_neto_ars=-5000.0)])
+    assert verificar_facturas_plantas(repo_neto_neg)["invalidas"] == 1

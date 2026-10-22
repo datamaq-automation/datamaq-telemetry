@@ -2,7 +2,7 @@
 
 import math
 import threading
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, ClassVar
 
 from src.application.mappers.payload_telemetria_parser import (
@@ -26,6 +26,7 @@ from src.application.use_cases.ingesta.procesador_alertas_ingesta import (
 from src.application.use_cases.ingesta.resolvedor_dispositivo import (
     ResolvedorDispositivoIngesta,
 )
+from src.application.use_cases.ingestar_harmonics_thd import IngestarHarmonicsThdUseCase
 from src.domain.telemetria.entities import Dispositivo, MedicionFase
 from src.domain.telemetria.ports import (
     LoggerPort,
@@ -65,6 +66,7 @@ class IngestarTelemetriaUseCase:
         self.permitir_auto_registro = permitir_auto_registro
         self.disponibilidad_use_case = disponibilidad_use_case
         self.capturador_campana = capturador_campana
+        self._harmonics = IngestarHarmonicsThdUseCase(repo_telemetria, granularidad_segundos, logger)
 
     def _parse_timestamp(self, ts_val: Any) -> datetime:
         return TelemetriaPayloadParser.parse_timestamp(ts_val)
@@ -120,7 +122,8 @@ class IngestarTelemetriaUseCase:
                 self.logger.debug("mqtt_eco_comando_propio_ignorado", topico=topico)
             return
 
-        if self.publicador and subtopico != "inst":
+        # harmonics no se retransmite en vivo: no es una lectura instantánea del dispositivo.
+        if self.publicador and subtopico not in ("inst", "harmonics"):
             self.publicador.publicar_telemetria_en_vivo(topico, payload)
 
         dev_info = payload.get("device_info") if isinstance(payload.get("device_info"), dict) else None
@@ -137,6 +140,8 @@ class IngestarTelemetriaUseCase:
             self._procesar_status(payload, dispositivo, recorded_at)
         elif subtopico == "event":
             self._procesar_event(payload, dispositivo)
+        elif subtopico == "harmonics":
+            self._harmonics.ejecutar(dispositivo.id, payload, datetime.now(timezone.utc))
 
     def _procesar_instantanea(
         self,

@@ -337,6 +337,8 @@ class _FakeAlertModel:
         self.unit = "V"
         self.category = "TENSION"
         self.notes = None
+        self.last_detected_at = None
+        self.occurrences = 1
 
 
 def test_alerta_guardar_nueva_asigna_id(db: Session) -> None:

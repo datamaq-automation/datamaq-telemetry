@@ -25,6 +25,8 @@ class MedicionFaseDTO(BaseModel):
     phi_grados: float | None = None
     thd_v_pct: float | None = None
     thd_i_pct: float | None = None
+    # True: la corriente de la fase supera el umbral sobre el TI declarado; False o None: thd_i_pct no es representativo.
+    thd_i_fiable: bool | None = None
     angulo_correccion: float | None = None
 
 
@@ -117,6 +119,13 @@ class AcumuladoEnergiaDTO(BaseModel):
 class EnergiaAgregadaDTO(BaseModel):
     periodo: date
     energia_activa_neta_kwh: float | None = None
+    periodos_sin_datos_previos: int = Field(
+        default=0,
+        description=(
+            "Periodos completos sin datos que absorbe este delta: si es > 0, la barra incluye el consumo "
+            "de esos periodos y no es el consumo de un solo día o mes."
+        ),
+    )
     model_config = ConfigDict(from_attributes=True)
 
 

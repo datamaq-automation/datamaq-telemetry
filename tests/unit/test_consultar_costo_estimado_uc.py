@@ -9,6 +9,8 @@ from datetime import datetime
 from unittest.mock import MagicMock, patch
 from zoneinfo import ZoneInfo
 
+import pytest
+
 from src.application.use_cases.consultar_costo_estimado import ConsultarCostoEstimadoUseCase
 from src.domain.sge.entities import FacturaDistribuidora
 from src.domain.telemetria.entities import EnergiaAgregada, NodoUnifilar, Planta
@@ -28,6 +30,30 @@ def _factura_energia(periodo: str, valor_kwh_promedio: float) -> FacturaDistribu
         importe_total_ars=valor_kwh_promedio * 1000.0,
         energia_activa_total_kwh=1000.0,
         importe_energia_ars=valor_kwh_promedio * 1000.0,
+    )
+
+
+def _factura_potencia(
+    periodo: str,
+    importe_potencia_ars: float,
+    contratada_punta: float = 800.0,
+    contratada_fp: float = 850.0,
+    adquirida_punta: float = 800.0,
+    adquirida_fp: float = 850.0,
+) -> FacturaDistribuidora:
+    return FacturaDistribuidora(
+        id=f"{PLANTA_ID}-{periodo}-potencia",
+        planta_id=PLANTA_ID,
+        periodo=periodo,
+        proveedor="EDELAP",
+        tipo_dato="potencia",
+        numero_factura="2",
+        importe_total_ars=importe_potencia_ars,
+        importe_potencia_ars=importe_potencia_ars,
+        potencia_contratada_punta_kw=contratada_punta,
+        potencia_contratada_fuera_punta_kw=contratada_fp,
+        potencia_adquirida_punta_kw=adquirida_punta,
+        potencia_adquirida_fuera_punta_kw=adquirida_fp,
     )
 
 
@@ -171,3 +197,141 @@ def test_periodo_actual_tiene_formato_anio_mes():
 
     assert len(resultado.periodo_actual) == 7
     assert resultado.periodo_actual[4] == "-"
+
+
+def test_costo_potencia_calculado_sin_exceso():
+    # 800 kW punta + 850 kW fuera punta = 1650 kW total. Importe = 1_650_000 -> tarifa = 1000 $/kW
+    f_pot = _factura_potencia("2026-08", importe_potencia_ars=1_650_000.0)
+    f_ene = _factura_energia("2026-08", valor_kwh_promedio=2.0)
+    use_case = _use_case([f_ene, f_pot], [_nodo_tgbt()])
+
+    from src.domain.telemetria.servicios.calculador_demanda_cuartohoraria import DemandaCuartohoraria
+
+    with (
+        patch(
+            "src.application.use_cases.consultar_costo_estimado.calcular_resumen",
+            return_value=_mockear_kwh_mes_actual(500.0),
+        ),
+        patch(
+            "src.application.use_cases.consultar_costo_estimado.calcular_demanda_cuartohoraria",
+            return_value=DemandaCuartohoraria(
+                potencia_adquirida_punta_kw=700.0,
+                potencia_adquirida_fuera_punta_kw=800.0,
+            ),
+        ),
+    ):
+        resultado = use_case.ejecutar(planta_id=PLANTA_ID)
+
+    assert resultado.costo_potencia_ars == 1_650_000.0
+    assert resultado.motivo_potencia_sin_dato is None
+
+
+def test_costo_potencia_calculado_con_exceso():
+    # Base: 800 kW punta + 850 kW fp = 1650 kW a 1000 $/kW -> cargo_base = 1_650_000
+    # Demanda medida: punta = 900 (exceso 100), fp = 950 (exceso 100) -> recargo exceso = 200 * 1000 = 200_000
+    # Total esperado = 1_850_000
+    f_pot = _factura_potencia("2026-08", importe_potencia_ars=1_650_000.0)
+    f_ene = _factura_energia("2026-08", valor_kwh_promedio=2.0)
+    use_case = _use_case([f_ene, f_pot], [_nodo_tgbt()])
+
+    from src.domain.telemetria.servicios.calculador_demanda_cuartohoraria import DemandaCuartohoraria
+
+    with (
+        patch(
+            "src.application.use_cases.consultar_costo_estimado.calcular_resumen",
+            return_value=_mockear_kwh_mes_actual(500.0),
+        ),
+        patch(
+            "src.application.use_cases.consultar_costo_estimado.calcular_demanda_cuartohoraria",
+            return_value=DemandaCuartohoraria(
+                potencia_adquirida_punta_kw=900.0,
+                potencia_adquirida_fuera_punta_kw=950.0,
+            ),
+        ),
+    ):
+        resultado = use_case.ejecutar(planta_id=PLANTA_ID)
+
+    assert resultado.costo_potencia_ars == 1_850_000.0
+    assert resultado.motivo_potencia_sin_dato is None
+
+
+def test_costo_potencia_sin_telemetria_queda_sin_dato():
+    f_pot = _factura_potencia("2026-08", importe_potencia_ars=1_650_000.0)
+    f_ene = _factura_energia("2026-08", valor_kwh_promedio=2.0)
+    use_case = _use_case([f_ene, f_pot], [_nodo_tgbt()])
+
+    from src.domain.telemetria.servicios.calculador_demanda_cuartohoraria import DemandaCuartohoraria
+
+    with (
+        patch(
+            "src.application.use_cases.consultar_costo_estimado.calcular_resumen",
+            return_value=_mockear_kwh_mes_actual(500.0),
+        ),
+        patch(
+            "src.application.use_cases.consultar_costo_estimado.calcular_demanda_cuartohoraria",
+            return_value=DemandaCuartohoraria(
+                potencia_adquirida_punta_kw=None,
+                potencia_adquirida_fuera_punta_kw=None,
+            ),
+        ),
+    ):
+        resultado = use_case.ejecutar(planta_id=PLANTA_ID)
+
+    assert resultado.costo_potencia_ars is None
+    assert resultado.motivo_potencia_sin_dato == "demanda_maxima_no_disponible"
+
+
+def test_costo_energia_usa_tarifa_integral_mem_cuando_esta_disponible():
+    factura_mem = FacturaDistribuidora(
+        id=f"{PLANTA_ID}-2026-08-energia",
+        planta_id=PLANTA_ID,
+        periodo="2026-08",
+        proveedor="CAMMESA",
+        tipo_dato="energia",
+        numero_factura="1",
+        importe_total_ars=98000.0,
+        energia_activa_total_kwh=1000.0,
+        importe_energia_ars=10000.0,  # $10/kWh monómica pura
+        importe_neto_ars=75000.0,  # $75/kWh integral mayorista
+        importe_potencia_mem_ars=15000.0,
+        importe_adicionales_mem_ars=45000.0,
+        importe_transporte_mem_ars=5000.0,
+        importe_impuestos_ars=23000.0,
+    )
+    use_case = _use_case([factura_mem], [_nodo_tgbt()])
+
+    with patch(
+        "src.application.use_cases.consultar_costo_estimado.calcular_resumen",
+        return_value=_mockear_kwh_mes_actual(500.0),
+    ):
+        resultado = use_case.ejecutar(planta_id=PLANTA_ID)
+
+    # Debe usar la tarifa integral ($75/kWh) y no la monómica pura ($10/kWh)
+    assert resultado.valor_energia_ars_kwh_promedio == pytest.approx(75.0)
+    assert resultado.costo_energia_ars == pytest.approx(37500.0)  # 500 kWh * 75 $/kWh
+
+
+def test_costo_energia_fallback_a_monomica_si_no_hay_tarifa_integral():
+    factura_legacy = FacturaDistribuidora(
+        id=f"{PLANTA_ID}-2026-08-energia",
+        planta_id=PLANTA_ID,
+        periodo="2026-08",
+        proveedor="CAMMESA",
+        tipo_dato="energia",
+        numero_factura="1",
+        importe_total_ars=10000.0,
+        energia_activa_total_kwh=1000.0,
+        importe_energia_ars=10000.0,  # $10/kWh monómica pura
+        importe_neto_ars=None,
+    )
+    use_case = _use_case([factura_legacy], [_nodo_tgbt()])
+
+    with patch(
+        "src.application.use_cases.consultar_costo_estimado.calcular_resumen",
+        return_value=_mockear_kwh_mes_actual(500.0),
+    ):
+        resultado = use_case.ejecutar(planta_id=PLANTA_ID)
+
+    # Al no haber importe_neto_ars, hace fallback a tarifa monómica ($10/kWh)
+    assert resultado.valor_energia_ars_kwh_promedio == pytest.approx(10.0)
+    assert resultado.costo_energia_ars == pytest.approx(5000.0)

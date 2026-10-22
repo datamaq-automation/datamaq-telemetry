@@ -15,8 +15,11 @@ from src.infrastructure.fastapi.dependencies import (
     get_usuario_actual,
 )
 from src.infrastructure.fastapi.planta_ownership import resolver_planta_permitida
+from src.infrastructure.settings.logger import get_logger
 
 router = APIRouter(prefix="/api/v1/analitica", tags=["Analítica SSOT de Planta"])
+logger = get_logger("analitica")
+_ERROR_INTERNO = "Ocurrió un error interno en el servidor"
 
 
 @router.get(
@@ -35,15 +38,14 @@ def obtener_banco_capacitores_planta(
     ] = None,
 ) -> AnaliticaBancoCapacitoresPlantaDTO:
     if use_case is None:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Use case no inyectado")
+        logger.error("analitica_use_case_no_inyectado", ruta="banco_capacitores", planta_id=planta_id)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=_ERROR_INTERNO)
 
     try:
         return use_case.obtener_banco_capacitores(planta_id=planta_id, periodo_dias=periodo_dias)
     except Exception as err:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error obteniendo analítica de banco de capacitores: {err}",
-        ) from err
+        logger.error("analitica_error_banco_capacitores", exc_info=True, planta_id=planta_id, error=str(err))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=_ERROR_INTERNO) from err
 
 
 @router.get(
@@ -51,23 +53,23 @@ def obtener_banco_capacitores_planta(
     dependencies=[Depends(resolver_planta_permitida)],
     response_model=AnaliticaPenalizacionesPlantaDTO,
     status_code=status.HTTP_200_OK,
-    summary="Obtener acumulado SSOT de penalizaciones por bajo FP a 7 días",
+    summary="Obtener acumulado SSOT de penalizaciones por bajo FP",
 )
 def obtener_penalizaciones_planta(
     planta_id: str = Query(..., description="ID de la planta industrial"),
+    periodo_dias: int = Query(7, ge=1, le=30, description="Ventana de análisis en días"),
     user_claims: Annotated[dict[str, Any] | None, Depends(get_usuario_actual)] = None,
     use_case: Annotated[
         ConsultarAnaliticaPlantaUseCase | None, Depends(get_consultar_analitica_planta_use_case)
     ] = None,
 ) -> AnaliticaPenalizacionesPlantaDTO:
     if use_case is None:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Use case no inyectado")
+        logger.error("analitica_use_case_no_inyectado", ruta="penalizaciones", planta_id=planta_id)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=_ERROR_INTERNO)
 
     try:
-        return use_case.obtener_penalizaciones(planta_id=planta_id)
+        return use_case.obtener_penalizaciones(planta_id=planta_id, periodo_dias=periodo_dias)
 
     except Exception as err:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error obteniendo analítica de penalizaciones: {err}",
-        ) from err
+        logger.error("analitica_error_penalizaciones", exc_info=True, planta_id=planta_id, error=str(err))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=_ERROR_INTERNO) from err

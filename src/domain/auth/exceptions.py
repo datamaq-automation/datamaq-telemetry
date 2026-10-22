@@ -56,3 +56,11 @@ class Operacion2FANoDisponibleParaInvitadoError(DominioAuthException):
 
 class UsuarioNoEncontradoError(DominioAuthException):
     """Lanzada cuando se administra un usuario que no existe."""
+
+
+class CodigoCambioInvalidoError(DominioAuthException):
+    """Código inexistente, expirado, ya usado o bloqueado por intentos (siempre 400, sin distinguir)."""
+
+
+class NoSePudoEnviarCodigoError(DominioAuthException):
+    """El email con el código no pudo enviarse; el usuario debe reintentar."""

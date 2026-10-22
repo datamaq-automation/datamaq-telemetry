@@ -1,5 +1,6 @@
 """src/infrastructure/settings/config.py."""
 
+import logging
 import os
 import secrets
 from functools import lru_cache
@@ -32,6 +33,11 @@ class Settings(BaseSettings):
     MQTT_TLS_KEYFILE: str = ""
     MQTT_MAX_PAYLOAD_BYTES: int = 65536
     MQTT_AUTO_REGISTER_DEVICES: bool = True
+    # Sin datos durante este lapso, un dispositivo activo pasa a OFFLINE (#19). 3 x el intervalo normal de 300 s,
+    # para no oscilar ONLINE/OFFLINE con un mensaje demorado.
+    DISPOSITIVO_OFFLINE_TIMEOUT_S: int = 900
+    # Abre además la alerta PÉRDIDA_COMUNICACIÓN. Apagada hasta que el dueño apruebe su texto y su activación.
+    DISPOSITIVO_OFFLINE_ALERTA_HABILITADA: bool = False
     MQTT_CLEAN_SESSION: bool = False
     MQTT_RECONNECT_MIN_DELAY_SEG: int = 1
     MQTT_RECONNECT_MAX_DELAY_SEG: int = 60
@@ -44,6 +50,8 @@ class Settings(BaseSettings):
     API_PORT: int = 8885
     API_SECRET_KEY: str = ""
     API_SECRET_KEY_ANTERIOR: str = ""
+    # Clave HMAC de los OTP de cambio de contraseña. Dedicada: no reutilizar API_SECRET_KEY.
+    OTP_HMAC_KEY: str = ""
     AUTH_TOKEN_EXPIRA_MINUTOS: int = 120
     AUTH_REQUIRED: bool = True
     GUEST_ORGANIZATION_ID: str | None = None
@@ -60,6 +68,10 @@ class Settings(BaseSettings):
     # Rate limiting de login
     LOGIN_MAX_INTENTOS: int = 5
     LOGIN_VENTANA_SEGUNDOS: int = 300
+
+    # Rate limiting 404 para mitigación de escaneos y sondas externas
+    RATE_LIMIT_404_MAX_INTENTOS: int = 30
+    RATE_LIMIT_404_VENTANA_SEGUNDOS: int = 60
 
     # SMTP / Email de recuperación
     SMTP_HOST: str = "127.0.0.1"
@@ -89,6 +101,10 @@ class Settings(BaseSettings):
 
     # Billing habilitado (D1-D5: 2026-09-24)
     BILLING_HABILITADO: bool = True
+
+    # Energy-ML (descubrimiento de cargas)
+    ENERGY_ML_URL: str = "http://127.0.0.1:8100"
+    ENERGY_ML_TIMEOUT_S: int = 120
 
     model_config = SettingsConfigDict(
         env_file=os.path.join(
@@ -148,14 +164,29 @@ class Settings(BaseSettings):
                 raise ValueError("DB_PASSWORD debe tener al menos 8 caracteres en producción")
             if (self.CORS_ORIGINS or "").strip() == "*":
                 raise ValueError("CORS_ORIGINS no puede ser '*' en producción")
+            # No aborta: la API levanta y el cambio de contraseña responde 503 hasta cargar la clave.
+            if not self.otp_hmac_configurada:
+                logging.getLogger("settings").critical(
+                    "OTP_HMAC_KEY ausente, corta o igual a API_SECRET_KEY: el cambio de contraseña "
+                    "responde 503 hasta cargar una clave de al menos 16 caracteres distinta de API_SECRET_KEY"
+                )
         elif not self.API_SECRET_KEY:
             object.__setattr__(self, "API_SECRET_KEY", secrets.token_urlsafe(32))
+        # Solo desarrollo/test: en producción nunca se genera una clave (quedaría "configurada" con un
+        # valor distinto en cada reinicio). Los OTP con clave efímera no sobreviven a un reinicio.
+        if self.DEBUG and not self.OTP_HMAC_KEY:
+            object.__setattr__(self, "OTP_HMAC_KEY", secrets.token_urlsafe(32))
         return self
 
     @property
     def database_url(self) -> str:
         pwd = f":{self.DB_PASSWORD}" if self.DB_PASSWORD else ""
         return f"mysql+pymysql://{self.DB_USER}{pwd}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}?charset=utf8mb4"
+
+    @property
+    def otp_hmac_configurada(self) -> bool:
+        """True si la clave OTP es usable: >=16 caracteres y distinta de API_SECRET_KEY."""
+        return len(self.OTP_HMAC_KEY) >= 16 and self.OTP_HMAC_KEY != self.API_SECRET_KEY
 
     @property
     def auth_cookie_secure(self) -> bool:

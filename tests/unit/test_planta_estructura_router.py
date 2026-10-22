@@ -352,11 +352,56 @@ def test_resumen_nodo_unifilar_exitoso():
         granularidad="day",
         zona="America/Argentina/Buenos_Aires",
         dias=7,
+        periodo_dias=None,
     )
     data = response.json()
     assert data["es_virtual"] is True
     assert data["dispositivos_ids"] == ["dev-1", "dev-2"]
     assert data["potencia_activa_total_w"] == 450000.0
+
+
+def test_resumen_nodo_unifilar_con_periodo_dias_query():
+    client, mock_use_case = _cliente()
+    mock_use_case.resumen.return_value = ResumenNodoUnifilarDTO(
+        planta_id="planta-1",
+        nodo_id="mt",
+        es_virtual=True,
+    )
+
+    response = client.get("/api/v1/plantas/planta-1/unifilar/nodos/mt/resumen?periodo_dias=30")
+
+    assert response.status_code == 200
+    mock_use_case.resumen.assert_called_once_with(
+        planta_id="planta-1",
+        nodo_id="mt",
+        organizacion_id="org-1",
+        granularidad="day",
+        zona="America/Argentina/Buenos_Aires",
+        dias=None,
+        periodo_dias=30,
+    )
+
+
+def test_resumen_nodo_unifilar_directo():
+    client, mock_use_case = _cliente()
+    mock_use_case.resumen.return_value = ResumenNodoUnifilarDTO(
+        planta_id="planta-1",
+        nodo_id="mt",
+        es_virtual=True,
+    )
+
+    response = client.get("/api/v1/nodo/unifilar/mt?planta_id=planta-1&periodo_dias=30")
+
+    assert response.status_code == 200
+    mock_use_case.resumen.assert_called_once_with(
+        planta_id="planta-1",
+        nodo_id="mt",
+        organizacion_id="org-1",
+        granularidad="day",
+        zona="America/Argentina/Buenos_Aires",
+        dias=None,
+        periodo_dias=30,
+    )
 
 
 def test_resumen_nodo_unifilar_superadmin_sin_org():

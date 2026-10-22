@@ -50,6 +50,11 @@ def create_tables_if_needed():
     try:
         engine = get_engine()
         Base.metadata.create_all(bind=engine)
+        session_factory = get_session_factory()
+        with session_factory() as db:
+            from src.infrastructure.sqlalchemy.repositories.oauth_repository import sembrar_clientes_oauth
+
+            sembrar_clientes_oauth(db)
     except Exception as e:
         logger.warning("auto_create_tables_failed", error=str(e))
 

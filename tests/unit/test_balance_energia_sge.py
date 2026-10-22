@@ -55,10 +55,10 @@ def test_balance_energia_con_sobreconteo_detecta_error_metrologico():
 
 
 def test_balance_energia_con_armonicos_elevados_explica_perdidas():
-    """Un residual del 6% con THD_I del 22% se cataloga como pérdidas por armónicos (IEEE 519)."""
+    """Un residual del 6% con THD_I del 22% se cataloga como pérdidas por armónicos (umbral interno)."""
     e_padre = 1000.0
     e_hijos = [500.0, 440.0]  # Suma = 940 kWh -> 6% residual
-    thd_i = 22.5  # % > 15% IEEE 519
+    thd_i = 22.5  # % > 15% (umbral interno)
 
     bal = BalanceEnergiaService.evaluar_balance(
         energia_padre_kwh=e_padre,

@@ -41,6 +41,12 @@ class MockEmailService(ServicioEmailPort):
         self.enviados.append((destinatario, enlace_restablecimiento))
         return True
 
+    def enviar_codigo_cambio_contrasena(self, destinatario: str, codigo: str) -> bool:
+        return True
+
+    def notificar_cambio_contrasena(self, destinatario: str, momento, ip: str | None) -> bool:
+        return True
+
 
 class MockRepoUsuarios(RepositorioUsuariosPort):
     def __init__(self, usuarios: list[UsuarioAuth] | None = None):

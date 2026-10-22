@@ -14,6 +14,9 @@ from src.infrastructure.sqlalchemy import models_cargas  # noqa: F401  isort:ski
 # Idem para el contexto del asistente conversacional.
 from src.infrastructure.sqlalchemy import models_asistente  # noqa: F401  isort:skip
 
+# Idem para el contexto de OAuth 2.0 PKCE.
+from src.infrastructure.sqlalchemy import oauth_models  # noqa: F401  isort:skip
+
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
@@ -21,7 +24,9 @@ config = context.config
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # disable_existing_loggers=False: en tests alembic corre dentro del mismo proceso que la app y, con el
+    # default (True), deshabilita loggers ya creados (p. ej. "settings"). En producción corre como CLI aparte.
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 
 def resolver_database_url() -> str:

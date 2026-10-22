@@ -97,8 +97,8 @@ plantas `a1`, `a2`; org B con `b1`):
 
 ## 5. Criterios del Gauntlet
 
-- `venv/bin/ruff check .` y `venv/bin/ruff format --check .` sin errores.
-- `venv/bin/python -m pyright` sin diagnósticos.
-- `venv/bin/python -m pytest tests/unit -n auto` en verde, cobertura ≥ 85 %.
+- `.venv/bin/ruff check .` y `.venv/bin/ruff format --check .` sin errores.
+- `.venv/bin/python -m pyright` sin diagnósticos.
+- `.venv/bin/python -m pytest tests/unit -n auto` en verde, cobertura ≥ 85 %.
 - `scripts/verify_architecture.py` y `scripts/verify_code_size.py` (ningún archivo de `src/` > 500 líneas).
 - `./scripts/pre-push.sh` (etapas 1-4) exitoso.

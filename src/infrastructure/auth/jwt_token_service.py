@@ -35,6 +35,8 @@ class JwtTokenService(GeneradorTokenPort):
         expira_en: datetime,
         rol: str = "operador",
         organizacion_id: str | None = None,
+        scope: str | None = None,
+        client_id: str | None = None,
     ) -> str:
         encabezado = _b64url(json.dumps({"alg": self.ALGORITMO, "typ": "JWT"}, separators=(",", ":")).encode("utf-8"))
         ahora = datetime.now(timezone.utc)
@@ -47,6 +49,10 @@ class JwtTokenService(GeneradorTokenPort):
         }
         if organizacion_id is not None:
             payload["org"] = organizacion_id
+        if scope is not None:
+            payload["scope"] = scope
+        if client_id is not None:
+            payload["client_id"] = client_id
         cuerpo = _b64url(
             json.dumps(
                 payload,

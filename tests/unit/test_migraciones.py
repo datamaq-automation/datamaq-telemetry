@@ -1,6 +1,7 @@
 """tests/unit/test_migraciones.py — Pruebas de la infraestructura de migraciones Alembic (specs/migraciones.md)."""
 
 import importlib.util
+import logging
 import sys
 import types
 from pathlib import Path
@@ -16,7 +17,7 @@ RAIZ = Path(__file__).resolve().parents[2]
 ALEMBIC_INI = RAIZ / "alembic.ini"
 ENV_PY = RAIZ / "alembic" / "env.py"
 REVISION_INICIAL = "209ce0774d59"
-REVISION_HEAD = "w7x8y9z0a1b2"
+REVISION_HEAD = "c4e8a1d2f6b9"
 
 TABLAS_MODELO = {
     "plans",
@@ -142,6 +143,18 @@ def test_env_usa_settings_sin_override(monkeypatch):
     opciones = _cargar_env(monkeypatch)
 
     assert opciones["sqlalchemy.url"] == "sqlite:///desde_settings.db"
+
+
+def test_migracion_no_deshabilita_loggers_ya_creados(tmp_path, monkeypatch):
+    # Regresión: alembic/env.py llama fileConfig(); con disable_existing_loggers=True deshabilitaba
+    # el logger "settings" (creado por config.py) y los tests de OTP dejaban de capturar sus CRITICAL.
+    logger_app = logging.getLogger("settings")
+    logger_app.disabled = False
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'logs.db'}")
+
+    command.upgrade(_config(), "head")
+
+    assert logger_app.disabled is False
 
 
 def test_upgrade_head_crea_esquema_completo(tmp_path, monkeypatch):

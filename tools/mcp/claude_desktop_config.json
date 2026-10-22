@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "datamaq": {
+      "command": "python",
+      "args": ["-m", "tools.mcp.server"],
+      "env": {
+        "DATAMAQ_API_URL": "https://api.datamaq.com.ar",
+        "DATAMAQ_AUTH_TOKEN": "eyJhbGci..."
+      }
+    }
+  }
+}

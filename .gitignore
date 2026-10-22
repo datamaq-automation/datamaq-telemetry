@@ -46,6 +46,8 @@ logs/
 
 # Tests & Linters
 .coverage
+.coverage*
+.coverage_report.txt
 htmlcov/
 .pytest_cache/
 .ruff_cache/

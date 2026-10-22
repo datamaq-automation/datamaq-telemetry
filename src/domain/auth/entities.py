@@ -83,3 +83,16 @@ class AccesoPlantaUsuario:
     planta_id: str
     puede_cambiar: bool = True
     creado_en: datetime = field(default_factory=ahora_utc)
+
+
+@dataclass
+class ValidacionCambioContrasena:
+    """OTP de cambio de contraseña. Se guarda el HMAC del código, nunca el código en claro."""
+
+    id: int
+    usuario_id: str
+    codigo_hash: str
+    ttl_expira: datetime
+    creado_en: datetime
+    intentos_fallidos: int = 0
+    consumido_en: datetime | None = None

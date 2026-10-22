@@ -60,7 +60,7 @@ sqlalchemy>=2.0.0 (ya pineado a <2.1.0)
 
 2. **CI programado nightly (P1):** ✅
    - GitHub Actions workflow: `.github/workflows/ci-nightly.yml`
-   - Corre diariamente a las 2 AM UTC (11 PM ARG)
+   - Corre semanalmente, lunes a las 2 AM UTC (domingo 11 PM ARG); también a mano (`workflow_dispatch`). Frecuencia semanal por consumo de minutos de Actions (decisión 2026-10-09)
    - Instala `requirements.txt` en fresco contra PyPI (sin `.lock`), corre gauntlet completo
    - Notifica por Telegram si falla (detecta breaking changes)
    - Commit: `bff05ef`

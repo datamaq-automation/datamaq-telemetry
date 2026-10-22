@@ -136,6 +136,10 @@ class MQTTListener:
 
     def _on_message(self, client, userdata, msg):
         topic = msg.topic
+        if topic.endswith("/conf/com"):
+            # Eco de un comando propio (suscripción a m/wifi/#): ya quedó como mqtt_comando_publicado.
+            logger.debug("mqtt_eco_comando_propio_descartado", topico=topic)
+            return
         payload_bytes = msg.payload
         if len(payload_bytes) > self.settings.MQTT_MAX_PAYLOAD_BYTES:
             logger.warning("mqtt_payload_descartado", topico=topic, tamano_bytes=len(payload_bytes))

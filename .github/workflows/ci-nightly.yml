@@ -1,17 +1,30 @@
 name: CI Nightly
 
-# Job diario que detecta breaking changes de dependencias antes de que lleguen a producción.
+# Job semanal que detecta breaking changes de dependencias antes de que lleguen a producción.
+# Frecuencia semanal (no diaria) para ahorrar minutos de GitHub Actions: repos privados.
 # Instala desde requirements.txt (no .lock) para testear versiones más nuevas.
 on:
   schedule:
-    - cron: '0 2 * * *'  # 2 AM UTC = 11 PM ARG (UTC-3, horario estándar)
+    - cron: '0 2 * * 1'  # lunes 2 AM UTC = domingo 11 PM ARG (UTC-3, horario estándar)
+  # Correr a mano antes de actualizar dependencias: Actions → CI Nightly → Run workflow.
+  workflow_dispatch:
 
 jobs:
   test-fresh-deps:
     name: Gauntlet con dependencias frescas
     runs-on: ubuntu-latest
+    env:
+      APP_ENV: test
     steps:
       - uses: actions/checkout@v4
+
+      # Sin `data/` los tests de YAML real fallan (ver run 37591679334): mismo checkout que ci.yml.
+      - name: Checkout datamaq-data (repo independiente de datos maestros)
+        uses: actions/checkout@v7
+        with:
+          repository: datamaq-automation/datamaq-data
+          ssh-key: ${{ secrets.SSH_DEPLOY_KEY_DATA }}
+          path: data
 
       # Misma versión que producción (VPS: 3.12.14): una rotura acá significa "rompería en prod".
       - name: Setup Python 3.12

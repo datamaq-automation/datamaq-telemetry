@@ -836,6 +836,38 @@ def test_dimensionador_estimacion_penalizacion_ars():
     assert DimensionadorCompensacionService.estimar_penalizacion_mensual_ars(0.0, 0.80) is None
 
 
+def test_dimensionador_sobrecompensacion_y_evaluacion():
+    # es_sobrecompensacion_sostenida
+    assert DimensionadorCompensacionService.es_sobrecompensacion_sostenida(-5.0) is True
+    assert DimensionadorCompensacionService.es_sobrecompensacion_sostenida(0.0) is True
+    assert DimensionadorCompensacionService.es_sobrecompensacion_sostenida(0.1) is False
+    assert DimensionadorCompensacionService.es_sobrecompensacion_sostenida(None) is False
+
+    # evaluar_compensacion con sobrecompensacion sostenida (Q_max <= 0)
+    qc, banco, escalones, sobrecomp = DimensionadorCompensacionService.evaluar_compensacion(
+        potencia_activa_kw=100.0,
+        fp_actual=0.88,
+        q_reactiva_kvar=-10.0,
+        q_max_kvar=0.0,
+    )
+    assert sobrecomp is True
+    assert qc == 0.0
+    assert banco is None
+    assert escalones == []
+
+    # evaluar_compensacion con régimen inductivo normal
+    qc, banco, escalones, sobrecomp = DimensionadorCompensacionService.evaluar_compensacion(
+        potencia_activa_kw=100.0,
+        fp_actual=0.80,
+        q_reactiva_kvar=50.0,
+        q_max_kvar=60.0,
+    )
+    assert sobrecomp is False
+    assert qc is not None and qc > 0.0
+    assert banco is not None
+    assert len(escalones) > 0
+
+
 def test_calculo_desbalance_corriente():
     # Balanceado
     assert AnalizadorCalidadEnergiaService.calcular_desbalance_corriente(100.0, 100.0, 100.0) == 0.0
@@ -1087,3 +1119,27 @@ def test_analitica_dimensiona_compensacion_con_carga_facturable():
     assert analitica.requiere_compensacion is True
     assert analitica.banco_sugerido_kvar is not None
     assert analitica.penalizacion_estimada_ars is not None
+
+
+def test_mensajes_thd_tension_son_umbral_interno_no_normativo():
+    """Los umbrales de THD_V son internos (addendum 2026-10-10): ningún mensaje afirma norma ni cumplimiento."""
+    ahora = datetime.now(timezone.utc)
+    lectura = LecturaInstantanea(
+        id=None,
+        dispositivo_id="dev-1",
+        registrado_en=ahora,
+        fase_r=MedicionFase(thd_v_porcentaje=5.8),
+        fase_s=MedicionFase(thd_v_porcentaje=9.2),
+        fase_t=MedicionFase(thd_v_porcentaje=3.0),
+    )
+
+    alertas = AnalizadorCalidadEnergiaService.evaluar_alertas_distorsion_armonica("dev-1", lectura)
+
+    assert len(alertas) == 2
+    for alerta in alertas:
+        assert "umbral interno" in alerta.mensaje
+        assert "referencia: IEEE 519-2014" in alerta.mensaje
+        assert "Límite IEEE 519" not in alerta.mensaje
+        assert "Límite IEC" not in alerta.mensaje
+        assert "normativ" not in alerta.mensaje.lower()
+        assert "normativ" not in (alerta.observaciones or "").lower()

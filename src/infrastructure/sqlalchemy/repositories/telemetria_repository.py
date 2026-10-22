@@ -15,6 +15,7 @@ from src.domain.telemetria.entities import (
     LogEstadoDispositivo,
 )
 from src.domain.telemetria.ports import RepositorioTelemetriaPort
+from src.domain.telemetria.servicios.harmonics_thd import ThdFase
 from src.domain.telemetria.value_objects import (
     LecturaPotenciaTemporal,
 )
@@ -27,9 +28,13 @@ from src.infrastructure.sqlalchemy.models import (
     TelemetryInstantaneousModel,
 )
 from src.infrastructure.sqlalchemy.repositories.telemetria_mappers import (
+    alerta_a_modelo,
     alerta_to_entity,
     energia_to_entity,
     instantanea_to_entity,
+)
+from src.infrastructure.sqlalchemy.repositories.telemetria_thd_actualizador import (
+    actualizar_thd_en_ultima_instantanea,
 )
 
 
@@ -40,6 +45,7 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
 
     def __init__(self, db: Session):
         self.db = db
+        self._zonas_tz_verificadas: set[str] = set()  # Una sonda de CONVERT_TZ por zona y request (#14).
 
     def guardar_instantanea(self, lectura: LecturaInstantanea) -> None:
         model = TelemetryInstantaneousModel(
@@ -172,41 +178,14 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
         self.db.commit()
 
     def guardar_alerta(self, alerta: AlertaDispositivo) -> None:
-        if alerta.id is not None:
-            model = self.db.query(DeviceAlertModel).filter(DeviceAlertModel.id == alerta.id).first()
-            if model:
-                model.device_id = alerta.dispositivo_id
-                model.alert_type = alerta.tipo_alerta
-                model.severity = alerta.severidad.value
-                model.message = alerta.mensaje
-                model.is_resolved = alerta.esta_resuelta
-                model.triggered_at = alerta.disparada_en
-                model.resolved_at = alerta.resuelta_en
-                model.phase = alerta.fase
-                model.measured_value = Decimal(str(alerta.valor_medido)) if alerta.valor_medido is not None else None
-                model.threshold_value = Decimal(str(alerta.valor_umbral)) if alerta.valor_umbral is not None else None
-                model.unit = alerta.unidad
-                model.category = alerta.categoria
-                model.notes = alerta.observaciones
-                self.db.commit()
-                return
-
-        model = DeviceAlertModel(
-            device_id=alerta.dispositivo_id,
-            alert_type=alerta.tipo_alerta,
-            severity=alerta.severidad.value,
-            message=alerta.mensaje,
-            is_resolved=alerta.esta_resuelta,
-            triggered_at=alerta.disparada_en,
-            resolved_at=alerta.resuelta_en,
-            phase=alerta.fase,
-            measured_value=Decimal(str(alerta.valor_medido)) if alerta.valor_medido is not None else None,
-            threshold_value=Decimal(str(alerta.valor_umbral)) if alerta.valor_umbral is not None else None,
-            unit=alerta.unidad,
-            category=alerta.categoria,
-            notes=alerta.observaciones,
+        existente = (
+            self.db.query(DeviceAlertModel).filter(DeviceAlertModel.id == alerta.id).first()
+            if alerta.id is not None
+            else None
         )
-        self.db.add(model)
+        model = alerta_a_modelo(alerta, existente or DeviceAlertModel())
+        if existente is None:
+            self.db.add(model)
         self.db.commit()
         if alerta.id is None:
             alerta.id = model.id
@@ -244,6 +223,11 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
     def obtener_alerta_por_id(self, alerta_id: int) -> AlertaDispositivo | None:
         m = self.db.query(DeviceAlertModel).filter(DeviceAlertModel.id == alerta_id).first()
         return self._alerta_to_entity(m) if m else None
+
+    def actualizar_thd_instantanea(
+        self, dispositivo_id: str, momento: datetime, ventana_s: int, thd: dict[str, ThdFase]
+    ) -> bool:
+        return actualizar_thd_en_ultima_instantanea(self.db, dispositivo_id, momento, ventana_s, thd)
 
     def obtener_ultima_instantanea(self, dispositivo_id: str) -> LecturaInstantanea | None:
         m = (
@@ -338,13 +322,14 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
         cualquier zona IANA y se pierde la partición por periodo local, así
         que se falla explícito en vez de agregar en silencio por UTC.
         """
-        prueba_tz = self.db.execute(select(func.convert_tz(func.now(), "UTC", zona))).scalar()
-        if prueba_tz is None:
-            raise RuntimeError(
-                f"CONVERT_TZ devolvió NULL para la zona {zona!r}: las tablas de zona horaria de "
-                "MySQL no están cargadas. Ejecutar `mysql_tzinfo_to_sql /usr/share/zoneinfo | "
-                "mysql mysql` en el servidor antes de agregar energía por periodo."
-            )
+        if zona not in self._zonas_tz_verificadas:
+            if self.db.execute(select(func.convert_tz(func.now(), "UTC", zona))).scalar() is None:
+                raise RuntimeError(
+                    f"CONVERT_TZ devolvió NULL para la zona {zona!r}: las tablas de zona horaria de "
+                    "MySQL no están cargadas. Ejecutar `mysql_tzinfo_to_sql /usr/share/zoneinfo | "
+                    "mysql mysql` en el servidor antes de agregar energía por periodo."
+                )
+            self._zonas_tz_verificadas.add(zona)
 
         recorded_at_local = func.convert_tz(TelemetryEnergyModel.recorded_at, "UTC", zona)
         periodo_expr = (

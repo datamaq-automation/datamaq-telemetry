@@ -88,7 +88,7 @@ fi
 
 ES_SOLO_CONFIG=false
 if [ -n "$CHANGED_FILES" ]; then
-    if ! echo "$CHANGED_FILES" | grep -qvE "^data/|^docs/|\.md$|^tests/unit/test_yaml_|^tests/unit/test_verificador_unifilar"; then
+    if ! echo "$CHANGED_FILES" | grep -qvE "^data/|^docs/|\.md$"; then
         ES_SOLO_CONFIG=true
     fi
 fi
@@ -147,11 +147,37 @@ run_stage "2" "Estilo & Formato: ruff check + format" "ruff check . && ruff form
 # Stage 3: Tipado Estricto
 run_stage "3" "Tipado Estricto: pyright" "$PYRIGHT"
 
-# Stage 4: Tests Unitarios con Cobertura
-run_stage "4" "Tests Unitarios & Cobertura (>=85%)" "$PYTEST tests/unit -n auto --cov=src --cov-report=term-missing:skip-covered --cov-fail-under=85 -o console_output_style=progress"
+# Stage 4: Tests Unitarios con Cobertura (Optimizado para tokens: reporte tabular a disco)
+run_unit_tests_with_coverage() {
+    local cov_file=".coverage_report.txt"
+    local status=0
+
+    # Ejecutar pytest con reporte completo redirigido a archivo temporal en disco
+    $PYTEST tests/unit -n auto --cov=src --cov-report=term-missing:skip-covered --cov-fail-under=85 --tb=short > "$cov_file" 2>&1 || status=$?
+
+    # Si hubo fallos, aislar únicamente los tests fallidos y sus tracebacks
+    if [ $status -ne 0 ]; then
+        if grep -q "FAILED" "$cov_file"; then
+            echo -e "${RED}Fallos detectados en tests unitarios:${RESET}"
+            grep -A 8 -E "(FAILED|FAILURES|ERROR:)" "$cov_file" | head -n 35
+        else
+            tail -n 20 "$cov_file"
+        fi
+        return $status
+    fi
+
+    # En caso de éxito, mostrar únicamente resumen consolidado y cobertura global
+    grep -E "(Required test coverage|TOTAL\s+[0-9]+|===+ [0-9]+ passed)" "$cov_file" | while read -r line; do
+        echo -e "  ${CYAN}${line}${RESET}"
+    done
+
+    return 0
+}
+
+run_stage "4" "Tests Unitarios & Cobertura (>=85%)" "run_unit_tests_with_coverage"
 
 # Stage 5: Tests de Integración
-run_stage "5" "Tests de Integración" "$PYTEST tests/integration -n auto -q --no-header"
+run_stage "5" "Tests de Integración" "$PYTEST tests/integration -n auto -q --no-header --tb=short"
 
 # Stage 6: Reglas de Arquitectura y Tamaño
 run_stage "6" "Clean Architecture & Tamaño de Código" "python3 scripts/verify_architecture.py && python3 scripts/verify_code_size.py"

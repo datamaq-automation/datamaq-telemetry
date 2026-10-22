@@ -234,3 +234,13 @@ class AnalisisConsumoResponseDTO(BaseModel):
     no_atribuidos: int = 0
     cargas_con_firma: int = 0
     advertencia_cadencia: str | None = None
+
+
+class ResumenPropuestaDTO(BaseModel):
+    """Resumen de la propuesta de firmas inferidas."""
+
+    dispositivo_id: str
+    actualizadas: list[str] = Field(default_factory=list)
+    creadas: list[str] = Field(default_factory=list)
+    protegidas: list[str] = Field(default_factory=list)
+    descartadas: int = 0

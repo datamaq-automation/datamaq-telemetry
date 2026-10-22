@@ -39,12 +39,15 @@ _CLAVES_ENV = [
     "LOGIN_VENTANA_SEGUNDOS",
     "LOG_FORMAT",
     "LOG_LEVEL",
+    "OTP_HMAC_KEY",
 ]
 
 
 def _settings(monkeypatch, **overrides):
     for clave in _CLAVES_ENV:
         monkeypatch.delenv(clave, raising=False)
+    # Producción exige OTP_HMAC_KEY propia (ver test_otp_hmac_key_config.py): clave de prueba por defecto.
+    overrides.setdefault("OTP_HMAC_KEY", "clave-otp-de-prueba-0123456789")
     return Settings(_env_file=None, **overrides)
 
 

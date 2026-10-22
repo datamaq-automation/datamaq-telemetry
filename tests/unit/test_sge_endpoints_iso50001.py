@@ -126,7 +126,8 @@ def test_endpoint_lineas_base_gitops(client):
     assert len(data) >= 1
     enb = data[0]
     assert enb["id"] == "enb-durax-usina-2026"
-    assert enb["nodoNombre"] == "TGBT Usina"
+    # La nomenclatura de datamaq-data nombra los nodos "<Ubicación> — <Función>".
+    assert enb["nodoNombre"].startswith("TGBT Usina")
     assert enb["secReferenciaKwhUnidad"] == 0.125
     assert enb["potenciaBaseKw"] == 15.0
     assert enb["autorizadoPor"] == "admin@durax.com.ar"
@@ -142,13 +143,15 @@ def test_endpoint_facturas_distribuidora_gitops(client):
     assert resp.status_code == 200
     data = resp.json()
     assert isinstance(data, list)
-    # UPP: facturas reales de potencia de EdeLAP (ver data/facturas_distribuidora.yml). Corregido
-    # 2026-09-28: el test afirmaba un par EDELAP+CAMMESA "2026-08" que en realidad era la factura
-    # EdeLAP 2024-11 mal fechada más una fila de CAMMESA armada a mano. Ya no están en el YAML.
-    assert len(data) >= 12
+    # UPP: 12 facturas de potencia (EdeLAP, 2023-12 a 2024-11) + 12 de energía (CAMMESA, 2023-11 a 2024-10)
+    # = 24 facturas totales. Corregido 2026-09-28: se quitaron las filas espurias "2026-08".
+    # Cargadas 2026-10-04: 12 facturas CAMMESA con desglose regulatorio MEM (potencia, adicionales,
+    # transporte, otros cargos).
+    assert len(data) == 24
     assert all(f["plantaId"] == PLANTA_UPP_ID for f in data)
     assert not [f for f in data if f["periodo"] == "2026-08"]
 
+    # EDELAP potencia 2024-11 (última factura)
     potencia = next(f for f in data if f["periodo"] == "2024-11")
     assert potencia["tipoDato"] == "potencia"
     assert potencia["proveedor"] == "EDELAP"
@@ -158,10 +161,45 @@ def test_endpoint_facturas_distribuidora_gitops(client):
     assert potencia["potenciaExcedidaFueraPuntaKw"] == pytest.approx(232.0)
     assert potencia["importeTotalArs"] == pytest.approx(21031736.78)
 
-    # 2024-02: mes sin exceso de potencia (demanda registrada por debajo de la contratada).
-    sin_exceso = next(f for f in data if f["periodo"] == "2024-02")
+    # EDELAP 2024-02: mes sin exceso de potencia (demanda registrada por debajo de la contratada).
+    sin_exceso = next(f for f in data if f["periodo"] == "2024-02" and f["tipoDato"] == "potencia")
     assert sin_exceso["potenciaAdquiridaPuntaKw"] == pytest.approx(508.0)
     assert sin_exceso["potenciaExcedidaPuntaKw"] == pytest.approx(0.0)
+
+    # CAMMESA energía: 12 facturas (2023-11 a 2024-10)
+    cammesa_facturas = [f for f in data if f["proveedor"] == "CAMMESA"]
+    assert len(cammesa_facturas) == 12
+    periodos_cammesa = {f["periodo"] for f in cammesa_facturas}
+    expected_periodos = {
+        "2023-11",
+        "2023-12",
+        "2024-01",
+        "2024-02",
+        "2024-03",
+        "2024-04",
+        "2024-05",
+        "2024-06",
+        "2024-07",
+        "2024-08",
+        "2024-09",
+        "2024-10",
+    }
+    assert periodos_cammesa == expected_periodos
+
+    # CAMMESA 2024-10 (última factura): validar desglose regulatorio MEM
+    cammesa_oct = next(f for f in data if f["periodo"] == "2024-10" and f["proveedor"] == "CAMMESA")
+    assert cammesa_oct["tipoDato"] == "energia"
+    assert cammesa_oct["numeroFactura"] == "0057-00323139"
+    assert cammesa_oct["energiaActivaTotalKwh"] == pytest.approx(300960.0)
+    assert cammesa_oct["importeEnergiaArs"] == pytest.approx(3117344.0)
+    assert cammesa_oct["potenciaAdquiridaMemKw"] == pytest.approx(1089.0)
+    assert cammesa_oct["importePotenciaMemArs"] == pytest.approx(3079473.0)
+    assert cammesa_oct["importeAdicionalesMemArs"] == pytest.approx(14419642.0)
+    assert cammesa_oct["importeTransporteMemArs"] == pytest.approx(1785216.0)
+    assert cammesa_oct["importeOtrosCargosMemArs"] == pytest.approx(149465.0)
+    assert cammesa_oct["importeNetoArs"] == pytest.approx(22551140.0)
+    assert cammesa_oct["importeImpuestosArs"] == pytest.approx(6981130.32)
+    assert cammesa_oct["importeTotalArs"] == pytest.approx(29532270.32)
 
 
 def test_endpoint_facturas_distribuidora_planta_inexistente_404(client):

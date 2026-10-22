@@ -524,15 +524,15 @@ resultados tras eliminar el campo de `Dispositivo`.
 
 Todos verificados en verde tras el rediseño a dos documentos (2026-09-24):
 
-- `venv/bin/ruff check .` y `venv/bin/ruff format .` sin errores.
-- `venv/bin/python -m pyright` (proyecto completo) — `0 errors, 0 warnings, 0 informations`.
-- `venv/bin/python -m pytest tests/unit -n auto --cov=src --cov-fail-under=85` — **1519 passed**,
+- `.venv/bin/ruff check .` y `.venv/bin/ruff format .` sin errores.
+- `.venv/bin/python -m pyright` (proyecto completo) — `0 errors, 0 warnings, 0 informations`.
+- `.venv/bin/python -m pytest tests/unit -n auto --cov=src --cov-fail-under=85` — **1519 passed**,
   cobertura total **92%**, verificado tanto normal como con `DB_HOST=127.0.0.2 DB_PORT=1`
   (memoria `tests-locales-tocan-db-real`: los tests no deben tocar la DB real de producción).
-- `venv/bin/python scripts/verify_architecture.py` — `[PASS]`. `FacturaDistribuidora` y
+- `.venv/bin/python scripts/verify_architecture.py` — `[PASS]`. `FacturaDistribuidora` y
   `ParserFacturaDistribuidoraPort` en `domain/sge/` sin imports de terceros; `pdfplumber` solo en
   `src/infrastructure/pdfplumber/`.
-- `venv/bin/python scripts/verify_code_size.py` — `[PASS]`. Ver nota de diseño abajo sobre
+- `.venv/bin/python scripts/verify_code_size.py` — `[PASS]`. Ver nota de diseño abajo sobre
   `server.py`, que sí llegó a superar el límite y se resolvió por extracción, no por recorte
   cosmético.
 - `pdfplumber>=0.11.0` y `reportlab>=5.0.0` (solo para el PDF de fixture del test del parser)
@@ -555,7 +555,7 @@ quedó en 492 líneas.
 
 - [x] La entidad de factura vive en `domain/` sin dependencias de terceros (parser en `infra`).
       `src/domain/sge/entities.py::FacturaDistribuidora` — `dataclass(frozen=True)` + `@property`,
-      solo stdlib. `venv/bin/python scripts/verify_architecture.py` → `[PASS]`.
+      solo stdlib. `.venv/bin/python scripts/verify_architecture.py` → `[PASS]`.
 - [x] El histórico queda versionado en git (archivo `.yml` nuevo, no en `organizaciones.yml`).
       `data/facturas_distribuidora.yml`, con una factura real de la planta Durax.
 - [x] `BalanceEnergiaService`/`ConsultarBalanceEnergiaUseCase` quedan conectados a la energía
@@ -564,5 +564,5 @@ quedó en 492 líneas.
       `energia_padre_kwh` cuando no se pasa explícito; cubierto por
       `tests/unit/test_consultar_balance_energia_uc.py`.
 - [x] Ningún archivo de `src/` supera 500 líneas tras la implementación.
-      `venv/bin/python scripts/verify_code_size.py` → `[PASS]` (ver nota de diseño en §5 sobre
+      `.venv/bin/python scripts/verify_code_size.py` → `[PASS]` (ver nota de diseño en §5 sobre
       `server.py`/`startup_verificaciones.py`).

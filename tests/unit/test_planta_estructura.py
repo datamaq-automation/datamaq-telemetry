@@ -366,6 +366,7 @@ def api_test_client():
     use_case = GestionarPlantaEstructuraUseCase(repo)
 
     settings = Settings(
+        _env_file=None,  # aislado del .env local: el test no debe depender de la configuración del desarrollador
         API_SECRET_KEY="test-secret-key-very-secure-for-testing",
         AUTH_REQUIRED=False,
         DEBUG=True,

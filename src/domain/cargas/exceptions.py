@@ -43,3 +43,7 @@ class DuracionCampanaInvalidaError(DominioCargasException):
 
 class IntervaloActividadNoEncontradoError(DominioCargasException):
     """Lanzada cuando se intenta corregir un intervalo de actividad que no existe."""
+
+
+class DescubridorNoDisponibleError(DominioCargasException):
+    """Lanzada cuando el servicio externo de descubrimiento de cargas no responde."""

@@ -251,6 +251,12 @@ class ResumenNodoUnifilarDTO(BaseModel):
         "tension_nominal_fase_V. 'LINEA' en MT (3 conductores, primario en triángulo): usar "
         "tension_linea_rs/st/tr_V contra tension_nominal_V.",
     )
+    potencia_contratada_punta_kw: float | None = None
+    potencia_contratada_fuera_punta_kw: float | None = None
+    potencia_adquirida_punta_en_curso_kw: float | None = None
+    potencia_adquirida_fuera_punta_en_curso_kw: float | None = None
+    ultima_potencia_adquirida_punta_kw: float | None = None
+    ultima_potencia_adquirida_fuera_punta_kw: float | None = None
 
 
 class PuntoPotenciaNodoUnifilarDTO(BaseModel):

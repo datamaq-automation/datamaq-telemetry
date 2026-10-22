@@ -1,19 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "Bash(ruff check *)",
-      "Bash(ruff format *)",
-      "Bash(.venv/bin/python -m ruff check *)",
-      "Bash(.venv/bin/python -m ruff format *)",
-      "Bash(pytest *)",
-      "Bash(python -m pytest *)",
-      "Bash(python3 -m pytest *)",
-      "Bash(.venv/bin/python -m pytest *)",
-      "Bash(python3 -m json.tool *)",
-      "Bash(gh run watch *)",
-      "Bash(systemctl is-active *)",
-      "Bash(systemctl status *)",
-      "Bash(systemctl --failed)"
-    ]
+      "Bash(git *)", "Bash(gh *)", "Bash(cd *)",
+      "Bash(.venv/bin/*)", "Bash(./scripts/*)", "Bash(APP_ENV=test ./scripts/pre-push.sh)",
+      "Bash(python3 *)", "Bash(uvx *)", "Bash(ls *)", "Bash(grep *)", "Bash(find *)",
+      "Bash(cat *)", "Bash(head *)", "Bash(tail *)", "Bash(wc *)", "Bash(sed *)",
+      "Bash(sleep *)", "Bash(timeout *)", "Bash(mkdir *)",
+      "Edit(src/**)", "Edit(tests/**)", "Edit(specs/**)", "Edit(scripts/**)", "Edit(.github/**)"
+    ],
+    "ask": ["Bash(git push --force*)", "Bash(git push -f*)"]
   }
 }

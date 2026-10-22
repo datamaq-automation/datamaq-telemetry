@@ -46,6 +46,7 @@ from src.domain.auth.ports import (
     ServicioEmailPort,
 )
 from src.domain.auth.services import HashContrasenaService, RateLimiterService, TokenRevocationService
+from src.domain.oauth.ports import OAuthRepositoryPort
 from src.domain.telemetria.ports import RepositorioDispositivosPort
 from src.infrastructure.auth.email_service import SmtpEmailService
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
@@ -232,9 +233,12 @@ def get_consultar_analitica_planta_use_case(
         ConsultarAnaliticaPlantaUseCase,
     )
 
-    # Reutilizar la misma sesión de telemetría
+    # Reutilizar la misma sesión de telemetría y el repositorio de organizaciones declarativo
     consultar_telemetria = get_telemetria_use_case(db, settings)
-    return ConsultarAnaliticaPlantaUseCase(consultar_telemetria=consultar_telemetria)
+    return ConsultarAnaliticaPlantaUseCase(
+        consultar_telemetria=consultar_telemetria,
+        repo_organizaciones=YamlOrganizacionesRepository(),
+    )
 
 
 def get_maquinas_use_case(
@@ -318,6 +322,18 @@ def get_usuarios_repository(db: Annotated[Session, Depends(get_db_session)]) -> 
 
 def get_auditoria_repository(db: Annotated[Session, Depends(get_db_session)]) -> RepositorioAuditoriaPort:
     return MySQLAuditoriaRepository(db)
+
+
+def get_oauth_repository(db: Annotated[Session, Depends(get_db_session)]) -> OAuthRepositoryPort:
+    from src.infrastructure.sqlalchemy.repositories.oauth_repository import MySQLOAuthRepository
+
+    return MySQLOAuthRepository(db)
+
+
+def get_jwt_token_service(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> JwtTokenService:
+    return JwtTokenService(settings.API_SECRET_KEY)
 
 
 def get_registrar_auditoria_use_case(
@@ -510,3 +526,14 @@ def get_monitorear_potencia_use_case(
     buffer = global_telemetria_buffer
     publisher = TuyaPublisher()
     return MonitorearPotenciaYAlarmaUseCase(repo_org, buffer, publisher)
+
+
+def get_consultar_maquinas_inferidas_use_case(
+    db: Annotated[Session, Depends(get_db_session)],
+) -> Any:
+    from src.application.use_cases.consultar_maquinas_inferidas import (
+        ConsultarMaquinasInferidaUseCase,
+    )
+
+    repo_cargas = MySQLCargasRepository(db)
+    return ConsultarMaquinasInferidaUseCase(repo_cargas)

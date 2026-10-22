@@ -173,7 +173,7 @@ def test_la_atribucion_reparte_los_kwh_contra_el_contador():
     use_case, _, _ = _use_case(_serie_con_termotanque(), [_termotanque()], energia=5.0)
     use_case.analizar(MEDIDOR, desde=INICIO, hasta=HASTA)
 
-    atribucion = use_case.atribucion(MEDIDOR)
+    atribucion = use_case.atribucion(MEDIDOR, desde=INICIO, hasta=HASTA)
 
     assert atribucion.energia_total_kwh == 5.0
     assert atribucion.energia_atribuida_kwh > 0

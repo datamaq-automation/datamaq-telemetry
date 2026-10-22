@@ -28,7 +28,14 @@ class _UseCaseFalso:
         self._excepcion = excepcion
         self.llamado_con: dict | None = None
 
-    def ejecutar(self, pregunta, organizacion_id, usuario_id, conversacion_id=None):
+    def ejecutar(
+        self,
+        pregunta,
+        organizacion_id,
+        usuario_id,
+        conversacion_id=None,
+        usuario_consiente_envio_groq=False,
+    ):
         self.llamado_con = {
             "pregunta": pregunta,
             "organizacion_id": organizacion_id,
@@ -101,4 +108,5 @@ def test_preguntar_traduce_excepcion_interna_a_500():
     response = client.post("/api/v1/asistente/preguntar", json={"pregunta": "¿Qué pasó con el medidor 3?"})
 
     assert response.status_code == 500
-    assert "el modelo de inferencia no respondió" in response.json()["detail"]
+    assert response.json()["detail"] == "Ocurrió un error interno en el servidor"
+    assert "el modelo de inferencia no respondió" not in response.text

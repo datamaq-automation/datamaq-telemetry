@@ -14,6 +14,41 @@ API FastAPI y Worker MQTT para la ingesta y persistencia de telemetría de medid
 - Verificación de arquitectura y tamaño: `.venv/bin/python scripts/verify_architecture.py && .venv/bin/python scripts/verify_code_size.py`
 - Linter: `.venv/bin/ruff check .`
 - LSP de OpenCode: habilitado vía `opencode.json` (servidor `pyright` → `.venv/bin/pyright-langserver --stdio`); da feedback de diagnósticos de tipos de `src/` al agente. La verificación autoritativa de tipos sigue siendo `.venv/bin/pyright` (etapa 3 del Gauntlet).
+- **`gh` en este repo:** el remoto es SSH y `gh` sin `-R` falla con «none of the git remotes ... known GitHub host». Usar siempre `gh <cmd> -R datamaq-automation/datamaq-telemetry`. `gh run watch --exit-status` no es confiable como verificación: confirmar con `gh run list` después.
+
+## Entornos (Development vs Producción)
+
+**Dos bases de datos completamente separadas:**
+- **Desarrollo/Testing (127.0.0.1:3306, `.env` local):** Vacía salvo por fixtures. Usada por tests locales y `./run.sh`.
+- **Producción (VPS, acceso via `ssh vps`):** Datos reales desde 2026-09. Script: `./scripts/logs.sh` (solo lectura de logs). Para queries SQL directas: `ssh vps` → `mysql -u ... -p...` (credenciales en VPS).
+
+**Regla:** Antes de queryar datos históricos/reales de medidores, validar: ¿esto es fixture de test (dev) o datos de producción? Si es producción, usar `ssh vps`.
+
+## Datos maestros (`data/`, repo `datamaq-data`)
+
+- **Cambios que tocan valores testeados:** un cambio en `datamaq-data` que toque un valor testeado (`correccion_angular_fases`, `potencia_contratada`, etc.) debe actualizar en el mismo flujo los tests que lo hardcodean (`tests/unit/test_yaml_organizaciones_repository.py`, `tests/unit/test_nodo_unifilar_potencia_contratada.py`). Si no, el CI de `main` queda en rojo.
+- **Despliegue de datos en el VPS:** el pull `--ff-only` trae todo `origin/main` de `datamaq-data`, no solo el commit propio. Antes de pullear, revisar `git log origin/main` contra el VPS. El pull no recarga el servicio: un cambio de datos necesita reinicio para que el proceso lo tome, con autorización explícita.
+
+## Mapeo de IDs: YAML vs Base de Datos
+
+**YAML usa IDs lógicos (números o nombres); DB usa UUIDs.** No confundir. Ver tabla completa en `docs/topologia-medidores.md`.
+
+**Importante:**
+- **Las facturas se cargan a nivel PLANTA, NO dispositivo.** Una planta puede tener múltiples distribuidoras (no son opciones mutuamente excluyentes).
+- `device_uid` es el identificador MAC (ej. `EC:C9:FF:B5:7F:20`), puede variar en formato entre YAML y DB
+- Siempre validar consistencia: `python scripts/validate_topology.py`
+- Para validar energía contra factura: sumar energía de TODOS los dispositivos de la planta, comparar contra factura de esa planta
+
+**Validación automática:**
+```bash
+python scripts/validate_topology.py           # Verificar inconsistencias YAML ↔ DB
+python scripts/validate_topology.py --strict  # Fallar en warnings
+```
+
+**Fuentes de verdad:**
+- `data/organizaciones.yml` (topología, medidores, device_uid)
+- `devices` en DB (device_id, last_seen_at, status)
+- App viva (`https://app.datamaq.com.ar/plantas/...`) para verificación visual
 
 ## Reglas de Dependencia y Arquitectura
 
@@ -39,6 +74,54 @@ API FastAPI y Worker MQTT para la ingesta y persistencia de telemetría de medid
 - **Todos los `__init__.py` (`src/` y `tests/`) deben ser de 0 bytes.**
 - **El LSP del editor (Pylance) debe alinear su exclusión con `pyrightconfig.json` vía `.vscode/settings.json` (`python.analysis.exclude`). Los `tests/` están excluidos del análisis de tipos por diseño; prohibido "corregirlos" con `cast`/`# type: ignore`.**
 - Commits: Conventional Commits (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`).
+- **Reportes y rutas:** Al generar reportes/documentos, siempre dar rutas absolutas completas (`/home/agustin/...`), no relativas.
+
+## Comunicación con Sesión Padre Orquestadora (datamaq-01)
+
+**TODA respuesta, cierre de tarea o reporte de bloqueadores DEBE dirigirse al PADRE, no al dueño.**
+
+**Protocolo (obligatorio):**
+1. Carga la herramienta `SendMessage` (si está deferred, usa `ToolSearch("select:SendMessage")`)
+2. Envía mensaje a `datamaq-01` (sesión padre):
+   ```
+   SendMessage(to="datamaq-01", 
+     summary="[Resumen corto de lo que reportas]",
+     message="[Detalle completo del cierre / bloqueador / status]")
+   ```
+3. Verifica que el resultado diga `"success":true`
+
+**Ejemplos:**
+```
+✅ Correcto:
+SendMessage(to="datamaq-01", 
+  summary="Trazabilidad TI Bloque A ✅",
+  message="T1–T5 commiteado en feat/trazabilidad-cambios-ti. Gauntlet pasó, integración en deploy-server.sh pendiente.")
+
+❌ Incorrecto:
+"Completé la tarea" (sin SendMessage → va a dueño)
+SendMessage(to="agustin", ...) (envío directo al dueño, saltándose padre)
+```
+
+**Criterio: ¿a quién reportar?**
+- **Padre (datamaq-01):** Status de tarea, cierre de bloque, bloqueadores técnicos, coordinaciones con otros repos
+- **Dueño:** Solo si padre te pide que plantees pregunta de negocio al dueño explícitamente
+
+---
+
+## Cuando Tengas Dudas o Preguntas
+
+**SIEMPRE indicar explícitamente:**
+```
+📋 PREGUNTA PARA: [Sesión Padre | Dueño]
+```
+
+**Criterio:**
+- **Sesión Padre:** Ambigüedad en briefing, inconsistencias YAML↔DB, bloqueos transversales
+  - Usar SendMessage: `SendMessage(to="datamaq-01", summary="Pregunta", message="...")`
+- **Dueño:** Clarificación de negocio, detalles técnicos de este repo que padre no puede responder
+  - Padre te indicará explícitamente si traspasar pregunta al dueño
+
+Ver `memory/clarificar-destinatario-preguntas.md` para tabla de criterios.
 
 ## Optimización de Tokens y Hardware Local (CPU, RAM, iGPU)
 

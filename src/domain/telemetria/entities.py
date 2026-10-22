@@ -135,6 +135,8 @@ class NodoUnifilar:
     # Contrato con la distribuidora: solo tiene sentido en la `acometida` (punto de
     # suministro). Los medidores aguas abajo lo heredan por el árbol.
     categoria_tarifaria: str | None = None
+    potencia_contratada_punta_kw: float | None = None
+    potencia_contratada_fuera_punta_kw: float | None = None
     penalizacion_reactiva_aplica: bool | None = None
     fuente_dato: str | None = None
     notas_metrologicas: str | None = None
@@ -162,6 +164,8 @@ class InstalacionMedidor:
     correccion_angular_fases: str | None = None
     invertido: bool | None = None
     orden_fases: list[str] | None = None
+    # Corriente nominal real del TI por fase (A), p. ej. {"R": 100.0}. Base del umbral de fiabilidad del THD_I.
+    corriente_nominal_ti_a: dict[str, float] | None = None
 
     def campos_declarados(self) -> set[str]:
         return {
@@ -174,6 +178,7 @@ class InstalacionMedidor:
                 ("correccion_angular_fases", self.correccion_angular_fases),
                 ("invertido", self.invertido),
                 ("orden_fases", self.orden_fases),
+                ("corriente_nominal_ti_a", self.corriente_nominal_ti_a),
             )
             if valor is not None
         }
@@ -242,6 +247,8 @@ class Dispositivo:
     # Derivada del nodo del unifilar que este medidor mide (data/organizaciones.yml).
     # No se persiste en MySQL: la resuelve DatosMaestrosMedidorService en cada lectura.
     tension_nominal_v: float | None = None
+    # Derivada del YAML (InstalacionMedidor), no se persiste en MySQL.
+    corriente_nominal_ti_a: dict[str, float] | None = None
     creado_en: datetime = field(default_factory=ahora_utc)
     actualizado_en: datetime = field(default_factory=ahora_utc)
 
@@ -313,10 +320,15 @@ class EnergiaAgregada:
 
     ``energia_activa_neta_kwh`` es ``None`` en el primer periodo, que no tiene un
     periodo anterior como referencia: la UI omite esa barra en vez de inventar un valor.
+
+    ``periodos_sin_datos_previos`` cuenta los periodos completos sin ningún acumulado entre el
+    anterior con dato y este: el delta de este periodo incluye también el consumo de esos periodos
+    (#18: el 14/09 de Durax sumó 19 780 kWh de 41,5 h sin datos). 0 en el caso normal.
     """
 
     periodo: date
     energia_activa_neta_kwh: float | None = None
+    periodos_sin_datos_previos: int = 0
 
 
 @dataclass(frozen=True)
@@ -347,6 +359,22 @@ class AlertaDispositivo:
     unidad: str | None = None
     categoria: str | None = None
     observaciones: str | None = None
+    # Una alerta abierta se actualiza en cada nueva detección en vez de abrir otra (#19).
+    ultima_deteccion_en: datetime | None = None
+    ocurrencias: int = 1
+
+    def es_equivalente(self, otra: "AlertaDispositivo") -> bool:
+        """Misma condición del mismo medidor: dispositivo, tipo y fase (BAJA_TENSION en R y en S son distintas)."""
+        return (self.dispositivo_id, self.tipo_alerta, self.fase) == (otra.dispositivo_id, otra.tipo_alerta, otra.fase)
+
+    def registrar_reincidencia(self, nueva: "AlertaDispositivo") -> None:
+        """Absorbe una nueva detección de la misma condición: conserva el inicio y actualiza los valores."""
+        self.ocurrencias += 1
+        self.ultima_deteccion_en = nueva.disparada_en
+        self.mensaje = nueva.mensaje
+        self.severidad = nueva.severidad
+        self.valor_medido = nueva.valor_medido
+        self.valor_umbral = nueva.valor_umbral
 
     @property
     def duracion_segundos(self) -> float | None:

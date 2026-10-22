@@ -56,7 +56,7 @@ medidor y alerta):
 
 ## 5. Criterios del Gauntlet
 
-- `venv/bin/ruff check .`, `venv/bin/ruff format --check .`, `venv/bin/python -m pyright` sin errores.
-- `venv/bin/python -m pytest tests/unit -n auto --cov=src --cov-fail-under=85` en verde, también con
+- `.venv/bin/ruff check .`, `.venv/bin/ruff format --check .`, `.venv/bin/python -m pyright` sin errores.
+- `.venv/bin/python -m pytest tests/unit -n auto --cov=src --cov-fail-under=85` en verde, también con
   `DB_HOST=127.0.0.2 DB_PORT=1` (como en CI).
 - `scripts/verify_architecture.py` y `scripts/verify_code_size.py`.

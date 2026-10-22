@@ -250,3 +250,112 @@ def test_dto_expone_la_energia_registrada_en_camel_case_sin_energia_facturada():
     assert datos["energiaReactivaValleKvarh"] == 23202.0
     assert datos["energiaFacturadaKwh"] is None
     assert datos["energiaActivaPuntaKwh"] is None
+
+
+def test_valor_potencia_ars_kw_promedio_con_y_sin_exceso():
+    # Factura con exceso: contratada 800+850=1650, adquirida 1049 (exc 249) y 1082 (exc 232) -> total 2131 kW
+    factura = _factura()
+    esperado = 7664856.62 / 2131.0
+    assert factura.valor_potencia_ars_kw_promedio == pytest.approx(esperado)
+
+    # Factura sin exceso: contratada 800+850=1650, adquirida 500 y 600 -> total 1650 kW
+    factura_sin_exceso = _factura(
+        potencia_adquirida_punta_kw=500.0,
+        potencia_adquirida_fuera_punta_kw=600.0,
+        importe_potencia_ars=3300000.0,
+    )
+    assert factura_sin_exceso.valor_potencia_ars_kw_promedio == pytest.approx(3300000.0 / 1650.0)
+
+    # Factura sin importe de potencia
+    factura_sin_importe = _factura(importe_potencia_ars=None)
+    assert factura_sin_importe.valor_potencia_ars_kw_promedio is None
+
+
+def test_campos_desglose_cammesa_opcionales_por_defecto():
+    factura = _factura()
+    assert factura.potencia_adquirida_mem_kw is None
+    assert factura.importe_potencia_mem_ars is None
+    assert factura.importe_adicionales_mem_ars is None
+    assert factura.importe_transporte_mem_ars is None
+    assert factura.importe_otros_cargos_mem_ars is None
+    assert factura.importe_neto_ars is None
+    assert factura.importe_impuestos_ars is None
+    assert factura.valor_energia_integral_ars_kwh is None
+
+
+def test_valor_energia_integral_ars_kwh_calculo_correcto():
+    # Caso real UPP 2024-10:
+    # 300.960 kWh demandados, neto $ 22.551.140,00 -> $ 74.93068846... / kWh
+    factura = _factura(
+        energia_activa_total_kwh=300960.0,
+        importe_neto_ars=22551140.00,
+        potencia_adquirida_mem_kw=1089.0,
+        importe_potencia_mem_ars=3079473.0,
+        importe_adicionales_mem_ars=14419642.0,
+        importe_transporte_mem_ars=1785216.0,
+        importe_otros_cargos_mem_ars=149465.0,
+        importe_impuestos_ars=6981130.32,
+        importe_total_ars=29532270.32,
+    )
+    esperado = 22551140.0 / 300960.0
+    assert factura.valor_energia_integral_ars_kwh == pytest.approx(esperado)
+    assert factura.potencia_adquirida_mem_kw == 1089.0
+    assert factura.importe_potencia_mem_ars == 3079473.0
+    assert factura.importe_adicionales_mem_ars == 14419642.0
+    assert factura.importe_transporte_mem_ars == 1785216.0
+    assert factura.importe_otros_cargos_mem_ars == 149465.0
+    assert factura.importe_neto_ars == 22551140.00
+    assert factura.importe_impuestos_ars == 6981130.32
+
+
+def test_valor_energia_integral_ars_kwh_none_si_falta_energia_o_neto():
+    factura_sin_neto = _factura(energia_activa_total_kwh=300960.0, importe_neto_ars=None)
+    assert factura_sin_neto.valor_energia_integral_ars_kwh is None
+
+    factura_sin_energia = _factura(
+        energia_activa_punta_kwh=None,
+        energia_activa_resto_kwh=None,
+        energia_activa_valle_kwh=None,
+        energia_activa_total_kwh=None,
+        importe_neto_ars=22551140.0,
+    )
+    assert factura_sin_energia.valor_energia_integral_ars_kwh is None
+
+    factura_energia_cero = _factura(energia_activa_total_kwh=0.0, importe_neto_ars=22551140.0)
+    assert factura_energia_cero.valor_energia_integral_ars_kwh is None
+
+
+def test_coexistencia_valor_monomico_e_integral():
+    # Coexistencia de precio spot monómico ($ 10,358/kWh) y precio integral ($ 74,93/kWh)
+    factura = _factura(
+        energia_activa_total_kwh=300960.0,
+        importe_energia_ars=3117344.0,
+        importe_neto_ars=22551140.0,
+    )
+    assert factura.valor_energia_ars_kwh_promedio == pytest.approx(3117344.0 / 300960.0)
+    assert factura.valor_energia_integral_ars_kwh == pytest.approx(22551140.0 / 300960.0)
+
+
+def test_dto_expone_desglose_cammesa_en_camel_case():
+    factura = _factura(
+        energia_activa_total_kwh=300960.0,
+        importe_neto_ars=22551140.0,
+        potencia_adquirida_mem_kw=1089.0,
+        importe_potencia_mem_ars=3079473.0,
+        importe_adicionales_mem_ars=14419642.0,
+        importe_transporte_mem_ars=1785216.0,
+        importe_otros_cargos_mem_ars=149465.0,
+        importe_impuestos_ars=6981130.32,
+        importe_total_ars=29532270.32,
+    )
+    dto = factura_to_dto(factura)
+    datos = dto.model_dump(by_alias=True)
+
+    assert datos["potenciaAdquiridaMemKw"] == 1089.0
+    assert datos["importePotenciaMemArs"] == 3079473.0
+    assert datos["importeAdicionalesMemArs"] == 14419642.0
+    assert datos["importeTransporteMemArs"] == 1785216.0
+    assert datos["importeOtrosCargosMemArs"] == 149465.0
+    assert datos["importeNetoArs"] == 22551140.0
+    assert datos["importeImpuestosArs"] == 6981130.32
+    assert datos["valorEnergiaIntegralArsKwh"] == pytest.approx(22551140.0 / 300960.0)

@@ -90,7 +90,7 @@ Nuevos helpers en `AnalizadorCalidadEnergiaService` (dominio puro, sin dependenc
 
 ## 5. Criterios del Gauntlet
 
-- `venv/bin/pytest tests/unit/` → 100% aprobados, cobertura de `src/` ≥ 85 %.
+- `.venv/bin/pytest tests/unit/` → 100% aprobados, cobertura de `src/` ≥ 85 %.
 - `bash scripts/pre-push.sh` → Exit Code 0 (etapas 1-4).
 - `ruff check .` y `ruff format --check .` → 0 errores.
 - `pyright` (modo strict) → 0 diagnósticos.

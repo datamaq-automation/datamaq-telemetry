@@ -73,9 +73,9 @@ ahora afirma que `slug` viaja en cada elemento de la respuesta de `GET /api/v1/p
 
 ## 5. Criterios del Gauntlet
 
-- `venv/bin/python -m pytest -q` completo (no solo el archivo nuevo) en verde: **1604 passed**,
+- `.venv/bin/python -m pytest -q` completo (no solo el archivo nuevo) en verde: **1604 passed**,
   corrido también con `DB_HOST=127.0.0.2 DB_PORT=1` (como CI, sin tocar la DB real).
-- `venv/bin/python -m pyright`: **0 errors, 0 warnings**.
-- `venv/bin/python scripts/verify_architecture.py`: **PASS** (el nuevo código de `entities.py` sigue
+- `.venv/bin/python -m pyright`: **0 errors, 0 warnings**.
+- `.venv/bin/python scripts/verify_architecture.py`: **PASS** (el nuevo código de `entities.py` sigue
   usando solo stdlib en `domain/`).
 - No se tocó ninguna migración: no aplica `tests/unit/test_migraciones.py`.

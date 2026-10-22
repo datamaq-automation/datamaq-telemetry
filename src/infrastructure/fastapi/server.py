@@ -19,6 +19,7 @@ from src.application.use_cases.caracterizar_carga import CaracterizarCargaUseCas
 from src.application.use_cases.ingesta.registro_campanas import registro_campanas_activas
 from src.application.use_cases.ingesta.resolvedor_dispositivo import ResolvedorDispositivoIngesta
 from src.domain.telemetria.services import debe_recibir_evento
+from src.domain.telemetria.servicios.alcance_tiempo_real import alcance_de_clientes
 from src.domain.telemetria.value_objects import MacAddress
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
 from src.infrastructure.fastapi.auth_cookies import ORIGENES_CORS_CYBERSYN
@@ -29,9 +30,12 @@ from src.infrastructure.fastapi.dependencies import (
     global_telemetria_buffer,
     registrar_mqtt_listener,
 )
+from src.infrastructure.fastapi.duracion_requests import DuracionRequestMiddleware
 from src.infrastructure.fastapi.error_handler import manejar_404
 from src.infrastructure.fastapi.headers_historico import HEADER_DATOS_DESDE, HEADER_POTENCIA_REFERENCIA
 from src.infrastructure.fastapi.middleware import RequestIdMiddleware
+from src.infrastructure.fastapi.renovacion_tiempo_real import marca_renovacion, renovar_modo_tiempo_real_medidores
+from src.infrastructure.fastapi.routes.admin_router import router as admin_router
 from src.infrastructure.fastapi.routes.alertas_router import router as alertas_router
 from src.infrastructure.fastapi.routes.analitica_router import router as analitica_router
 from src.infrastructure.fastapi.routes.asistente_router import router as asistente_router
@@ -41,7 +45,9 @@ from src.infrastructure.fastapi.routes.billing_router import router as billing_r
 from src.infrastructure.fastapi.routes.cargas_router import router as cargas_router
 from src.infrastructure.fastapi.routes.disponibilidad_router import router as disponibilidad_router
 from src.infrastructure.fastapi.routes.dispositivos_router import router as dispositivos_router
+from src.infrastructure.fastapi.routes.maquinas_router import router as maquinas_router
 from src.infrastructure.fastapi.routes.notificador_router import router as notificador_router
+from src.infrastructure.fastapi.routes.oauth_router import router as oauth_router
 from src.infrastructure.fastapi.routes.organizaciones_router import router as organizaciones_router
 from src.infrastructure.fastapi.routes.planes_router import router as planes_router
 from src.infrastructure.fastapi.routes.planta_estructura_router import router as planta_estructura_router
@@ -51,6 +57,8 @@ from src.infrastructure.fastapi.routes.system_router import router as system_rou
 from src.infrastructure.fastapi.routes.telemetria_router import router as telemetria_router
 from src.infrastructure.fastapi.routes.usuarios_router import router as usuarios_router
 from src.infrastructure.fastapi.security_headers import SecurityHeadersMiddleware
+from src.infrastructure.fastapi.seguridad_rutas import RateLimit404Middleware, RechazoPathInseguroMiddleware
+from src.infrastructure.fastapi.vigilancia_conectividad import loop_vigilancia_conectividad
 from src.infrastructure.paho_mqtt.mqtt_listener import MQTTListener
 from src.infrastructure.settings.config import Settings, get_settings
 from src.infrastructure.settings.logger import get_logger
@@ -65,6 +73,9 @@ from src.infrastructure.sqlalchemy.mysql_repositories import (
     MySQLDispositivosRepository,
 )
 from src.infrastructure.yaml.repositories.organizaciones_repository import YamlOrganizacionesRepository
+from tools.mcp.server import mcp as datamaq_mcp
+
+mcp_app = datamaq_mcp.streamable_http_app()
 
 logger = get_logger("server")
 
@@ -229,21 +240,10 @@ def websocket_broadcast_callback(topico: str, datos: dict):
     )
 
 
-def _renovar_modo_tiempo_real_medidores(listener: Any) -> None:
-    try:
-        session_factory = get_session_factory()
-        db = session_factory()
-        try:
-            repo = MySQLDispositivosRepository(db)
-            dispositivos = repo.listar()
-            for disp in dispositivos:
-                if disp.device_uid and disp.device_uid.valor:
-                    listener.activar_tiempo_real_dispositivo(disp.device_uid.valor, segundos=120)
-            logger.info("realtime_mode_auto_renovado", total_dispositivos=len(dispositivos))
-        finally:
-            db.close()
-    except Exception as e:
-        logger.warning("realtime_mode_auto_renovacion_fallida", error=str(e))
+def _renovar_modo_tiempo_real_medidores(listener: Any, clientes: list[ConnectedClient]) -> None:
+    renovar_modo_tiempo_real_medidores(
+        listener, alcance_de_clientes((c.es_superadmin, c.organizacion_id) for c in clientes)
+    )
 
 
 INTERVALO_SOSTEN_CAMPANAS_S = 45.0
@@ -299,7 +299,6 @@ async def _loop_campanas_activas() -> None:
 async def _ws_heartbeat_loop() -> None:
     """Mantiene activa la conexión a través de Cloudflare o Nginx ante períodos de inactividad
     y renueva el modo de tiempo real en medidores mientras haya clientes WebSocket conectados."""
-    ultimo_sync_realtime: float = 0.0
     while True:
         try:
             await asyncio.sleep(25)
@@ -315,15 +314,15 @@ async def _ws_heartbeat_loop() -> None:
 
                 # Renovación periódica de sampleo rápido (cada 60 segundos si hay clientes activos)
                 ahora_ts = time.time()
-                if ahora_ts - ultimo_sync_realtime >= 60.0:
-                    ultimo_sync_realtime = ahora_ts
+                if marca_renovacion.vencida(ahora_ts):
+                    marca_renovacion.registrar(ahora_ts)
                     listener = get_mqtt_listener()
                     if listener and listener.esta_conectado():
-                        _renovar_modo_tiempo_real_medidores(listener)
+                        _renovar_modo_tiempo_real_medidores(listener, list(active_websockets))
         except asyncio.CancelledError:
             break
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("ws_heartbeat_fallido", error=str(e))
 
 
 @asynccontextmanager
@@ -363,16 +362,22 @@ async def lifespan(app: FastAPI):
     # Iniciar heartbeat para Cloudflare / proxies
     heartbeat_task = asyncio.create_task(_ws_heartbeat_loop())
     campanas_task = asyncio.create_task(_loop_campanas_activas())
+    conectividad_task = asyncio.create_task(loop_vigilancia_conectividad())
 
     logger.info("servidor_datamaq_listo", websockets_route="/ws/live", docs_route="/docs")
 
-    yield
+    try:
+        async with mcp_app.router.lifespan_context(mcp_app):
+            yield
+    finally:
+        if hasattr(datamaq_mcp, "_session_manager") and datamaq_mcp._session_manager is not None:
+            datamaq_mcp._session_manager._has_started = False
 
     # Clean shutdown
     logger.info("deteniendo_servidor_datamaq")
-    heartbeat_task.cancel()
-    campanas_task.cancel()
-    for tarea in (heartbeat_task, campanas_task):
+    for tarea in (heartbeat_task, campanas_task, conectividad_task):
+        tarea.cancel()
+    for tarea in (heartbeat_task, campanas_task, conectividad_task):
         try:
             await tarea
         except asyncio.CancelledError:
@@ -406,6 +411,7 @@ async def _autenticar_cliente_ws(websocket: WebSocket, settings: Settings, clien
 
 
 def _registrar_cliente_ws(cliente: ConnectedClient, client_host: str) -> None:
+    alcance_previo = alcance_de_clientes((c.es_superadmin, c.organizacion_id) for c in active_websockets)
     active_websockets.append(cliente)
     ws_metrics.total_conexiones += 1
     logger.info(
@@ -415,10 +421,15 @@ def _registrar_cliente_ws(cliente: ConnectedClient, client_host: str) -> None:
         organizacion_id=cliente.organizacion_id,
         es_superadmin=cliente.es_superadmin,
     )
-    if len(active_websockets) == 1:
+    # Sin esperar al heartbeat (hasta ~85 s) si el cliente nuevo mira medidores que nadie estaba mirando.
+    alcance_nuevo = alcance_de_clientes([(cliente.es_superadmin, cliente.organizacion_id)])
+    if not alcance_previo.cubre(alcance_nuevo):
         listener = get_mqtt_listener()
         if listener and listener.esta_conectado():
-            _renovar_modo_tiempo_real_medidores(listener)
+            _renovar_modo_tiempo_real_medidores(listener, [cliente])
+            # Solo si renovó todo lo conectado: correr la marca dejaría sin renovar a los demás más de 120 s.
+            if alcance_nuevo.cubre(alcance_previo):
+                marca_renovacion.registrar()
 
 
 async def _bucle_recepcion_ws(websocket: WebSocket) -> None:
@@ -434,6 +445,20 @@ def _desconectar_cliente_ws(cliente: ConnectedClient, client_host: str, evento: 
     ws_metrics.total_desconexiones += 1
     log_fn = logger.info if evento == "ws_cliente_desconectado" else logger.warning
     log_fn(evento, client=client_host, total_activos=len(active_websockets), **detalle)
+
+
+class NormalizarMcpRutaMiddleware:
+    """Normaliza /mcp a /mcp/ en memoria para responder directamente sin redirección 307."""
+
+    def __init__(self, app: Any) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        if scope.get("type") == "http" and scope.get("path") == "/mcp":
+            scope = dict(scope)
+            scope["path"] = "/mcp/"
+            scope["raw_path"] = b"/mcp/"
+        await self.app(scope, receive, send)
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -471,13 +496,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         expose_headers=[HEADER_DATOS_DESDE, HEADER_POTENCIA_REFERENCIA],
     )
 
+    app.add_middleware(NormalizarMcpRutaMiddleware)
     app.add_middleware(SecurityHeadersMiddleware, settings=settings)
+    app.add_middleware(DuracionRequestMiddleware)  # Por dentro de RequestId: ya tiene el request_id.
+    app.add_middleware(RateLimit404Middleware, settings=settings)
+    app.add_middleware(RechazoPathInseguroMiddleware)
     app.add_middleware(RequestIdMiddleware)
     app.add_exception_handler(Exception, manejar_excepcion_no_mapeada)
     app.add_exception_handler(StarletteHTTPException, manejar_404)
 
     # Register Routers (asistente aislado según decisions/2026-09-24_bot-conversacional-aislamiento.md)
-    routers = (system_router, disponibilidad_router, cargas_router, telemetria_router, dispositivos_router, organizaciones_router, planta_estructura_router, planes_router, alertas_router, auth_router, audit_router, sge_router, usuarios_router, analitica_router, billing_router, produccion_router, notificador_router, asistente_router)  # fmt: skip
+    routers = (system_router, disponibilidad_router, cargas_router, telemetria_router, dispositivos_router, organizaciones_router, planta_estructura_router, planes_router, alertas_router, auth_router, admin_router, audit_router, sge_router, usuarios_router, analitica_router, billing_router, produccion_router, notificador_router, maquinas_router, oauth_router, asistente_router)  # fmt: skip
     for r in routers:
         app.include_router(r)
 
@@ -497,5 +526,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             _desconectar_cliente_ws(cliente, client_host, "ws_cliente_desconectado", code=e.code)
         except Exception as e:
             _desconectar_cliente_ws(cliente, client_host, "ws_cliente_error_conexion", error=str(e))
+
+    # Servidor MCP Streamable HTTP para Claude Desktop / Claude Code / Claude.ai
+    app.mount("/mcp", mcp_app)
 
     return app

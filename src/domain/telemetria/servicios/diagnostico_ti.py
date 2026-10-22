@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-from src.domain.telemetria.value_objects import CandidatoTI, MedicionFase
+from src.domain.telemetria.value_objects import CandidatoTI, MedicionFase, RotacionFasorial
 
 
 @dataclass
@@ -58,32 +58,17 @@ class DiagnosticoTIService:
     ) -> dict[str, MedicionFase]:
         """Aplica transformación de orden/polaridad a mediciones de fase.
 
-        Args:
-            orden: Tupla con reorden de fases (ej. ("S", "R", "T"))
-            invertido: Si True, invierte el signo de Q
-
-        Returns:
-            Dict {fase_nueva: MedicionFase} después de aplicar transformación
+        Delegado a RotacionFasorial para centralizar lógica fasorial.
         """
-        mediciones_map = {
-            "R": med_r,
-            "S": med_s,
-            "T": med_t,
-        }
+        rotacion = RotacionFasorial(orden_fases=orden, invertida=invertido)
+        mediciones_map = {"R": med_r, "S": med_s, "T": med_t}
 
         resultado: dict[str, MedicionFase] = {}
         for i, fase_original in enumerate(orden):
             med_orig = mediciones_map[fase_original]
-            p = med_orig.p
-            q = med_orig.q
-            s = med_orig.s
-            fp = med_orig.fp
-
-            if invertido and q is not None:
-                q = -q
-
+            med_rotada = rotacion.aplicar_a_fase(med_orig, i)
             fase_nueva = chr(ord("R") + i)
-            resultado[fase_nueva] = MedicionFase(p=p, q=q, s=s, fp=fp)
+            resultado[fase_nueva] = med_rotada
 
         return resultado
 
@@ -132,7 +117,7 @@ class DiagnosticoTIService:
                     registros, orden, invertido
                 )
                 if err_s_prom or err_fp_prom or q_signs:
-                    score = max(0.0, 100.0 - (err_s_prom + err_fp_prom) / 2.0) / 100.0
+                    score = max(0.0, 100.0 - (0.7 * err_s_prom + 0.3 * err_fp_prom)) / 100.0
                     q_sign_mode = max(q_signs, key=q_signs.count) if q_signs else 0
                     q_coherencia_str = (
                         "Q positiva (inductivo)"

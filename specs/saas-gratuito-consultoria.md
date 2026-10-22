@@ -222,7 +222,7 @@ Dos series de tests: una con `BILLING_HABILITADO=True` (comportamiento actual), 
    - `scripts/verify_code_size.py`: ningún archivo de `src/` supera 500 líneas.
 
 4. ✅ **Tests unitarios:**
-   - `venv/bin/python -m pytest tests/unit/ -n auto` → cobertura ≥ 85%, 0 fails.
+   - `.venv/bin/python -m pytest tests/unit/ -n auto` → cobertura ≥ 85%, 0 fails.
    - **Nuevos tests (Grupo 1–6 de esta matriz):** todos en `tests/unit/` o `tests/integration/`.
    - Tests parametrizados por `BILLING_HABILITADO`: fixture `config` que lo inyecta.
    - `test_politicas_suscripcion.py` (nuevo): 12 casos (2 series × 6 parámetros).
@@ -231,14 +231,14 @@ Dos series de tests: una con `BILLING_HABILITADO=True` (comportamiento actual), 
    - `test_billing_router.py` (existente, ampliar): 4 casos nuevos (Grupo 5).
 
 5. ✅ **Tests de integración:**
-   - `venv/bin/python -m pytest tests/integration/` → 0 fails.
+   - `.venv/bin/python -m pytest tests/integration/` → 0 fails.
    - Spin-up base de datos local (fixture `@pytest.fixture(scope="session")`).
    - Tests: `/me`, `/telemetria`, verificador MQTT, checkout/webhook.
 
 6. ✅ **Migraciones de BD (si aplica):**
    - Si se agrega `billing_habilitado` a `organizations`, crear migración Alembic.
    - Revision head se actualiza en `tests/unit/test_migraciones.py::REVISION_HEAD`.
-   - `venv/bin/python scripts/migrate.py upgrade head` sin errores.
+   - `.venv/bin/python scripts/migrate.py upgrade head` sin errores.
 
 7. ✅ **Documentación:**
    - Spec propia (`specs/saas-gratuito-consultoria.md`) marca **"Bloque cerrado: sí"**.

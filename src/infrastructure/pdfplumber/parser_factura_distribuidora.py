@@ -144,6 +144,29 @@ def _energia_registrada(texto: str, ruta_pdf: str) -> _EnergiaRegistrada:
     )
 
 
+def _extraer_importes_edelap(texto: str) -> tuple[float, float | None, float | None]:
+    """Extrae importe de potencia, subtotal neto e importe total de impuestos/tasas."""
+    importes_potencia = re.findall(
+        r"(?:Potencia (?:Fuera de )?Pico por Transporte|Exceso de Potencia (?:en|Fuera de) Pico Transporte)"
+        r"\s*\d+kW\s*\*[\d.,]+\s*\$/kW\s*([\d.]+,\d{2})",
+        texto,
+    )
+    importe_potencia = sum(_numero_ar(m) for m in importes_potencia)
+
+    subtotal_neto_m = re.search(r"SUBTOTAL POR SERVICIO ELECTRICO\s*([\d.]+,\d{2})", texto)
+    importe_neto = _numero_ar(subtotal_neto_m.group(1)) if subtotal_neto_m else None
+
+    subtotal_impuestos_m = re.search(r"SUBTOTAL IMPUESTOS\s*([\d.]+,\d{2})", texto)
+    cargos_exentos_m = re.search(r"SUBTOTAL CARGOS VARIOS EXENTOS\s*([\d.]+,\d{2})", texto)
+    importe_impuestos: float | None = None
+    if subtotal_impuestos_m:
+        imp = _numero_ar(subtotal_impuestos_m.group(1))
+        ex = _numero_ar(cargos_exentos_m.group(1)) if cargos_exentos_m else 0.0
+        importe_impuestos = imp + ex
+
+    return importe_potencia, importe_neto, importe_impuestos
+
+
 class ParserFacturaPotenciaEdelap(ParserFacturaDistribuidoraPort):
     """Extrae los campos de POTENCIA de una factura de EdeLAP (tarifa T5M12, Media Tensión).
 
@@ -187,14 +210,7 @@ class ParserFacturaPotenciaEdelap(ParserFacturaDistribuidoraPort):
         tarifa = re.search(r"Tipo de tarifa:\s*([A-Z0-9]+)", texto)
         dias = re.search(r"D[ií]as:\s*(\d+)", texto)
 
-        # Suma solo las líneas de potencia contratada y exceso (los excesos faltan en un mes sin
-        # exceso), no un tramo de texto: en ese tramo también caen intereses por mora y el CTT.
-        importes_potencia = re.findall(
-            r"(?:Potencia (?:Fuera de )?Pico por Transporte|Exceso de Potencia (?:en|Fuera de) Pico Transporte)"
-            r"\s*\d+kW\s*\*[\d.,]+\s*\$/kW\s*([\d.]+,\d{2})",
-            texto,
-        )
-        importe_potencia = sum(_numero_ar(m) for m in importes_potencia)
+        importe_potencia, importe_neto, importe_impuestos = _extraer_importes_edelap(texto)
 
         # El PDF real trae "Vencimientos Recargo\n1º 10/12/2024 21.031.736,78" (verificado con las
         # 11 facturas de UPP 2023-12..2024-11); se tolera también el "1º2º" pegado en la cabecera.
@@ -219,6 +235,8 @@ class ParserFacturaPotenciaEdelap(ParserFacturaDistribuidoraPort):
             potencia_adquirida_punta_kw=adquirida_punta,
             potencia_adquirida_fuera_punta_kw=adquirida_fp,
             importe_potencia_ars=importe_potencia,
+            importe_neto_ars=importe_neto,
+            importe_impuestos_ars=importe_impuestos,
             energia_registrada_punta_kwh=energia.punta_kwh,
             energia_registrada_resto_kwh=energia.resto_kwh,
             energia_registrada_valle_kwh=energia.valle_kwh,
@@ -231,28 +249,146 @@ class ParserFacturaPotenciaEdelap(ParserFacturaDistribuidoraPort):
 
 
 _RE_MONEDA_AR = re.compile(r"^[\d.]+(?:,\d{1,2})?$")
-_RE_CANTIDAD_MWH = re.compile(r"^\d+,\d{3}$")
+_RE_CANTIDAD_MWH = re.compile(r"^[\d.]+,\d{2,3}$")
+_RE_CANTIDAD_MW = re.compile(r"^[\d.]+,\d{2,3}$")
 _RE_NUMERO_FACTURA_CAMMESA = re.compile(r"^\d{4}-\d{8}$")
 
 
+def _extraer_potencia_mem(palabras: list[dict], fila_fn) -> tuple[float | None, float | None]:
+    potencia_label = next(
+        (p for p in palabras if p["text"] == "Potencia" and any(q["text"] == "Cargos" for q in fila_fn(p["top"]))),
+        None,
+    )
+    pot_kw: float | None = None
+    if potencia_label is not None:
+        cand_pot = next((p for p in fila_fn(potencia_label["top"]) if _RE_CANTIDAD_MW.match(p["text"])), None)
+        if cand_pot is not None:
+            pot_kw = _numero_coma(cand_pot["text"]) * 1000
+
+    subtotal_pot_label = next(
+        (p for p in palabras if p["text"] == "POTENCIA" and any(q["text"] == "SUBTOTAL" for q in fila_fn(p["top"]))),
+        None,
+    )
+    imp_pot: float | None = None
+    if subtotal_pot_label is not None:
+        cand_imp = next(
+            (p for p in reversed(fila_fn(subtotal_pot_label["top"])) if _RE_MONEDA_AR.match(p["text"])), None
+        )
+        if cand_imp is not None:
+            imp_pot = _numero_ar(cand_imp["text"])
+    return pot_kw, imp_pot
+
+
+def _extraer_adicionales_transporte(
+    palabras: list[dict], fila_fn
+) -> tuple[dict | None, float | None, dict | None, float | None]:
+    adic_lbl = next(
+        (p for p in palabras if p["text"] == "MEM" and any(q["text"] == "ADICIONALES" for q in fila_fn(p["top"]))),
+        None,
+    )
+    imp_adic: float | None = None
+    if adic_lbl is not None:
+        cand_adic = next((p for p in reversed(fila_fn(adic_lbl["top"])) if _RE_MONEDA_AR.match(p["text"])), None)
+        if cand_adic is not None:
+            imp_adic = _numero_ar(cand_adic["text"])
+
+    transp_lbl = next(
+        (p for p in palabras if p["text"] == "TRANSPORTE" and any(q["text"] == "SUBTOTAL" for q in fila_fn(p["top"]))),
+        None,
+    )
+    imp_transp: float | None = None
+    if transp_lbl is not None:
+        cand_transp = next((p for p in reversed(fila_fn(transp_lbl["top"])) if _RE_MONEDA_AR.match(p["text"])), None)
+        if cand_transp is not None:
+            imp_transp = _numero_ar(cand_transp["text"])
+    return adic_lbl, imp_adic, transp_lbl, imp_transp
+
+
+def _extraer_otros_cargos_mem(palabras: list[dict], top_desde: float, top_hasta: float) -> float | None:
+    intermedias = [p for p in palabras if top_desde < p["top"] < top_hasta]
+    filas: dict[float, list[dict]] = {}
+    for p in intermedias:
+        top_k = next((k for k in filas if abs(k - p["top"]) <= 2.0), None)
+        if top_k is None:
+            filas[p["top"]] = [p]
+        else:
+            filas[top_k].append(p)
+
+    total_otros = 0.0
+    hubo_otros = False
+    for k in sorted(filas.keys()):
+        fila_k = sorted(filas[k], key=lambda x: x["x0"])
+        cand_imp = next((p for p in reversed(fila_k) if p["x0"] > 450 and _RE_MONEDA_AR.match(p["text"])), None)
+        if cand_imp is not None:
+            total_otros += _numero_ar(cand_imp["text"])
+            hubo_otros = True
+    return round(total_otros, 2) if hubo_otros else None
+
+
+def _extraer_neto_total_impuestos(
+    palabras: list[dict], fila_fn, top_transp: float | None
+) -> tuple[float | None, float, float | None]:
+    subtotal_neto_lbl = next(
+        (p for p in palabras if p["text"] == "SUBTOTAL" and (top_transp is None or p["top"] > top_transp)),
+        None,
+    )
+    imp_neto: float | None = None
+    if subtotal_neto_lbl is not None:
+        cand_neto = next(
+            (p for p in reversed(fila_fn(subtotal_neto_lbl["top"])) if _RE_MONEDA_AR.match(p["text"])), None
+        )
+        if cand_neto is not None:
+            imp_neto = _numero_ar(cand_neto["text"])
+
+    total_lbl = next((p for p in palabras if p["text"] == "TOTAL"), None)
+    imp_total = 0.0
+    if total_lbl is not None:
+        candidatos = [
+            p
+            for p in palabras
+            if p["top"] >= total_lbl["top"] - 1
+            and p["top"] <= total_lbl["top"] + 3
+            and _RE_MONEDA_AR.match(p["text"])
+            and p["x0"] > total_lbl["x0"]
+        ]
+        if candidatos:
+            imp_total = _numero_ar(max(candidatos, key=lambda p: p["x0"])["text"])
+
+    imp_impuestos: float | None = None
+    if subtotal_neto_lbl is not None and total_lbl is not None:
+        filas_imp: dict[float, dict] = {}
+        for p in palabras:
+            if (
+                subtotal_neto_lbl["top"] + 2 < p["top"] < total_lbl["top"] - 2
+                and p["x0"] > 450
+                and _RE_MONEDA_AR.match(p["text"])
+            ):
+                top_k = next((k for k in filas_imp if abs(k - p["top"]) <= 2.0), None)
+                if top_k is None:
+                    filas_imp[p["top"]] = p
+                else:
+                    if p["x0"] > filas_imp[top_k]["x0"]:
+                        filas_imp[top_k] = p
+        if filas_imp:
+            imp_impuestos = round(sum(_numero_ar(p["text"]) for p in filas_imp.values()), 2)
+        elif imp_neto is not None and imp_total > imp_neto:
+            imp_impuestos = round(imp_total - imp_neto, 2)
+
+    return imp_neto, imp_total, imp_impuestos
+
+
 class ParserFacturaEnergiaCammesa(ParserFacturaDistribuidoraPort):
-    """Extrae los campos de ENERGÍA de una factura de CAMMESA (mercado eléctrico mayorista).
+    """Extrae los campos de ENERGÍA y DESGLOSE REGULATORIO de una factura de CAMMESA (MEM).
 
-    CAMMESA no discrimina la energía por franja horaria (Punta/Resto/Valle) como sí hace EdeLAP:
-    factura "Energía Demandada" como un total único del período, que se guarda en
-    `energia_activa_total_kwh`. Los cargos de potencia, transporte y adicionales del MEM que
-    también trae esta factura no se modelan en esta iteración (ver `specs/factura-distribuidora.md`
-    §"Pendientes"): solo se captura el total de energía y el importe total de la factura.
-
-    Nota de diseño (sesión 2026-09-24, tercera pasada): a diferencia de EdeLAP, acá SÍ hace falta
-    `page.extract_words()` (coordenadas) en vez de `extract_text()` lineal. Se detectó con una
-    segunda factura real de CAMMESA (cliente distinto, EITAR) que el texto plano pega sin
-    separador el valor de "Energía Demandada" a un código de barras/referencia adyacente
-    ("0006849353,610 MWh"), de forma no reproducible con regex sobre texto lineal porque no hay
-    ningún separador entre ambos tokens. Verificado con las dos facturas reales (UPP y EITAR,
-    clientes y períodos distintos): con `extract_words()` el valor de energía es SIEMPRE una
-    palabra propia, separada del código, en la misma posición relativa de la tabla
-    (columna "Cantidad", fila "Energía Demandada"; ver `specs/factura-distribuidora.md`).
+    CAMMESA factura al Gran Usuario (GUMA / GUME) el abastecimiento de energía eléctrica mayorista:
+    - Energía demandada (MWh x 1000 -> kWh) y su subtotal monómico spot puro.
+    - Cargos de potencia MEM (MW x 1000 -> kW) y su subtotal.
+    - Cargos adicionales del MEM (reserva fría, generación forzada, servicios auxiliares).
+    - Subtotal cargos por transporte (SADI / troncal).
+    - Otros cargos (MATER Res. 281 E/17, actividad de mercado, mora).
+    - Subtotal neto de liquidación (base imponible).
+    - Impuestos (IVA 27%, IVA percepción 3%, FNEE Ley 24065).
+    - Importe total de la liquidación.
     """
 
     def parsear(self, ruta_pdf: str, planta_id: str) -> FacturaDistribuidora:
@@ -271,7 +407,6 @@ class ParserFacturaEnergiaCammesa(ParserFacturaDistribuidoraPort):
             (p for p in palabras if p["text"] == "DEMANDADA" and any(q["text"] == "SUBTOTAL" for q in _fila(p["top"]))),
             None,
         )
-        total_label = next((p for p in palabras if p["text"] == "TOTAL"), None)
 
         if periodo_label is None or energia_label is None or subtotal_energia_label is None:
             raise FacturaDistribuidoraIlegibleError(
@@ -296,17 +431,15 @@ class ParserFacturaEnergiaCammesa(ParserFacturaDistribuidoraPort):
         periodo = f"{anio}-{mes}"
         energia_total_kwh = _numero_coma(cantidad_energia["text"]) * 1000
 
-        importe_total = 0.0
-        if total_label is not None:
-            candidatos = [
-                p
-                for p in palabras
-                if p["top"] >= total_label["top"] - 1
-                and p["top"] <= total_label["top"] + 3
-                and _RE_MONEDA_AR.match(p["text"])
-            ]
-            if candidatos:
-                importe_total = _numero_ar(max(candidatos, key=lambda p: p["x0"])["text"])
+        pot_kw, imp_pot = _extraer_potencia_mem(palabras, _fila)
+        adic_lbl, imp_adic, transp_lbl, imp_transp = _extraer_adicionales_transporte(palabras, _fila)
+
+        imp_otros: float | None = None
+        if adic_lbl is not None and transp_lbl is not None:
+            imp_otros = _extraer_otros_cargos_mem(palabras, adic_lbl["top"], transp_lbl["top"])
+
+        top_transp = transp_lbl["top"] if transp_lbl is not None else None
+        imp_neto, imp_total, imp_impuestos = _extraer_neto_total_impuestos(palabras, _fila, top_transp)
 
         return FacturaDistribuidora(
             id=f"{planta_id}-{periodo}-energia",
@@ -315,8 +448,15 @@ class ParserFacturaEnergiaCammesa(ParserFacturaDistribuidoraPort):
             proveedor="CAMMESA",
             tipo_dato="energia",
             numero_factura=numero_factura["text"] if numero_factura else "",
-            importe_total_ars=importe_total,
+            importe_total_ars=imp_total,
             energia_activa_total_kwh=energia_total_kwh,
             importe_energia_ars=_numero_ar(importe_energia["text"]),
+            potencia_adquirida_mem_kw=pot_kw,
+            importe_potencia_mem_ars=imp_pot,
+            importe_adicionales_mem_ars=imp_adic,
+            importe_transporte_mem_ars=imp_transp,
+            importe_otros_cargos_mem_ars=imp_otros,
+            importe_neto_ars=imp_neto,
+            importe_impuestos_ars=imp_impuestos,
             fuente_archivo=ruta_pdf.rsplit("/", 1)[-1],
         )

@@ -82,6 +82,12 @@ def get_unifilar_by_planta(
     response_model=ResumenNodoUnifilarDTO,
     dependencies=[Depends(resolver_planta_permitida)],
 )
+@router.get(
+    "/plantas/{planta_id}/unifilar/nodos/{nodo_id}",
+    response_model=ResumenNodoUnifilarDTO,
+    dependencies=[Depends(resolver_planta_permitida)],
+    include_in_schema=False,
+)
 def resumen_nodo_unifilar(
     planta_id: str,
     nodo_id: str,
@@ -90,6 +96,10 @@ def resumen_nodo_unifilar(
     granularity: str = "day",
     timezone: str = "America/Argentina/Buenos_Aires",
     dias: int | None = None,
+    periodo_dias: int | None = Query(
+        default=None,
+        description="Ventana de análisis en días para dimensionamiento de compensación (default 30, ISO 50001)",
+    ),
 ):
     try:
         org_id = _resolver_org_id(claims)
@@ -100,6 +110,43 @@ def resumen_nodo_unifilar(
             granularidad=granularity,
             zona=timezone,
             dias=dias,
+            periodo_dias=periodo_dias,
+        )
+    except Exception as e:
+        manejar_error_http(e)
+
+
+@router.get(
+    "/nodo/unifilar/{nodo_id}",
+    response_model=ResumenNodoUnifilarDTO,
+    dependencies=[Depends(resolver_planta_permitida)],
+    summary="Resumen de nodo unifilar con compensación histórica",
+)
+def resumen_nodo_unifilar_directo(
+    nodo_id: str,
+    planta_id: str = Query(..., description="ID de la planta industrial"),
+    use_case: Annotated[ConsultarNodoUnifilarUseCase | None, Depends(get_consultar_nodo_unifilar_use_case)] = None,
+    claims: Annotated[dict | None, Depends(get_usuario_actual)] = None,
+    granularity: str = "day",
+    timezone: str = "America/Argentina/Buenos_Aires",
+    dias: int | None = None,
+    periodo_dias: int | None = Query(
+        default=None,
+        description="Ventana de análisis en días para dimensionamiento de compensación (default 30, ISO 50001)",
+    ),
+):
+    try:
+        org_id = _resolver_org_id(claims) if claims else None
+        if use_case is None:
+            raise ValueError("use_case no inyectado")
+        return use_case.resumen(
+            planta_id=planta_id,
+            nodo_id=nodo_id,
+            organizacion_id=org_id,
+            granularidad=granularity,
+            zona=timezone,
+            dias=dias,
+            periodo_dias=periodo_dias,
         )
     except Exception as e:
         manejar_error_http(e)

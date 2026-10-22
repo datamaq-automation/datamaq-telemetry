@@ -147,3 +147,15 @@ class RepositorioIntervalosActividadPort(ABC):
         único que ninguna regla puede regenerar.
         """
         pass
+
+
+class DescubridorCargasPort(ABC):
+    """Puerto para descubrir cargas en una serie agregada mediante un servicio externo."""
+
+    @abstractmethod
+    def descubrir(self, medidor: str, desde: datetime, hasta: datetime) -> list:
+        """Descubre candidatas de cargas en el rango temporal.
+
+        Lanza DescubridorNoDisponibleError si el servicio no responde o responde != 200.
+        """
+        pass

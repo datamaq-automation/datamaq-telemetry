@@ -73,3 +73,26 @@ class HistogramaPotenciaResponseDTO(BaseModel):
     regimenes: list[RegimenOperacionDTO] = Field(default_factory=list)
     diagnostico_modal: DiagnosticoConfianzaModalDTO | None = None
     diagnostico_estacionariedad: DiagnosticoEstacionariedadDTO | None = None
+
+
+class MaquinaInferidaDTO(BaseModel):
+    """Máquina propuesta por energy-ml para un dispositivo."""
+
+    id: str = Field(..., description="UUID de la máquina inferida")
+    nombre: str = Field(..., min_length=1, max_length=120, description="Nombre propuesto por ML")
+    tipo_maquina: str = Field(..., description="Tipo: motor, compresor, bomba, etc.")
+    confianza: float = Field(..., ge=0.0, le=1.0, description="Score del modelo [0.0, 1.0]")
+    patrones_detectados: list[str] = Field(default_factory=list, description="Ej: armónicos, arranque-suave")
+    energia_kwh_mes: float = Field(..., ge=0.0, description="Consumo estimado mes")
+    costo_estimado_ars: float = Field(..., ge=0.0, description="Costo estimado mes")
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ListaMaquinasInferidaDTO(BaseModel):
+    """Respuesta: máquinas propuestas por ML para dispositivo."""
+
+    dispositivo_id: str
+    maquinas_inferidas: list[MaquinaInferidaDTO] = Field(default_factory=list)
+    ultima_ejecucion_ml: FechaHoraUTC | None = None
+    total_confianza_prom: float = Field(default=0.0, ge=0.0, le=1.0)
+    model_config = ConfigDict(from_attributes=True)

@@ -129,6 +129,8 @@ jobs:
         if: steps.changes.outputs.is_config_only != 'true'
         run: pytest tests/unit --cov=src --cov-report=term-missing --cov-fail-under=85
 
-      - name: Tests de integración
+      - name: Tests de integración (smoke test implícito)
         if: steps.changes.outputs.is_config_only != 'true'
         run: pytest tests/integration -q
+        # Los tests de integración levantan create_app() y TestClient, validando
+        # que el app se inicia correctamente (P2: smoke test post-deploy).

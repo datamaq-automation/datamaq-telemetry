@@ -3,10 +3,12 @@ actividad genuina del dispositivo. Ver plan de aislamiento cross-tenant / falso 
 """
 
 from typing import Any
+from unittest.mock import MagicMock, patch
 
 from src.application.use_cases.ingestar_telemetria import IngestarTelemetriaUseCase
 from src.domain.telemetria.entities import Dispositivo
 from src.domain.telemetria.value_objects import EstadoDispositivo, MacAddress
+from src.infrastructure.paho_mqtt.mqtt_listener import MQTTListener
 
 
 class _RepoDisp:
@@ -113,3 +115,30 @@ def test_topico_conf_sin_sufijo_no_rompe():
 
     # Sin 5ta parte (ni "com" ni "rta"): no debe lanzar excepción.
     use_case.ejecutar("m/wifi/AABBCCDDEEFF/conf", {})
+
+
+def _listener_falso() -> MQTTListener:
+    listener = MQTTListener.__new__(MQTTListener)
+    listener.settings = MagicMock(MQTT_MAX_PAYLOAD_BYTES=65536)
+    listener._dedup = MagicMock()
+    listener._dedup.es_duplicado.return_value = False
+    listener._executor = MagicMock()
+    return listener
+
+
+def test_listener_descarta_el_eco_conf_com_antes_de_la_ingesta():
+    listener = _listener_falso()
+    msg = MagicMock(topic="m/wifi/AABBCCDDEEFF/conf/com", payload=b'{"set": "realtime_sync_mode"}')
+    with patch("src.infrastructure.paho_mqtt.mqtt_listener.logger") as logger:
+        listener._on_message(None, None, msg)
+    listener._executor.submit.assert_not_called()
+    logger.info.assert_not_called()
+    logger.debug.assert_called_once_with("mqtt_eco_comando_propio_descartado", topico=msg.topic)
+
+
+def test_listener_procesa_conf_rta_del_medidor():
+    listener = _listener_falso()
+    msg = MagicMock(topic="m/wifi/AABBCCDDEEFF/conf/rta", payload=b'{"status": "ok"}')
+    with patch("src.infrastructure.paho_mqtt.mqtt_listener.logger"):
+        listener._on_message(None, None, msg)
+    listener._executor.submit.assert_called_once()
