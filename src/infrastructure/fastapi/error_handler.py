@@ -55,7 +55,8 @@ def manejar_404(request: Request, exc: Exception) -> JSONResponse:
         raise exc
     if exc.status_code == 404 and exc.detail == "Not Found":
         logger = structlog.get_logger("http_errors")
-        logger.warning(
+        # Un 404 operacional es error del cliente, no degradación del servidor.
+        logger.info(
             "ruta_no_encontrada",
             metodo=request.method,
             path=request.url.path,

@@ -148,6 +148,17 @@ def test_ruta_inexistente_loguea_ruta_no_encontrada():
     assert rutas[0]["request_id"] == request_id
 
 
+# E9b — ruta inexistente operacional es error de cliente: nivel info, no warning
+def test_ruta_inexistente_se_loguea_en_nivel_info():
+    client = TestClient(_app_con_middleware(), raise_server_exceptions=False)
+    with capture_logs() as logs:
+        client.get("/ruta-inexistente")
+
+    rutas = [ev for ev in logs if ev.get("event") == "ruta_no_encontrada"]
+    assert rutas, "No se registró el evento ruta_no_encontrada"
+    assert rutas[0]["log_level"] == "info"
+
+
 # E10 — 404 de negocio no duplica el log de ruta_no_encontrada
 def test_404_negocio_no_loguea_ruta_no_encontrada():
     client = TestClient(_app_con_middleware(), raise_server_exceptions=False)
