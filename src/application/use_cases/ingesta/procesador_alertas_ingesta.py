@@ -441,7 +441,8 @@ class ProcesadorAlertasIngesta:
             dispositivo, mac_raw, lectura, es_monofasico, recorded_at, repo_telemetria, publicador, logger
         )
         ti_raw = cls._evaluar_ti(dispositivo, mac_raw, lectura, recorded_at, repo_telemetria, publicador, logger)
-        hay_anomalia_ti = bool(ti_raw[1] or ti_raw[2])  # ti_cruce o ti_misma_fase
+        # Incluir ti_inv (índice 0) y ti_desconectado (índice 3) para inhibir alertas de FP ante incoherencias fasoriales
+        hay_anomalia_ti = any(bool(alertas_lista) for alertas_lista in ti_raw)
         fp_raw = cls._evaluar_fp(
             dispositivo,
             mac_raw,
