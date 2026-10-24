@@ -258,6 +258,7 @@ async def datamaq_analizar_capacitores(
 async def datamaq_consultar_penalizaciones(
     planta_id: str,
     periodo_dias: int = 7,
+    periodo_facturacion: str | None = None,
     ctx: Context | None = None,
 ) -> dict[str, Any]:
     """Obtiene el acumulado estimado de recargos y multas por bajo factor de potencia (cos phi).
@@ -270,6 +271,9 @@ async def datamaq_consultar_penalizaciones(
     Args:
         planta_id: Identificador único de la planta industrial.
         periodo_dias: Ventana de análisis en días (por defecto 7, de 1 a 30 días).
+        periodo_facturacion: Período de facturación AAAA-MM. Si se indica, la cifra sale solo de la
+            factura verificada de ese período, con distribuidora, tarifa y fuente. Sin factura
+            verificada devuelve null con motivo.
         ctx: Contexto de ejecución FastMCP inyectado automáticamente.
     """
     token = _resolver_token(ctx)
@@ -277,6 +281,8 @@ async def datamaq_consultar_penalizaciones(
         "planta_id": planta_id,
         "periodo_dias": periodo_dias,
     }
+    if periodo_facturacion is not None:
+        parametros["periodo_facturacion"] = periodo_facturacion
     resultado = await _ejecutar_peticion(
         "GET", "/api/v1/analitica/penalizaciones/planta", token=token, params=parametros
     )
