@@ -94,3 +94,148 @@ def test_procesar_pregunta_asistente_aislamiento_y_sin_alucinaciones():
 
     # Verificar que el gestor de dispositivos fue invocado con la organizacion_id correcta del usuario
     gestor_dispositivos.listar_dispositivos.assert_called_once_with(organizacion_id="org-durax")
+
+
+def test_asistente_incluye_telemetria_en_contexto():
+    from types import SimpleNamespace
+
+    clasificador = MagicMock()
+    clasificador.clasificar.return_value = SimpleNamespace(
+        nombre="RESUMEN_TELEMETRIA",
+        confianza=0.95,
+    )
+
+    generador = MagicMock()
+    generador.generar.return_value = iter(["Respuesta de prueba"])
+
+    repo_conv = MagicMock()
+    repo_conv.crear_conversacion.return_value = SimpleNamespace(id="conv-telemetria")
+
+    dispositivo = DispositivoResponseDTO(
+        id="dev-1",
+        device_uid="UID-1",
+        nombre="Medidor de prueba",
+        esta_activo=True,
+        estado="ONLINE",
+        creado_en=datetime.now(timezone.utc),
+        actualizado_en=datetime.now(timezone.utc),
+    )
+
+    gestor_dispositivos = MagicMock()
+    gestor_dispositivos.listar_dispositivos.return_value = [dispositivo]
+
+    lectura = SimpleNamespace(
+        instantanea=SimpleNamespace(
+            registrado_en=datetime.now(timezone.utc),
+            potencia_activa_total_W=12500.0,
+            factor_potencia_total=0.95,
+            voltage_linea_V=380.0,
+            thd_v_promedio_pct=2.1,
+            thd_i_total_pct=4.0,
+        ),
+        energia=SimpleNamespace(
+            net_active_energy_kwh=1250.0,
+        ),
+        analitica=SimpleNamespace(
+            estado_fp=SimpleNamespace(value="NORMAL"),
+            estado_tension=SimpleNamespace(value="NORMAL"),
+        ),
+    )
+    consultar_telemetria = MagicMock()
+    consultar_telemetria.obtener_ultima_telemetria.return_value = lectura
+
+    use_case = ProcesarPreguntaAsistenteUseCase(
+        clasificador=clasificador,
+        generador=generador,
+        repo_conversaciones=repo_conv,
+        gestor_alertas=MagicMock(),
+        gestor_dispositivos=gestor_dispositivos,
+        consultar_telemetria=consultar_telemetria,
+    )
+
+    resultado = use_case.ejecutar(
+        pregunta="¿Cuál es la potencia actual?",
+        organizacion_id="org-prueba",
+        usuario_id="usr-prueba",
+        usuario_consiente_envio_groq=True,
+    )
+
+    assert resultado.texto == "Respuesta de prueba"
+
+    gestor_dispositivos.listar_dispositivos.assert_called_once_with(organizacion_id="org-prueba")
+
+    consultar_telemetria.obtener_ultima_telemetria.assert_called_once_with("dev-1")
+    prompt_enviado = generador.generar.call_args.args[1]
+    assert '"potencia_activa_kw": 12.5' in prompt_enviado
+
+
+def test_clasificador_maneja_preguntas_vacias_y_ambiguas():
+    clasificador = ClasificadorIntencionReglasAdapter()
+
+    # Una pregunta vacía no debe activar ninguna intención.
+    vacia = clasificador.clasificar("")
+    assert vacia.nombre == "DESCONOCIDO"
+    assert vacia.confianza == 0.0
+
+    # Los espacios tampoco deben activar una intención.
+    espacios = clasificador.clasificar("   ")
+    assert espacios.nombre == "DESCONOCIDO"
+    assert espacios.confianza == 0.0
+
+    # Sin palabras reconocibles, la intención debe ser desconocida.
+    desconocida = clasificador.clasificar("Hola, ¿cómo estás?")
+    assert desconocida.nombre == "DESCONOCIDO"
+
+    # La pregunta contiene señales de alertas y de telemetría.
+    ambigua = clasificador.clasificar("Quiero consultar una alerta y la potencia")
+    assert ambigua.nombre == "DESCONOCIDO"
+
+
+def test_asistente_continua_si_falla_una_consulta_de_telemetria():
+    from types import SimpleNamespace
+
+    clasificador = MagicMock()
+    clasificador.clasificar.return_value = SimpleNamespace(
+        nombre="RESUMEN_TELEMETRIA",
+        confianza=0.95,
+    )
+
+    generador = MagicMock()
+    generador.generar.return_value = iter(["Respuesta sin telemetria"])
+
+    repo_conv = MagicMock()
+    repo_conv.crear_conversacion.return_value = SimpleNamespace(id="conv-error-telemetria")
+
+    dispositivo = DispositivoResponseDTO(
+        id="dev-1",
+        device_uid="UID-1",
+        nombre="Medidor de prueba",
+        esta_activo=True,
+        estado="ONLINE",
+        creado_en=datetime.now(timezone.utc),
+        actualizado_en=datetime.now(timezone.utc),
+    )
+
+    gestor_dispositivos = MagicMock()
+    gestor_dispositivos.listar_dispositivos.return_value = [dispositivo]
+
+    consultar_telemetria = MagicMock()
+    consultar_telemetria.obtener_ultima_telemetria.side_effect = RuntimeError("Error simulado de telemetria")
+
+    use_case = ProcesarPreguntaAsistenteUseCase(
+        clasificador=clasificador,
+        generador=generador,
+        repo_conversaciones=repo_conv,
+        gestor_alertas=MagicMock(),
+        gestor_dispositivos=gestor_dispositivos,
+        consultar_telemetria=consultar_telemetria,
+    )
+
+    resultado = use_case.ejecutar(
+        pregunta="¿Cuál es la potencia actual?",
+        organizacion_id="org-prueba",
+        usuario_id="usr-prueba",
+        usuario_consiente_envio_groq=True,
+    )
+
+    assert resultado.texto == "Respuesta sin telemetria"
