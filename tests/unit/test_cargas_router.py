@@ -31,6 +31,8 @@ from src.infrastructure.fastapi.dependencies import (
     get_exportar_cargas_use_case,
     get_usuario_actual,
 )
+from src.infrastructure.fastapi.device_ownership import verificar_propiedad_dispositivo
+from src.infrastructure.fastapi.routes.cargas_router import verificar_acceso_a_campana, verificar_acceso_a_carga
 from src.infrastructure.fastapi.server import create_app
 
 MEDIDOR_ID = "d48c49f0-3564-4000-8000-000000000001"
@@ -94,6 +96,10 @@ def _cliente(rol: str = "admin") -> tuple[TestClient, dict[str, MagicMock]]:
     app.dependency_overrides[get_caracterizacion_use_case] = lambda: mocks["caracterizacion"]
     app.dependency_overrides[get_exportar_cargas_use_case] = lambda: mocks["exportar"]
     app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "u1", "rol": rol}
+    # La propiedad del medidor y de la carga (#41) se prueba en test_cargas_filtro_organizacion.py.
+    app.dependency_overrides[verificar_propiedad_dispositivo] = lambda: None
+    app.dependency_overrides[verificar_acceso_a_carga] = lambda: None
+    app.dependency_overrides[verificar_acceso_a_campana] = lambda: None
     return TestClient(app), mocks
 
 

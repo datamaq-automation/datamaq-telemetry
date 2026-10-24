@@ -85,6 +85,8 @@ def test_exportar_cargas_csv_streaming_end_to_end():
     )
 
     app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "user-test", "rol": "operador"}
+    # La propiedad del medidor (#41) se prueba en test_cargas_filtro_organizacion.py.
+    app.dependency_overrides[verificar_propiedad_dispositivo] = lambda: None
     app.dependency_overrides[get_exportar_cargas_use_case] = lambda: mock_use_case
 
     client = TestClient(app)
