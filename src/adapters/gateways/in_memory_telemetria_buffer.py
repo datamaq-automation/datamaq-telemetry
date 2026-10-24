@@ -31,3 +31,8 @@ class InMemoryTelemetriaBuffer(BufferTelemetriaEnVivoPort):
         with self._lock:
             buffer = self._buffers.get(dispositivo_id)
             return list(buffer) if buffer else []
+
+    def limpiar(self) -> None:
+        """Vacía todos los buffers. Sirve para que las pruebas no dependan del orden de ejecución."""
+        with self._lock:
+            self._buffers.clear()
