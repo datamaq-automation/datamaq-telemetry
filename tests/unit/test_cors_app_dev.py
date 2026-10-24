@@ -28,6 +28,7 @@ def _settings_dev_api(cors_origins: str = ORIGEN_DEV) -> Settings:
         APP_ENV="production",
         DEBUG=False,
         API_SECRET_KEY=CLAVE,
+        DB_PASSWORD="clave-bd-de-prueba",
         CORS_ORIGINS=cors_origins,
         AUTH_COOKIE_SAMESITE="strict",
         MQTT_HABILITADO=False,
