@@ -34,12 +34,10 @@ from src.infrastructure.auth.email_service import (
 
 @pytest.fixture(autouse=True)
 def _limpiar_estado():
-    ProcesadorAlertasIngesta._filtro_persistencia.limpiar()
-    ProcesadorAlertasIngesta._cooldown_notificaciones.limpiar()
+    ProcesadorAlertasIngesta.limpiar_estado()
     ProcesadorAlertasIngesta.configurar_notificador(None, [])
     yield
-    ProcesadorAlertasIngesta._filtro_persistencia.limpiar()
-    ProcesadorAlertasIngesta._cooldown_notificaciones.limpiar()
+    ProcesadorAlertasIngesta.limpiar_estado()
     ProcesadorAlertasIngesta.configurar_notificador(None, [])
 
 
