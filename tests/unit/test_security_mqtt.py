@@ -107,8 +107,7 @@ def test_tls_configurado_cuando_habilitado(monkeypatch):
 
 
 def test_sin_auto_registro_descarta_mac_desconocida():
-    IngestarTelemetriaUseCase._device_cache.clear()
-    IngestarTelemetriaUseCase._ultimos_heartbeats.clear()
+    IngestarTelemetriaUseCase.limpiar_estado()
 
     repo_disp = MagicMock()
     repo_disp.obtener_por_uid.return_value = None

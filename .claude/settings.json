@@ -1,10 +1,13 @@
 {
   "permissions": {
-    "bash": {
-      "allow": ["git", "find", "sed", "grep", "ls", "python3", "pytest", ".venv/bin/python", "mv", "rm", "cp", "mkdir", "cat", "head", "tail", "wc", "cut", "sort", "uniq", "cd"]
-    },
-    "edit": {
-      "allow": ["src/**/*.py", "tests/**/*.py", "specs/**/*.md"]
-    }
+    "allow": [
+      "Bash(git *)", "Bash(gh *)", "Bash(cd *)",
+      "Bash(.venv/bin/*)", "Bash(./scripts/*)", "Bash(APP_ENV=test ./scripts/pre-push.sh)",
+      "Bash(python3 *)", "Bash(uvx *)", "Bash(ls *)", "Bash(grep *)", "Bash(find *)",
+      "Bash(cat *)", "Bash(head *)", "Bash(tail *)", "Bash(wc *)", "Bash(sed *)",
+      "Bash(sleep *)", "Bash(timeout *)", "Bash(mkdir *)",
+      "Edit(src/**)", "Edit(tests/**)", "Edit(specs/**)", "Edit(scripts/**)", "Edit(.github/**)"
+    ],
+    "ask": ["Bash(git push --force*)", "Bash(git push -f*)"]
   }
 }

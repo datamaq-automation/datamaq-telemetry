@@ -353,6 +353,12 @@ class ProcesadorAlertasIngesta:
         cls._verificador_plan = verificador_plan
 
     @classmethod
+    def limpiar_estado(cls) -> None:
+        """Vacía el estado de persistencia y cooldown en memoria (útil para pruebas)."""
+        cls._filtro_persistencia.limpiar()
+        cls._cooldown_notificaciones.limpiar()
+
+    @classmethod
     def _auto_resolver_todas_normalizadas(
         cls,
         dispositivo_id: str,

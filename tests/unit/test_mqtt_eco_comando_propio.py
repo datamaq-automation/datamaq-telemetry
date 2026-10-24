@@ -76,10 +76,7 @@ def _dispositivo() -> Dispositivo:
 
 
 def _limpiar_caches() -> None:
-    IngestarTelemetriaUseCase._device_cache.clear()
-    IngestarTelemetriaUseCase._ultimos_heartbeats.clear()
-    IngestarTelemetriaUseCase._ultimas_persistencias.clear()
-    IngestarTelemetriaUseCase._filtro_persistencia.limpiar()
+    IngestarTelemetriaUseCase.limpiar_estado()
 
 
 def test_conf_com_no_marca_online_ni_retransmite():

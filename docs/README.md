@@ -49,6 +49,8 @@ Bienvenido al centro de documentación técnica del backend de telemetría de en
   *Arquitectura de Datos SGE e ISA-95:* Jerarquía industrial de activos (Empresa -> Sitio/Planta -> Área/Topología Eléctrica -> Unidad/Medidor IoT), requisitos de ISO 50001 (Fronteras, USEs, Línea de Base y EnPIs) y persistencia GitOps declarativa en `./data/`.
 * 📄 [`docs/database_erd.md`](file:///home/agustin/proyectos_software/datamaq-telemetry/docs/database_erd.md)  
   *Diagrama Entidad-Relación (ERD):* Diagrama Mermaid autogenerado de todas las tablas MySQL, índices B-Tree, columnas de ingeniería y matriz de políticas de retención.
+* 📄 [`docs/arquitectura-puertos-y-flujo-mqtt.md`](./arquitectura-puertos-y-flujo-mqtt.md)  
+  *Puertos, adaptadores y flujo MQTT:* Diagrama de clases del puerto `RepositorioDispositivosPort` con su decorador de datos maestros, y diagrama de secuencia del camino de un mensaje desde el broker hasta la persistencia.
 * 📄 [`docs/adr-001-no-redis-cache.md`](file:///home/agustin/proyectos_software/datamaq-telemetry/docs/adr-001-no-redis-cache.md)  
   *ADR-001 — No incorporar Redis como cache sobre MySQL:* Decisión fundamentada con métricas reales de producción (buffer pool hit 99,999 %, 7 q/s, base de 79 MB en RAM). Define los disparadores concretos (múltiples workers, múltiples instancias, colas diferidas) que sí justificarían revisarla.
 * 📄 [`docs/to_www-datamaq.md`](file:///home/agustin/proyectos_software/datamaq-telemetry/docs/to_www-datamaq.md)  

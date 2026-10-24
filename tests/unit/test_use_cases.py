@@ -378,8 +378,7 @@ def test_ingestar_telemetria_compacta_acc():
 
 
 def test_ingestar_telemetria_calcula_y_persiste_desbalance_vur():
-    IngestarTelemetriaUseCase._device_cache.clear()
-    IngestarTelemetriaUseCase._filtro_persistencia.limpiar()
+    IngestarTelemetriaUseCase.limpiar_estado()
     repo_disp = MockDispositivosRepo()
     repo_telem = MockTelemetriaRepo()
     mock_logger = MockLogger()
@@ -432,8 +431,7 @@ def test_ingestar_telemetria_calcula_y_persiste_desbalance_vur():
 
 
 def test_ingestar_telemetria_filtro_persistencia_transitorio():
-    IngestarTelemetriaUseCase._device_cache.clear()
-    IngestarTelemetriaUseCase._filtro_persistencia.limpiar()
+    IngestarTelemetriaUseCase.limpiar_estado()
     repo_disp = MockDispositivosRepo()
     repo_telem = MockTelemetriaRepo()
 
