@@ -71,7 +71,7 @@ def _crear_lectura_con_ti_duplicado() -> LecturaInstantanea:
 
 
 def test_supresion_alertas_fp_cuando_hay_tis_duplicados():
-    ProcesadorAlertasIngesta._filtro_persistencia.limpiar()
+    ProcesadorAlertasIngesta.limpiar_estado()
     dispositivo = _crear_dispositivo_constituyentes()
     lectura = _crear_lectura_con_ti_duplicado()
     ahora = datetime.now(timezone.utc)

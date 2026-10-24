@@ -33,7 +33,12 @@ STUBS = {
     "git": """
 echo "git $*" >> "$LOG"
 case "$1" in
-    rev-parse) echo "commitanterior" ;;
+    rev-parse)
+        case "$*" in
+            *--abbrev-ref*) echo "${GIT_RAMA_ANTERIOR:-main}" ;;
+            *) echo "commitanterior" ;;
+        esac
+        ;;
     ls-files) exec "$GIT_REAL" "$@" ;;
     pull|merge)
         [ -n "${GIT_FALLA:-}" ] && exit 1
@@ -253,6 +258,58 @@ def test_con_token_hace_fetch_a_origin_main_y_merge(deploy):
     assert "git merge --ff-only origin/main" in deploy.llamadas
 
 
+def test_rama_por_defecto_es_main_con_checkout_y_merge(deploy):
+    """Sin DEPLOY_BRANCH, producción sigue publicando main."""
+    r = deploy.correr(GITHUB_TOKEN="tok", GITHUB_REPOSITORY="org/repo")
+
+    assert r.returncode == 0, r.stdout + r.stderr
+    llamadas = deploy.llamadas
+    assert "git checkout main" in llamadas
+    assert llamadas.index("git checkout main") < llamadas.index("git merge --ff-only origin/main")
+
+
+def test_rama_explicita_develop_hace_fetch_checkout_y_merge_de_develop(deploy):
+    r = deploy.correr(DEPLOY_BRANCH="develop", GITHUB_TOKEN="tok", GITHUB_REPOSITORY="org/repo")
+
+    assert r.returncode == 0, r.stdout + r.stderr
+    llamadas = deploy.llamadas
+    assert any("fetch https://github.com/org/repo.git develop:refs/remotes/origin/develop" in c for c in llamadas)
+    assert "git checkout develop" in llamadas
+    assert "git merge --ff-only origin/develop" in llamadas
+    assert not any("origin/main" in c for c in llamadas)
+
+
+def test_rollback_restaura_la_rama_anterior_ademas_del_commit(deploy):
+    """Si el deploy cambió de rama (main -> develop), el rollback vuelve a main y después al commit anterior."""
+    r = deploy.correr(
+        DEPLOY_BRANCH="develop",
+        GITHUB_TOKEN="tok",
+        GITHUB_REPOSITORY="org/repo",
+        GIT_RAMA_ANTERIOR="main",
+        ALEMBIC_FALLA="1",
+    )
+
+    assert r.returncode != 0
+    llamadas = deploy.llamadas
+    assert "git checkout -f main" in llamadas
+    assert llamadas.index("git checkout -f main") < llamadas.index("git reset --hard commitanterior")
+
+
+def test_rollback_desde_head_desacoplado_vuelve_al_commit_sin_rama(deploy):
+    r = deploy.correr(
+        DEPLOY_BRANCH="develop",
+        GITHUB_TOKEN="tok",
+        GITHUB_REPOSITORY="org/repo",
+        GIT_RAMA_ANTERIOR="HEAD",
+        ALEMBIC_FALLA="1",
+    )
+
+    assert r.returncode != 0
+    llamadas = deploy.llamadas
+    assert "git checkout -f --detach commitanterior" in llamadas
+    assert llamadas.index("git checkout -f --detach commitanterior") < llamadas.index("git reset --hard commitanterior")
+
+
 @pytest.mark.parametrize("sin", ["GITHUB_TOKEN", "GITHUB_REPOSITORY"])
 def test_set_u_tolera_variables_del_fallback_sin_definir(deploy, sin):
     env = dict(deploy.env)
@@ -341,3 +398,36 @@ def test_el_rollback_con_base_tambien_usa_el_archivo_y_lo_borra_al_salir_con_err
     assert "mysql restaurar" in deploy.llamadas
     assert deploy.llamadas.count("cnf 600 1") == 2  # mysqldump y mysql
     assert not any(p.exists() for p in _rutas_cnf(deploy))
+
+
+def test_el_script_externo_reenvia_por_ssh_rama_backup_y_deps(tmp_path: Path):
+    """El remoto solo ve lo que el ssh reenvía: DEPLOY_BRANCH, DEPLOY_BACKUP_DIR y DEPLOY_DEPS_FILE tienen que llegar.
+
+    Corre scripts/deploy-server.sh (copia en tmp) con un ssh falso que registra sus argumentos y no se conecta a nada.
+    """
+    (tmp_path / "scripts").mkdir()
+    shutil.copy(SCRIPT, tmp_path / "scripts" / "deploy-server.sh")
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    registro = tmp_path / "ssh.log"
+    _escribir_stub(bin_dir / "ssh", f'echo "$*" >> "{registro}"\ncat > /dev/null')
+    env = {
+        "PATH": f"{bin_dir}:/usr/bin:/bin",
+        "DEPLOY_SSH_HOST": "vps.example",
+        "DEPLOY_SSH_PORT": "22",
+        "DEPLOY_SSH_USER": "deploy",
+        "DEPLOY_REMOTE_DIR": "/var/www/x",
+        "DEPLOY_SERVICE_NAME": "svc",
+        "DEPLOY_BRANCH": "develop",
+        "DEPLOY_BACKUP_DIR": "/tmp/dev-pre",
+        "DEPLOY_DEPS_FILE": "/tmp/telemetry-deps-dev.txt",
+    }
+
+    subprocess.run(
+        ["bash", "scripts/deploy-server.sh"], cwd=tmp_path, env=env, capture_output=True, text=True, timeout=60
+    )
+
+    llamada = registro.read_text(encoding="utf-8")
+    assert "DEPLOY_BRANCH=develop" in llamada
+    assert "DEPLOY_BACKUP_DIR=/tmp/dev-pre" in llamada
+    assert "DEPLOY_DEPS_FILE=/tmp/telemetry-deps-dev.txt" in llamada

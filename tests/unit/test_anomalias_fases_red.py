@@ -399,7 +399,7 @@ def test_procesador_alertas_ingesta_anomalias_fases():
 
     from datetime import timedelta
 
-    ProcesadorAlertasIngesta._filtro_persistencia.limpiar()
+    ProcesadorAlertasIngesta.limpiar_estado()
 
     # 1. Primera lectura: registra condición de anomalía en ventana
     ProcesadorAlertasIngesta.procesar_alertas(
@@ -521,7 +521,7 @@ def test_procesador_alertas_ingesta_tis_en_misma_fase():
         factor_potencia_total=FactorPotencia(0.44),
     )
 
-    ProcesadorAlertasIngesta._filtro_persistencia.limpiar()
+    ProcesadorAlertasIngesta.limpiar_estado()
 
     # Muestra 1: registrar en ventana de persistencia
     ProcesadorAlertasIngesta.procesar_alertas(

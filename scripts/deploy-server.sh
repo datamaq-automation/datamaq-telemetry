@@ -34,6 +34,14 @@ esac
 
 HEALTH_URL="${DEPLOY_HEALTH_URL:-http://127.0.0.1:8885/health}"
 
+# Rama a desplegar. Producción usa main (valor por defecto); staging usa develop. Va sin comillas en el comando ssh,
+# así que se valida: solo nombres de rama seguros.
+DEPLOY_BRANCH="${DEPLOY_BRANCH:-main}"
+if ! [[ "$DEPLOY_BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+    echo "Error: DEPLOY_BRANCH inválido: '$DEPLOY_BRANCH'."
+    exit 1
+fi
+
 log() { echo "[$(date +"%Y-%m-%dT%H:%M:%S")] $1"; }
 
 log "Iniciando despliegue de datamaq-telemetry en $DEPLOY_SSH_HOST..."
@@ -41,6 +49,9 @@ log "Iniciando despliegue de datamaq-telemetry en $DEPLOY_SSH_HOST..."
 ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SSH_HOST" \
     DEPLOY_REMOTE_DIR="$DEPLOY_REMOTE_DIR" \
     DEPLOY_SERVICE_NAME="$DEPLOY_SERVICE_NAME" \
+    DEPLOY_BRANCH="$DEPLOY_BRANCH" \
+    DEPLOY_BACKUP_DIR="${DEPLOY_BACKUP_DIR:-}" \
+    DEPLOY_DEPS_FILE="${DEPLOY_DEPS_FILE:-}" \
     HEALTH_URL="$HEALTH_URL" \
     GITHUB_TOKEN="$GITHUB_TOKEN" \
     GITHUB_REPOSITORY="$GITHUB_REPOSITORY" \
@@ -51,13 +62,16 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
     # crean con modo 600 explícito (install -m 600), no con umask.
     set -Eeuo pipefail
     umask 022
+    DEPLOY_BRANCH="${DEPLOY_BRANCH:-main}"
 
     echo "==> Cambiando a $DEPLOY_REMOTE_DIR"
     cd "$DEPLOY_REMOTE_DIR" || { echo "Error: no se pudo entrar a $DEPLOY_REMOTE_DIR"; exit 1; }
 
     echo "==> Guardando commit actual para posible rollback..."
     PREVIOUS_COMMIT=$(git rev-parse HEAD)
-    # DEPLOY_DEPS_FILE y DEPLOY_BACKUP_DIR (abajo) se sobreescriben solo en tests/unit/test_deploy_server.py.
+    # "HEAD" si el checkout estaba desacoplado: el rollback vuelve al commit sin rama.
+    PREVIOUS_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+    # DEPLOY_DEPS_FILE y DEPLOY_BACKUP_DIR llegan desde el comando ssh (arriba); el default aplica si vienen vacíos.
     DEPS_ANTERIORES="${DEPLOY_DEPS_FILE:-/tmp/telemetry-deps.txt}"
 
     echo "==> Respaldando dependencias actuales (para rollback)..."
@@ -98,6 +112,11 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
             gunzip -c "$BACKUP_FILE" | mysql --defaults-file="$MYCNF" "$DB_NAME" || completo=false
         fi
         echo "==> Rollback de código y dependencias a $PREVIOUS_COMMIT..."
+        if [ "$PREVIOUS_BRANCH" = HEAD ]; then
+            git checkout -f --detach "$PREVIOUS_COMMIT" || completo=false
+        else
+            git checkout -f "$PREVIOUS_BRANCH" || completo=false
+        fi
         git reset --hard "$PREVIOUS_COMMIT" || completo=false
         ./.venv/bin/pip install -r "$DEPS_ANTERIORES" || completo=false
         if [ "${2:-}" = con_base ]; then
@@ -126,9 +145,13 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
         # fetch a refs/remotes/origin/main + merge, no `pull <URL> main`: un pull por URL deja origin/main
         # congelado en el VPS y `git status` miente sobre lo desplegado (#16). Mismo token efímero.
         git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $AUTH" \
-            fetch "https://github.com/${GITHUB_REPOSITORY}.git" main:refs/remotes/origin/main
-        git merge --ff-only origin/main
+            fetch "https://github.com/${GITHUB_REPOSITORY}.git" "$DEPLOY_BRANCH:refs/remotes/origin/$DEPLOY_BRANCH"
+        git checkout "$DEPLOY_BRANCH" 2>/dev/null || git checkout -b "$DEPLOY_BRANCH" --track "origin/$DEPLOY_BRANCH"
+        git merge --ff-only "origin/$DEPLOY_BRANCH"
     else
+        # Sin token no hay fetch explícito: la rama de deploy tiene que existir local con upstream (queda así tras
+        # el bootstrap). El checkout la deja como rama actual para que el pull siga su upstream.
+        git checkout "$DEPLOY_BRANCH"
         git pull --ff-only
     fi
 

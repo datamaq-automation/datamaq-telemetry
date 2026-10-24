@@ -230,9 +230,14 @@ async def datamaq_analizar_capacitores(
     resultado = await _ejecutar_peticion(
         "GET", "/api/v1/analitica/banco-capacitores/planta", token=token, params=parametros
     )
-    if isinstance(resultado, dict):
-        return resultado
-    return {"resultado": resultado}
+    # La recomendación de kVAr se calcula sobre el agregado de la planta: si un medidor tiene TI o signo abierto,
+    # se declara junto al número para no recomendar compensación a partir de un dato malo (#31).
+    recoleccion = await _recolectar_planta(planta_id, periodo_dias * 24, token)
+    respuesta: dict[str, Any] = dict(resultado) if isinstance(resultado, dict) else {"resultado": resultado}
+    respuesta["advertencias_calidad"] = recoleccion["advertencias_calidad"]
+    respuesta["dispositivos_con_error"] = recoleccion["con_error"]
+    respuesta["medidores"] = recoleccion["medidores"]
+    return respuesta
 
 
 @mcp.tool()
@@ -336,6 +341,97 @@ def _promedio(valores: list[float]) -> float | None:
     return sum(valores) / len(valores) if valores else None
 
 
+# Alertas que invalidan el número agregado: TI mal cableado o signo invertido (ver #31, caso del medidor 369).
+TIPOS_ALERTA_CALIDAD_TI = frozenset({"TI_INVERTIDO", "TI_DESCONECTADO", "POTENCIA_NEGATIVA"})
+_CAMPOS_FASE = {"R": "fase_r", "S": "fase_s", "T": "fase_t"}
+
+
+def _advertencias_calidad(alertas: list[dict[str, Any]], dispositivos_map: dict[str, str]) -> list[dict[str, Any]]:
+    """Alertas abiertas de TI o de signo de los medidores de la planta. Si hay alguna, el agregado no es confiable."""
+    advertencias: list[dict[str, Any]] = []
+    for alerta in alertas:
+        dev_id = alerta.get("dispositivo_id")
+        if alerta.get("tipo_alerta") in TIPOS_ALERTA_CALIDAD_TI and dev_id in dispositivos_map:
+            advertencias.append(
+                {
+                    "dispositivo_id": dev_id,
+                    "dispositivo_tag": dispositivos_map[dev_id],
+                    "tipo_alerta": alerta["tipo_alerta"],
+                    "mensaje": alerta.get("mensaje"),
+                }
+            )
+    return advertencias
+
+
+def _cobertura_fases(lecturas: list[dict[str, Any]]) -> dict[str, Any]:
+    """Fases con potencia activa medida en las lecturas de UN medidor. Una fase sin dato no cuenta como cero."""
+    total = len(lecturas)
+    cobertura: dict[str, float] = {}
+    for fase, campo in _CAMPOS_FASE.items():
+        con_dato = sum(
+            1
+            for lectura in lecturas
+            if isinstance(lectura.get(campo), dict) and lectura[campo].get("net_active_power_W") is not None
+        )
+        cobertura[fase] = round(100.0 * con_dato / total, 1) if total else 0.0
+    return {
+        "muestras": total,
+        "cobertura_fase_pct": cobertura,
+        "fases_medidas": [fase for fase, pct in cobertura.items() if pct > 0],
+        "fases_faltantes": [fase for fase, pct in cobertura.items() if pct == 0],
+    }
+
+
+async def _recolectar_planta(planta_id: str, horas: int, token: str | None) -> dict[str, Any]:
+    """Lecturas instantáneas de cada medidor de la planta en las últimas `horas`, con su cobertura por fase y las
+    alertas abiertas de TI o de signo. Base común de las herramientas que agregan a nivel planta (#31)."""
+    dispositivos = await _ejecutar_peticion("GET", "/api/v1/dispositivos", token=token, params={"planta_id": planta_id})
+    ids = (
+        [d["id"] for d in dispositivos if isinstance(d, dict) and d.get("id")] if isinstance(dispositivos, list) else []
+    )
+    dispositivos_map: dict[str, str] = {
+        d["id"]: d.get("ubicacion_tag") or d.get("nombre") or d["id"]
+        for d in (dispositivos if isinstance(dispositivos, list) else [])
+        if isinstance(d, dict) and d.get("id")
+    }
+
+    lecturas_por_dispositivo: list[list[dict[str, Any]]] = []
+    medidores: list[dict[str, Any]] = []
+    con_error: list[str] = []
+    for dispositivo_id in ids:
+        try:
+            lecturas = await _ejecutar_peticion(
+                "GET",
+                f"/api/v1/telemetria/instantaneous/{dispositivo_id}",
+                token=token,
+                params={"hours": horas, "granularity": "5m", "limit": 5000},
+            )
+        except RuntimeError:
+            con_error.append(dispositivo_id)
+            continue
+        if isinstance(lecturas, list):
+            lista = [x for x in lecturas if isinstance(x, dict)]
+            lecturas_por_dispositivo.append(lista)
+            medidores.append(
+                {
+                    "dispositivo_id": dispositivo_id,
+                    "dispositivo_tag": dispositivos_map.get(dispositivo_id, dispositivo_id),
+                    **_cobertura_fases(lista),
+                }
+            )
+
+    alertas = await _ejecutar_peticion(
+        "GET", "/api/v1/alertas", token=token, params={"planta_id": planta_id, "solo_abiertas": True}
+    )
+    return {
+        "ids": ids,
+        "con_error": con_error,
+        "medidores": medidores,
+        "lecturas_por_dispositivo": lecturas_por_dispositivo,
+        "advertencias_calidad": _advertencias_calidad(alertas if isinstance(alertas, list) else [], dispositivos_map),
+    }
+
+
 @mcp.tool()
 async def datamaq_consultar_potencia_reciente(
     planta_id: str,
@@ -357,28 +453,13 @@ async def datamaq_consultar_potencia_reciente(
         ctx: Contexto de ejecución FastMCP inyectado automáticamente.
     """
     token = _resolver_token(ctx)
-    dispositivos = await _ejecutar_peticion("GET", "/api/v1/dispositivos", token=token, params={"planta_id": planta_id})
-    ids = (
-        [d["id"] for d in dispositivos if isinstance(d, dict) and d.get("id")] if isinstance(dispositivos, list) else []
-    )
+    recoleccion = await _recolectar_planta(planta_id, horas, token)
+    ids = recoleccion["ids"]
+    con_error = recoleccion["con_error"]
+    medidores = recoleccion["medidores"]
+    advertencias_calidad = recoleccion["advertencias_calidad"]
 
-    lecturas_por_dispositivo: list[list[dict[str, Any]]] = []
-    con_error: list[str] = []
-    for dispositivo_id in ids:
-        try:
-            lecturas = await _ejecutar_peticion(
-                "GET",
-                f"/api/v1/telemetria/instantaneous/{dispositivo_id}",
-                token=token,
-                params={"hours": horas, "granularity": "5m", "limit": 5000},
-            )
-        except RuntimeError:
-            con_error.append(dispositivo_id)
-            continue
-        if isinstance(lecturas, list):
-            lecturas_por_dispositivo.append([x for x in lecturas if isinstance(x, dict)])
-
-    serie = _agregar_serie_planta(lecturas_por_dispositivo)
+    serie = _agregar_serie_planta(recoleccion["lecturas_por_dispositivo"])
     p_kw = [b["p_kw"] for b in serie if b["p_kw"] is not None]
     q_kvar = [b["q_kvar"] for b in serie if b["q_kvar"] is not None]
 
@@ -397,6 +478,8 @@ async def datamaq_consultar_potencia_reciente(
         "metodo": "promedio por dispositivo y suma entre dispositivos, por bucket de 5 min",
         "dispositivos_consultados": len(ids),
         "dispositivos_con_error": con_error,
+        "advertencias_calidad": advertencias_calidad,
+        "medidores": medidores,
         "puntos_medicion_count": puntos_count,
         "cobertura_puntos_pct": cobertura_puntos_pct,
         "potencia_activa_promedio_kw": round(_promedio(p_kw), 2) if p_kw else None,
