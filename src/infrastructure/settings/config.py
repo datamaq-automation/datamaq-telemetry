@@ -175,6 +175,13 @@ class Settings(BaseSettings):
         # valor distinto en cada reinicio). Los OTP con clave efímera no sobreviven a un reinicio.
         if self.DEBUG and not self.OTP_HMAC_KEY:
             object.__setattr__(self, "OTP_HMAC_KEY", secrets.token_urlsafe(32))
+        # Mismo criterio que OTP: no aborta (un deploy sin el secreto tiraría producción), pero el webhook
+        # de MP responde 503 hasta cargarlo. Solo importa si billing está encendido.
+        if self.BILLING_HABILITADO and not self.mp_webhook_secret_configurado:
+            logging.getLogger("settings").critical(
+                "MP_WEBHOOK_SECRET ausente con BILLING_HABILITADO activo: el webhook de Mercado Pago "
+                "responde 503 hasta cargar el secreto de la aplicación en MP"
+            )
         return self
 
     @property
@@ -186,6 +193,11 @@ class Settings(BaseSettings):
     def otp_hmac_configurada(self) -> bool:
         """True si la clave OTP es usable: >=16 caracteres y distinta de API_SECRET_KEY."""
         return len(self.OTP_HMAC_KEY) >= 16 and self.OTP_HMAC_KEY != self.API_SECRET_KEY
+
+    @property
+    def mp_webhook_secret_configurado(self) -> bool:
+        """True si el secreto HMAC del webhook de Mercado Pago es usable (no vacío ni solo espacios)."""
+        return bool(self.MP_WEBHOOK_SECRET.strip())
 
     @property
     def auth_cookie_secure(self) -> bool:

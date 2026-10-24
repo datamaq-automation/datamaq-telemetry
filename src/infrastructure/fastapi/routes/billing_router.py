@@ -79,6 +79,11 @@ async def webhook_mercadopago(
             falta_x_request_id=not x_request_id,
         )
         raise HTTPException(status_code=400, detail="Solicitud sin firma válida.")
+    if not settings.mp_webhook_secret_configurado:
+        # Sin secreto, validar_firma_mp aceptaría una firma hecha con clave vacía. Se corta antes de verificar.
+        # El nombre de la variable va al log, no a la respuesta.
+        logger.error("webhook_mp_secreto_ausente", variable="MP_WEBHOOK_SECRET")
+        raise HTTPException(status_code=503, detail="El servicio de pagos no está disponible.")
 
     try:
         validar_firma_mp(x_signature, x_request_id, data_id, settings.MP_WEBHOOK_SECRET)
