@@ -1,7 +1,7 @@
 <!-- Generado por scripts/generate_matriz_roles.py. No editar a mano: regenerar. -->
 # Matriz de roles y permisos (generada desde el código)
 
-Endpoints analizados: **121**. Roles válidos (`ROLES_VALIDOS`): `admin`, `auditor`, `ingeniero`, `invitado`, `invitado_global`, `mantenimiento`, `operador`, `superadmin`.
+Endpoints analizados: **120**. Roles válidos (`ROLES_VALIDOS`): `admin`, `auditor`, `ingeniero`, `invitado`, `invitado_global`, `mantenimiento`, `operador`, `superadmin`.
 
 Cómo se lee: "Roles que pasan" es lo que deja el guard de rol que la ruta declara (evaluado con la condición real del guard). Si la columna "Chequeo manual" dice `sí`, el cuerpo de la ruta o de una dependencia propia compara el rol o usa `ROLES_ACCESO_GLOBAL`: ese recorte no está en la columna y hay que leer la ruta para saberlo.
 
@@ -40,7 +40,6 @@ Con `AUTH_REQUIRED` apagado, `get_usuario_actual` devuelve `{"sub": "anon", "rol
 | POST | `/api/v1/auth/2fa/verificar` | — | todos (sin guard) | sin dependencia de auth detectada | no | `src/infrastructure/fastapi/routes/auth_router.py:verificar_2fa` |
 | PATCH | `/api/v1/auth/confirm-password-change` | — | todos (sin guard) | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/auth_router.py:confirm_password_change` |
 | POST | `/api/v1/auth/dispositivos/revocar-todos` | — | todos (sin guard) | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/auth_router.py:revocar_dispositivos` |
-| POST | `/api/v1/auth/guest` | — | todos (sin guard) | sin dependencia de auth detectada | sí | `src/infrastructure/fastapi/routes/auth_router.py:guest` |
 | POST | `/api/v1/auth/login` | — | todos (sin guard) | sin dependencia de auth detectada | no | `src/infrastructure/fastapi/routes/auth_router.py:login` |
 | POST | `/api/v1/auth/logout` | — | todos (sin guard) | sin dependencia de auth detectada | no | `src/infrastructure/fastapi/routes/auth_router.py:logout` |
 | POST | `/api/v1/auth/logout-todas` | — | todos (sin guard) | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/auth_router.py:logout_todas` |
@@ -48,26 +47,26 @@ Con `AUTH_REQUIRED` apagado, `get_usuario_actual` devuelve `{"sub": "anon", "rol
 | POST | `/api/v1/auth/recuperar-contrasena` | — | todos (sin guard) | sin dependencia de auth detectada | no | `src/infrastructure/fastapi/routes/auth_router.py:solicitar_recuperacion` |
 | PATCH | `/api/v1/auth/request-password-change-code` | — | todos (sin guard) | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/auth_router.py:request_password_change_code` |
 | POST | `/api/v1/auth/restablecer-contrasena` | — | todos (sin guard) | sin dependencia de auth detectada | no | `src/infrastructure/fastapi/routes/auth_router.py:restablecer_contrasena` |
-| GET | `/api/v1/cargas` | — | todos (sin guard) | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/cargas_router.py:listar_cargas` |
-| POST | `/api/v1/cargas` | `requiere_rol_escritura` | `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `superadmin` | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/cargas_router.py:registrar_carga` |
-| POST | `/api/v1/cargas/analisis` | `requiere_rol_escritura` | `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `superadmin` | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/cargas_router.py:disparar_analisis` |
-| GET | `/api/v1/cargas/atribucion` | — | todos (sin guard) | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/cargas_router.py:obtener_atribucion` |
-| POST | `/api/v1/cargas/campanas/activas` | `requiere_rol_escritura` | `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `superadmin` | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/cargas_router.py:iniciar_campana_activa` |
-| POST | `/api/v1/cargas/campanas/pasivas` | `requiere_rol_escritura` | `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `superadmin` | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/cargas_router.py:iniciar_campana_pasiva` |
-| GET | `/api/v1/cargas/campanas/{campana_id}` | — | todos (sin guard) | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/cargas_router.py:obtener_campana` |
-| PATCH | `/api/v1/cargas/campanas/{campana_id}/descartar` | `requiere_rol_escritura` | `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `superadmin` | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/cargas_router.py:descartar_campana` |
-| PATCH | `/api/v1/cargas/campanas/{campana_id}/finalizar` | `requiere_rol_escritura` | `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `superadmin` | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/cargas_router.py:finalizar_campana` |
-| GET | `/api/v1/cargas/exportar/csv` | — | todos (sin guard) | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/cargas_router.py:exportar_cargas_csv` |
-| GET | `/api/v1/cargas/intervalos` | — | todos (sin guard) | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/cargas_router.py:listar_intervalos` |
-| PATCH | `/api/v1/cargas/intervalos/{intervalo_id}/corregir` | `requiere_rol_escritura` | `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `superadmin` | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/cargas_router.py:corregir_intervalo` |
-| GET | `/api/v1/cargas/perfil` | — | todos (sin guard) | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/cargas_router.py:perfilar_consumo` |
-| GET | `/api/v1/cargas/presets` | — | todos (sin guard) | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/cargas_router.py:obtener_presets_catalogo` |
-| POST | `/api/v1/cargas/presets/inicializar` | `requiere_rol_escritura` | `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `superadmin` | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/cargas_router.py:inicializar_presets_catalogo` |
-| GET | `/api/v1/cargas/{carga_id}` | — | todos (sin guard) | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/cargas_router.py:obtener_carga` |
-| PATCH | `/api/v1/cargas/{carga_id}` | `requiere_rol_escritura` | `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `superadmin` | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/cargas_router.py:actualizar_carga` |
-| GET | `/api/v1/cargas/{carga_id}/campanas` | — | todos (sin guard) | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/cargas_router.py:listar_campanas_de_carga` |
-| PUT | `/api/v1/cargas/{carga_id}/firma` | `requiere_rol_escritura` | `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `superadmin` | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/cargas_router.py:fijar_firma_manual` |
-| GET | `/api/v1/cargas/{carga_id}/intervalos` | — | todos (sin guard) | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/cargas_router.py:listar_intervalos_de_carga` |
+| GET | `/api/v1/cargas` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/cargas_router.py:listar_cargas` |
+| POST | `/api/v1/cargas` | `requiere_rol_escritura` | `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `superadmin` | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/cargas_router.py:registrar_carga` |
+| POST | `/api/v1/cargas/analisis` | `requiere_rol_escritura` | `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `superadmin` | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/cargas_router.py:disparar_analisis` |
+| GET | `/api/v1/cargas/atribucion` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/cargas_router.py:obtener_atribucion` |
+| POST | `/api/v1/cargas/campanas/activas` | `requiere_rol_escritura` | `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `superadmin` | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/cargas_router.py:iniciar_campana_activa` |
+| POST | `/api/v1/cargas/campanas/pasivas` | `requiere_rol_escritura` | `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `superadmin` | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/cargas_router.py:iniciar_campana_pasiva` |
+| GET | `/api/v1/cargas/campanas/{campana_id}` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/cargas_router.py:obtener_campana` |
+| PATCH | `/api/v1/cargas/campanas/{campana_id}/descartar` | `requiere_rol_escritura` | `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `superadmin` | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/cargas_router.py:descartar_campana` |
+| PATCH | `/api/v1/cargas/campanas/{campana_id}/finalizar` | `requiere_rol_escritura` | `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `superadmin` | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/cargas_router.py:finalizar_campana` |
+| GET | `/api/v1/cargas/exportar/csv` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/cargas_router.py:exportar_cargas_csv` |
+| GET | `/api/v1/cargas/intervalos` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/cargas_router.py:listar_intervalos` |
+| PATCH | `/api/v1/cargas/intervalos/{intervalo_id}/corregir` | `requiere_rol_escritura` | `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `superadmin` | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/cargas_router.py:corregir_intervalo` |
+| GET | `/api/v1/cargas/perfil` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/cargas_router.py:perfilar_consumo` |
+| GET | `/api/v1/cargas/presets` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/cargas_router.py:obtener_presets_catalogo` |
+| POST | `/api/v1/cargas/presets/inicializar` | `requiere_rol_escritura` | `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `superadmin` | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/cargas_router.py:inicializar_presets_catalogo` |
+| GET | `/api/v1/cargas/{carga_id}` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/cargas_router.py:obtener_carga` |
+| PATCH | `/api/v1/cargas/{carga_id}` | `requiere_rol_escritura` | `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `superadmin` | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/cargas_router.py:actualizar_carga` |
+| GET | `/api/v1/cargas/{carga_id}/campanas` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/cargas_router.py:listar_campanas_de_carga` |
+| PUT | `/api/v1/cargas/{carga_id}/firma` | `requiere_rol_escritura` | `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `superadmin` | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/cargas_router.py:fijar_firma_manual` |
+| GET | `/api/v1/cargas/{carga_id}/intervalos` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/cargas_router.py:listar_intervalos_de_carga` |
 | PATCH | `/api/v1/disponibilidad/eventos/{evento_id}/corregir` | `requiere_rol_escritura` | `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `superadmin` | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/disponibilidad_router.py:corregir_clasificacion` |
 | POST | `/api/v1/disponibilidad/eventos/{evento_id}/corregir` | `requiere_rol_escritura` | `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `superadmin` | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/disponibilidad_router.py:corregir_clasificacion` |
 | GET | `/api/v1/disponibilidad/maquinas` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/disponibilidad_router.py:listar_maquinas` |
@@ -90,7 +89,7 @@ Con `AUTH_REQUIRED` apagado, `get_usuario_actual` devuelve `{"sub": "anon", "rol
 | GET | `/api/v1/nodo/unifilar/{nodo_id}` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/planta_estructura_router.py:resumen_nodo_unifilar_directo` |
 | POST | `/api/v1/oauth/authorize` | — | todos (sin guard) | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/oauth_router.py:autorizar_consentimiento_oauth` |
 | POST | `/api/v1/oauth/consent` | — | todos (sin guard) | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/oauth_router.py:procesar_consentimiento_oauth` |
-| GET | `/api/v1/oauth/consent-info` | — | todos (sin guard) | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/oauth_router.py:obtener_consent_info_oauth` |
+| GET | `/api/v1/oauth/consent-info` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/oauth_router.py:obtener_consent_info_oauth` |
 | POST | `/api/v1/oauth/register` | — | todos (sin guard) | sin dependencia de auth detectada | no | `src/infrastructure/fastapi/routes/oauth_router.py:registrar_cliente_dinamico_oauth` |
 | POST | `/api/v1/oauth/revoke` | — | todos (sin guard) | sin dependencia de auth detectada | no | `src/infrastructure/fastapi/routes/oauth_router.py:revocar_token_oauth` |
 | POST | `/api/v1/oauth/token` | — | todos (sin guard) | sin dependencia de auth detectada | no | `src/infrastructure/fastapi/routes/oauth_router.py:canjear_token_oauth` |

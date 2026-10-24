@@ -246,11 +246,11 @@ Después de cada despliegue, se ejecutan smoke tests automáticamente en CI para
 - ✓ No hay logs CRITICAL en startup
 
 ```bash
-# Ejecutar manualmente (local o post-deploy)
-.venv/bin/pytest tests/e2e/test_smoke_post_deploy.py -v
+# Ejecutar tests de router/salud (local)
+.venv/bin/pytest tests/unit/test_smoke_post_deploy.py -v
 
-# En CI/CD (deploy.yml)
-pytest tests/e2e/test_smoke_post_deploy.py -v
+# Smoke test post-deploy real contra servidor desplegado
+python3 scripts/smoke_post_deploy.py https://api.datamaq.com.ar/health/ready
 ```
 
 ---

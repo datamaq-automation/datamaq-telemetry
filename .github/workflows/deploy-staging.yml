@@ -53,27 +53,9 @@ jobs:
           set -o pipefail
           ./scripts/deploy-server.sh 2>&1 | tee "$RUNNER_TEMP/deploy.log"
 
-      - name: "Setup Python para smoke tests"
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: "Install dependencies para smoke tests"
-        run: |
-          python3 -m pip install --upgrade pip
-          pip install -r requirements.lock
-
       - name: "Smoke Test Post-Deploy"
-        env:
-          APP_ENV: development
         run: |
-          echo "Ejecutando smoke tests..."
-          python3 -m pytest tests/e2e/test_smoke_post_deploy.py -v --tb=short
-          if [ $? -ne 0 ]; then
-            echo "✗ Smoke test falló — rollback requerido"
-            exit 1
-          fi
-          echo "✓ Smoke tests pasaron — deploy válido"
+          python3 scripts/smoke_post_deploy.py "https://api-dev.datamaq.com.ar/health/ready"
 
       - name: "Alertar por Telegram si falló"
         if: failure()
