@@ -76,6 +76,49 @@ def verificar_acceso_a_carga(
     _exigir_acceso_a_carga(claims, db, use_case, carga_id)
 
 
+def verificar_acceso_a_intervalo(
+    intervalo_id: int,
+    claims: Annotated[dict, Depends(get_usuario_actual)],
+    db: Annotated[Session, Depends(get_db_session)],
+    use_case: Annotated[AtribuirConsumoUseCase, Depends(get_atribucion_use_case)],
+) -> None:
+    try:
+        dispositivo_id = use_case.dispositivo_de_intervalo(intervalo_id)
+    except Exception as e:
+        manejar_error_http(e)
+    verificar_propiedad_dispositivo(claims=claims, db=db, dispositivo_id=dispositivo_id)
+
+
+def verificar_alta_de_carga(
+    dto: CargaCreateDTO,
+    claims: Annotated[dict, Depends(get_usuario_actual)],
+    db: Annotated[Session, Depends(get_db_session)],
+) -> None:
+    verificar_propiedad_dispositivo(claims=claims, db=db, dispositivo_id=dto.dispositivo_id)
+
+
+def verificar_alta_de_campana(
+    dto: CampanaCreateDTO,
+    claims: Annotated[dict, Depends(get_usuario_actual)],
+    db: Annotated[Session, Depends(get_db_session)],
+    cargas: Annotated[GestionarCargasUseCase, Depends(get_cargas_use_case)],
+) -> None:
+    verificar_propiedad_dispositivo(claims=claims, db=db, dispositivo_id=dto.dispositivo_id)
+    if dto.carga_id is not None:
+        _exigir_acceso_a_carga(claims, db, cargas, dto.carga_id)
+
+
+def verificar_correccion_de_intervalo(
+    dto: CorregirIntervaloRequestDTO,
+    claims: Annotated[dict, Depends(get_usuario_actual)],
+    db: Annotated[Session, Depends(get_db_session)],
+    cargas: Annotated[GestionarCargasUseCase, Depends(get_cargas_use_case)],
+) -> None:
+    # Reimputar a una carga ajena cambia también el medidor de la carga: se exige la misma organización (#42).
+    if dto.carga_id is not None:
+        _exigir_acceso_a_carga(claims, db, cargas, dto.carga_id)
+
+
 def verificar_acceso_a_campana(
     campana_id: str,
     claims: Annotated[dict, Depends(get_usuario_actual)],
@@ -165,7 +208,11 @@ def disparar_analisis(
 @router.patch(
     "/intervalos/{intervalo_id}/corregir",
     response_model=IntervaloActividadResponseDTO,
-    dependencies=[Depends(requiere_rol_escritura)],
+    dependencies=[
+        Depends(requiere_rol_escritura),
+        Depends(verificar_acceso_a_intervalo),
+        Depends(verificar_correccion_de_intervalo),
+    ],
 )
 def corregir_intervalo(
     intervalo_id: int,
@@ -246,7 +293,11 @@ def obtener_carga(
         manejar_error_http(e)
 
 
-@router.post("", response_model=CargaResponseDTO, dependencies=[Depends(requiere_rol_escritura)])
+@router.post(
+    "",
+    response_model=CargaResponseDTO,
+    dependencies=[Depends(requiere_rol_escritura), Depends(verificar_alta_de_carga)],
+)
 def registrar_carga(
     dto: CargaCreateDTO,
     use_case: Annotated[GestionarCargasUseCase, Depends(get_cargas_use_case)],
@@ -257,7 +308,11 @@ def registrar_carga(
         manejar_error_http(e)
 
 
-@router.patch("/{carga_id}", response_model=CargaResponseDTO, dependencies=[Depends(requiere_rol_escritura)])
+@router.patch(
+    "/{carga_id}",
+    response_model=CargaResponseDTO,
+    dependencies=[Depends(requiere_rol_escritura), Depends(verificar_acceso_a_carga)],
+)
 def actualizar_carga(
     carga_id: str,
     dto: CargaUpdateDTO,
@@ -269,7 +324,11 @@ def actualizar_carga(
         manejar_error_http(e)
 
 
-@router.put("/{carga_id}/firma", response_model=CargaResponseDTO, dependencies=[Depends(requiere_rol_escritura)])
+@router.put(
+    "/{carga_id}/firma",
+    response_model=CargaResponseDTO,
+    dependencies=[Depends(requiere_rol_escritura), Depends(verificar_acceso_a_carga)],
+)
 def fijar_firma_manual(
     carga_id: str,
     dto: FirmaManualRequestDTO,
@@ -285,7 +344,7 @@ def fijar_firma_manual(
 @router.post(
     "/campanas/activas",
     response_model=CampanaResponseDTO,
-    dependencies=[Depends(requiere_rol_escritura)],
+    dependencies=[Depends(requiere_rol_escritura), Depends(verificar_alta_de_campana)],
 )
 def iniciar_campana_activa(
     dto: CampanaCreateDTO,
@@ -306,7 +365,7 @@ def iniciar_campana_activa(
 @router.post(
     "/campanas/pasivas",
     response_model=CampanaResponseDTO,
-    dependencies=[Depends(requiere_rol_escritura)],
+    dependencies=[Depends(requiere_rol_escritura), Depends(verificar_alta_de_campana)],
 )
 def iniciar_campana_pasiva(
     dto: CampanaCreateDTO,
@@ -339,7 +398,7 @@ def obtener_campana(
 @router.patch(
     "/campanas/{campana_id}/finalizar",
     response_model=CampanaResponseDTO,
-    dependencies=[Depends(requiere_rol_escritura)],
+    dependencies=[Depends(requiere_rol_escritura), Depends(verificar_acceso_a_campana)],
 )
 def finalizar_campana(
     campana_id: str,
@@ -356,7 +415,7 @@ def finalizar_campana(
 @router.patch(
     "/campanas/{campana_id}/descartar",
     response_model=CampanaResponseDTO,
-    dependencies=[Depends(requiere_rol_escritura)],
+    dependencies=[Depends(requiere_rol_escritura), Depends(verificar_acceso_a_campana)],
 )
 def descartar_campana(
     campana_id: str,
