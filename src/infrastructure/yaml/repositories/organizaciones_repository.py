@@ -1,4 +1,6 @@
 # src/infrastructure/yaml/repositories/organizaciones_repository.py
+from typing import Any
+
 import structlog
 
 from src.domain.sge.entities import FacturaDistribuidora
@@ -72,6 +74,17 @@ def _parsear_factura(f: dict) -> FacturaDistribuidora:
         fuente_archivo=f.get("fuente_archivo"),
         cargada_en=f.get("cargada_en"),
     )
+
+
+def _valor_con_nombre_nuevo(medidor: dict, nombre_nuevo: str, nombre_viejo: str) -> Any:
+    """Glosario TI (2026-10-13): lee el nombre nuevo y, si no está, el viejo del YAML.
+
+    Mantiene compatibilidad con los datos existentes en datamaq-data; el renombrado de los datos es el paso 2.
+    """
+    valor_nuevo = medidor.get(nombre_nuevo)
+    if valor_nuevo is not None:
+        return valor_nuevo
+    return medidor.get(nombre_viejo)
 
 
 def _parsear_corriente_nominal_ti(bloque: object) -> dict[str, float] | None:
@@ -360,8 +373,8 @@ class YamlOrganizacionesRepository(RepositorioOrganizacionesPort):
                             fases_con_ti=m.get("fases_con_ti"),
                             ct_fases_invertidas=m.get("ct_fases_invertidas"),
                             correccion_angular_fases=m.get("correccion_angular_fases"),
-                            invertido=m.get("invertido"),
-                            orden_fases=m.get("orden_fases"),
+                            invertido=_valor_con_nombre_nuevo(m, "polaridad_ti", "invertido"),
+                            orden_fases=_valor_con_nombre_nuevo(m, "asociacion_tension_corriente", "orden_fases"),
                             corriente_nominal_ti_a=_parsear_corriente_nominal_ti(m.get("corriente_nominal_ti_a")),
                         )
         return None
