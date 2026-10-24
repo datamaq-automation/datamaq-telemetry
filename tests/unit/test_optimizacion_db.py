@@ -322,7 +322,7 @@ class MockTelemetriaRepo(RepositorioTelemetriaPort):
 
 def test_downsampling_ingesta_5min():
     # Limpiar estado estático entre tests
-    IngestarTelemetriaUseCase._ultimas_persistencias.clear()
+    IngestarTelemetriaUseCase.limpiar_estado()
 
     repo_disp = MockDispositivosRepo()
     repo_telem = MockTelemetriaRepo()
@@ -359,9 +359,7 @@ def test_downsampling_ingesta_5min():
 
 
 def test_evaluacion_alerta_a_pesar_de_downsampling():
-    IngestarTelemetriaUseCase._ultimas_persistencias.clear()
-    IngestarTelemetriaUseCase._device_cache.clear()
-    IngestarTelemetriaUseCase._filtro_persistencia.limpiar()
+    IngestarTelemetriaUseCase.limpiar_estado()
 
     repo_disp = MockDispositivosRepo()
     repo_telem = MockTelemetriaRepo()
@@ -551,9 +549,7 @@ def test_indices_modelos_sin_duplicados_redundantes():
 
 def test_device_cache_resolucion_en_memoria():
     # Limpiar estado estático
-    IngestarTelemetriaUseCase._ultimas_persistencias.clear()
-    IngestarTelemetriaUseCase._device_cache.clear()
-    IngestarTelemetriaUseCase._ultimos_heartbeats.clear()
+    IngestarTelemetriaUseCase.limpiar_estado()
 
     class SpyDispositivosRepo(MockDispositivosRepo):
         def __init__(self):
@@ -590,9 +586,7 @@ def test_device_cache_resolucion_en_memoria():
 
 def test_heartbeat_throttling_60s():
     # Limpiar estado estático
-    IngestarTelemetriaUseCase._ultimas_persistencias.clear()
-    IngestarTelemetriaUseCase._device_cache.clear()
-    IngestarTelemetriaUseCase._ultimos_heartbeats.clear()
+    IngestarTelemetriaUseCase.limpiar_estado()
 
     class SpyDispositivosRepo(MockDispositivosRepo):
         def __init__(self):
