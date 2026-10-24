@@ -5,15 +5,15 @@ from typing import ClassVar
 
 from src.application.dtos.alerta_dto import AlertaResponseDTO
 from src.application.dtos.dispositivo_dto import DispositivoResponseDTO
+from src.application.use_cases.asistente.recopilar_telemetria import (
+    recopilar_telemetria,
+)
 from src.application.use_cases.consultar_telemetria import (
     ConsultarTelemetriaUseCase,
 )
 from src.application.use_cases.gestionar_alertas import GestionarAlertasUseCase
 from src.application.use_cases.gestionar_dispositivos import (
     GestionarDispositivosUseCase,
-)
-from src.application.use_cases.asistente.recopilar_telemetria import (
-    recopilar_telemetria,
 )
 from src.domain.asistente.entities import (
     ConversacionAsistente,
