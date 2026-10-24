@@ -1,6 +1,6 @@
 
-import unicodedata
 import re
+import unicodedata
 from typing import ClassVar
 
 from src.domain.asistente.entities import IntencionClasificada
