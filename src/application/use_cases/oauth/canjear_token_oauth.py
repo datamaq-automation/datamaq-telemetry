@@ -128,9 +128,8 @@ class CanjearTokenOAuthUseCase:
         if dto.client_id and dto.client_id != token_entidad.client_id:
             raise InvalidGrantError("client_id no coincide con el refresh token emitido")
 
-        # Rotación estricta de refresh token
-        self.oauth_repo.revocar_refresh_token(token_hash, ahora)
-
+        # Rotación estricta de refresh token. Se guarda el nuevo ANTES de revocar el viejo: get_usuario_actual
+        # exige un refresh activo para los access tokens OAuth, y un hueco entre ambas escrituras daría 401.
         nuevo_refresh = generar_token_aleatorio(32)
         nuevo_hash = hash_token(nuevo_refresh)
         expira_nuevo = ahora + timedelta(days=30)
@@ -145,6 +144,11 @@ class CanjearTokenOAuthUseCase:
             created_at=ahora,
         )
         self.oauth_repo.guardar_refresh_token(nuevo_entidad)
+        if not self.oauth_repo.revocar_refresh_token(token_hash, ahora):
+            # El viejo ya estaba revocado (desconexión o canje concurrente entre la lectura y acá):
+            # el nuevo no puede quedar activo ni resucitar la integración.
+            self.oauth_repo.revocar_refresh_token(nuevo_hash, ahora)
+            raise InvalidGrantError("Refresh token inexistente o revocado")
 
         usuario = self.usuario_repo.obtener_por_id(token_entidad.user_id) if self.usuario_repo else None
         username = usuario.usuario if usuario else token_entidad.user_id
