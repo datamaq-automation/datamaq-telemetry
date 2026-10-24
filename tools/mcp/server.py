@@ -138,6 +138,21 @@ async def _ejecutar_peticion(
             raise RuntimeError(f"Error de conexión con DataMaq API ({ruta}): {exc}") from exc
 
 
+# Dirección y coordenadas de la planta no se exponen al MCP (decisión 2026-10-15, issue #37).
+# La API las devuelve porque la app las usa: el filtro vive acá, no en el endpoint.
+_CLAVES_UBICACION = frozenset({"direccion", "latitud", "longitud"})
+_CAMPOS_PLANTA_PERMITIDOS = frozenset({"id", "organizacion_id", "nombre", "slug", "creado_en", "actualizado_en"})
+
+
+def _sin_ubicacion(valor: Any) -> Any:
+    """Quita `direccion`, `latitud` y `longitud` de cualquier nivel de una respuesta de la API."""
+    if isinstance(valor, dict):
+        return {k: _sin_ubicacion(v) for k, v in valor.items() if k not in _CLAVES_UBICACION}
+    if isinstance(valor, list):
+        return [_sin_ubicacion(v) for v in valor]
+    return valor
+
+
 @mcp.tool()
 async def datamaq_listar_plantas(ctx: Context | None = None) -> list[dict[str, Any]]:
     """Retorna las plantas industriales a las que el usuario autenticado tiene acceso en DataMaq.
@@ -148,9 +163,8 @@ async def datamaq_listar_plantas(ctx: Context | None = None) -> list[dict[str, A
     """
     token = _resolver_token(ctx)
     resultado = await _ejecutar_peticion("GET", "/api/v1/plantas", token=token)
-    if isinstance(resultado, list):
-        return resultado
-    return [resultado]
+    plantas = resultado if isinstance(resultado, list) else [resultado]
+    return [{k: v for k, v in p.items() if k in _CAMPOS_PLANTA_PERMITIDOS} for p in plantas if isinstance(p, dict)]
 
 
 @mcp.tool()
@@ -201,7 +215,7 @@ async def datamaq_consultar_alertas(
             alerta_enriquecida["dispositivo_tag"] = dispositivos_map[dev_id]
             alertas_filtradas.append(alerta_enriquecida)
 
-    return alertas_filtradas
+    return _sin_ubicacion(alertas_filtradas)
 
 
 @mcp.tool()
@@ -237,7 +251,7 @@ async def datamaq_analizar_capacitores(
     respuesta["advertencias_calidad"] = recoleccion["advertencias_calidad"]
     respuesta["dispositivos_con_error"] = recoleccion["con_error"]
     respuesta["medidores"] = recoleccion["medidores"]
-    return respuesta
+    return _sin_ubicacion(respuesta)
 
 
 @mcp.tool()
@@ -267,8 +281,8 @@ async def datamaq_consultar_penalizaciones(
         "GET", "/api/v1/analitica/penalizaciones/planta", token=token, params=parametros
     )
     if isinstance(resultado, dict):
-        return resultado
-    return {"resultado": resultado}
+        return _sin_ubicacion(resultado)
+    return {"resultado": _sin_ubicacion(resultado)}
 
 
 _BUCKET_SEGUNDOS = 300  # Serie de planta en buckets de 5 min (misma granularidad que el backend)
