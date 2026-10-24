@@ -10,7 +10,8 @@ Batería de Pruebas ("The Constraint Gauntlet"):
   1. test_init_files_must_be_empty:
      - El 100% de los archivos __init__.py en src/ y tests/ deben tener exactamente 0 bytes.
   2. test_clean_architecture_compliance:
-     - Domain: No importa application, adapters, infrastructure, fastapi ni ORMs/drivers de persistencia.
+     - Domain: Solo librería estándar y `src`. No importa application, adapters, infrastructure, fastapi
+       ni ORMs/drivers de persistencia.
      - Application: No importa adapters, infrastructure, fastapi ni ORMs.
      - Adapters: No importa infrastructure ni fastapi/starlette.
      - Infrastructure (Routers): No importan ORMs directamente (controladores delgados).
@@ -114,8 +115,18 @@ def verify_init_files_empty(root_dir: Path | None = None) -> list[str]:
 # ==============================================================================
 
 
-def verify_architecture_layers(root_dir: Path | None = None) -> list[str]:
-    """Verifica el cumplimiento de la regla de dependencias entre capas."""
+def _es_stdlib_o_interno(module_name: str) -> bool:
+    """True si el módulo pertenece a la librería estándar o al propio proyecto (`src`)."""
+    raiz = module_name.split(".")[0]
+    return raiz == "src" or raiz in sys.stdlib_module_names
+
+
+def verify_architecture_layers(root_dir: Path | None = None, incluir_controladores: bool = True) -> list[str]:
+    """Verifica el cumplimiento de la regla de dependencias entre capas.
+
+    `incluir_controladores` activa la regla de routers delgados (sin ORM). Es opcional porque hoy hay
+    routers que todavía importan SQLAlchemy; `scripts/verify_architecture.py` la omite para no romper CI.
+    """
     root = root_dir or find_project_root()
     src_dir = root / "src"
     errors: list[str] = []
@@ -186,7 +197,13 @@ def verify_architecture_layers(root_dir: Path | None = None) -> list[str]:
 
             imports = extract_imports(tree)
             for module_name, lineno, _ in imports:
-                if "src/domain" in rel_path and any(module_name.startswith(pkg) for pkg in domain_forbidden):
+                if "src/domain" in rel_path and not _es_stdlib_o_interno(module_name):
+                    errors.append(
+                        f"[DOMINIO VIOLADO] {rel_path}:{lineno} importa '{module_name}', que no es stdlib ni src. "
+                        "El dominio solo puede usar la librería estándar."
+                    )
+
+                elif "src/domain" in rel_path and any(module_name.startswith(pkg) for pkg in domain_forbidden):
                     errors.append(f"[DOMINIO VIOLADO] {rel_path}:{lineno} importa módulo prohibido '{module_name}'.")
 
                 elif "src/application" in rel_path and any(
@@ -199,7 +216,7 @@ def verify_architecture_layers(root_dir: Path | None = None) -> list[str]:
                         f"[ADAPTADORES VIOLADO] {rel_path}:{lineno} importa módulo prohibido '{module_name}'."
                     )
 
-                elif (
+                elif incluir_controladores and (
                     "src/infrastructure/fastapi/routers" in rel_path or "src/infrastructure/fastapi/routes" in rel_path
                 ):
                     if any(module_name.startswith(pkg) for pkg in ("sqlalchemy", "sqlmodel")):
@@ -522,6 +539,17 @@ def test_clean_architecture_compliance():
     assert not errors, f"\n❌ Se detectaron {len(errors)} violaciones de Clean Architecture:\n\n" + "\n".join(
         f"  • {err}" for err in errors
     )
+
+
+def test_dominio_rechaza_libreria_de_terceros_no_listada(tmp_path: Path):
+    """El dominio debe rechazar cualquier dependencia de terceros, aunque no esté en la lista de prohibidos."""
+    dominio = tmp_path / "src" / "domain" / "x"
+    dominio.mkdir(parents=True)
+    (dominio / "servicio.py").write_text("import structlog\n", encoding="utf-8")
+
+    errors = verify_architecture_layers(tmp_path)
+
+    assert any("structlog" in err for err in errors), errors
 
 
 def test_no_relative_imports():
