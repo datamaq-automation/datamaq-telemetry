@@ -206,7 +206,7 @@ def get_procesar_pregunta_asistente_use_case(
     db: Annotated[Session, Depends(get_db_session)],
 ) -> ProcesarPreguntaAsistenteUseCase:
     from src.infrastructure.asistente.clasificador_reglas import (
-        ClasificadorIntencionReglasAdapter,
+        ClasificadorIntencionPorReglas,
     )
     from src.infrastructure.groq.groq_adapter import GroqRespuestaAdapter
     from src.infrastructure.sqlalchemy.repositories.asistente_repository import (
@@ -214,7 +214,7 @@ def get_procesar_pregunta_asistente_use_case(
     )
 
     return ProcesarPreguntaAsistenteUseCase(
-        clasificador=ClasificadorIntencionReglasAdapter(),
+        clasificador=ClasificadorIntencionPorReglas(),
         generador=GroqRespuestaAdapter(),
         repo_conversaciones=MySQLConversacionesAsistenteRepository(db),
         gestor_alertas=get_alertas_use_case(db),

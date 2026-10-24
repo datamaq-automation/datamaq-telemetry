@@ -6,8 +6,8 @@ from src.domain.asistente.entities import IntencionClasificada
 from src.domain.asistente.ports import ClasificadorIntencionPort
 
 
-class ClasificadorIntencionReglasAdapter(ClasificadorIntencionPort):
-    """Adaptador determinístico y ligero en CPU local que clasifica la intención de la pregunta
+class ClasificadorIntencionPorReglas(ClasificadorIntencionPort):
+    """Implementación determinística y ligera en CPU local que clasifica la intención de la pregunta
 
     del usuario utilizando reglas semánticas y patrones de palabras clave.
     """
