@@ -610,7 +610,10 @@ def test_oauth_consent_info_y_consent_flow():
         assert info_data["client_id"] == "claude-ai"
         assert info_data["client_icon"] == "anthropic"
         assert info_data["organizacion_id"] == "org-durax"
-        assert "planta" in info_data["planta_activa_id"]
+        # "org-durax" no existe en data/organizaciones.yml (las orgs son UUID): sin plantas permitidas, null.
+        # Antes se fabricaba "planta-org-durax" (Issue #54, H-C).
+        assert info_data["planta_activa_id"] is None
+        assert info_data["planta_activa_nombre"] is None
         assert len(info_data["scopes"]) == 1
         assert info_data["scopes"][0]["scope"] == "read:telemetria"
         assert "Lectura" in info_data["scopes"][0]["descripcion"]
