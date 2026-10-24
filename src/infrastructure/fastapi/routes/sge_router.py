@@ -5,12 +5,6 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
-from src.adapters.gateways.in_memory_documentacion_sge_repository import (
-    InMemoryDocumentacionSgeRepository,
-)
-from src.adapters.gateways.in_memory_registro_capacitaciones_sge_repository import (
-    InMemoryRegistroCapacitacionesSgeRepository,
-)
 from src.application.dtos.sge_dto import (
     AcuseCapacitacionRequestDTO,
     AhorrosCusumResponseDTO,
@@ -59,31 +53,15 @@ from src.infrastructure.fastapi.dependencies import (
     get_telemetria_use_case,
     get_usuario_actual,
 )
+from src.infrastructure.fastapi.dependencies_memoria import (
+    get_documentacion_sge_repository,
+    get_organizaciones_repository,
+    get_registro_capacitaciones_repository,
+)
 from src.infrastructure.fastapi.error_handler import manejar_error_http
 from src.infrastructure.fastapi.planta_ownership import resolver_planta_permitida
 from src.infrastructure.settings.config import Settings
 from src.infrastructure.sqlalchemy.mysql_repositories import MySQLTelemetriaRepository
-from src.infrastructure.yaml.repositories.organizaciones_repository import (
-    YamlOrganizacionesRepository,
-)
-
-_repositorio_sge_singleton: RepositorioDocumentacionSgePort = InMemoryDocumentacionSgeRepository()
-_repositorio_capacitaciones_singleton: RepositorioRegistroCapacitacionesSgePort = (
-    InMemoryRegistroCapacitacionesSgeRepository()
-)
-_repositorio_organizaciones_singleton: RepositorioOrganizacionesPort = YamlOrganizacionesRepository()
-
-
-def get_documentacion_sge_repository() -> RepositorioDocumentacionSgePort:
-    return _repositorio_sge_singleton
-
-
-def get_registro_capacitaciones_repository() -> RepositorioRegistroCapacitacionesSgePort:
-    return _repositorio_capacitaciones_singleton
-
-
-def get_organizaciones_repository() -> RepositorioOrganizacionesPort:
-    return _repositorio_organizaciones_singleton
 
 
 def get_consultar_documentacion_sge_use_case(

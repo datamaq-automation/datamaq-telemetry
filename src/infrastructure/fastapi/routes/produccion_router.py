@@ -4,9 +4,6 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, status
 
-from src.adapters.gateways.in_memory_variables_proceso_repository import (
-    InMemoryVariablesProcesoRepository,
-)
 from src.application.dtos.produccion_dto import (
     CalcularSecRequestDTO,
     LecturaProcesoRequestDTO,
@@ -18,13 +15,8 @@ from src.application.use_cases.calcular_sec_hibrido import CalcularSecHibridoUse
 from src.application.use_cases.registrar_lectura_proceso import RegistrarLecturaProcesoUseCase
 from src.domain.produccion.ports import RepositorioVariablesProcesoPort
 from src.infrastructure.fastapi.dependencies import get_usuario_actual
+from src.infrastructure.fastapi.dependencies_memoria import get_variables_proceso_repository
 from src.infrastructure.fastapi.error_handler import manejar_error_http
-
-_repo_proceso_singleton: RepositorioVariablesProcesoPort = InMemoryVariablesProcesoRepository()
-
-
-def get_variables_proceso_repository() -> RepositorioVariablesProcesoPort:
-    return _repo_proceso_singleton
 
 
 def get_registrar_lectura_use_case(

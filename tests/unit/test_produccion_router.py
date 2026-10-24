@@ -14,10 +14,10 @@ from src.application.use_cases.registrar_lectura_proceso import RegistrarLectura
 from src.domain.produccion.entities import ConfiguracionMedicionMaquina
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
 from src.infrastructure.fastapi.dependencies import get_usuarios_repository
+from src.infrastructure.fastapi.dependencies_memoria import get_variables_proceso_repository
 from src.infrastructure.fastapi.routes.produccion_router import (
     get_calcular_sec_use_case,
     get_registrar_lectura_use_case,
-    get_variables_proceso_repository,
 )
 from src.infrastructure.fastapi.server import create_app
 from src.infrastructure.settings.config import get_settings

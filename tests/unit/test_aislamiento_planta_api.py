@@ -22,10 +22,10 @@ from src.infrastructure.fastapi.dependencies import (
     get_planta_estructura_use_case,
     get_usuario_actual,
 )
+from src.infrastructure.fastapi.dependencies_memoria import get_organizaciones_repository
 from src.infrastructure.fastapi.routes.sge_router import (
     get_consultar_ahorros_use_case,
     get_consultar_balance_use_case,
-    get_organizaciones_repository,
 )
 from src.infrastructure.fastapi.server import create_app
 
