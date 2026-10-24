@@ -418,9 +418,7 @@ def test_tls_mutuo_cuando_certfile_configurado(monkeypatch):
 
 
 def test_use_case_cache_lock():
-    IngestarTelemetriaUseCase._device_cache.clear()
-    IngestarTelemetriaUseCase._ultimos_heartbeats.clear()
-    IngestarTelemetriaUseCase._ultimas_persistencias.clear()
+    IngestarTelemetriaUseCase.limpiar_estado()
 
     lock = getattr(IngestarTelemetriaUseCase, "_lock", None)
     assert isinstance(lock, type(threading.Lock()))

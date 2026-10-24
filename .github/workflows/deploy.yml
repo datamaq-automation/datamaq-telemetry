@@ -1,6 +1,8 @@
 name: CD Deploy
 
-# Despliegue automático a staging (develop) y producción (main).
+# Único CD de datamaq-telemetry: despliega a staging (develop, api-dev, 8886) y a producción (main, api, 8885).
+# Solo corre si CI de la misma rama pasó. Todos los valores por ambiente salen del job target: ninguna rama hereda
+# los defaults de producción de scripts/deploy-server.sh (DEPLOY_BRANCH, DEPLOY_BACKUP_DIR, DEPLOY_DEPS_FILE).
 # Requiere bootstrap previo en el VPS (clon, .venv, systemd, BD, mosquitto, .env).
 # También disponible de forma manual vía workflow_dispatch.
 on:
@@ -22,6 +24,8 @@ jobs:
       remote_dir: ${{ steps.determine.outputs.remote_dir }}
       service: ${{ steps.determine.outputs.service }}
       health_url: ${{ steps.determine.outputs.health_url }}
+      backup_dir: ${{ steps.determine.outputs.backup_dir }}
+      deps_file: ${{ steps.determine.outputs.deps_file }}
     steps:
       - name: Determinar rama y ambiente
         id: determine
@@ -42,6 +46,9 @@ jobs:
             echo "remote_dir=/var/www/datamaq-telemetry-dev" >> "$GITHUB_OUTPUT"
             echo "service=datamaq-telemetry-dev.service" >> "$GITHUB_OUTPUT"
             echo "health_url=http://localhost:8886/health/ready" >> "$GITHUB_OUTPUT"
+            # Staging: dumps y freeze de rollback aparte de producción (mismo /tmp compartido en el VPS).
+            echo "backup_dir=/tmp/datamaq-telemetry-dev-pre-migracion" >> "$GITHUB_OUTPUT"
+            echo "deps_file=/tmp/telemetry-deps-dev.txt" >> "$GITHUB_OUTPUT"
           elif [ "$BRANCH" = "main" ]; then
             echo "branch=main" >> "$GITHUB_OUTPUT"
             echo "name=Deploy a Producción (api, 8885)" >> "$GITHUB_OUTPUT"
@@ -50,6 +57,8 @@ jobs:
             echo "remote_dir=/var/www/datamaq-telemetry" >> "$GITHUB_OUTPUT"
             echo "service=datamaq-telemetry.service" >> "$GITHUB_OUTPUT"
             echo "health_url=http://localhost:8885/health/ready" >> "$GITHUB_OUTPUT"
+            echo "backup_dir=/tmp/datamaq-telemetry-pre-migracion" >> "$GITHUB_OUTPUT"
+            echo "deps_file=/tmp/telemetry-deps.txt" >> "$GITHUB_OUTPUT"
           else
             echo "❌ Error: rama '$BRANCH' no está autorizada para despliegue"
             exit 1
@@ -104,6 +113,9 @@ jobs:
           DEPLOY_REMOTE_DIR: ${{ needs.target.outputs.remote_dir }}
           DEPLOY_SERVICE_NAME: ${{ needs.target.outputs.service }}
           DEPLOY_HEALTH_URL: ${{ needs.target.outputs.health_url }}
+          DEPLOY_BRANCH: ${{ needs.target.outputs.branch }}
+          DEPLOY_BACKUP_DIR: ${{ needs.target.outputs.backup_dir }}
+          DEPLOY_DEPS_FILE: ${{ needs.target.outputs.deps_file }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |

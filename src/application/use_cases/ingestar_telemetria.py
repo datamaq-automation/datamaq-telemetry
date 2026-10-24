@@ -34,7 +34,6 @@ from src.domain.telemetria.ports import (
     RepositorioDispositivosPort,
     RepositorioTelemetriaPort,
 )
-from src.domain.telemetria.services import FiltroPersistenciaTemporalService
 from src.domain.telemetria.servicios.analizador_calidad_metrologica import AnalizadorMetrologicoService
 
 
@@ -42,10 +41,15 @@ class IngestarTelemetriaUseCase:
     """Caso de uso de orquestación de ingesta y normalización de telemetría MQTT."""
 
     _ultimas_persistencias: ClassVar[dict[str, datetime]] = {}
-    _device_cache: ClassVar[dict[str, Dispositivo]] = ResolvedorDispositivoIngesta._device_cache
-    _ultimos_heartbeats: ClassVar[dict[str, datetime]] = ResolvedorDispositivoIngesta._ultimos_heartbeats
-    _filtro_persistencia: ClassVar[FiltroPersistenciaTemporalService] = ProcesadorAlertasIngesta._filtro_persistencia
     _lock: ClassVar[threading.Lock] = threading.Lock()
+
+    @classmethod
+    def limpiar_estado(cls) -> None:
+        """Vacía todo el estado en memoria de la ingesta: cachés de dispositivos, throttle y alertas (útil para pruebas)."""
+        ResolvedorDispositivoIngesta.limpiar_cache()
+        ProcesadorAlertasIngesta.limpiar_estado()
+        with cls._lock:
+            cls._ultimas_persistencias.clear()
 
     def __init__(
         self,

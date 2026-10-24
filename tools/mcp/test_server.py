@@ -745,3 +745,64 @@ def test_servidor_arranque_stdio():
     finally:
         proc.terminate()
         proc.wait(timeout=3)
+
+
+def _handler_con_ubicacion(request: httpx.Request) -> httpx.Response:
+    """Responde como la API real: la planta trae dirección y coordenadas, también anidadas en otras respuestas."""
+    planta = {
+        "id": "planta-alpha",
+        "organizacion_id": "org-1",
+        "nombre": "Planta Alpha",
+        "slug": "planta-alpha",
+        "direccion": "Av. Siempre Viva 742",
+        "latitud": -34.6,
+        "longitud": -58.4,
+        "creado_en": "2026-01-01T00:00:00Z",
+        "actualizado_en": "2026-01-01T00:00:00Z",
+    }
+    ruta = request.url.path
+    if ruta == "/api/v1/plantas":
+        return httpx.Response(200, json=[planta])
+    if ruta == "/api/v1/dispositivos":
+        return httpx.Response(200, json=[{"id": "d1", "nombre": "M1", "planta": planta}])
+    if ruta == "/api/v1/alertas":
+        return httpx.Response(200, json=[{"dispositivo_id": "d1", "tipo": "bajo_fp", "planta": planta}])
+    if ruta.startswith("/api/v1/telemetria/"):
+        return httpx.Response(200, json=[])
+    return httpx.Response(200, json={"planta": planta, "direccion": "Av. Siempre Viva 742", "valor": 1.0})
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "herramienta,argumentos",
+    [
+        (datamaq_listar_plantas, {}),
+        (datamaq_consultar_alertas, {"planta_id": "planta-alpha"}),
+        (datamaq_analizar_capacitores, {"planta_id": "planta-alpha"}),
+        (datamaq_consultar_penalizaciones, {"planta_id": "planta-alpha"}),
+        (datamaq_consultar_potencia_reciente, {"planta_id": "planta-alpha"}),
+    ],
+)
+async def test_ninguna_herramienta_expone_direccion_ni_coordenadas(herramienta, argumentos):
+    """Contrato de #37: ninguna herramienta del MCP devuelve direccion, latitud ni longitud, a ninguna profundidad."""
+    set_client(
+        httpx.AsyncClient(transport=httpx.MockTransport(_handler_con_ubicacion), base_url="http://datamaq.local")
+    )
+
+    resultado = await herramienta(**argumentos)
+
+    serializado = json.dumps(resultado)
+    for clave in ("direccion", "latitud", "longitud"):
+        assert f'"{clave}"' not in serializado, f"{herramienta.__name__} expone {clave}"
+
+
+@pytest.mark.asyncio
+async def test_listar_plantas_solo_devuelve_los_campos_de_identificacion():
+    """Allowlist de #37: la planta conserva identidad y fechas, y nada más."""
+    set_client(
+        httpx.AsyncClient(transport=httpx.MockTransport(_handler_con_ubicacion), base_url="http://datamaq.local")
+    )
+
+    plantas = await datamaq_listar_plantas()
+
+    assert set(plantas[0]) == {"id", "organizacion_id", "nombre", "slug", "creado_en", "actualizado_en"}

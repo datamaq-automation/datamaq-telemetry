@@ -50,6 +50,7 @@ from src.domain.oauth.ports import OAuthRepositoryPort
 from src.domain.telemetria.ports import RepositorioDispositivosPort
 from src.infrastructure.auth.email_service import SmtpEmailService
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
+from src.infrastructure.fastapi.acceso_oauth import integracion_oauth_vigente
 from src.infrastructure.paho_mqtt.mqtt_listener import MQTTListener
 from src.infrastructure.settings.config import Settings, get_settings
 from src.infrastructure.settings.logger import get_logger
@@ -204,6 +205,7 @@ def get_alertas_use_case(
 
 def get_procesar_pregunta_asistente_use_case(
     db: Annotated[Session, Depends(get_db_session)],
+    settings: Annotated[Settings, Depends(get_settings_dep)],
 ) -> ProcesarPreguntaAsistenteUseCase:
     from src.infrastructure.asistente.clasificador_reglas import (
         ClasificadorIntencionReglasAdapter,
@@ -219,6 +221,7 @@ def get_procesar_pregunta_asistente_use_case(
         repo_conversaciones=MySQLConversacionesAsistenteRepository(db),
         gestor_alertas=get_alertas_use_case(db),
         gestor_dispositivos=get_dispositivos_use_case(db),
+        consultar_telemetria=get_telemetria_use_case(db, settings),
     )
 
 
@@ -446,6 +449,7 @@ def get_usuario_actual(
     authorization: Annotated[str | None, Header()] = None,
     datamaq_token: Annotated[str | None, Cookie()] = None,
     repo_usuarios: Annotated[RepositorioUsuariosPort | None, Depends(get_usuarios_repository)] = None,
+    repo_oauth: Annotated[OAuthRepositoryPort | None, Depends(get_oauth_repository)] = None,
 ) -> dict[str, Any]:
     settings = get_settings()
     if not settings.AUTH_REQUIRED:
@@ -477,6 +481,10 @@ def get_usuario_actual(
             token_iat = datetime.fromtimestamp(iat, tz=timezone.utc)
             if token_iat < rev_dt:
                 raise HTTPException(status_code=401, detail="credenciales_invalidas")
+
+    # Access token OAuth (lleva client_id): vale solo mientras la integración siga conectada (Issue #33).
+    if not integracion_oauth_vigente(claims, repo_oauth):
+        raise HTTPException(status_code=401, detail="credenciales_invalidas")
 
     return claims
 

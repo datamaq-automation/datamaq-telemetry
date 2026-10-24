@@ -22,6 +22,7 @@ from src.domain.telemetria.services import debe_recibir_evento
 from src.domain.telemetria.servicios.alcance_tiempo_real import alcance_de_clientes
 from src.domain.telemetria.value_objects import MacAddress
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
+from src.infrastructure.fastapi.acceso_oauth import integracion_oauth_vigente_ws
 from src.infrastructure.fastapi.auth_cookies import ORIGENES_CORS_CYBERSYN
 from src.infrastructure.fastapi.dependencies import (
     extraer_token,
@@ -400,6 +401,9 @@ async def _autenticar_cliente_ws(websocket: WebSocket, settings: Settings, clien
     token = extraer_token(cookie_token, auth_header)
     adicionales = [settings.API_SECRET_KEY_ANTERIOR] if settings.API_SECRET_KEY_ANTERIOR else None
     claims = JwtTokenService(settings.API_SECRET_KEY).verificar(token, adicionales) if token else None
+    # Access token OAuth de una integración desconectada (Issue #33): mismo rechazo que un token inválido.
+    if claims is not None and not await asyncio.to_thread(integracion_oauth_vigente_ws, websocket.app, claims):
+        claims = None
     if claims is None:
         logger.warning("ws_auth_rechazada", client=client_host, razon="token_invalido")
         await websocket.close(code=WS_CLOSE_TOKEN_INVALIDO, reason="token_invalido")

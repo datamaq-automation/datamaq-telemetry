@@ -262,7 +262,10 @@ class AnalizadorMetrologicoService:
             requiere_comp = False
             banco_sug = None
 
-        penalizacion_ars = DimensionadorCompensacionService.estimar_penalizacion_mensual_ars(p_activa_kw, fp_val)
+        # Sin tarifa verificada de la distribuidora no se estima penalización en ARS (decisión 2026-10-11)
+        penalizacion_ars = DimensionadorCompensacionService.estimar_penalizacion_mensual_ars(
+            p_activa_kw, fp_val, tarifa_kwh_ars=None, cargo_potencia_kw_ars=None
+        )
         recargo_pct = round(((0.95 / fp_val) - 1.0) * 100.0, 2) if fp_val < 0.95 else 0.0
         return requiere_comp, qc_kvar, banco_sug, penalizacion_ars, recargo_pct
 

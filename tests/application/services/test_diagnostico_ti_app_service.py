@@ -93,8 +93,8 @@ class TestEjecutarDiagnosticoTIApplicationService:
         """Serializar DTO a dict."""
         candidatos = [
             CandidatoTI(
-                orden_fases=("R", "S", "T"),
-                invertido=False,
+                asociacion_tension_corriente=("R", "S", "T"),
+                polaridad_ti=False,
                 score=0.9876,
                 justificacion="OK",
             )

@@ -120,8 +120,8 @@ class DiagnosticoTIResultDTO:
             "error": self.error,
             "candidatos": [
                 {
-                    "orden_fases": list(cand.orden_fases),
-                    "invertido": cand.invertido,
+                    "orden_fases": list(cand.asociacion_tension_corriente),
+                    "invertido": cand.polaridad_ti,
                     "score": round(cand.score, 4),
                     "justificacion": cand.justificacion,
                 }

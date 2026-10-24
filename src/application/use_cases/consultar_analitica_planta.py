@@ -10,6 +10,7 @@ from src.application.use_cases.consultar_telemetria import ConsultarTelemetriaUs
 from src.domain.telemetria.analizador_reactiva import (
     DimensionadorCompensacionService,
 )
+from src.domain.telemetria.penalizacion_periodo import calcular_penalizacion_periodo
 from src.domain.telemetria.ports import RepositorioOrganizacionesPort
 
 # Límite de FP por debajo del cual un intervalo cuenta como penalizable (mismo valor que el DTO)
@@ -144,7 +145,36 @@ class ConsultarAnaliticaPlantaUseCase:
             fecha_calculo=datetime.now(timezone.utc),
         )
 
-    def obtener_penalizaciones(self, planta_id: str, periodo_dias: int = 7) -> AnaliticaPenalizacionesPlantaDTO:
+    def obtener_penalizaciones(
+        self,
+        planta_id: str,
+        periodo_dias: int = 7,
+        periodo_facturacion: str | None = None,
+    ) -> AnaliticaPenalizacionesPlantaDTO:
+        """Con periodo_facturacion, la cifra sale de la factura de ese período (sin telemetría).
+        Sin él, mantiene el análisis por ventana de bajo FP de abajo."""
+        if periodo_facturacion is not None:
+            return self._penalizacion_por_periodo(planta_id, periodo_facturacion)
+        return self._penalizacion_por_ventana(planta_id, periodo_dias)
+
+    @staticmethod
+    def _penalizacion_por_periodo(planta_id: str, periodo_facturacion: str) -> AnaliticaPenalizacionesPlantaDTO:
+        penalizacion = calcular_penalizacion_periodo(planta_id, periodo_facturacion)
+        importe = penalizacion.importe_ars
+        return AnaliticaPenalizacionesPlantaDTO(
+            planta_id=planta_id,
+            disponible=importe is not None,
+            motivo_no_disponible=penalizacion.motivo_sin_precio,
+            penalizacion_estimada_ars=float(importe) if importe is not None else None,
+            periodo_facturacion=periodo_facturacion,
+            distribuidora=penalizacion.distribuidora,
+            tarifa=penalizacion.tarifa,
+            fuente_archivo=penalizacion.fuente_archivo,
+            concepto=penalizacion.concepto,
+            timestamp_calculo=datetime.now(timezone.utc),
+        )
+
+    def _penalizacion_por_ventana(self, planta_id: str, periodo_dias: int) -> AnaliticaPenalizacionesPlantaDTO:
         """Intervalos y horas bajo FP reales por planta. La penalización en ARS queda sin calcular.
 
         Antes devolvía constantes fijas (P=120 kW, FP=0.88, 14,5 h) iguales para toda planta.

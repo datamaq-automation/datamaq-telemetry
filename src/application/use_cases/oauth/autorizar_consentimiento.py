@@ -2,11 +2,15 @@
 
 from datetime import datetime, timedelta, timezone
 
+import structlog
+
 from src.application.dtos.oauth_dtos import OAuthAuthorizeRequestDTO, OAuthAuthorizeResponseDTO
 from src.domain.oauth.entities import OAuthCode
 from src.domain.oauth.exceptions import InvalidClientError, InvalidRequestError
 from src.domain.oauth.ports import OAuthRepositoryPort
-from src.domain.oauth.services import generar_token_aleatorio, hash_token
+from src.domain.oauth.services import generar_token_aleatorio, hash_token, resolver_scopes
+
+_log = structlog.get_logger(__name__)
 
 
 class AutorizarConsentimientoUseCase:
@@ -37,6 +41,17 @@ class AutorizarConsentimientoUseCase:
         if dto.code_challenge_method != "S256":
             raise InvalidRequestError("code_challenge_method debe ser 'S256'")
 
+        # Scopes desconocidos: se descartan (no se rechaza, porque el servidor todavía no aplica scopes) y se
+        # registran para saber qué piden realmente los conectores.
+        scope, descartados = resolver_scopes(dto.scope)
+        if descartados:
+            _log.warning(
+                "oauth_scopes_desconocidos_descartados",
+                client_id=dto.client_id,
+                descartados=list(descartados),
+                otorgados=scope,
+            )
+
         ahora = datetime.now(timezone.utc)
         expira_en = ahora + timedelta(minutes=5)
         code = generar_token_aleatorio(32)
@@ -50,7 +65,7 @@ class AutorizarConsentimientoUseCase:
             redirect_uri=dto.redirect_uri,
             code_challenge=dto.code_challenge,
             code_challenge_method=dto.code_challenge_method,
-            scope=dto.scope,
+            scope=scope,
             expires_at=expira_en,
             used=False,
             created_at=ahora,

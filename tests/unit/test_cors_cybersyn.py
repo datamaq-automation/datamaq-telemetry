@@ -45,10 +45,6 @@ def mock_auth_use_case():
         token="token_jwt_prueba",
         expira_en=AHORA,
     )
-    mock.guest.return_value = LoginResponseDTO(
-        token="token_jwt_guest",
-        expira_en=AHORA,
-    )
     return mock
 
 
@@ -220,18 +216,6 @@ def test_login_cookie_synco_no_recibe_samesite_none(client):
     cookie_header = response.headers.get("set-cookie", "")
     assert "SameSite=strict" in cookie_header
     assert "SameSite=none" not in cookie_header
-
-
-def test_guest_cookie_cybersyn_samesite_none_secure(client):
-    response = client.post(
-        "/api/v1/auth/guest",
-        headers={"Origin": "https://cybersyn.com.ar"},
-    )
-    assert response.status_code == 200
-    cookie_header = response.headers.get("set-cookie", "")
-    assert "datamaq_token=token_jwt_guest" in cookie_header
-    assert "SameSite=none" in cookie_header
-    assert "Secure" in cookie_header
 
 
 def test_logout_cookie_cybersyn_samesite_none_secure(client):

@@ -152,3 +152,131 @@ def test_cambiar_rol_usuario_exitoso_y_auditoria():
     assert evento.resultado == "EXITO"
     assert evento.metadatos["rol_anterior"] == "operador"
     assert evento.metadatos["rol_nuevo"] == "mantenimiento"
+
+
+def _baja_de_superadmin(rol_actor: str) -> tuple[TestClient, MagicMock, MagicMock]:
+    from src.infrastructure.fastapi.dependencies import get_usuarios_repository
+
+    app = create_app()
+    repo = MagicMock()
+    usuario = MagicMock()
+    usuario.id = "user-x"
+    usuario.usuario = "root_2"
+    usuario.rol = "superadmin"
+    usuario.organizacion_id = "org-1"
+    usuario.esta_activo = True
+    repo.obtener_por_id.return_value = usuario
+    app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "actor", "rol": rol_actor, "org": "org-1"}
+    app.dependency_overrides[get_usuarios_repository] = lambda: repo
+    return TestClient(app), repo, usuario
+
+
+def test_admin_no_da_de_baja_a_un_superadmin_403_sin_desactivar():
+    client, repo, usuario = _baja_de_superadmin("admin")
+
+    response = client.delete("/api/v1/usuarios/user-x")
+
+    assert response.status_code == 403
+    assert usuario.esta_activo is True
+    repo.guardar.assert_not_called()
+
+
+def test_superadmin_da_de_baja_a_otro_superadmin_204():
+    client, _repo, usuario = _baja_de_superadmin("superadmin")
+
+    response = client.delete("/api/v1/usuarios/user-x")
+
+    assert response.status_code == 204
+    assert usuario.esta_activo is False
+
+
+def _app_con_repo(claims: dict, repo: MagicMock):
+    from src.infrastructure.fastapi.dependencies import get_usuarios_repository
+
+    app = create_app()
+    app.dependency_overrides[get_usuario_actual] = lambda: claims
+    app.dependency_overrides[get_usuarios_repository] = lambda: repo
+    return TestClient(app)
+
+
+def _repo_sin_usuario_previo() -> MagicMock:
+    repo = MagicMock()
+    repo.obtener_por_usuario.return_value = None
+    repo.guardar.side_effect = lambda u: u
+    return repo
+
+
+def test_admin_no_crea_superadmin_403_sin_guardar():
+    repo = _repo_sin_usuario_previo()
+    client = _app_con_repo({"sub": "admin-1", "rol": "admin", "org": "org-1"}, repo)
+
+    response = client.post("/api/v1/usuarios", json={"usuario": "nuevo_root", "rol": "superadmin"})
+
+    assert response.status_code == 403
+    repo.guardar.assert_not_called()
+
+
+def test_admin_no_crea_usuario_en_otra_organizacion_403_sin_guardar():
+    repo = _repo_sin_usuario_previo()
+    client = _app_con_repo({"sub": "admin-1", "rol": "admin", "org": "org-1"}, repo)
+
+    response = client.post(
+        "/api/v1/usuarios", json={"usuario": "intruso", "rol": "operador", "organizacion_id": "org-2"}
+    )
+
+    assert response.status_code == 403
+    repo.guardar.assert_not_called()
+
+
+def test_admin_crea_operador_en_su_organizacion_201():
+    repo = _repo_sin_usuario_previo()
+    client = _app_con_repo({"sub": "admin-1", "rol": "admin", "org": "org-1"}, repo)
+
+    response = client.post(
+        "/api/v1/usuarios", json={"usuario": "tecnico_3", "rol": "operador", "organizacion_id": "org-1"}
+    )
+
+    assert response.status_code == 201
+    assert response.json()["organizacion_id"] == "org-1"
+
+
+def test_superadmin_crea_superadmin_201():
+    repo = _repo_sin_usuario_previo()
+    client = _app_con_repo({"sub": "root-1", "rol": "superadmin", "org": "org-1"}, repo)
+
+    response = client.post("/api/v1/usuarios", json={"usuario": "nuevo_root", "rol": "superadmin"})
+
+    assert response.status_code == 201
+    assert response.json()["rol"] == "superadmin"
+
+
+def _usuario_existente(rol: str, organizacion_id: str = "org-1") -> MagicMock:
+    usuario = MagicMock()
+    usuario.id = "user-x"
+    usuario.usuario = "existente"
+    usuario.rol = rol
+    usuario.organizacion_id = organizacion_id
+    usuario.esta_activo = True
+    return usuario
+
+
+def test_admin_no_asigna_superadmin_con_cambio_de_rol_403():
+    repo = MagicMock()
+    repo.obtener_por_id.return_value = _usuario_existente("operador")
+    client = _app_con_repo({"sub": "admin-1", "rol": "admin", "org": "org-1"}, repo)
+
+    response = client.patch("/api/v1/usuarios/user-x/rol", json={"rol": "superadmin"})
+
+    assert response.status_code == 403
+    repo.guardar.assert_not_called()
+
+
+def test_admin_no_cambia_rol_de_un_superadmin_403():
+    repo = MagicMock()
+    repo.obtener_por_id.return_value = _usuario_existente("superadmin")
+    client = _app_con_repo({"sub": "admin-1", "rol": "admin", "org": "org-1"}, repo)
+
+    response = client.patch("/api/v1/usuarios/user-x/rol", json={"rol": "operador"})
+
+    assert response.status_code == 403
+    repo.guardar.assert_not_called()

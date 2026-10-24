@@ -267,51 +267,6 @@ def test_login_usuario_inactivo():
 
 
 # ==============================================================================
-# 3. GUEST
-# ==============================================================================
-
-
-def test_guest_exitoso_con_token_fija_cookie():
-    client, mocks = _cliente()
-    mocks["auth"].guest.return_value = LoginResponseDTO(
-        token="guest-jwt-token",
-        expira_en=AHORA,
-        require_2fa=False,
-    )
-
-    response = client.post("/api/v1/auth/guest")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["token"] == "guest-jwt-token"
-    assert "datamaq_token" in response.cookies
-    assert response.cookies["datamaq_token"] == "guest-jwt-token"
-    mocks["auth"].guest.assert_called_once_with(clave_limite="ip:testclient")
-
-
-def test_guest_sin_token_no_fija_cookie():
-    client, mocks = _cliente()
-    mocks["auth"].guest.return_value = LoginResponseDTO(
-        token=None,
-        expira_en=AHORA,
-        require_2fa=False,
-    )
-
-    response = client.post("/api/v1/auth/guest")
-    assert response.status_code == 200
-    assert "datamaq_token" not in response.cookies
-
-
-def test_guest_error_demasiados_intentos():
-    client, mocks = _cliente()
-    mocks["auth"].guest.side_effect = DemasiadosIntentosError("demasiados_intentos", retry_after_seg=90)
-
-    response = client.post("/api/v1/auth/guest")
-    assert response.status_code == 429
-    assert response.json()["detail"] == "demasiados_intentos"
-    assert response.headers.get("Retry-After") == "90"
-
-
-# ==============================================================================
 # 4. LOGOUT
 # ==============================================================================
 
