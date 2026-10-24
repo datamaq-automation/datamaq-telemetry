@@ -61,6 +61,7 @@ def crear_usuario(
     repo_usuarios: Annotated[RepositorioUsuariosPort, Depends(get_usuarios_repository)],
     audit_use_case: Annotated[RegistrarEventoAuditoriaUseCase | None, Depends(get_registrar_auditoria_use_case)] = None,
 ) -> UsuarioResponseDTO:
+    _verificar_alta_permitida(dto, claims)
     existente = repo_usuarios.obtener_por_usuario(dto.usuario)
     if existente:
         raise HTTPException(
@@ -168,6 +169,7 @@ def cambiar_rol_usuario(
     if not usuario:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado.")
 
+    _verificar_cambio_de_rol_permitido(claims, usuario, dto.rol)
     anterior_rol = usuario.rol
     usuario.rol = dto.rol
     guardado = repo_usuarios.guardar(usuario)
@@ -210,6 +212,24 @@ def _verificar_misma_organizacion(claims: dict, usuario_id: str, repo_usuarios: 
         return
     usuario = repo_usuarios.obtener_por_id(usuario_id)
     if usuario is not None and usuario.organizacion_id != claims.get("org"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
+
+
+def _verificar_alta_permitida(dto: CrearUsuarioRequestDTO, claims: dict) -> None:
+    """Un admin crea usuarios solo en su organización y nunca con rol superadmin (#40)."""
+    if claims.get("rol") == "superadmin":
+        return
+    if dto.rol == "superadmin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
+    if dto.organizacion_id is not None and dto.organizacion_id != claims.get("org"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
+
+
+def _verificar_cambio_de_rol_permitido(claims: dict, usuario: UsuarioAuth, rol_nuevo: str) -> None:
+    """Un admin no asigna ni quita el rol superadmin (#40)."""
+    if claims.get("rol") == "superadmin":
+        return
+    if usuario.rol == "superadmin" or rol_nuevo == "superadmin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
 
 
