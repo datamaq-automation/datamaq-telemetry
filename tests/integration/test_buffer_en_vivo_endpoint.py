@@ -129,6 +129,8 @@ class _RepoTelemetriaFakeSoloDb(RepositorioTelemetriaPort):
 
 
 def test_recarga_de_pagina_recupera_lectura_en_vivo_no_persistida_todavia():
+    # El buffer es global: se vacía antes para que los conteos exactos no dependan de otros tests.
+    global_telemetria_buffer.limpiar()
     dispositivo = Dispositivo(id="dev-e2e-1", device_uid=MacAddress("D48C49F03564"), nombre="Medidor E2E")
 
     # "BD": solo tiene la lectura de hace 4 minutos (la última que pasó el downsampling de 300s).
