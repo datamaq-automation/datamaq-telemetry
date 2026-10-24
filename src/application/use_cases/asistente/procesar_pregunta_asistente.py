@@ -1,4 +1,3 @@
-
 import json
 import logging
 import uuid
@@ -94,32 +93,26 @@ class ProcesarPreguntaAsistenteUseCase:
         ):
             return [], []
 
-        alertas: list[AlertaResponseDTO] = (
-            self._gestor_alertas.listar_alertas(
-                solo_abiertas=True,
-                limite=20,
-                organizacion_id=organizacion_id,
-            )
+        alertas: list[AlertaResponseDTO] = self._gestor_alertas.listar_alertas(
+            solo_abiertas=True,
+            limite=20,
+            organizacion_id=organizacion_id,
         )
-        dispositivos: list[DispositivoResponseDTO] = (
-            self._gestor_dispositivos.listar_dispositivos(
-                organizacion_id=organizacion_id,
-            )
+        dispositivos: list[DispositivoResponseDTO] = self._gestor_dispositivos.listar_dispositivos(
+            organizacion_id=organizacion_id,
         )
         return (
             [alerta.model_dump(mode="json") for alerta in alertas],
             [dispositivo.model_dump(mode="json") for dispositivo in dispositivos],
         )
+
     def _recopilar_telemetria(
         self,
         intencion: IntencionUsuario,
         organizacion_id: str,
     ) -> dict:
         """Obtiene un resumen de telemetría de hasta 20 dispositivos."""
-        if (
-            intencion != IntencionUsuario.RESUMEN_TELEMETRIA
-            or self._consultar_telemetria is None
-        ):
+        if intencion != IntencionUsuario.RESUMEN_TELEMETRIA or self._consultar_telemetria is None:
             return {}
 
         dispositivos = self._gestor_dispositivos.listar_dispositivos(
@@ -130,14 +123,10 @@ class ProcesarPreguntaAsistenteUseCase:
 
         for dispositivo in dispositivos[:limite]:
             datos_dispositivo = dispositivo.model_dump(mode="json")
-            device_id = (
-                datos_dispositivo.get("id")
-                or datos_dispositivo.get("device_uid")
-            )
+            device_id = datos_dispositivo.get("id") or datos_dispositivo.get("device_uid")
             if not device_id:
                 logger.warning(
-                    "No se pudo consultar telemetría: falta el identificador "
-                    "de un dispositivo de la organización %s",
+                    "No se pudo consultar telemetría: falta el identificador de un dispositivo de la organización %s",
                     organizacion_id,
                 )
                 continue
@@ -160,53 +149,28 @@ class ProcesarPreguntaAsistenteUseCase:
 
             resultados[device_id] = {
                 "fecha_lectura": (
-                    instantanea.registrado_en.isoformat()
-                    if instantanea and instantanea.registrado_en
-                    else None
+                    instantanea.registrado_en.isoformat() if instantanea and instantanea.registrado_en else None
                 ),
                 "potencia_activa_kw": (
                     instantanea.potencia_activa_total_W / 1000
-                    if instantanea
-                    and instantanea.potencia_activa_total_W is not None
+                    if instantanea and instantanea.potencia_activa_total_W is not None
                     else None
                 ),
-                "factor_potencia": (
-                    instantanea.factor_potencia_total
-                    if instantanea
-                    else None
-                ),
-                "tension_linea_v": (
-                    instantanea.voltage_linea_V
-                    if instantanea
-                    else None
-                ),
-                "thd_tension_pct": (
-                    instantanea.thd_v_promedio_pct
-                    if instantanea
-                    else None
-                ),
-                "thd_corriente_pct": (
-                    instantanea.thd_i_total_pct
-                    if instantanea
-                    else None
-                ),
-                "energia_activa_acumulada_kwh": (
-                    energia.net_active_energy_kwh
-                    if energia
-                    else None
-                ),
+                "factor_potencia": (instantanea.factor_potencia_total if instantanea else None),
+                "tension_linea_v": (instantanea.voltage_linea_V if instantanea else None),
+                "thd_tension_pct": (instantanea.thd_v_promedio_pct if instantanea else None),
+                "thd_corriente_pct": (instantanea.thd_i_total_pct if instantanea else None),
+                "energia_activa_acumulada_kwh": (energia.net_active_energy_kwh if energia else None),
                 "estado_factor_potencia": (
                     analitica.estado_fp.value
-                    if analitica
-                    and hasattr(analitica.estado_fp, "value")
+                    if analitica and hasattr(analitica.estado_fp, "value")
                     else str(analitica.estado_fp)
                     if analitica
                     else None
                 ),
                 "estado_tension": (
                     analitica.estado_tension.value
-                    if analitica
-                    and hasattr(analitica.estado_tension, "value")
+                    if analitica and hasattr(analitica.estado_tension, "value")
                     else str(analitica.estado_tension)
                     if analitica
                     else None
@@ -215,15 +179,13 @@ class ProcesarPreguntaAsistenteUseCase:
 
         if len(dispositivos) > limite:
             logger.info(
-                "Se limitaron los datos de telemetría a %s de %s dispositivos "
-                "para la organización %s",
+                "Se limitaron los datos de telemetría a %s de %s dispositivos para la organización %s",
                 limite,
                 len(dispositivos),
                 organizacion_id,
             )
 
         return resultados
-
 
     def _obtener_o_crear_conversacion(
         self,
@@ -314,9 +276,7 @@ class ProcesarPreguntaAsistenteUseCase:
         usuario_consiente_envio_groq: bool = False,
     ) -> RespuestaAsistente:
         if not organizacion_id:
-            raise ValueError(
-                "El asistente requiere la organización del usuario."
-            )
+            raise ValueError("El asistente requiere la organización del usuario.")
 
         conversacion = self._obtener_o_crear_conversacion(
             conversacion_id,

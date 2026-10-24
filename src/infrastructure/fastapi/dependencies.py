@@ -202,7 +202,6 @@ def get_alertas_use_case(
     )
 
 
-
 def get_procesar_pregunta_asistente_use_case(
     db: Annotated[Session, Depends(get_db_session)],
     settings: Annotated[Settings, Depends(get_settings_dep)],

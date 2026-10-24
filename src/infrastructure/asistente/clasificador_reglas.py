@@ -1,4 +1,3 @@
-
 import re
 import unicodedata
 from typing import ClassVar
@@ -9,7 +8,6 @@ from src.domain.asistente.ports import ClasificadorIntencionPort
 
 class ClasificadorIntencionReglasAdapter(ClasificadorIntencionPort):
     """Clasificador determinístico y ligero en CPU local."""
-
 
     PATRONES: ClassVar[dict[str, list[tuple[str, int]]]] = {
         "EXPLICAR_ALERTAS": [
@@ -57,16 +55,10 @@ class ClasificadorIntencionReglasAdapter(ClasificadorIntencionPort):
         ],
     }
 
-
     def clasificar(self, pregunta: str) -> IntencionClasificada:
         """Clasifica una pregunta según las reglas y sus puntajes."""
         texto = unicodedata.normalize("NFKD", pregunta.lower().strip())
-        texto = "".join(
-            caracter
-            for caracter in texto
-            if not unicodedata.combining(caracter)
-        )
-
+        texto = "".join(caracter for caracter in texto if not unicodedata.combining(caracter))
 
         if not texto:
             return IntencionClasificada(
@@ -74,12 +66,8 @@ class ClasificadorIntencionReglasAdapter(ClasificadorIntencionPort):
                 confianza=0.0,
             )
 
-        puntajes: dict[str, int] = {
-            intencion: 0 for intencion in self.PATRONES
-        }
-        coincidencias: dict[str, int] = {
-            intencion: 0 for intencion in self.PATRONES
-        }
+        puntajes: dict[str, int] = {intencion: 0 for intencion in self.PATRONES}
+        coincidencias: dict[str, int] = {intencion: 0 for intencion in self.PATRONES}
 
         for intencion, patrones in self.PATRONES.items():
             for patron, peso in patrones:
@@ -95,23 +83,14 @@ class ClasificadorIntencionReglasAdapter(ClasificadorIntencionPort):
                 confianza=0.1,
             )
 
-        mejores_intenciones = [
-            intencion
-            for intencion, puntaje in puntajes.items()
-            if puntaje == mejor_puntaje
-        ]
+        mejores_intenciones = [intencion for intencion, puntaje in puntajes.items() if puntaje == mejor_puntaje]
 
         # Si hay empate de puntaje, comparamos la cantidad de reglas coincidentes.
         if len(mejores_intenciones) > 1:
-            mayor_numero_coincidencias = max(
-                coincidencias[intencion]
-                for intencion in mejores_intenciones
-            )
+            mayor_numero_coincidencias = max(coincidencias[intencion] for intencion in mejores_intenciones)
 
             mejores_intenciones = [
-                intencion
-                for intencion in mejores_intenciones
-                if coincidencias[intencion] == mayor_numero_coincidencias
+                intencion for intencion in mejores_intenciones if coincidencias[intencion] == mayor_numero_coincidencias
             ]
 
         # Si el empate continúa, no elegimos una intención arbitrariamente.
