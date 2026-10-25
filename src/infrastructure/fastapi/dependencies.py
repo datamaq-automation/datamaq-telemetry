@@ -495,8 +495,6 @@ def requiere_rol_escritura(claims: Annotated[dict[str, Any], Depends(get_usuario
     return claims
 
 
-
-
 def get_monitorear_potencia_use_case(
     db: Annotated[Session, Depends(get_db_session)],
 ) -> Any:
