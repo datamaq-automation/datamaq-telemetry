@@ -488,15 +488,7 @@ def requiere_rol_admin(claims: Annotated[dict[str, Any], Depends(get_usuario_act
     return claims
 
 
-# Compatibilidad temporal (TODO #65): tokens emitidos con roles retirados. Viven solo en el
-# adaptador: el dominio y la aplicación no conocen estos roles.
-# TODO(#65): quitar cuando el frontend de main de app-datamaq deje de llamar a estos roles.
-ROLES_COMPAT_CLIENTE = frozenset({"invitado", "invitado_global"})
-# Rol que recibe el caso de uso de /me en lugar del real: solo sirve para armar los demás
-# campos de la respuesta. La respuesta devuelve el rol real del token.
-ROL_PLACEHOLDER_ME = "operador"
-
-
+# TODO(#65): compatibilidad temporal de roles retirados; quitar con el Issue.
 def no_permitido_para_invitados_2fa(claims: Annotated[dict[str, Any], Depends(get_usuario_actual)]) -> dict[str, Any]:
     # TODO(#65): quitar con los roles de compatibilidad.
     # Inline: el generador de la matriz evalúa esta condición sin constantes de módulo.

@@ -65,9 +65,8 @@ from src.infrastructure.fastapi.auth_dependencies import (
     get_setup_2fa_use_case,
     get_verificar_2fa_use_case,
 )
+from src.infrastructure.fastapi.compat_roles_invitado import construir_me_compat, es_rol_compat
 from src.infrastructure.fastapi.dependencies import (
-    ROL_PLACEHOLDER_ME,
-    ROLES_COMPAT_CLIENTE,
     get_registrar_auditoria_use_case,
     get_restablecer_contrasena_use_case,
     get_settings_dep,
@@ -258,21 +257,16 @@ def logout_todas(
 def me(
     claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
     use_case: Annotated[AutenticarUsuarioUseCase, Depends(get_auth_use_case)],
+    repo_usuarios: Annotated[RepositorioUsuariosPort, Depends(get_usuarios_repository)],
 ) -> MeResponseDTO | JSONResponse:
-    rol = claims.get("rol")
-    if rol not in ROLES_COMPAT_CLIENTE:
-        try:
-            return use_case.me(claims)
-        except Exception as e:
-            manejar_error_http(e)
-    # TODO(#65): compatibilidad temporal. El caso de uso no conoce el rol retirado: recibe un
-    # placeholder y la respuesta devuelve el rol real del token para que el frontend de main
-    # siga funcionando. Quitar con el Issue #65.
+    # TODO(#65): un token con rol retirado no pasa por el caso de uso: no obtiene plantas
+    # ni permisos. Ver compat_roles_invitado.py. Quitar con el Issue #65.
+    if es_rol_compat(claims.get("rol")):
+        return JSONResponse(content=construir_me_compat(claims, repo_usuarios))
     try:
-        dto = use_case.me({**claims, "rol": ROL_PLACEHOLDER_ME})
+        return use_case.me(claims)
     except Exception as e:
         manejar_error_http(e)
-    return JSONResponse(content={**dto.model_dump(mode="json"), "rol": rol})
 
 
 @router.post("/2fa/verificar", response_model=LoginResponseDTO)
