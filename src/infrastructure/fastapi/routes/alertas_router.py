@@ -36,7 +36,7 @@ def list_alertas(
 ):
     # Roles globales ven todas; el resto, solo las de su organización (un device_id ajeno da []).
     organizacion_id = None
-    if claims.get("rol") not in ("superadmin", "invitado_global"):
+    if claims.get("rol") != "superadmin":
         organizacion_id = claims.get("org")
         if not organizacion_id:
             return []  # Sin organización asignada: fail-closed, como GET /dispositivos.

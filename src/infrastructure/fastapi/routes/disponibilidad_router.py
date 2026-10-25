@@ -45,7 +45,7 @@ router = APIRouter(
 
 
 def _organizacion_de_claims(claims: dict[str, Any]) -> str | None:
-    if claims.get("rol") in ("superadmin", "invitado_global"):
+    if claims.get("rol") == "superadmin":
         return None
     return claims.get("org")
 
@@ -55,7 +55,7 @@ def listar_maquinas(
     use_case: Annotated[GestionarMaquinasUseCase, Depends(get_maquinas_use_case)],
     claims: Annotated[dict, Depends(get_usuario_actual)],
 ):
-    if claims.get("rol") not in ("superadmin", "invitado_global") and not claims.get("org"):
+    if claims.get("rol") != "superadmin" and not claims.get("org"):
         return []
     try:
         return use_case.listar_maquinas(_organizacion_de_claims(claims))
@@ -85,7 +85,7 @@ def registrar_maquina(
     claims: Annotated[dict, Depends(get_usuario_actual)],
 ):
     organizacion_id = _organizacion_de_claims(claims)
-    if claims.get("rol") not in ("superadmin", "invitado_global") and not organizacion_id:
+    if claims.get("rol") != "superadmin" and not organizacion_id:
         raise HTTPException(status_code=403, detail="sin_organizacion_asignada")
     try:
         return use_case.registrar_maquina(dto, organizacion_id)
@@ -208,7 +208,7 @@ def registrar_parada_programada(
     claims: Annotated[dict, Depends(requiere_rol_escritura)],
 ):
     organizacion_id = _organizacion_de_claims(claims)
-    if claims.get("rol") not in ("superadmin", "invitado_global") and not organizacion_id:
+    if claims.get("rol") != "superadmin" and not organizacion_id:
         raise HTTPException(status_code=403, detail="sin_organizacion_asignada")
     try:
         usuario_id = claims.get("sub")

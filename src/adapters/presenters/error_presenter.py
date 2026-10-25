@@ -10,7 +10,6 @@ from src.domain.auth.exceptions import (
     DemasiadosIntentosError,
     NombreUsuarioInvalidoError,
     NoSePudoEnviarCodigoError,
-    Operacion2FANoDisponibleParaInvitadoError,
     Setup2FAInvalidoError,
     TokenMFAPendienteInvalidoError,
     TokenRecuperacionInvalidoError,
@@ -128,8 +127,6 @@ class ErrorPresenter:
             return _ERRORES_CAMBIO_CONTRASENA[type(exc)]
         elif isinstance(exc, UsuarioInactivoError):
             return 403, {"error": "Forbidden", "mensaje": "usuario_inactivo"}
-        elif isinstance(exc, Operacion2FANoDisponibleParaInvitadoError):
-            return 403, {"error": "Forbidden", "mensaje": "2fa_no_disponible_para_invitado"}
         elif isinstance(exc, DemasiadosIntentosError):
             return 429, {"error": "TooManyRequests", "mensaje": exc.mensaje}
 

@@ -68,14 +68,14 @@ class HashContrasenaService:
         return hmac.compare_digest(digest, esperado)
 
 
-ROLES_ACCESO_GLOBAL: frozenset[str] = frozenset({"superadmin", "invitado_global"})
+ROLES_ACCESO_GLOBAL: frozenset[str] = frozenset({"superadmin"})
 
 
 class PoliticaAccesoPlantasService:
     """Decide a qué plantas accede un usuario y si puede cambiar la activa.
 
     Reglas, en orden:
-    1. Roles globales (`superadmin`, `invitado_global`): todas las plantas de todas
+    1. Rol global (`superadmin`): todas las plantas de todas
        las organizaciones, siempre con permiso de cambio. La tabla de asignaciones
        no aplica para ellos.
     2. Usuario con filas explícitas en `user_facility_access`: solo esas plantas,
