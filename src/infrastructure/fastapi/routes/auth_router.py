@@ -5,6 +5,7 @@ from typing import Annotated, Any
 
 import structlog
 from fastapi import APIRouter, Cookie, Depends, Request, Response
+from fastapi.responses import JSONResponse
 
 from src.application.dtos.audit_dto import RegistrarAuditLogDTO
 from src.application.dtos.auth_dto import (
@@ -65,6 +66,8 @@ from src.infrastructure.fastapi.auth_dependencies import (
     get_verificar_2fa_use_case,
 )
 from src.infrastructure.fastapi.dependencies import (
+    ROL_PLACEHOLDER_ME,
+    ROLES_COMPAT_CLIENTE,
     get_registrar_auditoria_use_case,
     get_restablecer_contrasena_use_case,
     get_settings_dep,
@@ -72,6 +75,7 @@ from src.infrastructure.fastapi.dependencies import (
     get_token_revocation_service,
     get_usuario_actual,
     get_usuarios_repository,
+    no_permitido_para_invitados_2fa,
 )
 from src.infrastructure.fastapi.dependencies_cambio_contrasena import (
     get_confirmar_cambio_contrasena_use_case,
@@ -254,11 +258,21 @@ def logout_todas(
 def me(
     claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
     use_case: Annotated[AutenticarUsuarioUseCase, Depends(get_auth_use_case)],
-) -> MeResponseDTO:
+) -> MeResponseDTO | JSONResponse:
+    rol = claims.get("rol")
+    if rol not in ROLES_COMPAT_CLIENTE:
+        try:
+            return use_case.me(claims)
+        except Exception as e:
+            manejar_error_http(e)
+    # TODO(#65): compatibilidad temporal. El caso de uso no conoce el rol retirado: recibe un
+    # placeholder y la respuesta devuelve el rol real del token para que el frontend de main
+    # siga funcionando. Quitar con el Issue #65.
     try:
-        return use_case.me(claims)
+        dto = use_case.me({**claims, "rol": ROL_PLACEHOLDER_ME})
     except Exception as e:
         manejar_error_http(e)
+    return JSONResponse(content={**dto.model_dump(mode="json"), "rol": rol})
 
 
 @router.post("/2fa/verificar", response_model=LoginResponseDTO)
@@ -326,6 +340,7 @@ def verificar_2fa(
 @router.post(
     "/2fa/setup",
     response_model=Setup2FAResponseDTO,
+    dependencies=[Depends(no_permitido_para_invitados_2fa)],
 )
 def setup_2fa(
     claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
@@ -341,6 +356,7 @@ def setup_2fa(
 @router.post(
     "/2fa/activar",
     response_model=Operacion2FAResponseDTO,
+    dependencies=[Depends(no_permitido_para_invitados_2fa)],
 )
 def activar_2fa(
     dto: Activar2FARequestDTO,
@@ -382,6 +398,7 @@ def activar_2fa(
 @router.post(
     "/2fa/desactivar",
     response_model=Operacion2FAResponseDTO,
+    dependencies=[Depends(no_permitido_para_invitados_2fa)],
 )
 def desactivar_2fa(
     dto: Desactivar2FARequestDTO,
