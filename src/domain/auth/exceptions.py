@@ -50,6 +50,11 @@ class ContrasenaDebilError(DominioAuthException):
     """Lanzada cuando la nueva contraseña no cumple con los requisitos mínimos de seguridad."""
 
 
+# TODO(#65): compatibilidad temporal. Quitar cuando no queden cuentas con estos roles.
+class Operacion2FANoDisponibleParaInvitadoError(DominioAuthException):
+    """Lanzada cuando un usuario con rol invitado intenta enrolar o gestionar 2FA."""
+
+
 class UsuarioNoEncontradoError(DominioAuthException):
     """Lanzada cuando se administra un usuario que no existe."""
 

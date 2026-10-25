@@ -50,6 +50,9 @@ class MeResponseDTO(BaseModel):
         "superadmin",
         "admin",
         "operador",
+        # TODO(#65): compatibilidad temporal. Quitar cuando no queden cuentas con estos roles.
+        "invitado",
+        "invitado_global",
         "mantenimiento",
         "ingeniero",
         "auditor",

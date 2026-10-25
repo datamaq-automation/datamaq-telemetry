@@ -16,6 +16,7 @@ from src.domain.auth.exceptions import (
     Codigo2FAInvalidoError,
     CredencialesInvalidasError,
     DemasiadosIntentosError,
+    Operacion2FANoDisponibleParaInvitadoError,
     TokenMFAPendienteInvalidoError,
     UsuarioInactivoError,
 )
@@ -148,6 +149,9 @@ class Setup2FAUseCase:
         usuario = self.repo_usuarios.obtener_por_usuario(usuario_nombre)
         if usuario is None or not usuario.esta_activo:
             raise UsuarioInactivoError("Usuario inexistente o inactivo.", usuario=usuario_nombre)
+        # TODO(#65): compatibilidad temporal de roles retirados; quitar con el Issue.
+        if usuario.rol in ("invitado", "invitado_global"):
+            raise Operacion2FANoDisponibleParaInvitadoError("2fa_no_disponible_para_invitado", usuario=usuario_nombre)
 
         secret = self.totp_service.generar_secreto()
         backup_codes = CodigosRespaldoService.generar_codigos(8)
@@ -177,6 +181,9 @@ class Activar2FAUseCase:
         usuario = self.repo_usuarios.obtener_por_usuario(usuario_nombre)
         if usuario is None or not usuario.esta_activo:
             raise UsuarioInactivoError("Usuario inexistente o inactivo.", usuario=usuario_nombre)
+        # TODO(#65): compatibilidad temporal de roles retirados; quitar con el Issue.
+        if usuario.rol in ("invitado", "invitado_global"):
+            raise Operacion2FANoDisponibleParaInvitadoError("2fa_no_disponible_para_invitado", usuario=usuario_nombre)
 
         if not self.totp_service.verificar_codigo(dto.secret, dto.codigo):
             raise Codigo2FAInvalidoError("Código TOTP inválido para activación.", usuario=usuario_nombre)
@@ -209,6 +216,9 @@ class Desactivar2FAUseCase:
         usuario = self.repo_usuarios.obtener_por_usuario(usuario_nombre)
         if usuario is None or not usuario.esta_activo:
             raise UsuarioInactivoError("Usuario inexistente o inactivo.", usuario=usuario_nombre)
+        # TODO(#65): compatibilidad temporal de roles retirados; quitar con el Issue.
+        if usuario.rol in ("invitado", "invitado_global"):
+            raise Operacion2FANoDisponibleParaInvitadoError("2fa_no_disponible_para_invitado", usuario=usuario_nombre)
 
         if not self.hash_service.verificar(dto.contrasena, usuario.hash_contrasena):
             raise CredencialesInvalidasError("Contraseña incorrecta.", usuario=usuario_nombre)
