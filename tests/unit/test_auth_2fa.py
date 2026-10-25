@@ -24,6 +24,7 @@ from src.domain.auth.exceptions import (
     Codigo2FAInvalidoError,
     CredencialesInvalidasError,
     DemasiadosIntentosError,
+    Operacion2FANoDisponibleParaInvitadoError,
     TokenMFAPendienteInvalidoError,
 )
 from src.domain.auth.ports import RepositorioUsuariosPort
@@ -467,3 +468,61 @@ def test_me_retorna_totp_enabled_false_cuando_usuario_no_lo_tiene(token_service)
     assert dto.usuario == "operador@datamaq.com.ar"
     assert dto.rol == "operador"
     assert dto.totp_enabled is False
+
+
+def test_setup_2fa_rechaza_rol_invitado(totp_service):
+    usuario = UsuarioAuth(
+        id="usr-invitado",
+        usuario="invitado@datamaq.com.ar",
+        hash_contrasena="",
+        rol="invitado",
+    )
+    repo = MockRepoUsuarios([usuario])
+    use_case = Setup2FAUseCase(repo, totp_service)
+    with pytest.raises(Operacion2FANoDisponibleParaInvitadoError):
+        use_case.ejecutar("invitado@datamaq.com.ar")
+
+
+def test_setup_2fa_rechaza_rol_invitado_global(totp_service):
+    usuario = UsuarioAuth(
+        id="usr-invitado-global",
+        usuario="estudiantes@datamaq.com.ar",
+        hash_contrasena="",
+        rol="invitado_global",
+    )
+    repo = MockRepoUsuarios([usuario])
+    use_case = Setup2FAUseCase(repo, totp_service)
+    with pytest.raises(Operacion2FANoDisponibleParaInvitadoError):
+        use_case.ejecutar("estudiantes@datamaq.com.ar")
+
+
+def test_activar_2fa_rechaza_rol_invitado(totp_service, cifrador):
+    usuario = UsuarioAuth(
+        id="usr-invitado",
+        usuario="invitado@datamaq.com.ar",
+        hash_contrasena="",
+        rol="invitado",
+    )
+    repo = MockRepoUsuarios([usuario])
+    use_case = Activar2FAUseCase(repo, totp_service, cifrador)
+    with pytest.raises(Operacion2FANoDisponibleParaInvitadoError):
+        use_case.ejecutar(
+            "invitado@datamaq.com.ar",
+            Activar2FARequestDTO(secret="JBSWY3DPEHPK3PXP", codigo="123456", backup_codes=["11111111"]),
+        )
+
+
+def test_desactivar_2fa_rechaza_rol_invitado(totp_service, cifrador):
+    usuario = UsuarioAuth(
+        id="usr-invitado",
+        usuario="invitado@datamaq.com.ar",
+        hash_contrasena=HashContrasenaService.generar_hash("secreto123"),
+        rol="invitado",
+    )
+    repo = MockRepoUsuarios([usuario])
+    use_case = Desactivar2FAUseCase(repo, HashContrasenaService(), totp_service, cifrador)
+    with pytest.raises(Operacion2FANoDisponibleParaInvitadoError):
+        use_case.ejecutar(
+            "invitado@datamaq.com.ar",
+            Desactivar2FARequestDTO(contrasena="secreto123", codigo="123456"),
+        )

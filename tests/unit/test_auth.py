@@ -433,14 +433,11 @@ def test_me_roles_operador_y_superadmin():
     assert use_case.me({"usuario": "u1", "rol": "superadmin"}).rol == "superadmin"
 
 
-def test_me_rechaza_roles_retirados():
+def test_me_acepta_roles_de_compatibilidad_temporal():
+    # TODO(#65): compatibilidad temporal; cuando se quite el rol, este test también.
     use_case = _use_case_me()
     for rol in ("invitado", "invitado_global"):
-        try:
-            use_case.me({"usuario": "u1", "rol": rol})
-            raise AssertionError(f"Se esperaba CredencialesInvalidasError para {rol}")
-        except CredencialesInvalidasError:
-            pass
+        assert use_case.me({"usuario": "u1", "rol": rol}).rol == rol
 
 
 def test_me_rol_ausente_o_invalido():
