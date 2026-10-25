@@ -488,6 +488,15 @@ def requiere_rol_admin(claims: Annotated[dict[str, Any], Depends(get_usuario_act
     return claims
 
 
+# TODO(#65): compatibilidad temporal de roles retirados; quitar con el Issue.
+def no_permitido_para_invitados_2fa(claims: Annotated[dict[str, Any], Depends(get_usuario_actual)]) -> dict[str, Any]:
+    # TODO(#65): quitar con los roles de compatibilidad.
+    # Inline: el generador de la matriz evalúa esta condición sin constantes de módulo.
+    if claims.get("rol") in ("invitado", "invitado_global"):
+        raise HTTPException(status_code=403, detail="2fa_no_disponible_para_invitado")
+    return claims
+
+
 def requiere_rol_escritura(claims: Annotated[dict[str, Any], Depends(get_usuario_actual)]) -> dict[str, Any]:
     # Allowlist: un rol retirado (p. ej. invitado en un token viejo) no escribe.
     if claims.get("rol") not in ("superadmin", "admin", "operador", "mantenimiento", "ingeniero", "auditor"):

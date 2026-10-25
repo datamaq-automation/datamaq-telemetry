@@ -5,6 +5,7 @@ from typing import Annotated, Any
 
 import structlog
 from fastapi import APIRouter, Cookie, Depends, Request, Response
+from fastapi.responses import JSONResponse
 
 from src.application.dtos.audit_dto import RegistrarAuditLogDTO
 from src.application.dtos.auth_dto import (
@@ -64,6 +65,7 @@ from src.infrastructure.fastapi.auth_dependencies import (
     get_setup_2fa_use_case,
     get_verificar_2fa_use_case,
 )
+from src.infrastructure.fastapi.compat_roles_invitado import construir_me_compat, es_rol_compat
 from src.infrastructure.fastapi.dependencies import (
     get_registrar_auditoria_use_case,
     get_restablecer_contrasena_use_case,
@@ -72,6 +74,7 @@ from src.infrastructure.fastapi.dependencies import (
     get_token_revocation_service,
     get_usuario_actual,
     get_usuarios_repository,
+    no_permitido_para_invitados_2fa,
 )
 from src.infrastructure.fastapi.dependencies_cambio_contrasena import (
     get_confirmar_cambio_contrasena_use_case,
@@ -254,7 +257,12 @@ def logout_todas(
 def me(
     claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
     use_case: Annotated[AutenticarUsuarioUseCase, Depends(get_auth_use_case)],
-) -> MeResponseDTO:
+    repo_usuarios: Annotated[RepositorioUsuariosPort, Depends(get_usuarios_repository)],
+) -> MeResponseDTO | JSONResponse:
+    # TODO(#65): un token con rol retirado no pasa por el caso de uso: no obtiene plantas
+    # ni permisos. Ver compat_roles_invitado.py. Quitar con el Issue #65.
+    if es_rol_compat(claims.get("rol")):
+        return JSONResponse(content=construir_me_compat(claims, repo_usuarios))
     try:
         return use_case.me(claims)
     except Exception as e:
@@ -326,6 +334,7 @@ def verificar_2fa(
 @router.post(
     "/2fa/setup",
     response_model=Setup2FAResponseDTO,
+    dependencies=[Depends(no_permitido_para_invitados_2fa)],
 )
 def setup_2fa(
     claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
@@ -341,6 +350,7 @@ def setup_2fa(
 @router.post(
     "/2fa/activar",
     response_model=Operacion2FAResponseDTO,
+    dependencies=[Depends(no_permitido_para_invitados_2fa)],
 )
 def activar_2fa(
     dto: Activar2FARequestDTO,
@@ -382,6 +392,7 @@ def activar_2fa(
 @router.post(
     "/2fa/desactivar",
     response_model=Operacion2FAResponseDTO,
+    dependencies=[Depends(no_permitido_para_invitados_2fa)],
 )
 def desactivar_2fa(
     dto: Desactivar2FARequestDTO,

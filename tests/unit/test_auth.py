@@ -1,6 +1,7 @@
 """tests/unit/test_auth.py — Pruebas unitarias del dominio, casos de uso y servicios de autenticación."""
 
 from datetime import datetime, timedelta, timezone
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi import HTTPException, Response
@@ -467,7 +468,7 @@ def test_me_sin_usuario_ni_sub():
 
 def test_me_handler_exitoso():
     use_case = _use_case_me()
-    dto = me_handler({"usuario": "u1", "rol": "admin"}, use_case)
+    dto = me_handler({"usuario": "u1", "rol": "admin"}, use_case, MagicMock())
     assert dto.usuario == "u1"
     assert dto.rol == "admin"
 
@@ -475,7 +476,7 @@ def test_me_handler_exitoso():
 def test_me_handler_rol_invalido():
     use_case = _use_case_me()
     try:
-        me_handler({"usuario": "u1", "rol": "root"}, use_case)
+        me_handler({"usuario": "u1", "rol": "root"}, use_case, MagicMock())
         raise AssertionError("Se esperaba HTTPException 401")
     except HTTPException as e:
         assert e.status_code == 401
