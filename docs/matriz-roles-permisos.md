@@ -1,7 +1,7 @@
 <!-- Generado por scripts/generate_matriz_roles.py. No editar a mano: regenerar. -->
 # Matriz de roles y permisos (generada desde el código)
 
-Endpoints analizados: **120**. Roles válidos (`ROLES_VALIDOS`): `admin`, `auditor`, `ingeniero`, `invitado`, `invitado_global`, `mantenimiento`, `operador`, `superadmin`.
+Endpoints analizados: **120**. Roles válidos (`ROLES_VALIDOS`): `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `superadmin`.
 
 Cómo se lee: "Roles que pasan" es lo que deja el guard de rol que la ruta declara (evaluado con la condición real del guard). Si la columna "Chequeo manual" dice `sí`, el cuerpo de la ruta o de una dependencia propia compara el rol o usa `ROLES_ACCESO_GLOBAL`: ese recorte no está en la columna y hay que leer la ruta para saberlo.
 

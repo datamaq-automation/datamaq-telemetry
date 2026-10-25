@@ -50,9 +50,6 @@ class MeResponseDTO(BaseModel):
         "superadmin",
         "admin",
         "operador",
-        # TODO(#65): quitar cuando el frontend de main de app-datamaq deje de llamar a estos roles.
-        "invitado",
-        "invitado_global",
         "mantenimiento",
         "ingeniero",
         "auditor",
