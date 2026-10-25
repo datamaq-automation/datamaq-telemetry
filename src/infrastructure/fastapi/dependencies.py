@@ -488,16 +488,16 @@ def requiere_rol_admin(claims: Annotated[dict[str, Any], Depends(get_usuario_act
     return claims
 
 
+ROLES_CON_ESCRITURA = ("superadmin", "admin", "operador", "mantenimiento", "ingeniero", "auditor")
+
+
 def requiere_rol_escritura(claims: Annotated[dict[str, Any], Depends(get_usuario_actual)]) -> dict[str, Any]:
-    if claims.get("rol") in ("invitado", "invitado_global"):
+    # Allowlist: un rol retirado (p. ej. invitado en un token viejo) no escribe.
+    if claims.get("rol") not in ROLES_CON_ESCRITURA:
         raise HTTPException(status_code=403, detail="forbidden")
     return claims
 
 
-def no_permitido_para_invitados_2fa(claims: Annotated[dict[str, Any], Depends(get_usuario_actual)]) -> dict[str, Any]:
-    if claims.get("rol") in ("invitado", "invitado_global"):
-        raise HTTPException(status_code=403, detail="2fa_no_disponible_para_invitado")
-    return claims
 
 
 def get_monitorear_potencia_use_case(
