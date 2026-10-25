@@ -2,6 +2,7 @@
 
 import smtplib
 from datetime import datetime, timezone
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -12,10 +13,7 @@ from src.infrastructure.auth.email_service import (
     SmtpEmailService,
     _construir_mensaje_alerta_critica,
 )
-from src.infrastructure.fastapi.dependencies import (
-    get_email_service,
-    get_email_service_singleton,
-)
+from src.infrastructure.fastapi.dependencies import get_email_service
 from src.infrastructure.settings.config import Settings
 
 # ---------------------------------------------------------------------------
@@ -589,16 +587,17 @@ class TestReintentosSmtp:
 
 
 class TestVariablesEntornoYFactoryDependencies:
-    def test_get_email_service_singleton_creacion(self):
-        service = get_email_service_singleton(
-            host="smtp.servidor.com",
-            port=465,
-            user="usuario_api",
-            password="Password123!",
-            use_tls=True,
-            from_email="notificaciones@datamaq.com.ar",
-            app_env="production",
+    def test_get_email_service_crea_servicio_con_los_valores_de_settings(self):
+        settings = SimpleNamespace(
+            SMTP_HOST="smtp.servidor.com",
+            SMTP_PORT=465,
+            SMTP_USER="usuario_api",
+            SMTP_PASSWORD="Password123!",
+            SMTP_TLS=True,
+            SMTP_FROM="notificaciones@datamaq.com.ar",
+            APP_ENV="production",
         )
+        service = get_email_service(settings)
         assert isinstance(service, SmtpEmailService)
         assert service.host == "smtp.servidor.com"
         assert service.port == 465

@@ -348,38 +348,19 @@ def get_consultar_auditoria_use_case(
     return ConsultarAuditLogsUseCase(repo_auditoria=repo_auditoria)
 
 
-@lru_cache(maxsize=1)
-def get_email_service_singleton(
-    host: str,
-    port: int,
-    user: str,
-    password: str,
-    use_tls: bool,
-    from_email: str,
-    app_env: str,
-) -> SmtpEmailService:
-    return SmtpEmailService(
-        host=host,
-        port=port,
-        user=user,
-        password=password,
-        use_tls=use_tls,
-        from_email=from_email,
-        app_env=app_env,
-    )
-
-
 def get_email_service(
     settings: Annotated[Settings, Depends(get_settings_dep)],
 ) -> ServicioEmailPort:
-    return get_email_service_singleton(
-        settings.SMTP_HOST,
-        settings.SMTP_PORT,
-        settings.SMTP_USER,
-        settings.SMTP_PASSWORD,
-        settings.SMTP_TLS,
-        settings.SMTP_FROM,
-        settings.APP_ENV,
+    # Sin caché: el servicio es liviano y no tiene estado. Así los cambios de configuración
+    # (y las contraseñas) no quedan congelados en una clave de caché.
+    return SmtpEmailService(
+        host=settings.SMTP_HOST,
+        port=settings.SMTP_PORT,
+        user=settings.SMTP_USER,
+        password=settings.SMTP_PASSWORD,
+        use_tls=settings.SMTP_TLS,
+        from_email=settings.SMTP_FROM,
+        app_env=settings.APP_ENV,
     )
 
 
