@@ -33,15 +33,12 @@ GUARDS_DE_ROL = {
     "requiere_rol_auditor_o_superadmin",
     "requiere_rol_admin",
     "requiere_rol_escritura",
-    "no_permitido_para_invitados_2fa",
 }
 DEPENDENCIA_AUTH = "get_usuario_actual"
 NOMBRES_DE_ROL_EN_CODIGO = {
     "superadmin",
     "admin",
     "operador",
-    "invitado",
-    "invitado_global",
     "mantenimiento",
     "ingeniero",
     "auditor",
