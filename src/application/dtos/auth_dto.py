@@ -50,8 +50,6 @@ class MeResponseDTO(BaseModel):
         "superadmin",
         "admin",
         "operador",
-        "invitado",
-        "invitado_global",
         "mantenimiento",
         "ingeniero",
         "auditor",

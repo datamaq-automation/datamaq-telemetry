@@ -31,8 +31,6 @@ ROLES_VALIDOS = frozenset(
         "superadmin",
         "admin",
         "operador",
-        "invitado",
-        "invitado_global",
         "mantenimiento",
         "ingeniero",
         "auditor",
