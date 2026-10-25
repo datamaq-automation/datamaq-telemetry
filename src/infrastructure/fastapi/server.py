@@ -509,7 +509,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_credentials=not cors_abierto,
         allow_methods=["*"],
         allow_headers=["*"],
-        expose_headers=[HEADER_DATOS_DESDE, HEADER_POTENCIA_REFERENCIA],
+        expose_headers=[HEADER_DATOS_DESDE, HEADER_POTENCIA_REFERENCIA, "X-Request-ID"],
     )
 
     app.add_middleware(NormalizarMcpRutaMiddleware)
