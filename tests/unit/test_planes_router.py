@@ -179,17 +179,6 @@ def test_crear_plan_rol_invitado_rechazado_403():
     mocks["planes"].crear_plan.assert_not_called()
 
 
-def test_crear_plan_rol_invitado_global_rechazado_403():
-    client, mocks = _cliente(rol="invitado_global")
-
-    payload = _payload_crear_plan()
-    response = client.post("/api/v1/planes", json=payload)
-
-    assert response.status_code == 403
-    assert response.json()["detail"] == "forbidden"
-    mocks["planes"].crear_plan.assert_not_called()
-
-
 def test_crear_plan_no_autenticado_rechazado_401():
     app = create_app()
 

@@ -30,8 +30,6 @@ def test_roles_validos_salen_de_la_fuente_de_autenticacion():
         "superadmin",
         "admin",
         "operador",
-        "invitado",
-        "invitado_global",
         "mantenimiento",
         "ingeniero",
         "auditor",
@@ -45,8 +43,7 @@ def test_guards_dejan_pasar_exactamente_los_roles_que_su_codigo_dice():
     assert guards["requiere_rol_superadmin"] == {"superadmin"}
     assert guards["requiere_rol_admin"] == {"admin", "superadmin"}
     assert guards["requiere_rol_auditor_o_superadmin"] == {"auditor", "superadmin"}
-    assert guards["requiere_rol_escritura"] == set(roles) - {"invitado", "invitado_global"}
-    assert guards["no_permitido_para_invitados_2fa"] == set(roles) - {"invitado", "invitado_global"}
+    assert guards["requiere_rol_escritura"] == set(roles)
 
 
 def test_cada_endpoint_tiene_su_guard_o_una_razon_para_no_tenerlo():

@@ -120,16 +120,6 @@ def test_listar_dispositivos_superadmin_sin_filtro_org():
     mocks["dispositivos"].listar_dispositivos.assert_called_once_with(None, organizacion_id=None)
 
 
-def test_listar_dispositivos_invitado_global_sin_filtro_org():
-    client, mocks = _cliente(rol="invitado_global", org="org-invitado")
-    mocks["dispositivos"].listar_dispositivos.return_value = [_dispositivo_dto()]
-
-    response = client.get("/api/v1/dispositivos")
-
-    assert response.status_code == 200
-    mocks["dispositivos"].listar_dispositivos.assert_called_once_with(None, organizacion_id=None)
-
-
 def test_listar_dispositivos_sin_org_fail_closed():
     client, mocks = _cliente(rol="admin", org=None)
 

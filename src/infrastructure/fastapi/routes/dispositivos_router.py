@@ -39,7 +39,7 @@ def list_dispositivos(
     planta_id: PlantaPermitida,
 ):
     rol = claims.get("rol")
-    if rol in ("superadmin", "invitado_global"):
+    if rol == "superadmin":
         organizacion_id = None
     else:
         organizacion_id = claims.get("org")
