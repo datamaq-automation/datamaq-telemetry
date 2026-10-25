@@ -488,12 +488,9 @@ def requiere_rol_admin(claims: Annotated[dict[str, Any], Depends(get_usuario_act
     return claims
 
 
-ROLES_CON_ESCRITURA = ("superadmin", "admin", "operador", "mantenimiento", "ingeniero", "auditor")
-
-
 def requiere_rol_escritura(claims: Annotated[dict[str, Any], Depends(get_usuario_actual)]) -> dict[str, Any]:
     # Allowlist: un rol retirado (p. ej. invitado en un token viejo) no escribe.
-    if claims.get("rol") not in ROLES_CON_ESCRITURA:
+    if claims.get("rol") not in ("superadmin", "admin", "operador", "mantenimiento", "ingeniero", "auditor"):
         raise HTTPException(status_code=403, detail="forbidden")
     return claims
 
