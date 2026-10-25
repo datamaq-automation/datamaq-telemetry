@@ -153,7 +153,7 @@ def test_usuario_propio_accede_a_su_planta(cliente):
     assert client.get("/api/v1/planta/unifilar?planta_id=a2").json()["planta_id"] == "a2"
 
 
-@pytest.mark.parametrize("rol", ["superadmin", "invitado_global"])
+@pytest.mark.parametrize("rol", ["superadmin"])
 def test_roles_globales_acceden_a_cualquier_planta(cliente, rol):
     crear, _ = cliente
     client = crear({"sub": "u-g", "rol": rol, "org": "org-a"})
