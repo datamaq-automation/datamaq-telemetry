@@ -1,4 +1,4 @@
-"""tests/e2e/test_smoke_post_deploy.py — Smoke test post-deploy: validación mínima de startup."""
+"""tests/unit/test_smoke_post_deploy.py — Smoke test de router/startup: validación de endpoints de salud."""
 
 import logging
 from unittest.mock import MagicMock, patch

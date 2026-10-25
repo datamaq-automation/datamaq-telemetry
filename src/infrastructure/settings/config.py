@@ -38,12 +38,18 @@ class Settings(BaseSettings):
     DISPOSITIVO_OFFLINE_TIMEOUT_S: int = 900
     # Abre además la alerta PÉRDIDA_COMUNICACIÓN. Apagada hasta que el dueño apruebe su texto y su activación.
     DISPOSITIVO_OFFLINE_ALERTA_HABILITADA: bool = False
+    # Ingesta MQTT. En dev se apaga con false: el listener no se crea ni se conecta.
+    MQTT_HABILITADO: bool = True
     MQTT_CLEAN_SESSION: bool = False
     MQTT_RECONNECT_MIN_DELAY_SEG: int = 1
     MQTT_RECONNECT_MAX_DELAY_SEG: int = 60
     MQTT_DEDUP_VENTANA_SEGUNDOS: int = 120
     MQTT_WORKER_MAX_THREADS: int = 2
     MQTT_LOG_LEVEL: str = "WARNING"
+    # Buffer de resiliencia MQTT ante caídas de BD (#60)
+    MQTT_BUFFER_MAX_SIZE: int = 1000
+    MQTT_RETRY_BACKOFF_BASE_S: float = 2.0
+    MQTT_RETRY_BACKOFF_MAX_S: float = 60.0
 
     # API
     API_HOST: str = "127.0.0.1"

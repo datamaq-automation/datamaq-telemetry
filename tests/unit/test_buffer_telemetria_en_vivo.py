@@ -44,3 +44,14 @@ def test_descarta_lecturas_mas_viejas_que_el_maxlen():
         buffer.agregar("m/wifi/D48C49F03564/inst", {"dispositivo_id": "dev-1", "n": i})
 
     assert [d["n"] for d in buffer.obtener("dev-1")] == [3, 4]
+
+
+def test_limpiar_vacia_todos_los_buffers():
+    buffer = InMemoryTelemetriaBuffer()
+    buffer.agregar("m/wifi/D48C49F03564/inst", {"dispositivo_id": "dev-1"})
+    buffer.agregar("m/wifi/D48C49F03565/inst", {"dispositivo_id": "dev-2"})
+
+    buffer.limpiar()
+
+    assert buffer.obtener("dev-1") == []
+    assert buffer.obtener("dev-2") == []
