@@ -50,7 +50,7 @@ class ContrasenaDebilError(DominioAuthException):
     """Lanzada cuando la nueva contraseña no cumple con los requisitos mínimos de seguridad."""
 
 
-# TODO(#65): compatibilidad temporal. Quitar cuando no queden cuentas con estos roles.
+# TODO(#65): quitar cuando el frontend de main de app-datamaq deje de llamar a estos roles.
 class Operacion2FANoDisponibleParaInvitadoError(DominioAuthException):
     """Lanzada cuando un usuario con rol invitado intenta enrolar o gestionar 2FA."""
 

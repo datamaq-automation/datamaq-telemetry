@@ -149,7 +149,7 @@ class Setup2FAUseCase:
         usuario = self.repo_usuarios.obtener_por_usuario(usuario_nombre)
         if usuario is None or not usuario.esta_activo:
             raise UsuarioInactivoError("Usuario inexistente o inactivo.", usuario=usuario_nombre)
-        # TODO(#65): compatibilidad temporal de roles retirados; quitar con el Issue.
+        # TODO(#65): quitar cuando el frontend de main de app-datamaq deje de llamar a estos roles.
         if usuario.rol in ("invitado", "invitado_global"):
             raise Operacion2FANoDisponibleParaInvitadoError("2fa_no_disponible_para_invitado", usuario=usuario_nombre)
 
@@ -181,7 +181,7 @@ class Activar2FAUseCase:
         usuario = self.repo_usuarios.obtener_por_usuario(usuario_nombre)
         if usuario is None or not usuario.esta_activo:
             raise UsuarioInactivoError("Usuario inexistente o inactivo.", usuario=usuario_nombre)
-        # TODO(#65): compatibilidad temporal de roles retirados; quitar con el Issue.
+        # TODO(#65): quitar cuando el frontend de main de app-datamaq deje de llamar a estos roles.
         if usuario.rol in ("invitado", "invitado_global"):
             raise Operacion2FANoDisponibleParaInvitadoError("2fa_no_disponible_para_invitado", usuario=usuario_nombre)
 
@@ -216,7 +216,7 @@ class Desactivar2FAUseCase:
         usuario = self.repo_usuarios.obtener_por_usuario(usuario_nombre)
         if usuario is None or not usuario.esta_activo:
             raise UsuarioInactivoError("Usuario inexistente o inactivo.", usuario=usuario_nombre)
-        # TODO(#65): compatibilidad temporal de roles retirados; quitar con el Issue.
+        # TODO(#65): quitar cuando el frontend de main de app-datamaq deje de llamar a estos roles.
         if usuario.rol in ("invitado", "invitado_global"):
             raise Operacion2FANoDisponibleParaInvitadoError("2fa_no_disponible_para_invitado", usuario=usuario_nombre)
 

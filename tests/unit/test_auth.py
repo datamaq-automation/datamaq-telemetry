@@ -434,7 +434,7 @@ def test_me_roles_operador_y_superadmin():
 
 
 def test_me_acepta_roles_de_compatibilidad_temporal():
-    # TODO(#65): compatibilidad temporal; cuando se quite el rol, este test también.
+    # TODO(#65): quitar cuando el frontend de main de app-datamaq deje de llamar a estos roles.
     use_case = _use_case_me()
     for rol in ("invitado", "invitado_global"):
         assert use_case.me({"usuario": "u1", "rol": rol}).rol == rol
