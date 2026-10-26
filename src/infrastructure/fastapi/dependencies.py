@@ -50,6 +50,7 @@ from src.domain.oauth.ports import OAuthRepositoryPort
 from src.domain.telemetria.ports import RepositorioDispositivosPort
 from src.infrastructure.auth.email_service import SmtpEmailService
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
+from src.infrastructure.fastapi.acceso_oauth import integracion_oauth_vigente
 from src.infrastructure.paho_mqtt.mqtt_listener import MQTTListener
 from src.infrastructure.settings.config import Settings, get_settings
 from src.infrastructure.settings.logger import get_logger
@@ -204,6 +205,7 @@ def get_alertas_use_case(
 
 def get_procesar_pregunta_asistente_use_case(
     db: Annotated[Session, Depends(get_db_session)],
+    settings: Annotated[Settings, Depends(get_settings_dep)],
 ) -> ProcesarPreguntaAsistenteUseCase:
     from src.infrastructure.asistente.clasificador_reglas import (
         ClasificadorIntencionReglasAdapter,
@@ -219,6 +221,7 @@ def get_procesar_pregunta_asistente_use_case(
         repo_conversaciones=MySQLConversacionesAsistenteRepository(db),
         gestor_alertas=get_alertas_use_case(db),
         gestor_dispositivos=get_dispositivos_use_case(db),
+        consultar_telemetria=get_telemetria_use_case(db, settings),
     )
 
 
@@ -345,38 +348,19 @@ def get_consultar_auditoria_use_case(
     return ConsultarAuditLogsUseCase(repo_auditoria=repo_auditoria)
 
 
-@lru_cache(maxsize=1)
-def get_email_service_singleton(
-    host: str,
-    port: int,
-    user: str,
-    password: str,
-    use_tls: bool,
-    from_email: str,
-    app_env: str,
-) -> SmtpEmailService:
-    return SmtpEmailService(
-        host=host,
-        port=port,
-        user=user,
-        password=password,
-        use_tls=use_tls,
-        from_email=from_email,
-        app_env=app_env,
-    )
-
-
 def get_email_service(
     settings: Annotated[Settings, Depends(get_settings_dep)],
 ) -> ServicioEmailPort:
-    return get_email_service_singleton(
-        settings.SMTP_HOST,
-        settings.SMTP_PORT,
-        settings.SMTP_USER,
-        settings.SMTP_PASSWORD,
-        settings.SMTP_TLS,
-        settings.SMTP_FROM,
-        settings.APP_ENV,
+    # Sin caché: el servicio es liviano y no tiene estado. Así los cambios de configuración
+    # (y las contraseñas) no quedan congelados en una clave de caché.
+    return SmtpEmailService(
+        host=settings.SMTP_HOST,
+        port=settings.SMTP_PORT,
+        user=settings.SMTP_USER,
+        password=settings.SMTP_PASSWORD,
+        use_tls=settings.SMTP_TLS,
+        from_email=settings.SMTP_FROM,
+        app_env=settings.APP_ENV,
     )
 
 
@@ -446,6 +430,7 @@ def get_usuario_actual(
     authorization: Annotated[str | None, Header()] = None,
     datamaq_token: Annotated[str | None, Cookie()] = None,
     repo_usuarios: Annotated[RepositorioUsuariosPort | None, Depends(get_usuarios_repository)] = None,
+    repo_oauth: Annotated[OAuthRepositoryPort | None, Depends(get_oauth_repository)] = None,
 ) -> dict[str, Any]:
     settings = get_settings()
     if not settings.AUTH_REQUIRED:
@@ -478,6 +463,10 @@ def get_usuario_actual(
             if token_iat < rev_dt:
                 raise HTTPException(status_code=401, detail="credenciales_invalidas")
 
+    # Access token OAuth (lleva client_id): vale solo mientras la integración siga conectada (Issue #33).
+    if not integracion_oauth_vigente(claims, repo_oauth):
+        raise HTTPException(status_code=401, detail="credenciales_invalidas")
+
     return claims
 
 
@@ -499,15 +488,19 @@ def requiere_rol_admin(claims: Annotated[dict[str, Any], Depends(get_usuario_act
     return claims
 
 
-def requiere_rol_escritura(claims: Annotated[dict[str, Any], Depends(get_usuario_actual)]) -> dict[str, Any]:
+# TODO(#65): compatibilidad temporal de roles retirados; quitar con el Issue.
+def no_permitido_para_invitados_2fa(claims: Annotated[dict[str, Any], Depends(get_usuario_actual)]) -> dict[str, Any]:
+    # TODO(#65): quitar con los roles de compatibilidad.
+    # Inline: el generador de la matriz evalúa esta condición sin constantes de módulo.
     if claims.get("rol") in ("invitado", "invitado_global"):
-        raise HTTPException(status_code=403, detail="forbidden")
+        raise HTTPException(status_code=403, detail="2fa_no_disponible_para_invitado")
     return claims
 
 
-def no_permitido_para_invitados_2fa(claims: Annotated[dict[str, Any], Depends(get_usuario_actual)]) -> dict[str, Any]:
-    if claims.get("rol") in ("invitado", "invitado_global"):
-        raise HTTPException(status_code=403, detail="2fa_no_disponible_para_invitado")
+def requiere_rol_escritura(claims: Annotated[dict[str, Any], Depends(get_usuario_actual)]) -> dict[str, Any]:
+    # Allowlist: un rol retirado (p. ej. invitado en un token viejo) no escribe.
+    if claims.get("rol") not in ("superadmin", "admin", "operador", "mantenimiento", "ingeniero", "auditor"):
+        raise HTTPException(status_code=403, detail="forbidden")
     return claims
 
 

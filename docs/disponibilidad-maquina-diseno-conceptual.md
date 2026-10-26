@@ -1,6 +1,6 @@
 # Disponibilidad de Máquina a partir del Comportamiento Energético — Diseño Conceptual
 
-> **Estado:** Documento de diseño conceptual. No describe código existente ni un plan de implementación con tablas/servicios definidos — es la base de razonamiento para una futura sesión de diseño técnico.
+> **Estado:** Parcialmente implementado. El avance real está en la sección 8 (roadmap), donde cada etapa indica dónde está su código. Las secciones 1 a 7 son el razonamiento que originó el diseño y pueden no reflejar el código actual.
 > **Origen:** Sesión de diseño 2026-09-02/03, orientada a evaluar cómo derivar disponibilidad de máquina (marcha / parada programada / parada no programada) a partir de las variables eléctricas que ya captura la plataforma.
 
 ---
@@ -127,7 +127,7 @@ La implementación de `SegmentadorRegimenesService` convierte estas técnicas de
 * **Técnica A — Clustering por nivel de potencia:** implementada directamente mediante `SegmentadorRegimenesService.segmentar(k > 2)`. Identifica los niveles estables resultantes de combinaciones de cargas concurrentes mediante persistencia topológica sobre bins logarítmicos.
 * **Técnica B — Detección de escalones ($\Delta P$):** implementada en `DetectorEscalonesService` (`src/domain/cargas/servicios/`), que replica el criterio de huecos del segmentador y agrega el emparejado de cada encendido con su apagado en episodios acotados. La atribución de cada episodio a una carga concreta vive en `EmparejadorFirmasService`, que usa el par $(\Delta P, \Delta Q)$ —la potencia reactiva ya estaba en la base— más la **duración**, que es el único eje que separa entre sí a cargas resistivas de potencia parecida.
 
-Ambas se documentan en detalle en [`docs/desagregacion-cargas-nilm.md`](file:///home/agustin/proyectos_software/datamaq-telemetry/docs/desagregacion-cargas-nilm.md).
+Ambas se documentan en detalle en [`docs/desagregacion-cargas-nilm.md`](./desagregacion-cargas-nilm.md).
 
 ### 6.3 El conocimiento del proceso reduce el espacio real de estados
 
@@ -162,10 +162,10 @@ El espacio combinatorio teórico (2ⁿ) casi nunca se da completo en la práctic
 
 ## 8. Roadmap de implementación (secuencial)
 
-1. **Segmentación modal y calibración de umbrales:** motor `SegmentadorRegimenesService` (bins log, persistencia topológica, barrido de ancho de banda, dinámicas $|\Delta P|$ y estacionariedad). `CalibradorUmbralService` se apoya en este motor para inferir el umbral marcha/parada de máquinas individuales ($k=2$).
-2. **Motor de reglas de disponibilidad:** clasificar eventos instantáneos en marcha/parada según umbral calibrado con filtro anti-transitorios (`FiltroPersistenciaEstadoService`). Cruce con calendario de paradas programadas.
-3. **Corrección humana y feedback loop:** endpoint para corregir clasificaciones erróneas guardando autoría y motivo, construyendo el dataset etiquetado.
-4. **Desagregación NILM y modelos de estados:** ~~extensión con $k > 2$ para medidores agregados~~ **[implementado]** — ver [`docs/desagregacion-cargas-nilm.md`](file:///home/agustin/proyectos_software/datamaq-telemetry/docs/desagregacion-cargas-nilm.md) y el contexto `src/domain/cargas/`. Queda pendiente la exploración de modelos HSMM supervisados sobre el historial etiquetado, que ahora sí tiene de dónde salir: las correcciones humanas sobre `load_activity_intervals`.
+1. **Segmentación modal y calibración de umbrales:** *[Implementado en `src/domain/disponibilidad/servicios/` (`segmentador_regimenes.py`, `calibrador_umbral.py`)]* motor `SegmentadorRegimenesService` (bins log, persistencia topológica, barrido de ancho de banda, dinámicas $|\Delta P|$ y estacionariedad). `CalibradorUmbralService` se apoya en este motor para inferir el umbral marcha/parada de máquinas individuales ($k=2$).
+2. **Motor de reglas de disponibilidad:** *[Implementado en `clasificador_disponibilidad.py` y `filtro_persistencia.py`; el cruce con paradas programadas usa `buscar_vigente` en `src/application/use_cases/gestionar_disponibilidad.py`]* clasificar eventos instantáneos en marcha/parada según umbral calibrado con filtro anti-transitorios (`FiltroPersistenciaEstadoService`). Cruce con calendario de paradas programadas.
+3. **Corrección humana y feedback loop:** *[Implementado en parte: endpoint `/eventos/{evento_id}/corregir` (`src/infrastructure/fastapi/routes/disponibilidad_router.py`) guarda la autoría y un comentario; la construcción del dataset etiquetado sigue pendiente]* endpoint para corregir clasificaciones erróneas guardando autoría y motivo, construyendo el dataset etiquetado.
+4. **Desagregación NILM y modelos de estados:** ~~extensión con $k > 2$ para medidores agregados~~ **[implementado]** — ver [`docs/desagregacion-cargas-nilm.md`](./desagregacion-cargas-nilm.md) y el contexto `src/domain/cargas/`. Queda pendiente la exploración de modelos HSMM supervisados sobre el historial etiquetado, que ahora sí tiene de dónde salir: las correcciones humanas sobre `load_activity_intervals`.
 5. **Variables de Proceso e Indicadores ISO 50001/50006 [Implementado 2026-09-19]:** Incorporación de sensórica inductiva (longitud/cortes) en `src/domain/produccion/` (`CalculadorEnPIService`) y `DesagregadorAsistidoService` para vincular potencia de TGBT con eventos reales de máquina y cálculo de EnPI (SEC en kWh/m y kWh/corte) — ver [`decisions/2026-09-19_clasificacion-energia-industrial-enpi-ml.md`](file:///home/agustin/proyectos_software/datamaq/decisions/2026-09-19_clasificacion-energia-industrial-enpi-ml.md).
 
 Para medidores que agregan varias cargas (sección 6), este roadmap aplica **por carga o por línea**, no por medidor — lo que exige primero decidir, caso por caso, si corresponde desagregación algorítmica o submedición dedicada.
@@ -178,4 +178,4 @@ Para medidores que agregan varias cargas (sección 6), este roadmap aplica **por
 - ~~Diseño del modelo de datos~~ **[resuelto]** para disponibilidad (`machines`, `machine_availability_events`, `scheduled_stops`) y para desagregación de cargas (`loads`, `characterization_campaigns`, `campaign_samples`, `load_activity_intervals`).
 - ~~Punto de enganche técnico~~ **[resuelto]**: disponibilidad evalúa por evento en la ingesta; la desagregación de cargas corre **batch**, porque la duración de un encendido es parte de su identidad y en vivo no se conoce hasta que terminó.
 - Formato concreto de integración con el calendario externo de mantenimiento.
-- ~~Selección de algoritmo específico de NILM y su implementación~~ **[resuelto]**, ver [`docs/desagregacion-cargas-nilm.md`](file:///home/agustin/proyectos_software/datamaq-telemetry/docs/desagregacion-cargas-nilm.md). GMM y HSMM siguen pendientes.
+- ~~Selección de algoritmo específico de NILM y su implementación~~ **[resuelto]**, ver [`docs/desagregacion-cargas-nilm.md`](./desagregacion-cargas-nilm.md). GMM y HSMM siguen pendientes.

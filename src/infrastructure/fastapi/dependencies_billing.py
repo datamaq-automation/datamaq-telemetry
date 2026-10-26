@@ -3,7 +3,6 @@
 Separado de `dependencies.py` (no por capa, sino porque ese archivo ya está en el
 límite de tamaño del baseline de `scripts/verify_code_size.py`)."""
 
-from functools import lru_cache
 from typing import Annotated
 
 from fastapi import Depends
@@ -27,7 +26,6 @@ from src.infrastructure.sqlalchemy.mysql_repositories import (
 from src.infrastructure.yaml.repositories.organizaciones_repository import YamlOrganizacionesRepository
 
 
-@lru_cache(maxsize=1)
 def get_mercadopago_gateway() -> MercadoPagoGateway:
     settings = get_settings()
     return MercadoPagoGateway(settings.MP_ACCESS_TOKEN, base_url=settings.MP_BASE_URL)

@@ -1,3 +1,5 @@
+> **⚠️ Desactualizado (2026-10-15).** Este documento describe tres roles y rutas sin `/v1`. El estado vigente está en `specs/roles-y-permisos.md` y en la matriz generada `docs/matriz-roles-permisos.md`.
+
 # Spec R: Permisos por rol — invitado de solo lectura (D-04b)
 
 ## 1. Objetivo y Contexto

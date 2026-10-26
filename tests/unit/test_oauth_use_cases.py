@@ -96,6 +96,17 @@ class InMemoryOAuthRepository(OAuthRepositoryPort):
                 count += 1
         return count
 
+    def tiene_integracion_activa(
+        self, user_id: str, client_id: str, refresh_creado_hasta: datetime | None = None
+    ) -> bool:
+        return any(
+            t.user_id == user_id
+            and t.client_id == client_id
+            and t.revoked_at is None
+            and (refresh_creado_hasta is None or t.created_at <= refresh_creado_hasta)
+            for t in self.refresh_tokens.values()
+        )
+
     def listar_integraciones_usuario(self, user_id: str) -> list[dict[str, Any]]:
         activas: dict[str, dict[str, Any]] = {}
         for t in self.refresh_tokens.values():
@@ -293,6 +304,88 @@ def test_canjear_codigo_exitoso_y_refrescar(repo, token_service, usuario_repo):
     # El refresh_token anterior debe quedar revocado
     with pytest.raises(InvalidGrantError):
         token_uc.ejecutar(refresh_dto)
+
+
+class _RepoQueMideHuecos(InMemoryOAuthRepository):
+    """Registra si la integración queda sin refresh activo después de cada escritura."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.hubo_hueco = False
+
+    def _medir(self) -> None:
+        if not self.tiene_integracion_activa("u123", "claude-ai"):
+            self.hubo_hueco = True
+
+    def guardar_refresh_token(self, refresh_token: OAuthRefreshToken) -> None:
+        super().guardar_refresh_token(refresh_token)
+        self._medir()
+
+    def revocar_refresh_token(self, token_hash: str, ahora: datetime) -> bool:
+        revocado = super().revocar_refresh_token(token_hash, ahora)
+        self._medir()
+        return revocado
+
+
+def test_rotacion_de_refresh_nunca_deja_la_integracion_sin_token_activo(token_service, usuario_repo):
+    """Issue #33: get_usuario_actual consulta la integración activa; un hueco en la rotación daría 401 espurio."""
+    repo_medido = _RepoQueMideHuecos()
+    token_uc = CanjearTokenOAuthUseCase(repo_medido, token_service, usuario_repo)
+    ahora = datetime.now(timezone.utc)
+    repo_medido.guardar_refresh_token(
+        OAuthRefreshToken(
+            token_hash=hash_token("refresh-viejo"),
+            client_id="claude-ai",
+            user_id="u123",
+            organization_id="org-durax",
+            scope="read:telemetria",
+            expires_at=ahora + timedelta(days=30),
+            revoked_at=None,
+            created_at=ahora,
+        )
+    )
+
+    token_uc.ejecutar(
+        OAuthTokenRequestDTO(grant_type="refresh_token", client_id="claude-ai", refresh_token="refresh-viejo")
+    )
+
+    assert repo_medido.hubo_hueco is False
+    assert repo_medido.tiene_integracion_activa("u123", "claude-ai") is True
+
+
+class _RepoQueDesconectaTrasLeer(InMemoryOAuthRepository):
+    """Simula que el usuario desconecta la integración justo después de que el canje leyó el refresh."""
+
+    def obtener_refresh_token(self, token_hash: str) -> OAuthRefreshToken | None:
+        token = super().obtener_refresh_token(token_hash)
+        self.revocar_tokens_usuario_cliente("u123", "claude-ai", datetime.now(timezone.utc))
+        return token
+
+
+def test_rotacion_que_pierde_la_carrera_contra_la_desconexion_no_resucita_la_integracion(token_service, usuario_repo):
+    """Issue #35/#33: si el viejo ya fue revocado al momento de rotar, el nuevo no puede quedar activo."""
+    repo_carrera = _RepoQueDesconectaTrasLeer()
+    token_uc = CanjearTokenOAuthUseCase(repo_carrera, token_service, usuario_repo)
+    ahora = datetime.now(timezone.utc)
+    repo_carrera.guardar_refresh_token(
+        OAuthRefreshToken(
+            token_hash=hash_token("refresh-viejo"),
+            client_id="claude-ai",
+            user_id="u123",
+            organization_id="org-durax",
+            scope="read:telemetria",
+            expires_at=ahora + timedelta(days=30),
+            revoked_at=None,
+            created_at=ahora,
+        )
+    )
+
+    with pytest.raises(InvalidGrantError):
+        token_uc.ejecutar(
+            OAuthTokenRequestDTO(grant_type="refresh_token", client_id="claude-ai", refresh_token="refresh-viejo")
+        )
+
+    assert repo_carrera.tiene_integracion_activa("u123", "claude-ai") is False
 
 
 def test_canjear_codigo_verifier_invalido(repo, token_service, usuario_repo):

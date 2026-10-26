@@ -55,7 +55,7 @@ def verificar_propiedad_dispositivo(
     404 en vez de 403 para no confirmar la existencia del dispositivo a un usuario ajeno.
     """
     settings = get_settings()
-    if not settings.AUTH_REQUIRED or claims.get("rol") in ("superadmin", "invitado_global"):
+    if not settings.AUTH_REQUIRED or claims.get("rol") == "superadmin":
         return
 
     id_dispositivo = device_id or dispositivo_id
@@ -87,7 +87,7 @@ def verificar_propiedad_maquina(
     autenticado. Superadmin y modo sin auth (AUTH_REQUIRED=False) pasan sin chequeo.
     """
     settings = get_settings()
-    if not settings.AUTH_REQUIRED or claims.get("rol") in ("superadmin", "invitado_global"):
+    if not settings.AUTH_REQUIRED or claims.get("rol") == "superadmin":
         return
 
     if maquina_id is None:
@@ -109,11 +109,11 @@ def verificar_propiedad_alerta(
     alerta_id: int | None = None,
 ) -> None:
     """Rechaza con 404 si la alerta pedida no pertenece a la organización del usuario
-    autenticado (alerta -> dispositivo -> planta -> organización). Superadmin, invitado_global
+    autenticado (alerta -> dispositivo -> planta -> organización). Superadmin,
     y modo sin auth (AUTH_REQUIRED=False) pasan sin chequeo.
     """
     settings = get_settings()
-    if not settings.AUTH_REQUIRED or claims.get("rol") in ("superadmin", "invitado_global"):
+    if not settings.AUTH_REQUIRED or claims.get("rol") == "superadmin":
         return
 
     if alerta_id is None:
@@ -137,7 +137,7 @@ def verificar_propiedad_evento_disponibilidad(
     del usuario autenticado. Superadmin y modo sin auth (AUTH_REQUIRED=False) pasan sin chequeo.
     """
     settings = get_settings()
-    if not settings.AUTH_REQUIRED or claims.get("rol") in ("superadmin", "invitado_global"):
+    if not settings.AUTH_REQUIRED or claims.get("rol") == "superadmin":
         return
 
     if evento_id is None:

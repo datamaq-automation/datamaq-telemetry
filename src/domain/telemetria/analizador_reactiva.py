@@ -121,18 +121,23 @@ class DimensionadorCompensacionService:
         potencia_activa_kw: float | None,
         fp_actual: float | None,
         horas_mes: float = 720.0,
-        tarifa_kwh_ars: float = 95.0,
-        cargo_potencia_kw_ars: float = 1500.0,
+        tarifa_kwh_ars: float | None = None,
+        cargo_potencia_kw_ars: float | None = None,
     ) -> float | None:
         """Estima el recargo monetario mensual en la factura (ARS) si el FP permanece bajo el umbral de penalidad (0.95).
 
         Regulación ENRE / Tarifas industriales T2 / T3:
             Recargo (%) = (0.95 / FP_actual - 1) * 100
             Penalización ($) = Costo_Factura_Base * (0.95 / FP_actual - 1)
+
+        Sin tarifa verificada de la distribuidora (ambos parámetros explícitos) no hay cifra en ARS:
+        devuelve None, incluso si el FP no llega al umbral.
         """
         if potencia_activa_kw is None or fp_actual is None:
             return None
         if potencia_activa_kw <= 0.0 or fp_actual <= 0.0 or fp_actual > 1.0:
+            return None
+        if tarifa_kwh_ars is None or cargo_potencia_kw_ars is None:
             return None
 
         # Si el FP no está bajo el umbral de penalidad (0.95), el recargo es 0

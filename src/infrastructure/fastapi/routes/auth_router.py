@@ -5,6 +5,7 @@ from typing import Annotated, Any
 
 import structlog
 from fastapi import APIRouter, Cookie, Depends, Request, Response
+from fastapi.responses import JSONResponse
 
 from src.application.dtos.audit_dto import RegistrarAuditLogDTO
 from src.application.dtos.auth_dto import (
@@ -64,6 +65,7 @@ from src.infrastructure.fastapi.auth_dependencies import (
     get_setup_2fa_use_case,
     get_verificar_2fa_use_case,
 )
+from src.infrastructure.fastapi.compat_roles_invitado import construir_me_compat, es_rol_compat
 from src.infrastructure.fastapi.dependencies import (
     get_registrar_auditoria_use_case,
     get_restablecer_contrasena_use_case,
@@ -165,28 +167,6 @@ def login(
         manejar_error_http(e)
 
 
-@router.post("/guest", response_model=LoginResponseDTO)
-def guest(
-    request: Request,
-    response: Response,
-    use_case: Annotated[AutenticarUsuarioUseCase, Depends(get_auth_use_case)],
-    settings: Annotated[Settings, Depends(get_settings_dep)],
-) -> LoginResponseDTO:
-    try:
-        ip = request.client.host if request.client else "desconocida"
-        resultado = use_case.guest(clave_limite=f"ip:{ip}")
-        logger.info(
-            "login_exitoso",
-            usuario="invitado",
-            request_id=structlog.contextvars.get_contextvars().get("request_id"),
-        )
-        if resultado.token:
-            _fijar_cookie(response, settings, resultado.token, request=request)
-        return resultado
-    except Exception as e:
-        manejar_error_http(e)
-
-
 @router.post("/logout")
 def logout(
     response: Response,
@@ -277,7 +257,12 @@ def logout_todas(
 def me(
     claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
     use_case: Annotated[AutenticarUsuarioUseCase, Depends(get_auth_use_case)],
-) -> MeResponseDTO:
+    repo_usuarios: Annotated[RepositorioUsuariosPort, Depends(get_usuarios_repository)],
+) -> MeResponseDTO | JSONResponse:
+    # TODO(#65): un token con rol retirado no pasa por el caso de uso: no obtiene plantas
+    # ni permisos. Ver compat_roles_invitado.py. Quitar con el Issue #65.
+    if es_rol_compat(claims.get("rol")):
+        return JSONResponse(content=construir_me_compat(claims, repo_usuarios))
     try:
         return use_case.me(claims)
     except Exception as e:

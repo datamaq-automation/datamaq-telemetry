@@ -214,6 +214,15 @@ El esquema se gestiona con **Alembic** (fuente de verdad: `src/infrastructure/sq
 ./push.sh               # o bien: git push-watch
 ```
 
+Antes de correr los tests, la configuración debe permitir arrancar la app. Si copiás `.env.example` tal cual, `APP_ENV=production` exige una `API_SECRET_KEY` fuerte, y los tests fallan sin ella. Para desarrollo local, definí estas variables (o ponelas en `.env`):
+
+```bash
+export APP_ENV=development
+export API_SECRET_KEY="$(python3 -c 'import secrets; print(secrets.token_urlsafe(48))')"
+```
+
+Los tests que leen la configuración de organizaciones (`data/`, por ejemplo unifilar, YAML de organizaciones y SGE) necesitan el repositorio `datamaq-data` clonado en `./data`. Sin él, fallan por falta de datos, no por código.
+
 Verificación individual:
 
 ```bash
@@ -237,11 +246,11 @@ Después de cada despliegue, se ejecutan smoke tests automáticamente en CI para
 - ✓ No hay logs CRITICAL en startup
 
 ```bash
-# Ejecutar manualmente (local o post-deploy)
-.venv/bin/pytest tests/e2e/test_smoke_post_deploy.py -v
+# Ejecutar tests de router/salud (local)
+.venv/bin/pytest tests/unit/test_smoke_post_deploy.py -v
 
-# En CI/CD (deploy.yml)
-pytest tests/e2e/test_smoke_post_deploy.py -v
+# Smoke test post-deploy real contra servidor desplegado
+python3 scripts/smoke_post_deploy.py https://api.datamaq.com.ar/health/ready
 ```
 
 ---

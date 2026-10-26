@@ -1,0 +1,86 @@
+name: CD Deploy Staging
+
+# Despliegue a staging (api-dev, 8886) en cada push a develop.
+# Producción se despliega con deploy.yml (CI en main). Requiere bootstrap previo en el VPS.
+# Decisión: decisions/2026-10-20_cd-staging-disparo-por-push.md (repo padre).
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy a Staging (api-dev, 8886)
+    runs-on: ubuntu-latest
+    environment: staging
+    concurrency:
+      group: deploy-telemetry-staging
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+          log-public-key: false
+
+      - name: Agregar known hosts
+        env:
+          DEPLOY_SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+          DEPLOY_SSH_PORT: ${{ secrets.DEPLOY_SSH_PORT }}
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p "$DEPLOY_SSH_PORT" -H "$DEPLOY_SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Deploy (pull + deps + restart + health check + rollback)
+        env:
+          DEPLOY_SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+          DEPLOY_SSH_PORT: ${{ secrets.DEPLOY_SSH_PORT }}
+          DEPLOY_SSH_USER: ${{ secrets.DEPLOY_SSH_USER }}
+          DEPLOY_REMOTE_DIR: /var/www/datamaq-telemetry-dev
+          DEPLOY_SERVICE_NAME: datamaq-telemetry-dev.service
+          DEPLOY_HEALTH_URL: http://localhost:8886/health/ready
+          # Staging publica develop (no main) y guarda sus dumps aparte: su limpieza a 5 no puede tocar los de producción.
+          DEPLOY_BRANCH: develop
+          DEPLOY_BACKUP_DIR: /tmp/datamaq-telemetry-dev-pre-migracion
+          # Los pip freeze de rollback de staging no pisan los de producción (mismo /tmp compartido).
+          DEPLOY_DEPS_FILE: /tmp/telemetry-deps-dev.txt
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -o pipefail
+          ./scripts/deploy-server.sh 2>&1 | tee "$RUNNER_TEMP/deploy.log"
+
+      - name: "Smoke Test Post-Deploy"
+        run: |
+          python3 scripts/smoke_post_deploy.py "https://api-dev.datamaq.com.ar/health/ready"
+
+      - name: "Alertar por Telegram si falló"
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SHA_CORTO: ${{ github.sha }}
+          ACTOR: ${{ github.actor }}
+          TARGET: Staging (api-dev, 8886)
+        run: |
+          LOG="$RUNNER_TEMP/deploy.log"
+          if [ -f "$LOG" ] && grep -q "ROLLBACK FALLIDO" "$LOG"; then
+            TITULO="🚨 ROLLBACK FALLIDO: servicio CAÍDO en $TARGET"
+          elif [ -f "$LOG" ] && grep -q "ROLLBACK INCOMPLETO" "$LOG"; then
+            TITULO="🚨 ROLLBACK INCOMPLETO: servicio en estado desconocido ($TARGET)"
+          elif [ -f "$LOG" ] && grep -q "el servicio está OK" "$LOG"; then
+            TITULO="↩️ Deploy revertido, servicio OK ($TARGET)"
+          else
+            TITULO="🔴 CD Deploy falló ($TARGET)"
+          fi
+          MSG="$TITULO — datamaq-telemetry
+          Commit: ${SHA_CORTO:0:7} (disparado por ${ACTOR})
+          Run: ${RUN_URL}"
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=${MSG}" \
+            -o /dev/null -w "Telegram respondió HTTP %{http_code}\n"

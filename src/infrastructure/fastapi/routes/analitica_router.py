@@ -58,6 +58,11 @@ def obtener_banco_capacitores_planta(
 def obtener_penalizaciones_planta(
     planta_id: str = Query(..., description="ID de la planta industrial"),
     periodo_dias: int = Query(7, ge=1, le=30, description="Ventana de análisis en días"),
+    periodo_facturacion: str | None = Query(
+        None,
+        pattern=r"^\d{4}-\d{2}$",
+        description="Período de facturación AAAA-MM. Si se indica, la cifra sale de esa factura",
+    ),
     user_claims: Annotated[dict[str, Any] | None, Depends(get_usuario_actual)] = None,
     use_case: Annotated[
         ConsultarAnaliticaPlantaUseCase | None, Depends(get_consultar_analitica_planta_use_case)
@@ -68,7 +73,9 @@ def obtener_penalizaciones_planta(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=_ERROR_INTERNO)
 
     try:
-        return use_case.obtener_penalizaciones(planta_id=planta_id, periodo_dias=periodo_dias)
+        return use_case.obtener_penalizaciones(
+            planta_id=planta_id, periodo_dias=periodo_dias, periodo_facturacion=periodo_facturacion
+        )
 
     except Exception as err:
         logger.error("analitica_error_penalizaciones", exc_info=True, planta_id=planta_id, error=str(err))

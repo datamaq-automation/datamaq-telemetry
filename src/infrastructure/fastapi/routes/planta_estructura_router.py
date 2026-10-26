@@ -38,7 +38,7 @@ router = APIRouter(
 
 def _resolver_org_id(claims: dict) -> str | None:
     rol = claims.get("rol")
-    if rol in ("superadmin", "invitado_global"):
+    if rol == "superadmin":
         return None
     return claims.get("org")
 

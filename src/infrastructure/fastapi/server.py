@@ -14,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from src.adapters.gateways.in_memory_event_broadcaster import InMemoryEventBroadcaster
 from src.adapters.gateways.mqtt_comando_rafaga import MqttComandoRafagaGateway
 from src.application.use_cases.caracterizar_carga import CaracterizarCargaUseCase
 from src.application.use_cases.ingesta.registro_campanas import registro_campanas_activas
@@ -22,6 +23,7 @@ from src.domain.telemetria.services import debe_recibir_evento
 from src.domain.telemetria.servicios.alcance_tiempo_real import alcance_de_clientes
 from src.domain.telemetria.value_objects import MacAddress
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
+from src.infrastructure.fastapi.acceso_oauth import integracion_oauth_vigente_ws
 from src.infrastructure.fastapi.auth_cookies import ORIGENES_CORS_CYBERSYN
 from src.infrastructure.fastapi.dependencies import (
     extraer_token,
@@ -57,6 +59,7 @@ from src.infrastructure.fastapi.routes.system_router import router as system_rou
 from src.infrastructure.fastapi.routes.telemetria_router import router as telemetria_router
 from src.infrastructure.fastapi.routes.usuarios_router import router as usuarios_router
 from src.infrastructure.fastapi.security_headers import SecurityHeadersMiddleware
+from src.infrastructure.fastapi.seguridad_rutas import RateLimit404Middleware, RechazoPathInseguroMiddleware
 from src.infrastructure.fastapi.vigilancia_conectividad import loop_vigilancia_conectividad
 from src.infrastructure.paho_mqtt.mqtt_listener import MQTTListener
 from src.infrastructure.settings.config import Settings, get_settings
@@ -324,6 +327,17 @@ async def _ws_heartbeat_loop() -> None:
             logger.warning("ws_heartbeat_fallido", error=str(e))
 
 
+def _iniciar_mqtt_si_habilitado(habilitado: bool, broadcaster: InMemoryEventBroadcaster) -> MQTTListener | None:
+    """Arranca el listener MQTT solo si está habilitado. Con False no se crea, registra ni conecta nada."""
+    if not habilitado:
+        logger.info("mqtt_deshabilitado", motivo="MQTT_HABILITADO=false")
+        return None
+    listener = MQTTListener(publicador_eventos=broadcaster)
+    registrar_mqtt_listener(listener)
+    listener.start()
+    return listener
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global async_loop
@@ -353,10 +367,8 @@ async def lifespan(app: FastAPI):
     # Buffer en RAM de lecturas en vivo por dispositivo (sobrevive a un F5 del navegador)
     global_event_broadcaster.suscribir(global_telemetria_buffer.agregar)
 
-    # Start MQTT background listener
-    mqtt_listener = MQTTListener(publicador_eventos=global_event_broadcaster)
-    registrar_mqtt_listener(mqtt_listener)
-    mqtt_listener.start()
+    # Start MQTT background listener (apagable con MQTT_HABILITADO=false, p. ej. en dev)
+    _iniciar_mqtt_si_habilitado(get_settings().MQTT_HABILITADO, global_event_broadcaster)
 
     # Iniciar heartbeat para Cloudflare / proxies
     heartbeat_task = asyncio.create_task(_ws_heartbeat_loop())
@@ -381,7 +393,9 @@ async def lifespan(app: FastAPI):
             await tarea
         except asyncio.CancelledError:
             pass
-    mqtt_listener.stop()
+    listener_mqtt = get_mqtt_listener()
+    if listener_mqtt is not None:
+        listener_mqtt.stop()
     global_event_broadcaster.desuscribir(websocket_broadcast_callback)
     global_event_broadcaster.desuscribir(global_telemetria_buffer.agregar)
 
@@ -399,12 +413,15 @@ async def _autenticar_cliente_ws(websocket: WebSocket, settings: Settings, clien
     token = extraer_token(cookie_token, auth_header)
     adicionales = [settings.API_SECRET_KEY_ANTERIOR] if settings.API_SECRET_KEY_ANTERIOR else None
     claims = JwtTokenService(settings.API_SECRET_KEY).verificar(token, adicionales) if token else None
+    # Access token OAuth de una integración desconectada (Issue #33): mismo rechazo que un token inválido.
+    if claims is not None and not await asyncio.to_thread(integracion_oauth_vigente_ws, websocket.app, claims):
+        claims = None
     if claims is None:
         logger.warning("ws_auth_rechazada", client=client_host, razon="token_invalido")
         await websocket.close(code=WS_CLOSE_TOKEN_INVALIDO, reason="token_invalido")
         return None
 
-    es_superadmin = claims.get("rol") in ("superadmin", "invitado_global")
+    es_superadmin = claims.get("rol") == "superadmin"
     organizacion_id = None if es_superadmin else claims.get("org")
     return ConnectedClient(websocket=websocket, organizacion_id=organizacion_id, es_superadmin=es_superadmin)
 
@@ -492,12 +509,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_credentials=not cors_abierto,
         allow_methods=["*"],
         allow_headers=["*"],
-        expose_headers=[HEADER_DATOS_DESDE, HEADER_POTENCIA_REFERENCIA],
+        expose_headers=[HEADER_DATOS_DESDE, HEADER_POTENCIA_REFERENCIA, "X-Request-ID"],
     )
 
     app.add_middleware(NormalizarMcpRutaMiddleware)
     app.add_middleware(SecurityHeadersMiddleware, settings=settings)
     app.add_middleware(DuracionRequestMiddleware)  # Por dentro de RequestId: ya tiene el request_id.
+    app.add_middleware(RateLimit404Middleware, settings=settings)
+    app.add_middleware(RechazoPathInseguroMiddleware)
     app.add_middleware(RequestIdMiddleware)
     app.add_exception_handler(Exception, manejar_excepcion_no_mapeada)
     app.add_exception_handler(StarletteHTTPException, manejar_404)

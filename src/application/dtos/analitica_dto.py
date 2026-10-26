@@ -61,3 +61,10 @@ class AnaliticaPenalizacionesPlantaDTO(BaseModel):
     )
     moneda: str = Field(default="ARS", description="Código de moneda")
     timestamp_calculo: datetime = Field(..., description="Fecha y hora ISO del cálculo")
+    periodo_facturacion: str | None = Field(
+        default=None, description="Período de facturación AAAA-MM si la cifra es por período; None si es por ventana"
+    )
+    distribuidora: str | None = Field(default=None, description="Distribuidora de la factura del período")
+    tarifa: str | None = Field(default=None, description="Tarifa de la distribuidora aplicada en el período")
+    fuente_archivo: str | None = Field(default=None, description="Factura real que respalda la cifra")
+    concepto: str | None = Field(default=None, description="Qué mide la cifra (recargo o penalización reactiva)")

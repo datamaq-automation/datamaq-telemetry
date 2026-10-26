@@ -3,8 +3,9 @@
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
+from sqlalchemy.orm import Session
 
 from src.application.dtos.carga_dto import (
     AnalisisConsumoResponseDTO,
@@ -35,25 +36,125 @@ from src.infrastructure.fastapi.dependencies import (
     get_usuario_actual,
     requiere_rol_escritura,
 )
+from src.infrastructure.fastapi.device_ownership import verificar_propiedad_dispositivo
 from src.infrastructure.fastapi.error_handler import manejar_error_http
+from src.infrastructure.sqlalchemy.database import get_db_session
 
 router = APIRouter(
     prefix="/api/v1/cargas",
     tags=["Desagregación de Cargas"],
-    dependencies=[Depends(get_usuario_actual)],
+    # verificar_propiedad_dispositivo es no-op si la ruta no trae device_id/dispositivo_id: así cubre por igual
+    # las rutas con dispositivo en la query (#41) sin repetirla en cada una.
+    dependencies=[Depends(get_usuario_actual), Depends(verificar_propiedad_dispositivo)],
 )
+
+
+def _pertenece_a_la_organizacion(claims: dict, db: Session, dispositivo_id: str) -> bool:
+    """Misma regla que el resto de los endpoints de dispositivo: superadmin y el acceso global pasan."""
+    try:
+        verificar_propiedad_dispositivo(claims=claims, db=db, dispositivo_id=dispositivo_id)
+    except HTTPException:
+        return False
+    return True
+
+
+def _exigir_acceso_a_carga(claims: dict, db: Session, use_case: GestionarCargasUseCase, carga_id: str) -> None:
+    """Lee el dispositivo de la carga y exige que sea de la organización del token (404 si no lo es)."""
+    try:
+        dispositivo_id = use_case.obtener_carga(carga_id).dispositivo_id
+    except Exception as e:
+        manejar_error_http(e)
+    verificar_propiedad_dispositivo(claims=claims, db=db, dispositivo_id=dispositivo_id)
+
+
+def verificar_acceso_a_carga(
+    carga_id: str,
+    claims: Annotated[dict, Depends(get_usuario_actual)],
+    db: Annotated[Session, Depends(get_db_session)],
+    use_case: Annotated[GestionarCargasUseCase, Depends(get_cargas_use_case)],
+) -> None:
+    _exigir_acceso_a_carga(claims, db, use_case, carga_id)
+
+
+def verificar_acceso_a_intervalo(
+    intervalo_id: int,
+    claims: Annotated[dict, Depends(get_usuario_actual)],
+    db: Annotated[Session, Depends(get_db_session)],
+    use_case: Annotated[AtribuirConsumoUseCase, Depends(get_atribucion_use_case)],
+) -> None:
+    try:
+        dispositivo_id = use_case.dispositivo_de_intervalo(intervalo_id)
+    except Exception as e:
+        manejar_error_http(e)
+    verificar_propiedad_dispositivo(claims=claims, db=db, dispositivo_id=dispositivo_id)
+
+
+def verificar_alta_de_carga(
+    dto: CargaCreateDTO,
+    claims: Annotated[dict, Depends(get_usuario_actual)],
+    db: Annotated[Session, Depends(get_db_session)],
+) -> None:
+    verificar_propiedad_dispositivo(claims=claims, db=db, dispositivo_id=dto.dispositivo_id)
+
+
+def verificar_alta_de_campana(
+    dto: CampanaCreateDTO,
+    claims: Annotated[dict, Depends(get_usuario_actual)],
+    db: Annotated[Session, Depends(get_db_session)],
+    cargas: Annotated[GestionarCargasUseCase, Depends(get_cargas_use_case)],
+) -> None:
+    verificar_propiedad_dispositivo(claims=claims, db=db, dispositivo_id=dto.dispositivo_id)
+    if dto.carga_id is not None:
+        _exigir_acceso_a_carga(claims, db, cargas, dto.carga_id)
+
+
+def verificar_correccion_de_intervalo(
+    dto: CorregirIntervaloRequestDTO,
+    claims: Annotated[dict, Depends(get_usuario_actual)],
+    db: Annotated[Session, Depends(get_db_session)],
+    cargas: Annotated[GestionarCargasUseCase, Depends(get_cargas_use_case)],
+) -> None:
+    # Reimputar a una carga ajena cambia también el medidor de la carga: se exige la misma organización (#42).
+    if dto.carga_id is not None:
+        _exigir_acceso_a_carga(claims, db, cargas, dto.carga_id)
+
+
+def verificar_acceso_a_campana(
+    campana_id: str,
+    claims: Annotated[dict, Depends(get_usuario_actual)],
+    db: Annotated[Session, Depends(get_db_session)],
+    use_case: Annotated[CaracterizarCargaUseCase, Depends(get_caracterizacion_use_case)],
+) -> None:
+    try:
+        dispositivo_id = use_case.obtener(campana_id).dispositivo_id
+    except Exception as e:
+        manejar_error_http(e)
+    verificar_propiedad_dispositivo(claims=claims, db=db, dispositivo_id=dispositivo_id)
 
 
 @router.get("", response_model=list[CargaResponseDTO])
 def listar_cargas(
     use_case: Annotated[GestionarCargasUseCase, Depends(get_cargas_use_case)],
+    claims: Annotated[dict, Depends(get_usuario_actual)],
+    db: Annotated[Session, Depends(get_db_session)],
     device_id: Annotated[str | None, Query(description="Filtrar por dispositivo (UUID o MAC).")] = None,
     solo_activas: bool = False,
 ):
     try:
-        return use_case.listar_cargas(dispositivo_id=device_id, solo_activas=solo_activas)
+        cargas = use_case.listar_cargas(dispositivo_id=device_id, solo_activas=solo_activas)
     except Exception as e:
         manejar_error_http(e)
+    if device_id is not None:
+        return cargas
+    # Sin device_id se listan las cargas de todos los medidores: solo las de la organización del token (#41).
+    permitidos: dict[str, bool] = {}
+    resultado = []
+    for carga in cargas:
+        if carga.dispositivo_id not in permitidos:
+            permitidos[carga.dispositivo_id] = _pertenece_a_la_organizacion(claims, db, carga.dispositivo_id)
+        if permitidos[carga.dispositivo_id]:
+            resultado.append(carga)
+    return resultado
 
 
 @router.get("/perfil", response_model=PerfilConsumoResponseDTO)
@@ -107,7 +208,11 @@ def disparar_analisis(
 @router.patch(
     "/intervalos/{intervalo_id}/corregir",
     response_model=IntervaloActividadResponseDTO,
-    dependencies=[Depends(requiere_rol_escritura)],
+    dependencies=[
+        Depends(requiere_rol_escritura),
+        Depends(verificar_acceso_a_intervalo),
+        Depends(verificar_correccion_de_intervalo),
+    ],
 )
 def corregir_intervalo(
     intervalo_id: int,
@@ -177,7 +282,7 @@ def listar_intervalos(
         manejar_error_http(e)
 
 
-@router.get("/{carga_id}", response_model=CargaResponseDTO)
+@router.get("/{carga_id}", response_model=CargaResponseDTO, dependencies=[Depends(verificar_acceso_a_carga)])
 def obtener_carga(
     carga_id: str,
     use_case: Annotated[GestionarCargasUseCase, Depends(get_cargas_use_case)],
@@ -188,7 +293,11 @@ def obtener_carga(
         manejar_error_http(e)
 
 
-@router.post("", response_model=CargaResponseDTO, dependencies=[Depends(requiere_rol_escritura)])
+@router.post(
+    "",
+    response_model=CargaResponseDTO,
+    dependencies=[Depends(requiere_rol_escritura), Depends(verificar_alta_de_carga)],
+)
 def registrar_carga(
     dto: CargaCreateDTO,
     use_case: Annotated[GestionarCargasUseCase, Depends(get_cargas_use_case)],
@@ -199,7 +308,11 @@ def registrar_carga(
         manejar_error_http(e)
 
 
-@router.patch("/{carga_id}", response_model=CargaResponseDTO, dependencies=[Depends(requiere_rol_escritura)])
+@router.patch(
+    "/{carga_id}",
+    response_model=CargaResponseDTO,
+    dependencies=[Depends(requiere_rol_escritura), Depends(verificar_acceso_a_carga)],
+)
 def actualizar_carga(
     carga_id: str,
     dto: CargaUpdateDTO,
@@ -211,7 +324,11 @@ def actualizar_carga(
         manejar_error_http(e)
 
 
-@router.put("/{carga_id}/firma", response_model=CargaResponseDTO, dependencies=[Depends(requiere_rol_escritura)])
+@router.put(
+    "/{carga_id}/firma",
+    response_model=CargaResponseDTO,
+    dependencies=[Depends(requiere_rol_escritura), Depends(verificar_acceso_a_carga)],
+)
 def fijar_firma_manual(
     carga_id: str,
     dto: FirmaManualRequestDTO,
@@ -227,7 +344,7 @@ def fijar_firma_manual(
 @router.post(
     "/campanas/activas",
     response_model=CampanaResponseDTO,
-    dependencies=[Depends(requiere_rol_escritura)],
+    dependencies=[Depends(requiere_rol_escritura), Depends(verificar_alta_de_campana)],
 )
 def iniciar_campana_activa(
     dto: CampanaCreateDTO,
@@ -248,7 +365,7 @@ def iniciar_campana_activa(
 @router.post(
     "/campanas/pasivas",
     response_model=CampanaResponseDTO,
-    dependencies=[Depends(requiere_rol_escritura)],
+    dependencies=[Depends(requiere_rol_escritura), Depends(verificar_alta_de_campana)],
 )
 def iniciar_campana_pasiva(
     dto: CampanaCreateDTO,
@@ -263,7 +380,11 @@ def iniciar_campana_pasiva(
         manejar_error_http(e)
 
 
-@router.get("/campanas/{campana_id}", response_model=CampanaResponseDTO)
+@router.get(
+    "/campanas/{campana_id}",
+    response_model=CampanaResponseDTO,
+    dependencies=[Depends(verificar_acceso_a_campana)],
+)
 def obtener_campana(
     campana_id: str,
     use_case: Annotated[CaracterizarCargaUseCase, Depends(get_caracterizacion_use_case)],
@@ -277,7 +398,7 @@ def obtener_campana(
 @router.patch(
     "/campanas/{campana_id}/finalizar",
     response_model=CampanaResponseDTO,
-    dependencies=[Depends(requiere_rol_escritura)],
+    dependencies=[Depends(requiere_rol_escritura), Depends(verificar_acceso_a_campana)],
 )
 def finalizar_campana(
     campana_id: str,
@@ -294,7 +415,7 @@ def finalizar_campana(
 @router.patch(
     "/campanas/{campana_id}/descartar",
     response_model=CampanaResponseDTO,
-    dependencies=[Depends(requiere_rol_escritura)],
+    dependencies=[Depends(requiere_rol_escritura), Depends(verificar_acceso_a_campana)],
 )
 def descartar_campana(
     campana_id: str,
@@ -307,7 +428,11 @@ def descartar_campana(
         manejar_error_http(e)
 
 
-@router.get("/{carga_id}/campanas", response_model=list[CampanaResponseDTO])
+@router.get(
+    "/{carga_id}/campanas",
+    response_model=list[CampanaResponseDTO],
+    dependencies=[Depends(verificar_acceso_a_carga)],
+)
 def listar_campanas_de_carga(
     carga_id: str,
     use_case: Annotated[CaracterizarCargaUseCase, Depends(get_caracterizacion_use_case)],
@@ -318,7 +443,11 @@ def listar_campanas_de_carga(
         manejar_error_http(e)
 
 
-@router.get("/{carga_id}/intervalos", response_model=list[IntervaloActividadResponseDTO])
+@router.get(
+    "/{carga_id}/intervalos",
+    response_model=list[IntervaloActividadResponseDTO],
+    dependencies=[Depends(verificar_acceso_a_carga)],
+)
 def listar_intervalos_de_carga(
     carga_id: str,
     use_case: Annotated[AtribuirConsumoUseCase, Depends(get_atribucion_use_case)],

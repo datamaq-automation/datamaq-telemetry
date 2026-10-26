@@ -64,30 +64,30 @@ class TestCandidatoTI:
     def test_creacion_basica(self) -> None:
         """Crear candidato con orden R,S,T normal."""
         cand = CandidatoTI(
-            orden_fases=("R", "S", "T"),
-            invertido=False,
+            asociacion_tension_corriente=("R", "S", "T"),
+            polaridad_ti=False,
             score=0.95,
             justificacion="Coherencia alta",
         )
-        assert cand.orden_fases == ("R", "S", "T")
-        assert cand.invertido is False
+        assert cand.asociacion_tension_corriente == ("R", "S", "T")
+        assert cand.polaridad_ti is False
         assert cand.score == 0.95
 
     def test_creacion_bifasico(self) -> None:
         """Crear candidato bifásico."""
         cand = CandidatoTI(
-            orden_fases=("R", "S"),
-            invertido=True,
+            asociacion_tension_corriente=("R", "S"),
+            polaridad_ti=True,
             score=0.42,
             justificacion="Bajo",
         )
-        assert len(cand.orden_fases) == 2
+        assert len(cand.asociacion_tension_corriente) == 2
 
     def test_posicion_sin_inversion(self) -> None:
         """Método posicion() sin inversión."""
         cand = CandidatoTI(
-            orden_fases=("R", "S", "T"),
-            invertido=False,
+            asociacion_tension_corriente=("R", "S", "T"),
+            polaridad_ti=False,
             score=0.9,
             justificacion="OK",
         )
@@ -96,8 +96,8 @@ class TestCandidatoTI:
     def test_posicion_con_inversion(self) -> None:
         """Método posicion() con inversión."""
         cand = CandidatoTI(
-            orden_fases=("S", "R", "T"),
-            invertido=True,
+            asociacion_tension_corriente=("S", "R", "T"),
+            polaridad_ti=True,
             score=0.5,
             justificacion="OK",
         )
@@ -106,8 +106,8 @@ class TestCandidatoTI:
     def test_score_limite_minimo(self) -> None:
         """Score 0.0 es válido."""
         cand = CandidatoTI(
-            orden_fases=("R", "S", "T"),
-            invertido=False,
+            asociacion_tension_corriente=("R", "S", "T"),
+            polaridad_ti=False,
             score=0.0,
             justificacion="Peor posible",
         )
@@ -116,8 +116,8 @@ class TestCandidatoTI:
     def test_score_limite_maximo(self) -> None:
         """Score 1.0 es válido."""
         cand = CandidatoTI(
-            orden_fases=("R", "S", "T"),
-            invertido=False,
+            asociacion_tension_corriente=("R", "S", "T"),
+            polaridad_ti=False,
             score=1.0,
             justificacion="Perfecto",
         )
@@ -127,8 +127,8 @@ class TestCandidatoTI:
         """Score < 0.0 rechazado."""
         with pytest.raises(ValueError, match="Score fuera de rango"):
             CandidatoTI(
-                orden_fases=("R", "S", "T"),
-                invertido=False,
+                asociacion_tension_corriente=("R", "S", "T"),
+                polaridad_ti=False,
                 score=-0.1,
                 justificacion="Inválido",
             )
@@ -137,8 +137,8 @@ class TestCandidatoTI:
         """Score > 1.0 rechazado."""
         with pytest.raises(ValueError, match="Score fuera de rango"):
             CandidatoTI(
-                orden_fases=("R", "S", "T"),
-                invertido=False,
+                asociacion_tension_corriente=("R", "S", "T"),
+                polaridad_ti=False,
                 score=1.1,
                 justificacion="Inválido",
             )
@@ -147,8 +147,8 @@ class TestCandidatoTI:
         """Fase que no sea R, S, T rechazada."""
         with pytest.raises(ValueError, match="Fase inválida"):
             CandidatoTI(
-                orden_fases=("R", "X", "T"),
-                invertido=False,
+                asociacion_tension_corriente=("R", "X", "T"),
+                polaridad_ti=False,
                 score=0.5,
                 justificacion="Inválido",
             )
@@ -157,8 +157,8 @@ class TestCandidatoTI:
         """Orden vacía rechazada."""
         with pytest.raises(ValueError, match="Orden de fases debe tener 1-3"):
             CandidatoTI(
-                orden_fases=(),
-                invertido=False,
+                asociacion_tension_corriente=(),
+                polaridad_ti=False,
                 score=0.5,
                 justificacion="Inválido",
             )
@@ -167,8 +167,8 @@ class TestCandidatoTI:
         """Orden con más de 3 fases rechazada."""
         with pytest.raises(ValueError, match="Orden de fases debe tener 1-3"):
             CandidatoTI(
-                orden_fases=("R", "S", "T", "X"),
-                invertido=False,
+                asociacion_tension_corriente=("R", "S", "T", "X"),
+                polaridad_ti=False,
                 score=0.5,
                 justificacion="Inválido",
             )
@@ -176,14 +176,14 @@ class TestCandidatoTI:
     def test_frozen_dataclass(self) -> None:
         """CandidatoTI es un frozen dataclass (validable por type checker)."""
         cand = CandidatoTI(
-            orden_fases=("R", "S", "T"),
-            invertido=False,
+            asociacion_tension_corriente=("R", "S", "T"),
+            polaridad_ti=False,
             score=0.9,
             justificacion="OK",
         )
         cand2 = CandidatoTI(
-            orden_fases=cand.orden_fases,
-            invertido=cand.invertido,
+            asociacion_tension_corriente=cand.asociacion_tension_corriente,
+            polaridad_ti=cand.polaridad_ti,
             score=cand.score,
             justificacion=cand.justificacion,
         )
@@ -192,14 +192,14 @@ class TestCandidatoTI:
     def test_igualdad(self) -> None:
         """Dos candidatos con igual contenido son iguales."""
         cand1 = CandidatoTI(
-            orden_fases=("R", "S", "T"),
-            invertido=False,
+            asociacion_tension_corriente=("R", "S", "T"),
+            polaridad_ti=False,
             score=0.9,
             justificacion="OK",
         )
         cand2 = CandidatoTI(
-            orden_fases=("R", "S", "T"),
-            invertido=False,
+            asociacion_tension_corriente=("R", "S", "T"),
+            polaridad_ti=False,
             score=0.9,
             justificacion="OK",
         )
@@ -208,14 +208,14 @@ class TestCandidatoTI:
     def test_desigualdad_score(self) -> None:
         """Candidatos con score diferente no son iguales."""
         cand1 = CandidatoTI(
-            orden_fases=("R", "S", "T"),
-            invertido=False,
+            asociacion_tension_corriente=("R", "S", "T"),
+            polaridad_ti=False,
             score=0.9,
             justificacion="OK",
         )
         cand2 = CandidatoTI(
-            orden_fases=("R", "S", "T"),
-            invertido=False,
+            asociacion_tension_corriente=("R", "S", "T"),
+            polaridad_ti=False,
             score=0.8,
             justificacion="OK",
         )

@@ -161,8 +161,44 @@ def test_404_negocio_no_loguea_ruta_no_encontrada():
     assert not rutas, "No se debe loguear ruta_no_encontrada para un 404 de negocio"
 
 
+# E10b — Sonda sospechosa (escaneo externo): 404 + log sonda_sospechosa sin ensuciar ruta_no_encontrada
+@pytest.mark.parametrize(
+    "ruta_sonda",
+    [
+        "/.env",
+        "/api/v1/.env",
+        "/docker/.env",
+        "/lib/file-control.php",
+        "/api/v1/node-load-method/customMCP",
+        "/langflow/api",
+        "/terraform.tfstate",
+        "/compose.yaml",
+        "/service_account.json",
+        "/wp-admin/setup-config.php",
+        "/proc/self/environ",
+        "/z9x8c7v6b5-debug-trigger-api.datamaq.com.ar",
+    ],
+)
+def test_sonda_sospechosa_loguea_sonda_y_no_ruta_no_encontrada(ruta_sonda: str):
+    client = TestClient(_app_con_middleware(), raise_server_exceptions=False)
+    with capture_logs() as logs:
+        respuesta = client.get(ruta_sonda, headers={"X-Forwarded-For": "136.69.200.122, 10.0.0.1"})
+
+    assert respuesta.status_code == 404
+    sondas = [ev for ev in logs if ev.get("event") == "sonda_sospechosa"]
+    assert sondas, f"No se registró el evento sonda_sospechosa para {ruta_sonda}"
+    assert sondas[0]["path"] == ruta_sonda
+    assert sondas[0]["metodo"] == "GET"
+    assert sondas[0]["ip"] == "136.69.200.122"
+    assert "request_id" in sondas[0]
+
+    rutas_normales = [ev for ev in logs if ev.get("event") == "ruta_no_encontrada"]
+    assert not rutas_normales, f"No se debió registrar ruta_no_encontrada para {ruta_sonda}"
+
+
 # E11 — /favicon.ico responde 204 No Content sin error
 def test_favicon_endpoint_retorna_204():
+
     from src.infrastructure.fastapi.routes.system_router import router as system_router
 
     app = FastAPI()

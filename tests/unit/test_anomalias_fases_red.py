@@ -348,6 +348,7 @@ def test_evaluar_alerta_sobrecompensacion_reactiva():
     assert alerta_cap.severidad == SeveridadAlerta.WARNING
     assert alerta_cap.categoria == "FACTOR_POTENCIA"
     assert alerta_cap.valor_medido == -1800.0
+    assert alerta_cap.observaciones == "Banco de capacitores sobredimensionado o con pasos encendidos en vacío."
 
 
 def test_procesador_alertas_ingesta_anomalias_fases():
@@ -399,7 +400,7 @@ def test_procesador_alertas_ingesta_anomalias_fases():
 
     from datetime import timedelta
 
-    ProcesadorAlertasIngesta._filtro_persistencia.limpiar()
+    ProcesadorAlertasIngesta.limpiar_estado()
 
     # 1. Primera lectura: registra condición de anomalía en ventana
     ProcesadorAlertasIngesta.procesar_alertas(
@@ -521,7 +522,7 @@ def test_procesador_alertas_ingesta_tis_en_misma_fase():
         factor_potencia_total=FactorPotencia(0.44),
     )
 
-    ProcesadorAlertasIngesta._filtro_persistencia.limpiar()
+    ProcesadorAlertasIngesta.limpiar_estado()
 
     # Muestra 1: registrar en ventana de persistencia
     ProcesadorAlertasIngesta.procesar_alertas(
