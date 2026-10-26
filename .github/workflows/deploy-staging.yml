@@ -43,7 +43,8 @@ jobs:
           DEPLOY_SERVICE_NAME: datamaq-telemetry-dev.service
           DEPLOY_HEALTH_URL: http://localhost:8886/health/ready
           # Staging publica develop (no main) y guarda sus dumps aparte: su limpieza a 5 no puede tocar los de producción.
-          DEPLOY_BRANCH: develop
+          DEPLOY_BRANCH: ${{ github.ref_name }}
+          DEPLOY_COMMIT: ${{ github.sha }}
           DEPLOY_BACKUP_DIR: /tmp/datamaq-telemetry-dev-pre-migracion
           # Los pip freeze de rollback de staging no pisan los de producción (mismo /tmp compartido).
           DEPLOY_DEPS_FILE: /tmp/telemetry-deps-dev.txt

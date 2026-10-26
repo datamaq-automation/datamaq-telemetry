@@ -113,7 +113,8 @@ jobs:
           DEPLOY_REMOTE_DIR: ${{ needs.target.outputs.remote_dir }}
           DEPLOY_SERVICE_NAME: ${{ needs.target.outputs.service }}
           DEPLOY_HEALTH_URL: ${{ needs.target.outputs.health_url }}
-          DEPLOY_BRANCH: ${{ needs.target.outputs.branch }}
+          DEPLOY_BRANCH: ${{ github.ref_name }}
+          DEPLOY_COMMIT: ${{ github.sha }}
           DEPLOY_BACKUP_DIR: ${{ needs.target.outputs.backup_dir }}
           DEPLOY_DEPS_FILE: ${{ needs.target.outputs.deps_file }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
