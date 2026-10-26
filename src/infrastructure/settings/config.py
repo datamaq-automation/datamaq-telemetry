@@ -111,6 +111,12 @@ class Settings(BaseSettings):
     ENERGY_ML_URL: str = "http://127.0.0.1:8100"
     ENERGY_ML_TIMEOUT_S: int = 120
 
+    # Build info (#79)
+    BUILD_INFO_PATH: str = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
+        "build_info.json",
+    )
+
     model_config = SettingsConfigDict(
         env_file=os.path.join(
             os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))), ".env"
@@ -216,6 +222,13 @@ class Settings(BaseSettings):
     @property
     def topic_prefixes(self) -> list[str]:
         return [p.strip() for p in self.MQTT_TOPIC_PREFIX.split(",") if p.strip()]
+
+    @property
+    def ruta_build_info(self) -> str:
+        if os.path.isabs(self.BUILD_INFO_PATH):
+            return self.BUILD_INFO_PATH
+        raiz = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        return os.path.join(raiz, self.BUILD_INFO_PATH)
 
 
 @lru_cache(maxsize=1)
