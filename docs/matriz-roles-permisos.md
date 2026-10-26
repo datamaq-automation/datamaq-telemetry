@@ -1,7 +1,7 @@
 <!-- Generado por scripts/generate_matriz_roles.py. No editar a mano: regenerar. -->
 # Matriz de roles y permisos (generada desde el código)
 
-Endpoints analizados: **120**. Roles válidos (`ROLES_VALIDOS`): `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `superadmin`.
+Endpoints analizados: **121**. Roles válidos (`ROLES_VALIDOS`): `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `superadmin`.
 
 Cómo se lee: "Roles que pasan" es lo que deja el guard de rol que la ruta declara (evaluado con la condición real del guard). Si la columna "Chequeo manual" dice `sí`, el cuerpo de la ruta o de una dependencia propia compara el rol o usa `ROLES_ACCESO_GLOBAL`: ese recorte no está en la columna y hay que leer la ruta para saberlo.
 
@@ -136,6 +136,7 @@ Con `AUTH_REQUIRED` apagado, `get_usuario_actual` devuelve `{"sub": "anon", "rol
 | POST | `/api/v1/webhooks/mercadopago` | — | todos (sin guard) | sin dependencia de auth detectada | no | `src/infrastructure/fastapi/routes/billing_router.py:webhook_mercadopago` |
 | GET | `/favicon.ico` | — | todos (sin guard) | sin dependencia de auth detectada | no | `src/infrastructure/fastapi/routes/system_router.py:favicon` |
 | GET | `/health` | — | todos (sin guard) | sin dependencia de auth detectada | no | `src/infrastructure/fastapi/routes/system_router.py:health_check` |
+| GET | `/health/build` | — | todos (sin guard) | sin dependencia de auth detectada | no | `src/infrastructure/fastapi/routes/system_router.py:health_build` |
 | GET | `/health/live` | — | todos (sin guard) | sin dependencia de auth detectada | no | `src/infrastructure/fastapi/routes/system_router.py:liveness_check` |
 | GET | `/health/ready` | — | todos (sin guard) | sin dependencia de auth detectada | no | `src/infrastructure/fastapi/routes/system_router.py:readiness_check` |
 | POST | `/oauth/register` | — | todos (sin guard) | sin dependencia de auth detectada | no | `src/infrastructure/fastapi/routes/oauth_router.py:registrar_cliente_dinamico_oauth` |
