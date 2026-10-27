@@ -99,6 +99,27 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
         return 1
     }
 
+    esperar_health_build() {
+        local i build_commit
+        local health_build_url="${DEPLOY_HEALTH_BUILD_URL:-${HEALTH_URL%/health*}/health/build}"
+        local commit_esperado="${COMMIT_CORTO:-${DEPLOY_COMMIT:0:7}}"
+        if [ -z "$commit_esperado" ]; then
+            local c_hex
+            c_hex=$(git rev-parse HEAD 2>/dev/null || echo "")
+            commit_esperado="${c_hex:0:7}"
+        fi
+        for i in $(seq 1 "$ATTEMPTS"); do
+            sleep "$INTERVAL"
+            build_commit=$(./.venv/bin/python3 -c "import urllib.request, json; print(json.loads(urllib.request.urlopen('$health_build_url', timeout=5).read().decode('utf-8')).get('commit', ''))" 2>/dev/null || echo "")
+            if [ -n "$commit_esperado" ] && [ "$build_commit" = "$commit_esperado" ]; then
+                echo "Health-check /health/build OK: commit '$build_commit' verificado en el intento $i."
+                return 0
+            fi
+            echo "Intento $i/$ATTEMPTS: /health/build devolvió commit '$build_commit' (esperado: '$commit_esperado'). Reintentando..."
+        done
+        return 1
+    }
+
     # Rollback común (#17). Sale SIEMPRE con exit 1: un deploy revertido nunca puede dejar el CD en verde. Si una
     # parte del propio rollback falla, no re-entra ni corta a mitad: hace el resto y avisa "ROLLBACK INCOMPLETO".
     # Si la base ya se detuvo (con_base), después del rollback reinicia el servicio y repite el health-check: un
@@ -124,7 +145,7 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
         ./.venv/bin/pip install -r "$DEPS_ANTERIORES" || completo=false
         if [ -n "$PREVIOUS_COMMIT" ]; then
             printf '{"commit": "%s", "rama": "%s"}\n' "${PREVIOUS_COMMIT:0:7}" "${PREVIOUS_BRANCH:-desconocido}" > "$DEPLOY_REMOTE_DIR/build_info.json" 2>/dev/null || true
-            chmod 640 "$DEPLOY_REMOTE_DIR/build_info.json" 2>/dev/null || true
+            chmod 644 "$DEPLOY_REMOTE_DIR/build_info.json" 2>/dev/null || true
         fi
         if [ "${2:-}" = con_base ]; then
             echo "==> Reiniciando servicio $DEPLOY_SERVICE_NAME tras el rollback..."
@@ -232,7 +253,7 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
     BUILD_INFO_TMP=$(mktemp "$DEPLOY_REMOTE_DIR/.build_info.json.tmp.XXXXXX")
 
     printf '{"commit": "%s", "rama": "%s"}\n' "$COMMIT_CORTO" "$RAMA_BUILD" > "$BUILD_INFO_TMP"
-    chmod 640 "$BUILD_INFO_TMP"
+    chmod 644 "$BUILD_INFO_TMP"
     if id "datamaq" &>/dev/null; then
         chown datamaq "$BUILD_INFO_TMP" 2>/dev/null || sudo chown datamaq "$BUILD_INFO_TMP" 2>/dev/null || true
     fi
@@ -307,6 +328,12 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
     echo "==> Verificando salud del servicio vía HTTP ($HEALTH_URL)..."
     if ! esperar_health; then
         abortar_con_rollback "el health-check falló después de ${MAX_WAIT}s." con_base
+    fi
+
+    HEALTH_BUILD_URL="${DEPLOY_HEALTH_BUILD_URL:-${HEALTH_URL%/health*}/health/build}"
+    echo "==> Verificando versión construida vía HTTP ($HEALTH_BUILD_URL)..."
+    if ! esperar_health_build; then
+        abortar_con_rollback "la verificación de /health/build falló: el endpoint no devolvió el commit desplegado '$COMMIT_CORTO' tras ${MAX_WAIT}s." con_base
     fi
 
     echo "==> Verificando estado del servicio..."
