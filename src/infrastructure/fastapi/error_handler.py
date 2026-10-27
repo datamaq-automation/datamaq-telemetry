@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from src.adapters.presenters.error_presenter import ErrorPresenter
+from src.infrastructure.fastapi.ip_cliente import extraer_ip_cliente
 
 PATRONES_SONDA_SOSPECHOSA: tuple[re.Pattern[str], ...] = (
     # Directorios de sistema operativo y credenciales sensibles
@@ -90,12 +91,7 @@ def manejar_404(request: Request, exc: Exception) -> JSONResponse:
         es_sonda = es_sonda_sospechosa(path)
         evento = "sonda_sospechosa" if es_sonda else "ruta_no_encontrada"
 
-        client_ip = None
-        if request.client:
-            client_ip = request.client.host
-        x_forwarded_for = request.headers.get("x-forwarded-for")
-        if x_forwarded_for:
-            client_ip = x_forwarded_for.split(",")[0].strip()
+        client_ip = extraer_ip_cliente(request, fallback="")
 
         extra: dict[str, Any] = {
             "metodo": request.method,

@@ -180,9 +180,9 @@ def test_404_negocio_no_loguea_ruta_no_encontrada():
     ],
 )
 def test_sonda_sospechosa_loguea_sonda_y_no_ruta_no_encontrada(ruta_sonda: str):
-    client = TestClient(_app_con_middleware(), raise_server_exceptions=False)
+    client = TestClient(_app_con_middleware(), client=("136.69.200.122", 50000), raise_server_exceptions=False)
     with capture_logs() as logs:
-        respuesta = client.get(ruta_sonda, headers={"X-Forwarded-For": "136.69.200.122, 10.0.0.1"})
+        respuesta = client.get(ruta_sonda)
 
     assert respuesta.status_code == 404
     sondas = [ev for ev in logs if ev.get("event") == "sonda_sospechosa"]
