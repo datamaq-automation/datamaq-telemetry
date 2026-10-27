@@ -74,7 +74,16 @@ exit 0
 """,
     # HEALTH_FALLA: /health responde 500 siempre. HEALTH_FALLA_PRIMERAS=N: responde 500 los primeros N intentos y
     # después 200 (simula un servicio que se recupera tras el rollback). El contador vive en $LOG.health.
+    # HEALTH_BUILD_FALLA: /health/build devuelve "desconocido".
+    # HEALTH_BUILD_COMMIT: /health/build devuelve un commit específico arbitrario.
     "python3": """
+if [[ "$*" == *health/build* ]]; then
+    if [ -n "${HEALTH_BUILD_FALLA:-}" ]; then echo "desconocido"; exit 0; fi
+    if [ -n "${HEALTH_BUILD_COMMIT:-}" ]; then echo "${HEALTH_BUILD_COMMIT}"; exit 0; fi
+    c="${DEPLOY_COMMIT:-$(git rev-parse HEAD)}"
+    echo "${c:0:7}"
+    exit 0
+fi
 if [ -n "${HEALTH_FALLA:-}" ]; then echo 500; exit 0; fi
 if [ -n "${HEALTH_FALLA_PRIMERAS:-}" ]; then
     n=$(cat "$LOG.health" 2>/dev/null || echo 0)
@@ -440,6 +449,33 @@ def test_deploy_escribe_build_info_con_commit_y_rama(deploy):
     assert r.returncode == 0, r.stdout + r.stderr
     build_info = deploy.remoto / "build_info.json"
     assert build_info.exists()
-    assert _modo(build_info) == 0o640
+    assert _modo(build_info) == 0o644
     data = json.loads(build_info.read_text(encoding="utf-8"))
     assert data == {"commit": "abcdef0", "rama": "develop"}
+
+
+def test_health_build_correcto_pasa_deploy(deploy):
+    r = deploy.correr(DEPLOY_BRANCH="develop", DEPLOY_COMMIT="abcdef0123456789")
+
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "Health-check /health/build OK: commit 'abcdef0' verificado" in r.stdout
+
+
+def test_health_build_desconocido_aborta_con_rollback(deploy):
+    """Criterio de cierre #83: si /health/build devuelve 'desconocido' (fallo simulado), el deploy aborta con rollback."""
+    r = deploy.correr(DEPLOY_BRANCH="develop", DEPLOY_COMMIT="abcdef0123456789", HEALTH_BUILD_FALLA="1")
+
+    assert r.returncode != 0
+    assert "mysql restaurar" in deploy.llamadas
+    assert "git reset --hard commitanterior" in deploy.llamadas
+    assert "la verificación de /health/build falló" in r.stdout
+
+
+def test_health_build_commit_distinto_aborta_con_rollback(deploy):
+    """Criterio de cierre #83: si /health/build devuelve otro commit, el deploy aborta con rollback."""
+    r = deploy.correr(DEPLOY_BRANCH="develop", DEPLOY_COMMIT="abcdef0123456789", HEALTH_BUILD_COMMIT="distinto")
+
+    assert r.returncode != 0
+    assert "mysql restaurar" in deploy.llamadas
+    assert "git reset --hard commitanterior" in deploy.llamadas
+    assert "la verificación de /health/build falló" in r.stdout
