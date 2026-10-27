@@ -1,9 +1,9 @@
 name: CI
 
 on:
-  push:
-    branches: [develop, main]
+  # Decisión 2026-10-27: CI en la nube solo en el PR hacia main. develop se valida en local.
   pull_request:
+    branches: [main]
 
 jobs:
   gauntlet:

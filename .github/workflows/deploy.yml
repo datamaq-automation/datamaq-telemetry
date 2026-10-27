@@ -1,20 +1,19 @@
 name: CD Deploy
 
-# Único CD de datamaq-telemetry: despliega a staging (develop, api-dev, 8886) y a producción (main, api, 8885).
-# Solo corre si CI de la misma rama pasó. Todos los valores por ambiente salen del job target: ninguna rama hereda
-# los defaults de producción de scripts/deploy-server.sh (DEPLOY_BRANCH, DEPLOY_BACKUP_DIR, DEPLOY_DEPS_FILE).
+# CD de producción de datamaq-telemetry: despliega a producción (main, api, 8885).
+# Se dispara con el push a main o a mano (workflow_dispatch) sobre main. Staging se despliega aparte
+# (deploy-staging.yml, solo workflow_dispatch). No vuelve a correr el gauntlet: la condición es de proceso
+# (no se mergea a main un PR con CI rojo o sin terminar; el padre lo verifica con `gh pr checks`).
 # Requiere bootstrap previo en el VPS (clon, .venv, systemd, BD, mosquitto, .env).
-# También disponible de forma manual vía workflow_dispatch.
 on:
-  workflow_run:
-    workflows: ["CI"]
-    branches: [develop, main]
-    types: [completed]
+  push:
+    branches: [main]
   workflow_dispatch:
 
 jobs:
   target:
     name: Determinar rama y ambiente
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     outputs:
       branch: ${{ steps.determine.outputs.branch }}
@@ -30,39 +29,22 @@ jobs:
       - name: Determinar rama y ambiente
         id: determine
         run: |
-          # Obtener la rama según el evento
-          if [ "${{ github.event_name }}" = "workflow_run" ]; then
-            BRANCH="${{ github.event.workflow_run.head_branch }}"
-          else
-            BRANCH="${{ github.ref_name }}"
-          fi
-
-          # Asignar variables según la rama
-          if [ "$BRANCH" = "develop" ]; then
-            echo "branch=develop" >> "$GITHUB_OUTPUT"
-            echo "name=Deploy a Staging (api-dev, 8886)" >> "$GITHUB_OUTPUT"
-            echo "environment=staging" >> "$GITHUB_OUTPUT"
-            echo "concurrency=deploy-telemetry-staging" >> "$GITHUB_OUTPUT"
-            echo "remote_dir=/var/www/datamaq-telemetry-dev" >> "$GITHUB_OUTPUT"
-            echo "service=datamaq-telemetry-dev.service" >> "$GITHUB_OUTPUT"
-            echo "health_url=http://localhost:8886/health/ready" >> "$GITHUB_OUTPUT"
-            # Staging: dumps y freeze de rollback aparte de producción (mismo /tmp compartido en el VPS).
-            echo "backup_dir=/tmp/datamaq-telemetry-dev-pre-migracion" >> "$GITHUB_OUTPUT"
-            echo "deps_file=/tmp/telemetry-deps-dev.txt" >> "$GITHUB_OUTPUT"
-          elif [ "$BRANCH" = "main" ]; then
-            echo "branch=main" >> "$GITHUB_OUTPUT"
-            echo "name=Deploy a Producción (api, 8885)" >> "$GITHUB_OUTPUT"
-            echo "environment=production" >> "$GITHUB_OUTPUT"
-            echo "concurrency=deploy-telemetry-production" >> "$GITHUB_OUTPUT"
-            echo "remote_dir=/var/www/datamaq-telemetry" >> "$GITHUB_OUTPUT"
-            echo "service=datamaq-telemetry.service" >> "$GITHUB_OUTPUT"
-            echo "health_url=http://localhost:8885/health/ready" >> "$GITHUB_OUTPUT"
-            echo "backup_dir=/tmp/datamaq-telemetry-pre-migracion" >> "$GITHUB_OUTPUT"
-            echo "deps_file=/tmp/telemetry-deps.txt" >> "$GITHUB_OUTPUT"
-          else
-            echo "❌ Error: rama '$BRANCH' no está autorizada para despliegue"
+          # Solo main despliega producción (el guard del job ya lo exige).
+          BRANCH="${{ github.ref_name }}"
+          if [ "$BRANCH" != "main" ]; then
+            echo "❌ Error: rama '$BRANCH' no está autorizada para despliegue (solo main)"
             exit 1
           fi
+
+          echo "branch=main" >> "$GITHUB_OUTPUT"
+          echo "name=Deploy a Producción (api, 8885)" >> "$GITHUB_OUTPUT"
+          echo "environment=production" >> "$GITHUB_OUTPUT"
+          echo "concurrency=deploy-telemetry-production" >> "$GITHUB_OUTPUT"
+          echo "remote_dir=/var/www/datamaq-telemetry" >> "$GITHUB_OUTPUT"
+          echo "service=datamaq-telemetry.service" >> "$GITHUB_OUTPUT"
+          echo "health_url=http://localhost:8885/health/ready" >> "$GITHUB_OUTPUT"
+          echo "backup_dir=/tmp/datamaq-telemetry-pre-migracion" >> "$GITHUB_OUTPUT"
+          echo "deps_file=/tmp/telemetry-deps.txt" >> "$GITHUB_OUTPUT"
 
   deploy:
     name: ${{ needs.target.outputs.name }}
@@ -73,21 +55,10 @@ jobs:
       group: ${{ needs.target.outputs.concurrency }}
       cancel-in-progress: false
     if: |
-      (github.event_name == 'workflow_dispatch') ||
-      (github.event_name == 'workflow_run' &&
-       github.event.workflow_run.conclusion == 'success' &&
-       needs.target.result == 'success')
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      needs.target.result == 'success'
     steps:
-      - name: Verificar que CI pasó
-        if: ${{ github.event_name != 'workflow_dispatch' }}
-        run: |
-          echo "✓ Deplegando después de CI exitoso"
-          echo "Workflow run conclusion: ${{ github.event.workflow_run.conclusion }}"
-          if [ "${{ github.event.workflow_run.conclusion }}" != "success" ]; then
-            echo "✗ ERROR: CI no pasó (conclusion: ${{ github.event.workflow_run.conclusion }})"
-            exit 1
-          fi
-
       - name: Checkout
         uses: actions/checkout@v7
 
