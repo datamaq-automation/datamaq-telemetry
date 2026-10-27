@@ -4,6 +4,7 @@ Corre el heredoc remoto (lo que el deploy ejecuta por ssh en el VPS) con bash re
 mysqldump, mysql, sudo y sleep. No toca ninguna base, servicio ni repo: los stubs registran las llamadas en un log.
 """
 
+import json
 import os
 import shutil
 import stat
@@ -431,3 +432,14 @@ def test_el_script_externo_reenvia_por_ssh_rama_backup_y_deps(tmp_path: Path):
     assert "DEPLOY_BRANCH=develop" in llamada
     assert "DEPLOY_BACKUP_DIR=/tmp/dev-pre" in llamada
     assert "DEPLOY_DEPS_FILE=/tmp/telemetry-deps-dev.txt" in llamada
+
+
+def test_deploy_escribe_build_info_con_commit_y_rama(deploy):
+    r = deploy.correr(DEPLOY_BRANCH="develop", DEPLOY_COMMIT="abcdef0123456789")
+
+    assert r.returncode == 0, r.stdout + r.stderr
+    build_info = deploy.remoto / "build_info.json"
+    assert build_info.exists()
+    assert _modo(build_info) == 0o640
+    data = json.loads(build_info.read_text(encoding="utf-8"))
+    assert data == {"commit": "abcdef0", "rama": "develop"}

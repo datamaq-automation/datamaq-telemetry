@@ -66,3 +66,6 @@ data/
 # terminó commiteado una vez (eccc85d) con DEPLOY_SSH_USER=root, rompiendo el
 # guard anti-root del propio script y el pipeline de CD por ~14 horas.
 scripts/.env.deploy
+
+# Metadatos del build generados en deploy (#79)
+build_info.json

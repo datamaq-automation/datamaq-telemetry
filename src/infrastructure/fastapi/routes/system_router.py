@@ -1,11 +1,13 @@
 """src/infrastructure/fastapi/routes/system_router.py."""
 
+import json
 import os
 from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Response
 
+from src.application.dtos.build_info_dto import BuildInfoResponseDTO
 from src.application.dtos.purga_dto import PurgaRequestDTO, PurgaResultadoDTO
 from src.application.use_cases.purgar_telemetria import PurgarTelemetriaExpiradaUseCase
 from src.infrastructure.fastapi.dependencies import (
@@ -14,6 +16,7 @@ from src.infrastructure.fastapi.dependencies import (
     requiere_rol_admin,
 )
 from src.infrastructure.fastapi.error_handler import manejar_error_http
+from src.infrastructure.settings.config import Settings, get_settings
 from src.infrastructure.sqlalchemy.database import (
     verificar_conexion_db,
     verificar_estado_migraciones,
@@ -92,6 +95,46 @@ def readiness_check(response: Response):
 def health_check(response: Response):
     """Chequeo general de salud (compatibilidad con monitores heredados)."""
     return readiness_check(response)
+
+
+VALOR_BUILD_DESCONOCIDO = "desconocido"
+
+
+def _leer_build_info(ruta_archivo: str) -> dict[str, str]:
+    """Lee build_info.json de forma segura sin excepciones no controladas."""
+    try:
+        if not os.path.isfile(ruta_archivo):
+            return {"commit": VALOR_BUILD_DESCONOCIDO, "rama": VALOR_BUILD_DESCONOCIDO}
+        with open(ruta_archivo, encoding="utf-8") as f:
+            datos = json.load(f)
+        if not isinstance(datos, dict):
+            return {"commit": VALOR_BUILD_DESCONOCIDO, "rama": VALOR_BUILD_DESCONOCIDO}
+
+        commit = datos.get("commit")
+        rama = datos.get("rama")
+
+        if not isinstance(commit, str) or not commit.strip():
+            commit_str = VALOR_BUILD_DESCONOCIDO
+        elif commit.strip() == VALOR_BUILD_DESCONOCIDO:
+            commit_str = VALOR_BUILD_DESCONOCIDO
+        else:
+            commit_str = commit.strip()[:7]
+
+        if not isinstance(rama, str) or not rama.strip():
+            rama_str = VALOR_BUILD_DESCONOCIDO
+        else:
+            rama_str = rama.strip()
+
+        return {"commit": commit_str, "rama": rama_str}
+    except Exception:
+        return {"commit": VALOR_BUILD_DESCONOCIDO, "rama": VALOR_BUILD_DESCONOCIDO}
+
+
+@router.get("/health/build", response_model=BuildInfoResponseDTO)
+def health_build(settings: Annotated[Settings, Depends(get_settings)]) -> BuildInfoResponseDTO:
+    """Retorna información de la versión construida (commit y rama)."""
+    info = _leer_build_info(settings.ruta_build_info)
+    return BuildInfoResponseDTO(commit=info["commit"], rama=info["rama"])
 
 
 @router.get("/api/v1/system/ws-status")
