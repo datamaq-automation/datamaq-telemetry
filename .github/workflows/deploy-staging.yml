@@ -1,11 +1,9 @@
 name: CD Deploy Staging
 
-# Despliegue a staging (api-dev, 8886) en cada push a develop.
-# Producción se despliega con deploy.yml (CI en main). Requiere bootstrap previo en el VPS.
-# Decisión: decisions/2026-10-20_cd-staging-disparo-por-push.md (repo padre).
+# Despliegue a staging (api-dev, 8886) a mano (workflow_dispatch), una vez por tanda de cambios.
+# Producción se despliega con deploy.yml (push a main). Requiere bootstrap previo en el VPS.
+# Decisión vigente: decisions/2026-10-27_ci-solo-en-pr-a-main.md (repo padre).
 on:
-  push:
-    branches: [develop]
   workflow_dispatch:
 
 jobs:
@@ -42,9 +40,10 @@ jobs:
           DEPLOY_REMOTE_DIR: /var/www/datamaq-telemetry-dev
           DEPLOY_SERVICE_NAME: datamaq-telemetry-dev.service
           DEPLOY_HEALTH_URL: http://localhost:8886/health/ready
-          # Staging publica develop (no main) y guarda sus dumps aparte: su limpieza a 5 no puede tocar los de producción.
-          DEPLOY_BRANCH: ${{ github.ref_name }}
-          DEPLOY_COMMIT: ${{ github.sha }}
+          # Staging publica SIEMPRE develop: un workflow_dispatch desde main no debe desplegar main acá.
+          # Sin DEPLOY_COMMIT: el script registra el commit real del checkout (develop).
+          # Sus dumps y freeze de rollback van aparte: su limpieza a 5 no puede tocar los de producción.
+          DEPLOY_BRANCH: develop
           DEPLOY_BACKUP_DIR: /tmp/datamaq-telemetry-dev-pre-migracion
           # Los pip freeze de rollback de staging no pisan los de producción (mismo /tmp compartido).
           DEPLOY_DEPS_FILE: /tmp/telemetry-deps-dev.txt
