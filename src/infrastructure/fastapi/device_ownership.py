@@ -5,8 +5,11 @@ from typing import Annotated, Any
 from fastapi import Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from src.application.use_cases.gestionar_acceso_plantas import GestionarAccesoPlantasUseCase
+from src.domain.telemetria.exceptions import PlantaNoEncontradaError
 from src.domain.telemetria.services import debe_recibir_evento
 from src.domain.telemetria.value_objects import MacAddress
+from src.infrastructure.fastapi.auth_dependencies import get_acceso_plantas_use_case
 from src.infrastructure.fastapi.dependencies import get_usuario_actual, repo_dispositivos_resuelto
 from src.infrastructure.settings.config import get_settings
 from src.infrastructure.sqlalchemy.database import get_db_session
@@ -46,11 +49,12 @@ def _organizacion_de_dispositivo(db: Session, dispositivo_id: str | None) -> str
 def verificar_propiedad_dispositivo(
     claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
     db: Annotated[Session, Depends(get_db_session)],
+    acceso_plantas: Annotated[GestionarAccesoPlantasUseCase | None, Depends(get_acceso_plantas_use_case)] = None,
     device_id: str | None = None,
     dispositivo_id: str | None = None,
 ) -> None:
     """Rechaza con 404 si el dispositivo pedido (UUID o MAC) no pertenece a la organización
-    del usuario autenticado. Superadmin y modo sin auth (AUTH_REQUIRED=False) pasan sin chequeo.
+    o planta asignada del usuario autenticado. Superadmin y modo sin auth pasan sin chequeo.
 
     404 en vez de 403 para no confirmar la existencia del dispositivo a un usuario ajeno.
     """
@@ -76,6 +80,17 @@ def verificar_propiedad_dispositivo(
 
     if not debe_recibir_evento(False, claims.get("org"), organizacion_dispositivo):
         raise HTTPException(status_code=404, detail="dispositivo_no_encontrado")
+
+    if acceso_plantas is not None and dispositivo.planta_id:
+        try:
+            acceso_plantas.resolver_planta_permitida(
+                usuario_id=str(claims.get("sub") or "") or None,
+                rol=str(claims.get("rol") or ""),
+                organizacion_id=claims.get("org"),
+                planta_id=dispositivo.planta_id,
+            )
+        except PlantaNoEncontradaError as err:
+            raise HTTPException(status_code=404, detail="dispositivo_no_encontrado") from err
 
 
 def verificar_propiedad_maquina(
