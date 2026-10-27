@@ -5,9 +5,9 @@ API FastAPI y Worker MQTT para la ingesta y persistencia de telemetría de medid
 ## Comandos (siempre desde la raíz del repo)
 
 - Servidor dev: `./run.sh` — activa `.venv/`, setea `PYTHONPATH=.`, corre `uvicorn src.main:app --reload` en `:8000`.
-- Push y Deploy con feedback en vivo: `./push.sh` o `git push-watch` — ejecuta Gauntlet local, hace push y transmite el estado en vivo de CI y CD Deploy en GitHub Actions.
+- Push y Deploy con feedback en vivo: `./push.sh` o `git push-watch` — ejecuta el Gauntlet local, hace push y transmite el estado en vivo del CI/CD en GitHub Actions (el CI en la nube corre solo en PR a `main`).
 - Inspección de logs en VPS: `./scripts/logs.sh [-f | -n 200 | --status | --mqtt | --save]` — consulta y transmite logs de producción.
-- Gauntlet completo (CI): `./scripts/ci.sh` — integridad, ruff, pyright, tests unitarios con cobertura >=85%, integración.
+- Gauntlet completo (local, el mismo que corre el CI): `./scripts/ci.sh` — integridad, ruff, pyright, tests unitarios con cobertura >=85%, integración.
 - Gauntlet pre-push (local): `./scripts/pre-push.sh` — etapas 1-4 (sin integración).
 - Hook de git: `git config core.hooksPath .githooks` (una vez por clonado; invoca `scripts/pre-push.sh` en cada push).
 - Tests unitarios: `.venv/bin/pytest tests/unit/` (agregar `-n auto` para usar todos los núcleos: 57 s → 24 s en 8 cores; un archivo suelto conviene correrlo sin `-n`, el arranque de los workers cuesta ~2 s).
@@ -15,6 +15,15 @@ API FastAPI y Worker MQTT para la ingesta y persistencia de telemetría de medid
 - Linter: `.venv/bin/ruff check .`
 - LSP de OpenCode: habilitado vía `opencode.json` (servidor `pyright` → `.venv/bin/pyright-langserver --stdio`); da feedback de diagnósticos de tipos de `src/` al agente. La verificación autoritativa de tipos sigue siendo `.venv/bin/pyright` (etapa 3 del Gauntlet).
 - **`gh` en este repo:** el remoto es SSH y `gh` sin `-R` falla con «none of the git remotes ... known GitHub host». Usar siempre `gh <cmd> -R datamaq-automation/datamaq-telemetry`. `gh run watch --exit-status` no es confiable como verificación: confirmar con `gh run list` después.
+
+## CI/CD (decisión 2026-10-27: CI solo en PR a `main`)
+
+- **`develop` se valida en local:** correr `APP_ENV=test ./scripts/pre-push.sh` (o `./scripts/ci.sh` para el gauntlet completo) antes de cada push. El PR a `develop` se abre igual, lleva el resumen del gauntlet local en el cuerpo y se mergea sin CI.
+- **CI en la nube (`ci.yml`) corre solo en PR hacia `main`.** Los push y PR a `develop` no disparan workflows.
+- **CD de producción (`deploy.yml`)** se dispara con el push a `main` o a mano (`workflow_dispatch`) sobre `main`. No vuelve a correr el gauntlet: no se mergea a `main` un PR con CI rojo o sin terminar (verificar `gh pr checks`).
+- **Staging (`deploy-staging.yml`)** se despliega a mano (`workflow_dispatch`), siempre desde `develop`, una vez por tanda de cambios. Verificar `/health/build`.
+- **CI Nightly (`ci-nightly.yml`)** es solo manual (`workflow_dispatch`), antes de actualizar dependencias.
+- Decisión completa: `decisions/2026-10-27_ci-solo-en-pr-a-main.md` (repo padre).
 
 ## Entornos (Development vs Producción)
 
