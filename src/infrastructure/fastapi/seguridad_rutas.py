@@ -8,6 +8,7 @@ import structlog
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from src.infrastructure.fastapi.ip_cliente import extraer_ip_cliente
 from src.infrastructure.settings.config import Settings
 
 logger = structlog.get_logger("security")
@@ -47,15 +48,8 @@ def contiene_secuencia_insegura(path: str, raw_path: bytes | None = None) -> tup
 
 
 def _extraer_ip_cliente(scope: Scope) -> str:
-    """Extrae la IP del cliente considerando X-Forwarded-For si está disponible."""
-    headers = dict(scope.get("headers", []))
-    xff = headers.get(b"x-forwarded-for")
-    if xff:
-        return xff.decode("latin-1", "replace").split(",")[0].strip()
-    client = scope.get("client")
-    if client and client[0]:
-        return str(client[0])
-    return "desconocido"
+    """Extrae la IP del cliente a partir de scope['client'] confiando en el proxy middleware."""
+    return extraer_ip_cliente(scope, fallback="desconocido")
 
 
 class RechazoPathInseguroMiddleware:
