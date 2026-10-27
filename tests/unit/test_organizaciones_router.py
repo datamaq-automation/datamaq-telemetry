@@ -5,10 +5,12 @@ from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient
 
+from src.application.dtos.auth_dto import PlantaAccesoDTO
 from src.application.dtos.organizacion_dto import (
     OrganizacionResponseDTO,
     PlantaResponseDTO,
 )
+from src.infrastructure.fastapi.auth_dependencies import get_acceso_plantas_use_case
 from src.infrastructure.fastapi.dependencies import (
     get_dispositivos_use_case,
     get_usuario_actual,
@@ -54,7 +56,12 @@ def _planta_dto(**kwargs) -> PlantaResponseDTO:
 def _cliente(rol: str = "admin", org: str = "org-1") -> tuple[TestClient, MagicMock]:
     app = create_app()
     mock_use_case = MagicMock()
+    mock_acceso = MagicMock()
+    mock_acceso.resolver.return_value = [
+        PlantaAccesoDTO(id="planta-1", nombre="Planta Principal", organizacion_id=org, puede_cambiar=True)
+    ]
     app.dependency_overrides[get_dispositivos_use_case] = lambda: mock_use_case
+    app.dependency_overrides[get_acceso_plantas_use_case] = lambda: mock_acceso
     app.dependency_overrides[get_usuario_actual] = lambda: {
         "sub": "usuario-1",
         "rol": rol,

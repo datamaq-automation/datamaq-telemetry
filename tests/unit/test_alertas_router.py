@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 from src.application.dtos.alerta_dto import AlertaResponseDTO
 from src.domain.telemetria.exceptions import AlertaNoEncontradaError
+from src.infrastructure.fastapi.auth_dependencies import get_acceso_plantas_use_case
 from src.infrastructure.fastapi.dependencies import (
     get_alertas_use_case,
     get_usuario_actual,
@@ -45,8 +46,11 @@ def _cliente(rol: str = "admin", autenticado: bool = True) -> tuple[TestClient, 
     app = create_app()
     mocks = {
         "alertas": MagicMock(),
+        "acceso_plantas": MagicMock(),
     }
+    mocks["acceso_plantas"].resolver_planta_permitida.side_effect = lambda uid, rol, org, pid: pid
     app.dependency_overrides[get_alertas_use_case] = lambda: mocks["alertas"]
+    app.dependency_overrides[get_acceso_plantas_use_case] = lambda: mocks["acceso_plantas"]
     # La propiedad de la alerta se prueba en test_aislamiento_alertas.py.
     app.dependency_overrides[verificar_propiedad_alerta] = lambda: None
     if autenticado:
