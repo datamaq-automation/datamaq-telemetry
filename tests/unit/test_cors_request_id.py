@@ -57,3 +57,17 @@ def test_request_id_se_expone_a_cors(client):
     )
     expuestos = response.headers.get("access-control-expose-headers", "")
     assert "X-Request-ID" in expuestos
+
+
+def test_request_id_se_expone_en_get_con_origin_permitido(client):
+    """Issue datamaq-automation/datamaq#64: una respuesta GET con Origin permitido
+    debe incluir X-Request-ID en Access-Control-Expose-Headers.
+    """
+    response = client.get(
+        "/health/build",
+        headers={"Origin": "http://localhost:5173"},
+    )
+    assert response.status_code == 200
+    expuestos = response.headers.get("access-control-expose-headers", "")
+    assert "X-Request-ID" in expuestos
+    assert response.headers.get("x-request-id")
