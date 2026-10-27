@@ -80,7 +80,8 @@ class PoliticaAccesoPlantasService:
        no aplica para ellos.
     2. Usuario con filas explícitas en `user_facility_access`: solo esas plantas,
        acotadas a su organización (una fila que apunte a otra org se ignora), con
-       el `puede_cambiar` de cada fila.
+       el `puede_cambiar` de cada fila. Si ninguna fila coincide con una planta válida,
+       se devuelve lista vacía (fail-close, Issue #85).
     3. Usuario sin filas: comportamiento histórico, todas las plantas de su
        organización con permiso de cambio.
 
@@ -109,8 +110,7 @@ class PoliticaAccesoPlantasService:
                 continue
             vistas.add(planta.id)
             resultado.append((planta, acceso.puede_cambiar))
-        # Si las filas de asignaciones no coinciden con ninguna planta válida, fallback a todas las propias
-        return resultado if resultado else [(p, True) for p in propias]
+        return resultado
 
 
 class PoliticaExpiracionService:
