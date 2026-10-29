@@ -71,6 +71,14 @@ class HashContrasenaService:
 ROLES_ACCESO_GLOBAL: frozenset[str] = frozenset({"superadmin"})
 
 
+def roles_de_acceso_global(extra: str) -> frozenset[str]:
+    """Roles con visibilidad de todas las organizaciones: los del código más los que agrega la configuración.
+
+    `extra` viene de ROLES_ACCESO_GLOBAL_EXTRA, que es vacío salvo en api-dev (decisión 2026-10-29).
+    """
+    return ROLES_ACCESO_GLOBAL | frozenset(r.strip() for r in extra.split(",") if r.strip())
+
+
 class PoliticaAccesoPlantasService:
     """Decide a qué plantas accede un usuario y si puede cambiar la activa.
 
@@ -95,8 +103,9 @@ class PoliticaAccesoPlantasService:
         organizacion_id: str | None,
         plantas: list[Planta],
         accesos: list[AccesoPlantaUsuario],
+        roles_globales: frozenset[str] = ROLES_ACCESO_GLOBAL,
     ) -> list[tuple[Planta, bool]]:
-        if rol in ROLES_ACCESO_GLOBAL:
+        if rol in roles_globales:
             return [(p, True) for p in plantas]
         propias = [p for p in plantas if organizacion_id is not None and p.organizacion_id == organizacion_id]
         if not accesos:

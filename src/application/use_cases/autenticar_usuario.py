@@ -34,6 +34,7 @@ ROLES_VALIDOS = frozenset(
         "mantenimiento",
         "ingeniero",
         "auditor",
+        "solo_lectura",
     }
 )
 

@@ -23,7 +23,7 @@ from src.domain.auth.ports import (
     RepositorioUsuariosPort,
     ServicioTOTPPort,
 )
-from src.domain.auth.services import HashContrasenaService
+from src.domain.auth.services import HashContrasenaService, roles_de_acceso_global
 from src.infrastructure.auth.cifrador_2fa import CifradorSecreto2FA
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
 from src.infrastructure.auth.totp_service import PyOtpService
@@ -62,7 +62,8 @@ def get_acceso_plantas_use_case(
     repo_accesos: Annotated[RepositorioAccesosPlantaPort, Depends(get_accesos_planta_repository)],
     repo_usuarios: Annotated[RepositorioUsuariosPort, Depends(get_usuarios_repository)],
 ) -> GestionarAccesoPlantasUseCase:
-    return GestionarAccesoPlantasUseCase(repo_accesos, YamlOrganizacionesRepository(), repo_usuarios)
+    roles_globales = roles_de_acceso_global(get_settings().ROLES_ACCESO_GLOBAL_EXTRA)
+    return GestionarAccesoPlantasUseCase(repo_accesos, YamlOrganizacionesRepository(), repo_usuarios, roles_globales)
 
 
 def get_auth_use_case(

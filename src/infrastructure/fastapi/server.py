@@ -35,7 +35,7 @@ from src.infrastructure.fastapi.dependencies import (
 from src.infrastructure.fastapi.duracion_requests import DuracionRequestMiddleware
 from src.infrastructure.fastapi.error_handler import manejar_404
 from src.infrastructure.fastapi.headers_historico import HEADER_DATOS_DESDE, HEADER_POTENCIA_REFERENCIA
-from src.infrastructure.fastapi.middleware import RequestIdMiddleware
+from src.infrastructure.fastapi.middleware import RequestIdMiddleware, registrar_guard_solo_lectura
 from src.infrastructure.fastapi.renovacion_tiempo_real import marca_renovacion, renovar_modo_tiempo_real_medidores
 from src.infrastructure.fastapi.routes.admin_router import router as admin_router
 from src.infrastructure.fastapi.routes.alertas_router import router as alertas_router
@@ -512,8 +512,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_headers=["*"],
         expose_headers=[HEADER_DATOS_DESDE, HEADER_POTENCIA_REFERENCIA, "X-Request-ID"],
     )
-
     app.add_middleware(NormalizarMcpRutaMiddleware)
+    registrar_guard_solo_lectura(app, settings)
     app.add_middleware(SecurityHeadersMiddleware, settings=settings)
     app.add_middleware(DuracionRequestMiddleware)  # Por dentro de RequestId: ya tiene el request_id.
     app.add_middleware(RateLimit404Middleware, settings=settings)

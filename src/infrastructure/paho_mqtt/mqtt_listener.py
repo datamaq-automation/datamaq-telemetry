@@ -16,6 +16,7 @@ from src.application.use_cases.ingestar_telemetria import IngestarTelemetriaUseC
 from src.domain.telemetria.ports import PublicadorEventosPort
 from src.domain.telemetria.services import FiltroDeduplicacionService
 from src.domain.telemetria.servicios.consumo_mqtt import AcumuladorConsumoHorario, uid_desde_topico
+from src.infrastructure.paho_mqtt.ingesta_sin_escritura import sin_escritura_si
 from src.infrastructure.paho_mqtt.mqtt_buffer import BufferMensajesMQTT, MensajeBuffer
 from src.infrastructure.paho_mqtt.volcador_consumo_mqtt import VolcadorConsumoMqtt
 from src.infrastructure.settings.config import get_settings
@@ -212,13 +213,16 @@ class MQTTListener:
         """Abre sesión de BD y ejecuta la ingesta correspondiente."""
         db = self.session_factory()
         try:
-            repo_disp = DispositivosConDatosMaestrosGateway(
-                MySQLDispositivosRepository(db), YamlOrganizacionesRepository()
+            # Réplica de solo lectura (decisión 2026-10-29): con la persistencia apagada, ningún repositorio escribe.
+            sin_escritura = not self.settings.INGESTA_PERSISTENCIA_HABILITADA
+            repo_disp = sin_escritura_si(
+                sin_escritura,
+                DispositivosConDatosMaestrosGateway(MySQLDispositivosRepository(db), YamlOrganizacionesRepository()),
             )
-            repo_telem = MySQLTelemetriaRepository(db)
+            repo_telem = sin_escritura_si(sin_escritura, MySQLTelemetriaRepository(db))
             disponibilidad_use_case = GestionarDisponibilidadUseCase(
                 repo_maquinas=MySQLMaquinasRepository(db),
-                repo_eventos=MySQLEventosDisponibilidadRepository(db),
+                repo_eventos=sin_escritura_si(sin_escritura, MySQLEventosDisponibilidadRepository(db)),
                 repo_paradas=MySQLParadasProgramadasRepository(db),
             )
 
@@ -282,6 +286,10 @@ class MQTTListener:
         return self._esta_conectado
 
     def publicar_comando(self, topico: str, payload: dict) -> bool:
+        if not self.settings.MQTT_COMANDOS_HABILITADOS:
+            # Réplica de solo lectura: no se escribe hacia los medidores. Cubre también la renovación de ráfaga.
+            logger.info("mqtt_comando_bloqueado_solo_lectura", topico=topico)
+            return False
         if not self._esta_conectado:
             logger.warning("mqtt_comando_no_enviado_desconectado", topico=topico)
             return False

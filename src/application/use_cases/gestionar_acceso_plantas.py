@@ -4,7 +4,7 @@ from src.application.dtos.auth_dto import AsignarPlantasRequestDTO, PlantaAcceso
 from src.domain.auth.entities import AccesoPlantaUsuario, UsuarioAuth
 from src.domain.auth.exceptions import UsuarioNoEncontradoError
 from src.domain.auth.ports import RepositorioAccesosPlantaPort, RepositorioUsuariosPort
-from src.domain.auth.services import PoliticaAccesoPlantasService
+from src.domain.auth.services import ROLES_ACCESO_GLOBAL, PoliticaAccesoPlantasService
 from src.domain.telemetria.exceptions import PlantaNoEncontradaError
 from src.domain.telemetria.ports import RepositorioOrganizacionesPort
 
@@ -21,16 +21,20 @@ class GestionarAccesoPlantasUseCase:
         repo_accesos: RepositorioAccesosPlantaPort,
         repo_organizaciones: RepositorioOrganizacionesPort,
         repo_usuarios: RepositorioUsuariosPort | None = None,
+        roles_globales: frozenset[str] = ROLES_ACCESO_GLOBAL,
     ):
         self.repo_accesos = repo_accesos
         self.repo_organizaciones = repo_organizaciones
         self.repo_usuarios = repo_usuarios
+        self.roles_globales = roles_globales
 
     def resolver(self, usuario_id: str | None, rol: str, organizacion_id: str | None) -> list[PlantaAccesoDTO]:
         """Plantas accesibles para los claims dados. Lista vacía si no hay contexto de organización."""
         accesos = self.repo_accesos.listar_por_usuario(usuario_id) if usuario_id else []
         plantas = self.repo_organizaciones.listar_plantas(None)
-        resueltas = PoliticaAccesoPlantasService.resolver(rol, organizacion_id, plantas, accesos)
+        resueltas = PoliticaAccesoPlantasService.resolver(
+            rol, organizacion_id, plantas, accesos, roles_globales=self.roles_globales
+        )
         return [
             PlantaAccesoDTO(id=p.id, nombre=p.nombre, organizacion_id=p.organizacion_id, puede_cambiar=puede)
             for p, puede in resueltas
