@@ -1,5 +1,7 @@
 # Spec F: Usuario invitado (`invitado` / `invitado`)
 
+> **⚠️ Superado.** Los roles `invitado` e `invitado_global` se retiraron de `develop` y `main` (PR #74; compatibilidad temporal en PR #76). El estado vigente de roles y permisos está en [`specs/roles-y-permisos.md`](roles-y-permisos.md) y en la matriz generada [`docs/matriz-roles-permisos.md`](../docs/matriz-roles-permisos.md). Este documento se conserva como histórico.
+
 > **Estado:** Implementado (DEC-03) · **Nota de vigencia:** La SPA utiliza preferentemente el endpoint sin credenciales `POST /api/auth/guest` (DEC-04, ver `specs/guest-endpoint.md`, `specs/roles-permisos.md` y `docs/contrato-auth.md`). El seed de este documento se mantiene activo para scripts de prueba y retrocompatibilidad.
 
 ## 1. Objetivo y Contexto

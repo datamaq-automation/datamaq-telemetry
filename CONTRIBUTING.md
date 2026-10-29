@@ -8,6 +8,7 @@
    - `APP_ENV=test ./scripts/pre-push.sh` (etapas 1-4: integridad, ruff, pyright, unit + cobertura).
    - `./scripts/ci.sh` para el gauntlet completo (agrega integración).
 4. Abrir el PR hacia `develop` con el resumen del gauntlet local en el cuerpo. Se mergea sin CI en la nube.
+   La plantilla de PR es la del repo padre (`datamaq-automation/datamaq`, `.github/PULL_REQUEST_TEMPLATE.md`). Este repo no tiene una propia.
 5. Release: abrir el PR `develop` → `main`. Ese PR corre el CI en la nube; se mergea solo con el CI en verde
    (verificar con `gh pr checks`). El merge a `main` dispara el CD de producción.
 

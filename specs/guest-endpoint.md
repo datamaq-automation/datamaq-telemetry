@@ -1,5 +1,7 @@
 # Spec G: Endpoint invitado (`POST /api/auth/guest`) + `Retry-After` en 429
 
+> **⚠️ Superado.** El rol `invitado` y su endpoint se retiraron de `develop` y `main` (PR #74; compatibilidad temporal en PR #76). El estado vigente de roles y permisos está en [`specs/roles-y-permisos.md`](roles-y-permisos.md). Este documento se conserva como histórico; la parte de `Retry-After` en 429 no depende del rol.
+
 ## 1. Objetivo y Contexto
 
 Proveer acceso anónimo de solo lectura mediante `POST /api/auth/guest`, que emite
