@@ -179,10 +179,15 @@ def update_dispositivo(
 def activate_realtime_mode(
     device_id: str,
     use_case: Annotated[GestionarDispositivosUseCase, Depends(get_dispositivos_use_case)],
+    claims: Annotated[dict, Depends(get_usuario_actual)],
     segundos: int = Query(120, ge=10, le=600),
 ):
     try:
-        disp = use_case.obtener_dispositivo(device_id)
+        # Misma regla que el listado: superadmin sin filtro; el resto, solo dispositivos de su organización (#99).
+        if claims.get("rol") == "superadmin":
+            disp = use_case.obtener_dispositivo(device_id)
+        else:
+            disp = use_case.obtener_dispositivo_de_organizacion(device_id, claims.get("org"))
         listener = get_mqtt_listener()
         enviado = False
         if listener:

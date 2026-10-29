@@ -114,6 +114,19 @@ class GestionarDispositivosUseCase:
             raise DispositivoNoEncontradoError(f"Dispositivo '{id_o_uid}' no encontrado.")
         return self._enriquecer_dispositivo(dev)
 
+    def obtener_dispositivo_de_organizacion(self, id_o_uid: str, organizacion_id: str | None) -> DispositivoResponseDTO:
+        """Como `obtener_dispositivo`, pero solo si el dispositivo está en la organización (misma regla que el listado).
+
+        Si es de otra organización, o no hay organización en el claim, responde como inexistente: no revela que existe.
+        La búsqueda por id y por UID pasan por la misma comprobación.
+        """
+        dispositivo = self.obtener_dispositivo(id_o_uid)
+        if organizacion_id is None or not any(
+            d.id == dispositivo.id for d in self.repo_dispositivos.listar(None, organizacion_id=organizacion_id)
+        ):
+            raise DispositivoNoEncontradoError(f"Dispositivo '{id_o_uid}' no encontrado.")
+        return dispositivo
+
     def registrar_dispositivo(self, dto: DispositivoCreateDTO) -> DispositivoResponseDTO:
         if dto.planta_id:
             self._validar_cupo_dispositivos(dto.planta_id)
