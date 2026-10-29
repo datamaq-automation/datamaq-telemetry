@@ -10,6 +10,7 @@ from starlette.responses import Response
 from starlette.types import ASGIApp
 
 from src.infrastructure.fastapi.solo_lectura_middleware import (
+    BloqueoEscrituraSoloLecturaMiddleware,
     SoloLecturaMiddleware,
     excepciones_desde_config,
     excepciones_efectivas,
@@ -35,7 +36,13 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
 
 
 def registrar_guard_solo_lectura(app: Any, settings: Any) -> None:
-    """Agrega el guard de solo lectura solo si API_SOLO_LECTURA está activo (decisión 2026-10-29, D1)."""
+    """Bloquea escrituras del rol solo_lectura en toda instancia, y el guard de método en api-dev (D1)."""
+    app.add_middleware(
+        BloqueoEscrituraSoloLecturaMiddleware,
+        secreto=settings.API_SECRET_KEY,
+        secreto_anterior=settings.API_SECRET_KEY_ANTERIOR,
+        nombre_cookie=settings.AUTH_COOKIE_NOMBRE,
+    )
     if settings.API_SOLO_LECTURA:
         excepciones = excepciones_efectivas(
             excepciones_desde_config(settings.API_SOLO_LECTURA_EXCEPCIONES), settings.DB_NAME

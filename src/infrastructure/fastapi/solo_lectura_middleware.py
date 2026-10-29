@@ -9,6 +9,10 @@ import json
 from collections.abc import Awaitable, Callable, Iterable
 from typing import Any
 
+from starlette.requests import Request
+
+from src.infrastructure.auth.jwt_token_service import JwtTokenService
+
 METODOS_LECTURA = frozenset({"GET", "HEAD", "OPTIONS"})
 
 
@@ -53,3 +57,58 @@ class SoloLecturaMiddleware:
             }
         )
         await send({"type": "http.response.body", "body": cuerpo})
+
+
+ROL_SOLO_LECTURA = "solo_lectura"
+RUTAS_LOGOUT_Y_LOGIN = frozenset({"/api/v1/auth/login", "/api/v1/auth/logout"})
+"""Únicas rutas no GET que puede usar el rol de solo lectura: entrar y salir de su propia sesión."""
+
+
+class BloqueoEscrituraSoloLecturaMiddleware:
+    """Rechaza con 403 cualquier método que escribe cuando el token es de rol `solo_lectura`.
+
+    Va en todas las instancias (el rol existe en cualquier ambiente). Verifica la firma del token igual que
+    `get_usuario_actual`, pero no depende de un guard de ruta: así cubre también rutas que no resuelven usuario,
+    como `POST /api/v1/dispositivos/{id}/realtime` (issue #99). Si el token no verifica, no bloquea: esas rutas
+    siguen con su propia autenticación.
+    """
+
+    def __init__(self, app: Any, secreto: str, secreto_anterior: str, nombre_cookie: str) -> None:
+        self.app = app
+        self.verificador = JwtTokenService(secreto)
+        self.secretos_adicionales = [secreto_anterior] if secreto_anterior else None
+        self.nombre_cookie = nombre_cookie
+
+    async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
+        if (
+            scope["type"] != "http"
+            or scope["method"] in METODOS_LECTURA
+            or scope["path"] in RUTAS_LOGOUT_Y_LOGIN
+            or not self._es_solo_lectura(scope)
+        ):
+            await self.app(scope, receive, send)
+            return
+        cuerpo = json.dumps({"detail": "rol solo_lectura: no puede escribir"}).encode()
+        await send(
+            {
+                "type": "http.response.start",
+                "status": 403,
+                "headers": [(b"content-type", b"application/json"), (b"content-length", str(len(cuerpo)).encode())],
+            }
+        )
+        await send({"type": "http.response.body", "body": cuerpo})
+
+    def _es_solo_lectura(self, scope: dict[str, Any]) -> bool:
+        # Misma regla de extracción que `extraer_token`: cookie primero, después Bearer.
+        request = Request(scope)
+        cookie = request.cookies.get(self.nombre_cookie)
+        authorization = request.headers.get("authorization")
+        token = cookie or (
+            authorization.removeprefix("Bearer ").strip()
+            if authorization and authorization.startswith("Bearer ")
+            else None
+        )
+        if not token:
+            return False
+        claims = self.verificador.verificar(token, self.secretos_adicionales)
+        return claims is not None and claims.get("rol") == ROL_SOLO_LECTURA
