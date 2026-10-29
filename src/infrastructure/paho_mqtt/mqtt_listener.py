@@ -5,6 +5,7 @@ import json
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
 
 import paho.mqtt.client as mqtt
 from paho.mqtt.enums import CallbackAPIVersion
@@ -14,6 +15,7 @@ from src.application.use_cases.gestionar_disponibilidad import GestionarDisponib
 from src.application.use_cases.ingestar_telemetria import IngestarTelemetriaUseCase
 from src.domain.telemetria.ports import PublicadorEventosPort
 from src.domain.telemetria.services import FiltroDeduplicacionService
+from src.domain.telemetria.servicios.consumo_mqtt import AcumuladorConsumoHorario, uid_desde_topico
 from src.infrastructure.paho_mqtt.mqtt_buffer import BufferMensajesMQTT, MensajeBuffer
 from src.infrastructure.settings.config import get_settings
 from src.infrastructure.settings.logger import get_logger
@@ -25,6 +27,7 @@ from src.infrastructure.sqlalchemy.mysql_repositories import (
     MySQLParadasProgramadasRepository,
     MySQLTelemetriaRepository,
 )
+from src.infrastructure.sqlalchemy.repositories.consumo_mqtt_repository import sumar_consumo
 from src.infrastructure.yaml.repositories.organizaciones_repository import YamlOrganizacionesRepository
 
 logger = get_logger("mqtt_listener")
@@ -53,6 +56,9 @@ def _configurar_notificador_alertas(settings, session_factory) -> None:
         session_factory, billing_habilitado=settings.BILLING_HABILITADO
     )
     ProcesadorAlertasIngesta.configurar_notificador(notificador, dests, verificador_plan=verificador_plan)
+
+
+CONSUMO_INTERVALO_S = 60
 
 
 class MQTTListener:
@@ -103,6 +109,8 @@ class MQTTListener:
             backoff_max_s=self.settings.MQTT_RETRY_BACKOFF_MAX_S,
             on_descarte=self._on_buffer_descarte,
         )
+        self._consumo = AcumuladorConsumoHorario()
+        self._hilo_consumo: threading.Thread | None = None
 
         if self.settings.ALERTAS_EMAIL_HABILITADAS:
             _configurar_notificador_alertas(self.settings, self.session_factory)
@@ -169,6 +177,9 @@ class MQTTListener:
             return
 
         logger.info("mqtt_mensaje_recibido", topico=topic, tamano_bytes=len(payload_bytes))
+        uid = uid_desde_topico(topic)
+        if uid:
+            self._consumo.registrar(uid, len(payload_bytes), datetime.now(timezone.utc))
 
         clave_dedup = f"{topic}:{hashlib.sha256(payload_bytes).hexdigest()}"
         if self._dedup.es_duplicado(clave_dedup):
@@ -250,6 +261,21 @@ class MQTTListener:
                 error=str(e),
             )
 
+    def _bucle_consumo(self) -> None:
+        """Vuelca a la base el consumo MQTT por hora cada CONSUMO_INTERVALO_S (#93), fuera del camino de ingesta."""
+        while not self._stop_reintentos.wait(timeout=CONSUMO_INTERVALO_S):
+            self.persistir_consumo()
+
+    def persistir_consumo(self) -> None:
+        datos = self._consumo.extraer()
+        if not datos:
+            return
+        try:
+            sumar_consumo(self.session_factory, datos)
+        except Exception as e:
+            self._consumo.fusionar(datos)
+            logger.warning("mqtt_consumo_persistencia_fallida", error=str(e))
+
     def _bucle_reintentos(self) -> None:
         """Hilo de fondo que reintenta periódicamente los mensajes encolados en el buffer."""
         stop_ev = getattr(self, "_stop_reintentos", None)
@@ -309,6 +335,12 @@ class MQTTListener:
                 daemon=True,
             )
             self._hilo_reintentos.start()
+            self._hilo_consumo = threading.Thread(
+                target=self._bucle_consumo,
+                name="mqtt-consumo-horario",
+                daemon=True,
+            )
+            self._hilo_consumo.start()
 
         try:
             self.client.connect_async(
@@ -334,3 +366,4 @@ class MQTTListener:
         except Exception:
             pass
         self._executor.shutdown(wait=True)
+        self.persistir_consumo()

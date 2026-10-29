@@ -36,6 +36,7 @@ def _construir_listener(monkeypatch, settings: Settings, logger_fake: _LoggerFak
     listener.settings = settings
     listener.session_factory = lambda: _DBSessionStub()
     listener.publicador = None
+    listener._consumo = MagicMock()
     listener.client = MagicMock()
     listener.is_running = False
     listener._esta_conectado = True
