@@ -1,12 +1,15 @@
 """src/infrastructure/fastapi/middleware.py — Middleware de correlación de requests: genera y propaga un request_id único."""
 
 import uuid
+from typing import Any
 
 import structlog
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import Response
 from starlette.types import ASGIApp
+
+from src.infrastructure.fastapi.solo_lectura_middleware import SoloLecturaMiddleware, excepciones_desde_config
 
 
 class RequestIdMiddleware(BaseHTTPMiddleware):
@@ -25,3 +28,11 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
             return response
         finally:
             structlog.contextvars.clear_contextvars()
+
+
+def registrar_guard_solo_lectura(app: Any, settings: Any) -> None:
+    """Agrega el guard de solo lectura solo si API_SOLO_LECTURA está activo (decisión 2026-10-29, D1)."""
+    if settings.API_SOLO_LECTURA:
+        app.add_middleware(
+            SoloLecturaMiddleware, excepciones=excepciones_desde_config(settings.API_SOLO_LECTURA_EXCEPCIONES)
+        )
