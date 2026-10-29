@@ -492,7 +492,8 @@ def requiere_rol_admin(claims: Annotated[dict[str, Any], Depends(get_usuario_act
 def no_permitido_para_invitados_2fa(claims: Annotated[dict[str, Any], Depends(get_usuario_actual)]) -> dict[str, Any]:
     # TODO(#65): quitar con los roles de compatibilidad.
     # Inline: el generador de la matriz evalúa esta condición sin constantes de módulo.
-    if claims.get("rol") in ("invitado", "invitado_global"):
+    # solo_lectura (decisión 2026-10-29, D3): la cuenta de la copia tampoco activa 2FA.
+    if claims.get("rol") in ("invitado", "invitado_global", "solo_lectura"):
         raise HTTPException(status_code=403, detail="2fa_no_disponible_para_invitado")
     return claims
 
