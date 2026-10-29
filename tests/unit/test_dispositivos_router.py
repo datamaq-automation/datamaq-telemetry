@@ -389,7 +389,7 @@ def test_actualizar_dispositivo_patch_no_encontrado_404():
 @patch("src.infrastructure.fastapi.routes.dispositivos_router.get_mqtt_listener")
 def test_activar_realtime_modo_exitoso_default_segundos(mock_get_listener):
     client, mocks = _cliente()
-    mocks["dispositivos"].obtener_dispositivo.return_value = _dispositivo_dto(
+    mocks["dispositivos"].obtener_dispositivo_de_organizacion.return_value = _dispositivo_dto(
         id="dev-1", device_uid="00:11:22:33:44:55"
     )
 
@@ -406,14 +406,14 @@ def test_activar_realtime_modo_exitoso_default_segundos(mock_get_listener):
     assert data["device_uid"] == "00:11:22:33:44:55"
     assert data["tiempo_real_activado"] is True
     assert data["segundos"] == 120
-    mocks["dispositivos"].obtener_dispositivo.assert_called_once_with("dev-1")
+    mocks["dispositivos"].obtener_dispositivo_de_organizacion.assert_called_once_with("dev-1", "org-1")
     mock_listener.activar_tiempo_real_dispositivo.assert_called_once_with("00:11:22:33:44:55", segundos=120)
 
 
 @patch("src.infrastructure.fastapi.routes.dispositivos_router.get_mqtt_listener")
 def test_activar_realtime_con_segundos_personalizado(mock_get_listener):
     client, mocks = _cliente()
-    mocks["dispositivos"].obtener_dispositivo.return_value = _dispositivo_dto(
+    mocks["dispositivos"].obtener_dispositivo_de_organizacion.return_value = _dispositivo_dto(
         id="dev-1", device_uid="00:11:22:33:44:55"
     )
 
@@ -434,7 +434,7 @@ def test_activar_realtime_con_segundos_personalizado(mock_get_listener):
 @patch("src.infrastructure.fastapi.routes.dispositivos_router.get_mqtt_listener")
 def test_activar_realtime_listener_none_mqtt_offline(mock_get_listener):
     client, mocks = _cliente()
-    mocks["dispositivos"].obtener_dispositivo.return_value = _dispositivo_dto(
+    mocks["dispositivos"].obtener_dispositivo_de_organizacion.return_value = _dispositivo_dto(
         id="dev-1", device_uid="00:11:22:33:44:55"
     )
     mock_get_listener.return_value = None
@@ -453,7 +453,7 @@ def test_activar_realtime_listener_none_mqtt_offline(mock_get_listener):
 @patch("src.infrastructure.fastapi.routes.dispositivos_router.get_mqtt_listener")
 def test_activar_realtime_listener_envio_fallido(mock_get_listener):
     client, mocks = _cliente()
-    mocks["dispositivos"].obtener_dispositivo.return_value = _dispositivo_dto(
+    mocks["dispositivos"].obtener_dispositivo_de_organizacion.return_value = _dispositivo_dto(
         id="dev-1", device_uid="00:11:22:33:44:55"
     )
 
@@ -489,7 +489,9 @@ def test_activar_realtime_segundos_mayor_que_maximo_422():
 
 def test_activar_realtime_dispositivo_no_encontrado_404():
     client, mocks = _cliente()
-    mocks["dispositivos"].obtener_dispositivo.side_effect = DispositivoNoEncontradoError("Dispositivo no encontrado.")
+    mocks["dispositivos"].obtener_dispositivo_de_organizacion.side_effect = DispositivoNoEncontradoError(
+        "Dispositivo no encontrado."
+    )
 
     response = client.post("/api/v1/dispositivos/dev-inexistente/realtime")
 
@@ -499,7 +501,7 @@ def test_activar_realtime_dispositivo_no_encontrado_404():
 
 def test_activar_realtime_error_inesperado_500():
     client, mocks = _cliente()
-    mocks["dispositivos"].obtener_dispositivo.side_effect = RuntimeError("Fallo inesperado")
+    mocks["dispositivos"].obtener_dispositivo_de_organizacion.side_effect = RuntimeError("Fallo inesperado")
 
     response = client.post("/api/v1/dispositivos/dev-1/realtime")
 
