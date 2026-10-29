@@ -61,6 +61,7 @@ from src.infrastructure.fastapi.routes.telemetria_router import router as teleme
 from src.infrastructure.fastapi.routes.usuarios_router import router as usuarios_router
 from src.infrastructure.fastapi.security_headers import SecurityHeadersMiddleware
 from src.infrastructure.fastapi.seguridad_rutas import RateLimit404Middleware, RechazoPathInseguroMiddleware
+from src.infrastructure.fastapi.solo_lectura_middleware import SoloLecturaMiddleware, excepciones_desde_config
 from src.infrastructure.fastapi.vigilancia_conectividad import loop_vigilancia_conectividad
 from src.infrastructure.paho_mqtt.mqtt_listener import MQTTListener
 from src.infrastructure.settings.config import Settings, get_settings
@@ -514,6 +515,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
 
     app.add_middleware(NormalizarMcpRutaMiddleware)
+    if settings.API_SOLO_LECTURA:
+        app.add_middleware(
+            SoloLecturaMiddleware, excepciones=excepciones_desde_config(settings.API_SOLO_LECTURA_EXCEPCIONES)
+        )
     app.add_middleware(SecurityHeadersMiddleware, settings=settings)
     app.add_middleware(DuracionRequestMiddleware)  # Por dentro de RequestId: ya tiene el request_id.
     app.add_middleware(RateLimit404Middleware, settings=settings)
