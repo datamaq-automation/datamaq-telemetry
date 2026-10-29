@@ -1,7 +1,7 @@
 <!-- Generado por scripts/generate_matriz_roles.py. No editar a mano: regenerar. -->
 # Matriz de roles y permisos (generada desde el código)
 
-Endpoints analizados: **122**. Roles válidos (`ROLES_VALIDOS`): `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `superadmin`.
+Endpoints analizados: **122**. Roles válidos (`ROLES_VALIDOS`): `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `solo_lectura`, `superadmin`.
 
 Cómo se lee: "Roles que pasan" es lo que deja el guard de rol que la ruta declara (evaluado con la condición real del guard). Si la columna "Chequeo manual" dice `sí`, el cuerpo de la ruta o de una dependencia propia compara el rol o usa `ROLES_ACCESO_GLOBAL`: ese recorte no está en la columna y hay que leer la ruta para saberlo.
 
@@ -11,7 +11,7 @@ Con `AUTH_REQUIRED` apagado, `get_usuario_actual` devuelve `{"sub": "anon", "rol
 
 | Guard | Roles que pasan |
 |---|---|
-| `no_permitido_para_invitados_2fa` | `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `superadmin` |
+| `no_permitido_para_invitados_2fa` | `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `solo_lectura`, `superadmin` |
 | `requiere_rol_admin` | `admin`, `superadmin` |
 | `requiere_rol_auditor_o_superadmin` | `auditor`, `superadmin` |
 | `requiere_rol_escritura` | `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `superadmin` |
@@ -34,9 +34,9 @@ Con `AUTH_REQUIRED` apagado, `get_usuario_actual` devuelve `{"sub": "anon", "rol
 | GET | `/api/v1/analitica/penalizaciones/planta` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/analitica_router.py:obtener_penalizaciones_planta` |
 | POST | `/api/v1/asistente/preguntar` | — | todos (sin guard) | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/asistente_router.py:preguntar` |
 | GET | `/api/v1/audit/logs` | `requiere_rol_auditor_o_superadmin` | `auditor`, `superadmin` | — | no | `src/infrastructure/fastapi/routes/audit_router.py:listar_audit_logs` |
-| POST | `/api/v1/auth/2fa/activar` | `no_permitido_para_invitados_2fa` | `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `superadmin` | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/auth_router.py:activar_2fa` |
-| POST | `/api/v1/auth/2fa/desactivar` | `no_permitido_para_invitados_2fa` | `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `superadmin` | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/auth_router.py:desactivar_2fa` |
-| POST | `/api/v1/auth/2fa/setup` | `no_permitido_para_invitados_2fa` | `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `superadmin` | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/auth_router.py:setup_2fa` |
+| POST | `/api/v1/auth/2fa/activar` | `no_permitido_para_invitados_2fa` | `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `solo_lectura`, `superadmin` | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/auth_router.py:activar_2fa` |
+| POST | `/api/v1/auth/2fa/desactivar` | `no_permitido_para_invitados_2fa` | `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `solo_lectura`, `superadmin` | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/auth_router.py:desactivar_2fa` |
+| POST | `/api/v1/auth/2fa/setup` | `no_permitido_para_invitados_2fa` | `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `solo_lectura`, `superadmin` | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/auth_router.py:setup_2fa` |
 | POST | `/api/v1/auth/2fa/verificar` | — | todos (sin guard) | sin dependencia de auth detectada | no | `src/infrastructure/fastapi/routes/auth_router.py:verificar_2fa` |
 | PATCH | `/api/v1/auth/confirm-password-change` | — | todos (sin guard) | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/auth_router.py:confirm_password_change` |
 | POST | `/api/v1/auth/dispositivos/revocar-todos` | — | todos (sin guard) | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/auth_router.py:revocar_dispositivos` |
