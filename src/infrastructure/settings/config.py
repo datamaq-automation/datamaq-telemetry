@@ -40,6 +40,11 @@ class Settings(BaseSettings):
     DISPOSITIVO_OFFLINE_ALERTA_HABILITADA: bool = False
     # Ingesta MQTT. En dev se apaga con false: el listener no se crea ni se conecta.
     MQTT_HABILITADO: bool = True
+    # Réplica de solo lectura (develop/api-dev, decisión 2026-10-29): sin persistir ni publicar comandos.
+    MQTT_COMANDOS_HABILITADOS: bool = True
+    INGESTA_PERSISTENCIA_HABILITADA: bool = True
+    API_SOLO_LECTURA: bool = False
+    API_SOLO_LECTURA_EXCEPCIONES: str = ""
     MQTT_CLEAN_SESSION: bool = False
     MQTT_RECONNECT_MIN_DELAY_SEG: int = 1
     MQTT_RECONNECT_MAX_DELAY_SEG: int = 60
