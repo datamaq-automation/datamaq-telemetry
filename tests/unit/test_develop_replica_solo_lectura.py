@@ -129,3 +129,66 @@ def test_rol_solo_lectura_existe_y_no_pasa_el_guard_de_escritura():
     with pytest.raises(Exception) as excinfo:
         requiere_rol_escritura({"rol": "solo_lectura"})
     assert getattr(excinfo.value, "status_code", None) == 403
+
+
+from fastapi import HTTPException  # noqa: E402
+
+from src.infrastructure.fastapi.dependencies import no_permitido_para_invitados_2fa  # noqa: E402
+from src.infrastructure.fastapi.middleware import registrar_guard_solo_lectura  # noqa: E402
+from src.infrastructure.fastapi.solo_lectura_middleware import (  # noqa: E402
+    BASE_COPIA_DEV,
+    excepciones_efectivas,
+)
+
+LOGIN = "/api/v1/auth/login"
+
+
+def _app_login(nombre_base: str, excepciones: str = LOGIN) -> FastAPI:
+    app = FastAPI()
+
+    @app.post(LOGIN)
+    def login():
+        return {"ok": True}
+
+    @app.post("/api/v1/dispositivos")
+    def dispositivos():
+        return {"ok": True}
+
+    ajustes = MagicMock(API_SOLO_LECTURA=True, API_SOLO_LECTURA_EXCEPCIONES=excepciones, DB_NAME=nombre_base)
+    registrar_guard_solo_lectura(app, ajustes)
+    return app
+
+
+def test_excepcion_de_login_aplica_solo_en_la_copia():
+    assert excepciones_efectivas(frozenset({LOGIN}), BASE_COPIA_DEV) == frozenset({LOGIN})
+
+
+def test_excepcion_no_aplica_en_otra_base_aunque_este_configurada():
+    assert excepciones_efectivas(frozenset({LOGIN}), "datamaq_telemetry") == frozenset()
+    assert excepciones_efectivas(frozenset({LOGIN}), "datamaq_telemetry_prod") == frozenset()
+
+
+def test_solo_login_puede_quedar_exento_aunque_la_config_pida_otras_rutas():
+    pedidas = frozenset({LOGIN, "/api/v1/dispositivos"})
+    assert excepciones_efectivas(pedidas, BASE_COPIA_DEV) == frozenset({LOGIN})
+
+
+def test_en_la_copia_el_login_entra_y_la_escritura_de_dispositivos_se_bloquea():
+    cliente = TestClient(_app_login(BASE_COPIA_DEV))
+
+    assert cliente.post(LOGIN).status_code == 200
+    assert cliente.post("/api/v1/dispositivos").status_code == 403
+
+
+def test_con_la_misma_excepcion_en_otra_base_el_login_se_bloquea():
+    cliente = TestClient(_app_login("datamaq_telemetry"))
+
+    respuesta = cliente.post(LOGIN)
+    assert respuesta.status_code == 403
+    assert "solo lectura" in respuesta.json()["detail"]
+
+
+def test_2fa_niega_el_rol_solo_lectura():
+    with pytest.raises(HTTPException) as excinfo:
+        no_permitido_para_invitados_2fa({"rol": "solo_lectura"})
+    assert excinfo.value.status_code == 403
