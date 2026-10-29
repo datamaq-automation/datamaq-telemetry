@@ -86,7 +86,7 @@ una rama de código.
 - Resultado: el publicador en vivo sigue recibiendo cada mensaje (`ingestar_telemetria.py:130-131, 160-164`), y ninguna
   escritura llega a la base. Un solo punto de corte, sin tocar las capas de dominio ni aplicación.
 
-### 3.3 Comandos al broker (fuera de lo pedido, pero necesario)
+### 3.3 Comandos al broker (decisión D2: `develop` no renueva la ráfaga)
 
 El flujo en vivo es de solo lectura, pero el backend también **escribe hacia los medidores**. Eso contradice la
 decisión ("solo lectura sobre el broker"):
@@ -96,17 +96,46 @@ decisión ("solo lectura sobre el broker"):
 - La renovación automática de la ráfaga (`server.py:319-323` y `:443-448`, y `dispositivos_router.py:187`) llama a esos
   comandos mientras haya clientes WebSocket conectados.
 
-Propuesta: flag `MQTT_COMANDOS_HABILITADOS` (default `true`). En `api-dev`, `false`: los comandos devuelven `False`
-sin publicar y se loguean. El dueño decide si `develop` tiene que renovar la ráfaga (ver D2).
+**Decisión D2 (aceptada):** `develop` no renueva la ráfaga. Flag `MQTT_COMANDOS_HABILITADOS` (default `true`). En
+`api-dev` vale `false`: `publicar_comando` devuelve `False`, no publica y loguea `mqtt_comando_bloqueado_solo_lectura`.
+Eso cubre también las renovaciones automáticas, porque todas pasan por `publicar_comando`.
 
-### 3.4 Cuenta `invitado@datamaq.com.ar` como `operador`
+Además, el usuario MQTT de `api-dev` es de solo lectura. DevOps lo crea con autorización del dueño y tiene que tener
+`topic read` sobre `m/wifi/#` y `auto24v4m/#`, sin `write`. La configuración de telemetry sólo lo asume (`MQTT_USERNAME`
+y `MQTT_PASSWORD`, `config.py`). El flag de arriba es la defensa del lado de la app, y el ACL del broker la del lado del
+broker: las dos se necesitan.
 
-- Rol: `operador` (el rol `invitado` ya no existe en el backend).
-- Como `operador` puede escribir, la solo lectura de la cuenta **no** se garantiza con el rol. Se propone:
-  - (1) el usuario de la réplica sin permisos de escritura (3.1), y
-  - (2) un guard de método en `api-dev`: flag `MODO_SOLO_LECTURA` que rechace con 403 todo método distinto de
-    `GET`/`HEAD`/`OPTIONS` para las cuentas con rol `operador`, o para todas las sesiones de `api-dev`.
-- La cuenta se crea después de aprobar esta spec y con autorización del dueño.
+### 3.4 Guard de método en `api-dev` y rol de solo lectura
+
+**Decisión D1 (aceptada):** el bloqueo de métodos que escriben aplica a **todas** las sesiones de `api-dev`, no solo a
+la cuenta de invitado. Va como guard de método en `api-dev`, activado por configuración.
+
+- Flag `API_SOLO_LECTURA` (default `false`). Con `true`, un middleware rechaza con 403 todo método distinto de
+  `GET`, `HEAD` y `OPTIONS`, para cualquier usuario autenticado o no. Va como middleware ASGI, por fuera de los guards
+  de rol, así que no depende de cómo esté armado cada router.
+- Excepciones: una lista configurable `API_SOLO_LECTURA_EXCEPCIONES` de rutas exactas que siguen aceptando POST. Por
+  defecto vacía. **Ver punto abierto P1.**
+
+**Decisión D3 (aceptada):** la cuenta `invitado@datamaq.com.ar` va con un **rol nuevo de solo lectura**, no con
+`operador` y guard. Nombre propuesto `solo_lectura`. Ese rol no está en la lista de escritura de
+`requiere_rol_escritura` (`dependencies.py:500-507`), así que no pasa ningún guard de escritura. Se agrega a
+`ROLES_VALIDOS` (`autenticar_usuario.py:29`) y a la matriz de roles (regenerada por `scripts/generate_matriz_roles.py`).
+
+Este cambio es de modelo de roles. Hace falta el alta de la cuenta en `api-dev` después de aprobar esta spec y con
+autorización del dueño. El backend solo define el rol.
+
+### 3.5 Punto abierto P1: el login escribe
+
+`POST /api/v1/auth/login` (`auth_router.py:96`) registra un evento de auditoría (`gestionar_auditoria.py:42`, llamado
+desde el router) y el caso de uso de autenticación usa repositorios de escritura. Con la réplica de solo lectura, el
+login de **cualquier** cuenta falla en la base, incluida `invitado@`. Por eso la solución no puede ser sólo el guard:
+
+- opción A: el login no escribe en `api-dev` (el evento de auditoría se omite con un flag), y el guard deja pasar el
+  POST de login; o
+- opción B: la réplica acepta escrituras sólo en tablas de sesión y auditoría, y no en datos. Eso rompe la regla de
+  "réplica de solo lectura" y no lo propongo sin aprobación.
+
+Esta spec no lo decide. Mientras esté abierto, `api-dev` con `API_SOLO_LECTURA=true` no permite login.
 
 ## 4. Matriz de pruebas
 
@@ -114,33 +143,37 @@ sin publicar y se loguean. El dueño decide si `develop` tiene que renovar la r�
 |---|---|---|
 | `test_flag_apagado_no_escribe_telemetria` | infra | con `INGESTA_PERSISTENCIA_HABILITADA=false`, `guardar_instantanea` y `guardar_energia` no se llaman |
 | `test_flag_apagado_sigue_publicando_en_vivo` | infra | el publicador recibe la instantánea aunque no se persista |
-| `test_flag_apagado_no_crea_dispositivos` | infra | `resolvedor_dispositivo` no llama `guardar` |
-| `test_comandos_apagados_no_publican` | infra | con `MQTT_COMANDOS_HABILITADOS=false`, `publicar_comando` devuelve `False` y no publica |
-| `test_modo_solo_lectura_rechaza_escrituras` | infra | `POST /api/v1/dispositivos` con rol `operador` devuelve 403 |
-| `test_modo_solo_lectura_permite_get` | infra | `GET` de telemetría con rol `operador` responde 200 |
+| `test_flag_apagado_no_crea_dispositivos` | infra | el repositorio de dispositivos no recibe `guardar` |
+| `test_comandos_apagados_no_publican` | infra | con `MQTT_COMANDOS_HABILITADOS=false`, `publicar_comando` devuelve `False` y no publica (también la renovación de ráfaga) |
+| `test_guard_solo_lectura_rechaza_post_en_api_dev` | infra | con `API_SOLO_LECTURA=true`, `POST` a cualquier ruta no excluida devuelve 403, con o sin sesión |
+| `test_guard_solo_lectura_permite_get` | infra | con el flag activo, `GET` de telemetría responde sin 403 |
+| `test_rol_solo_lectura_no_pasa_guard_de_escritura` | aplicación | el rol `solo_lectura` no está en la lista de `requiere_rol_escritura` |
 | `test_escritura_en_replica_falla` | integración (VPS, no CI) | usuario de la réplica: `INSERT` rechazado por la base |
 | `test_flujo_en_vivo_no_crea_filas` | integración (dev) | con el flag en `false`, contar filas antes y después de N mensajes: sin diferencia |
 
-Las dos primeras pruebas de integración (réplica y flujo en vivo) corren en `develop` con una base descartable. No
-usan la base real.
+Las integraciones de réplica y flujo en vivo corren en `develop` con una base descartable. No usan la base real.
 
 ## 5. Criterios de aceptación
 
-- En `develop`, una escritura contra la réplica falla.
+- En `api-dev`, un `POST` a una ruta no excluida devuelve 403 con `API_SOLO_LECTURA=true`. La prueba se hace en el
+  entorno de pruebas con ese flag, no en `api-dev` real.
+- En `develop`, una escritura contra la réplica falla (la base rechaza el `INSERT`).
 - El flujo en vivo no crea filas nuevas en ninguna tabla.
-- La cuenta `invitado@` no puede escribir, aunque su rol sea `operador`.
-- Con los flags en su default, el comportamiento de `main` no cambia (prueba: `pre-push` verde sin flags).
+- La cuenta `invitado@` no puede escribir: su rol `solo_lectura` no pasa ningún guard de escritura.
+- Con los flags en su default, el comportamiento de `main` no cambia.
 
-## 6. Decisiones del dueño
+## 6. Decisiones
 
-- **D1 — Guard de método en `develop`.** ¿El guard de solo lectura (3.4) aplica a todas las sesiones de `api-dev` o
-  solo a la cuenta `invitado@`?
-- **D2 — Ráfaga en `develop`.** ¿`develop` renueva la ráfaga (requiere `MQTT_COMANDOS_HABILITADOS=true`) o no?
-- **D3 — Cuenta.** Crear `invitado@` como `operador` (la decisión lo pide) con el guard de método, o un rol nuevo de
-  solo lectura (cambia el modelo de roles; no lo propongo sin aprobación).
+| ID | Decisión | Estado |
+|---|---|---|
+| D1 | El bloqueo de métodos que escriben aplica a todas las sesiones de `api-dev`, por configuración. | Aceptada por el dueño |
+| D2 | `develop` no renueva la ráfaga: `MQTT_COMANDOS_HABILITADOS=false` en `api-dev`. | Aceptada por el dueño |
+| D3 | `invitado@` con rol nuevo de solo lectura, no `operador` con guard. | Aceptada por el dueño |
+| P1 | Login: cómo dejar entrar a `api-dev` si el login escribe (ver 3.5). | **Abierta, del dueño** |
 
 ## 7. Fuera de alcance
 
-- Crear la réplica, el usuario de solo lectura y la conexión al broker: DevOps, con autorización del dueño.
+- Crear la réplica, el usuario de solo lectura de la base y la conexión al broker: DevOps, con autorización del dueño.
+  El usuario MQTT de solo lectura también lo crea DevOps.
+- Crear la cuenta `invitado@` en `api-dev`: después de aprobar la spec, con autorización del dueño.
 - Cualquier cambio en `main` o en producción.
-- El rol de solo lectura nuevo (D3), salvo que el dueño lo pida.
