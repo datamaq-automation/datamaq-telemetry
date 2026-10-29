@@ -85,15 +85,15 @@ python scripts/validate_topology.py --strict  # Fallar en warnings
 - Commits: Conventional Commits (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`).
 - **Reportes y rutas:** Al generar reportes/documentos, siempre dar rutas absolutas completas (`/home/agustin/...`), no relativas.
 
-## Comunicación con Sesión Padre Orquestadora (datamaq-01)
+## Comunicación con Sesión Padre Orquestadora (el padre, ver `ListAgents`)
 
 **TODA respuesta, cierre de tarea o reporte de bloqueadores DEBE dirigirse al PADRE, no al dueño.**
 
 **Protocolo (obligatorio):**
 1. Carga la herramienta `SendMessage` (si está deferred, usa `ToolSearch("select:SendMessage")`)
-2. Envía mensaje a `datamaq-01` (sesión padre):
+2. Envía mensaje al padre (ver `ListAgents`):
    ```
-   SendMessage(to="datamaq-01", 
+   SendMessage(to="<nombre del padre (ver ListAgents)>", 
      summary="[Resumen corto de lo que reportas]",
      message="[Detalle completo del cierre / bloqueador / status]")
    ```
@@ -102,7 +102,7 @@ python scripts/validate_topology.py --strict  # Fallar en warnings
 **Ejemplos:**
 ```
 ✅ Correcto:
-SendMessage(to="datamaq-01", 
+SendMessage(to="<nombre del padre (ver ListAgents)>", 
   summary="Trazabilidad TI Bloque A ✅",
   message="T1–T5 commiteado en feat/trazabilidad-cambios-ti. Gauntlet pasó, integración en deploy-server.sh pendiente.")
 
@@ -112,7 +112,7 @@ SendMessage(to="agustin", ...) (envío directo al dueño, saltándose padre)
 ```
 
 **Criterio: ¿a quién reportar?**
-- **Padre (datamaq-01):** Status de tarea, cierre de bloque, bloqueadores técnicos, coordinaciones con otros repos
+- **Padre (el padre, ver `ListAgents`):** Status de tarea, cierre de bloque, bloqueadores técnicos, coordinaciones con otros repos
 - **Dueño:** Solo si padre te pide que plantees pregunta de negocio al dueño explícitamente
 
 ---
@@ -126,7 +126,7 @@ SendMessage(to="agustin", ...) (envío directo al dueño, saltándose padre)
 
 **Criterio:**
 - **Sesión Padre:** Ambigüedad en briefing, inconsistencias YAML↔DB, bloqueos transversales
-  - Usar SendMessage: `SendMessage(to="datamaq-01", summary="Pregunta", message="...")`
+  - Usar SendMessage: `SendMessage(to="<nombre del padre (ver ListAgents)>", summary="Pregunta", message="...")`
 - **Dueño:** Clarificación de negocio, detalles técnicos de este repo que padre no puede responder
   - Padre te indicará explícitamente si traspasar pregunta al dueño
 
