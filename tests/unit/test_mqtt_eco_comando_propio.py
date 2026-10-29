@@ -118,6 +118,7 @@ def _listener_falso() -> MQTTListener:
     listener = MQTTListener.__new__(MQTTListener)
     listener.settings = MagicMock(MQTT_MAX_PAYLOAD_BYTES=65536)
     listener._dedup = MagicMock()
+    listener._consumo = MagicMock()
     listener._dedup.es_duplicado.return_value = False
     listener._executor = MagicMock()
     return listener

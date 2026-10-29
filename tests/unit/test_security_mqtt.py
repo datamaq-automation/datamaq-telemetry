@@ -66,6 +66,7 @@ def _listener(monkeypatch, settings: Settings, logger_fake: _LoggerFake) -> MQTT
     listener.session_factory = lambda: _DBSessionStub()
     listener.publicador = None
     listener._executor = _FakeExecutor()
+    listener._consumo = MagicMock()
     listener._dedup = FiltroDeduplicacionService(settings.MQTT_DEDUP_VENTANA_SEGUNDOS)
     return listener
 

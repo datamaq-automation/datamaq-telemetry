@@ -5,6 +5,7 @@ import json
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
 
 import paho.mqtt.client as mqtt
 from paho.mqtt.enums import CallbackAPIVersion
@@ -14,7 +15,9 @@ from src.application.use_cases.gestionar_disponibilidad import GestionarDisponib
 from src.application.use_cases.ingestar_telemetria import IngestarTelemetriaUseCase
 from src.domain.telemetria.ports import PublicadorEventosPort
 from src.domain.telemetria.services import FiltroDeduplicacionService
+from src.domain.telemetria.servicios.consumo_mqtt import AcumuladorConsumoHorario, uid_desde_topico
 from src.infrastructure.paho_mqtt.mqtt_buffer import BufferMensajesMQTT, MensajeBuffer
+from src.infrastructure.paho_mqtt.volcador_consumo_mqtt import VolcadorConsumoMqtt
 from src.infrastructure.settings.config import get_settings
 from src.infrastructure.settings.logger import get_logger
 from src.infrastructure.sqlalchemy.database import get_session_factory
@@ -103,6 +106,8 @@ class MQTTListener:
             backoff_max_s=self.settings.MQTT_RETRY_BACKOFF_MAX_S,
             on_descarte=self._on_buffer_descarte,
         )
+        self._consumo = AcumuladorConsumoHorario()
+        self._volcador_consumo = VolcadorConsumoMqtt(self._consumo, self.session_factory)
 
         if self.settings.ALERTAS_EMAIL_HABILITADAS:
             _configurar_notificador_alertas(self.settings, self.session_factory)
@@ -169,6 +174,9 @@ class MQTTListener:
             return
 
         logger.info("mqtt_mensaje_recibido", topico=topic, tamano_bytes=len(payload_bytes))
+        uid = uid_desde_topico(topic)
+        if uid:
+            self._consumo.registrar(uid, len(payload_bytes), datetime.now(timezone.utc))
 
         clave_dedup = f"{topic}:{hashlib.sha256(payload_bytes).hexdigest()}"
         if self._dedup.es_duplicado(clave_dedup):
@@ -309,6 +317,7 @@ class MQTTListener:
                 daemon=True,
             )
             self._hilo_reintentos.start()
+            self._volcador_consumo.iniciar()
 
         try:
             self.client.connect_async(
@@ -334,3 +343,4 @@ class MQTTListener:
         except Exception:
             pass
         self._executor.shutdown(wait=True)
+        self._volcador_consumo.detener()
