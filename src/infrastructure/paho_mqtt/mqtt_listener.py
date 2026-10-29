@@ -17,6 +17,7 @@ from src.domain.telemetria.ports import PublicadorEventosPort
 from src.domain.telemetria.services import FiltroDeduplicacionService
 from src.domain.telemetria.servicios.consumo_mqtt import AcumuladorConsumoHorario, uid_desde_topico
 from src.infrastructure.paho_mqtt.mqtt_buffer import BufferMensajesMQTT, MensajeBuffer
+from src.infrastructure.paho_mqtt.volcador_consumo_mqtt import VolcadorConsumoMqtt
 from src.infrastructure.settings.config import get_settings
 from src.infrastructure.settings.logger import get_logger
 from src.infrastructure.sqlalchemy.database import get_session_factory
@@ -27,7 +28,6 @@ from src.infrastructure.sqlalchemy.mysql_repositories import (
     MySQLParadasProgramadasRepository,
     MySQLTelemetriaRepository,
 )
-from src.infrastructure.sqlalchemy.repositories.consumo_mqtt_repository import sumar_consumo
 from src.infrastructure.yaml.repositories.organizaciones_repository import YamlOrganizacionesRepository
 
 logger = get_logger("mqtt_listener")
@@ -56,9 +56,6 @@ def _configurar_notificador_alertas(settings, session_factory) -> None:
         session_factory, billing_habilitado=settings.BILLING_HABILITADO
     )
     ProcesadorAlertasIngesta.configurar_notificador(notificador, dests, verificador_plan=verificador_plan)
-
-
-CONSUMO_INTERVALO_S = 60
 
 
 class MQTTListener:
@@ -110,7 +107,7 @@ class MQTTListener:
             on_descarte=self._on_buffer_descarte,
         )
         self._consumo = AcumuladorConsumoHorario()
-        self._hilo_consumo: threading.Thread | None = None
+        self._volcador_consumo = VolcadorConsumoMqtt(self._consumo, self.session_factory)
 
         if self.settings.ALERTAS_EMAIL_HABILITADAS:
             _configurar_notificador_alertas(self.settings, self.session_factory)
@@ -261,21 +258,6 @@ class MQTTListener:
                 error=str(e),
             )
 
-    def _bucle_consumo(self) -> None:
-        """Vuelca a la base el consumo MQTT por hora cada CONSUMO_INTERVALO_S (#93), fuera del camino de ingesta."""
-        while not self._stop_reintentos.wait(timeout=CONSUMO_INTERVALO_S):
-            self.persistir_consumo()
-
-    def persistir_consumo(self) -> None:
-        datos = self._consumo.extraer()
-        if not datos:
-            return
-        try:
-            sumar_consumo(self.session_factory, datos)
-        except Exception as e:
-            self._consumo.fusionar(datos)
-            logger.warning("mqtt_consumo_persistencia_fallida", error=str(e))
-
     def _bucle_reintentos(self) -> None:
         """Hilo de fondo que reintenta periódicamente los mensajes encolados en el buffer."""
         stop_ev = getattr(self, "_stop_reintentos", None)
@@ -335,12 +317,7 @@ class MQTTListener:
                 daemon=True,
             )
             self._hilo_reintentos.start()
-            self._hilo_consumo = threading.Thread(
-                target=self._bucle_consumo,
-                name="mqtt-consumo-horario",
-                daemon=True,
-            )
-            self._hilo_consumo.start()
+            self._volcador_consumo.iniciar()
 
         try:
             self.client.connect_async(
@@ -366,4 +343,4 @@ class MQTTListener:
         except Exception:
             pass
         self._executor.shutdown(wait=True)
-        self.persistir_consumo()
+        self._volcador_consumo.detener()

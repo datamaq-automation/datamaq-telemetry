@@ -105,6 +105,7 @@ def _listener(monkeypatch, settings: Settings, logger_fake: _LoggerFake) -> MQTT
     listener.session_factory = lambda: _DBSessionStub()
     listener.publicador = None
     listener._consumo = MagicMock()
+    listener._volcador_consumo = MagicMock()
     listener.client = _FakeClient()
     listener.is_running = False
     listener._esta_conectado = False
