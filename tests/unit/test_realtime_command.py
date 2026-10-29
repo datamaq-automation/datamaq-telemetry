@@ -55,9 +55,9 @@ def test_endpoint_activar_tiempo_real():
     mock_disp = MagicMock()
     mock_disp.id = "disp-1"
     mock_disp.device_uid = "D48C49F03564"
-    mock_uc.obtener_dispositivo.return_value = mock_disp
+    mock_uc.obtener_dispositivo_de_organizacion.return_value = mock_disp
 
-    app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "user-test", "rol": "operador"}
+    app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "user-test", "rol": "operador", "org": "org-1"}
     app.dependency_overrides[get_dispositivos_use_case] = lambda: mock_uc
 
     client = TestClient(app)
