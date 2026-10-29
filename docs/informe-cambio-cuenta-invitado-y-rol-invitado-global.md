@@ -1,5 +1,7 @@
 # Informe de Cambio — Cuenta `invitado@datamaq.com.ar` y nuevo rol `invitado_global`
 
+> **⚠️ Superado.** La cuenta `invitado` y los roles `invitado` e `invitado_global` se retiraron de `develop` y `main` (PR #74; compatibilidad temporal en PR #76). Este informe describe un cambio histórico. El estado vigente está en [`specs/roles-y-permisos.md`](../specs/roles-y-permisos.md) y en [`docs/matriz-roles-permisos.md`](matriz-roles-permisos.md).
+
 > **Para:** Equipo de Frontend (`app-datamaq` / `www-datamaq`)
 > **De:** Equipo de Backend (`datamaq-telemetry`)
 > **Fecha:** 2026-09-10
