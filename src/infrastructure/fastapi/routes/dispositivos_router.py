@@ -12,6 +12,7 @@ from src.application.dtos.dispositivo_dto import (
 )
 from src.application.use_cases.gestionar_auditoria import RegistrarEventoAuditoriaUseCase
 from src.application.use_cases.gestionar_dispositivos import GestionarDispositivosUseCase
+from src.domain.auth.services import roles_de_acceso_global
 from src.infrastructure.fastapi.dependencies import (
     get_dispositivos_use_case,
     get_mqtt_listener,
@@ -22,6 +23,7 @@ from src.infrastructure.fastapi.dependencies import (
 from src.infrastructure.fastapi.device_ownership import verificar_propiedad_dispositivo
 from src.infrastructure.fastapi.error_handler import manejar_error_http
 from src.infrastructure.fastapi.planta_ownership import resolver_planta_permitida
+from src.infrastructure.settings.config import get_settings
 
 router = APIRouter(
     prefix="/api/v1/dispositivos",
@@ -39,7 +41,7 @@ def list_dispositivos(
     planta_id: PlantaPermitida,
 ):
     rol = claims.get("rol")
-    if rol == "superadmin":
+    if rol in roles_de_acceso_global(get_settings().ROLES_ACCESO_GLOBAL_EXTRA):
         organizacion_id = None
     else:
         organizacion_id = claims.get("org")

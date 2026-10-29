@@ -45,6 +45,8 @@ class Settings(BaseSettings):
     INGESTA_PERSISTENCIA_HABILITADA: bool = True
     API_SOLO_LECTURA: bool = False
     API_SOLO_LECTURA_EXCEPCIONES: str = ""
+    # Roles con visibilidad de todas las organizaciones, además de superadmin. Solo api-dev (decisión 2026-10-29).
+    ROLES_ACCESO_GLOBAL_EXTRA: str = ""
     MQTT_CLEAN_SESSION: bool = False
     MQTT_RECONNECT_MIN_DELAY_SEG: int = 1
     MQTT_RECONNECT_MAX_DELAY_SEG: int = 60
@@ -158,6 +160,8 @@ class Settings(BaseSettings):
         if self.DEBUG and self.APP_ENV == "production":
             object.__setattr__(self, "APP_ENV", "development")
         es_produccion = self.APP_ENV == "production"
+        if es_produccion and self.ROLES_ACCESO_GLOBAL_EXTRA.strip():
+            raise ValueError("ROLES_ACCESO_GLOBAL_EXTRA no puede usarse en producción")
 
         if self.API_EXPOSE_DOCS is None:
             object.__setattr__(self, "API_EXPOSE_DOCS", not es_produccion)
