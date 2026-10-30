@@ -287,3 +287,36 @@ def test_leer_tabla_exportada_csv(tmp_path):
     assert filas == [
         {"id": "1", "device_id": rt.DISPOSITIVO_ID, "recorded_at": "2026-10-01 00:00:00", "active_power_r": "-341.77"}
     ]
+
+
+def test_ya_corregida_integra_el_valor_almacenado_sin_volver_a_rotar():
+    # Fila posterior al reinicio: ya está en R:-60,S:0 y se genera desde un crudo entero.
+    fila = _fila_con_config(30000.0, 20000.0, 35000.0, 19000.0, config="R-60_S0")
+    fila["recorded_at"] = "2026-10-30 01:00:00"
+    procesadas = rt.procesar_instantanea([fila], "2026-09-26 00:00:00")
+    assert procesadas[0]["estado"] == "ya_corregida"
+
+    (muestra,) = rt.muestras_desde_filas(procesadas)
+
+    assert muestra.p_corr == pytest.approx(float(fila["active_power_r"]) + float(fila["active_power_s"]), abs=1e-9)
+    assert muestra.q_corr == pytest.approx(float(fila["reactive_power_r"]) + float(fila["reactive_power_s"]), abs=1e-9)
+
+
+def test_fila_de_energia_que_cruza_una_muestra_ambigua_queda_marcada():
+    t0 = datetime(2026, 9, 26, 0, 0, 0)
+    muestras = [
+        rt.Muestra(t=t0, p_raw=0, q_raw=0, p_corr=1000.0, q_corr=0.0),
+        rt.Muestra(t=t0 + timedelta(minutes=15), p_raw=0, q_raw=0, p_corr=1000.0, q_corr=0.0),
+    ]
+    energia = [
+        _energia(1, "2026-09-26 00:00:00", 20.0, 0.0),
+        _energia(2, "2026-09-26 00:07:30", 20.125, 0.0),
+        _energia(3, "2026-09-26 00:15:00", 20.25, 0.0),
+    ]
+    ambigua = [
+        t0 + timedelta(minutes=8)
+    ]  # no entra en la integral: queda entre las muestras 00:00 y 00:15  # no entra en la integral: la serie se interpola entre vecinas
+    filas, _ = rt.recalcular_energia(energia, muestras, "2026-09-26 00:00:00", "2026-09-25 00:00:00", ambiguas=ambigua)
+    marcas = {f["id"]: f["marca"] for f in filas}
+    assert marcas["2"] == "interpolada_ambigua"
+    assert marcas["1"] == "integrada"
