@@ -79,6 +79,13 @@ def roles_de_acceso_global(extra: str) -> frozenset[str]:
     return ROLES_ACCESO_GLOBAL | frozenset(r.strip() for r in extra.split(",") if r.strip())
 
 
+def puede_listar_usuarios(rol: str, listado_operador_habilitado: bool) -> bool:
+    """Quién puede listar las cuentas. `operador` solo si el flag está activo (api-dev, decisión 2026-10-30)."""
+    if rol in ("superadmin", "admin"):
+        return True
+    return rol == "operador" and listado_operador_habilitado
+
+
 class PoliticaAccesoPlantasService:
     """Decide a qué plantas accede un usuario y si puede cambiar la activa.
 

@@ -20,6 +20,10 @@ class RepositorioUsuariosPort(ABC):
     def obtener_por_id(self, usuario_id: str) -> UsuarioAuth | None:
         return None
 
+    def listar_todos(self) -> list[UsuarioAuth]:
+        """Todas las cuentas, de todas las organizaciones. Por defecto vacío (fail-closed)."""
+        return []
+
     @abstractmethod
     def guardar(self, usuario: UsuarioAuth) -> UsuarioAuth:
         pass
