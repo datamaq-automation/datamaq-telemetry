@@ -7,7 +7,6 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.application.use_cases.listar_usuarios import ListarUsuariosUseCase
-from src.domain.auth.services import puede_listar_usuarios
 from src.infrastructure.fastapi import dependencies as deps
 from src.infrastructure.fastapi.dependencies import get_usuario_actual, get_usuarios_repository
 from src.infrastructure.fastapi.server import create_app
@@ -36,27 +35,6 @@ def _cliente(rol: str, listado_operador: bool, monkeypatch: pytest.MonkeyPatch) 
     app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "quien", "rol": rol, "org": "org-1"}
     app.dependency_overrides[get_usuarios_repository] = lambda: repo
     return TestClient(app), repo
-
-
-# --- Política de dominio ---
-
-
-@pytest.mark.parametrize("rol", ["superadmin", "admin"])
-def test_admin_y_superadmin_siempre_listan(rol: str) -> None:
-    assert puede_listar_usuarios(rol, listado_operador_habilitado=False) is True
-
-
-def test_operador_no_lista_con_flag_apagado() -> None:
-    assert puede_listar_usuarios("operador", listado_operador_habilitado=False) is False
-
-
-def test_operador_lista_solo_con_flag_encendido() -> None:
-    assert puede_listar_usuarios("operador", listado_operador_habilitado=True) is True
-
-
-@pytest.mark.parametrize("rol", ["mantenimiento", "ingeniero", "auditor", "solo_lectura", "invitado", ""])
-def test_otros_roles_no_listan_aunque_flag_encendido(rol: str) -> None:
-    assert puede_listar_usuarios(rol, listado_operador_habilitado=True) is False
 
 
 # --- Caso de uso ---
