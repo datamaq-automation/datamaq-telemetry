@@ -730,6 +730,10 @@ def _formatear_resumen(resumen: dict[str, Any]) -> str:
     for k, v in resumen["control_energia"].items():
         if k != "validacion_dias":
             lineas.append(f"  {k}: {v}")
+    lineas.append("dias_fuera_5pct_energia:")
+    for d in resumen["control_energia"]["validacion_dias"]:
+        if d["fuera_5pct"]:
+            lineas.append(f"  {d}")
     lineas.append("control_post:")
     for k, v in resumen["control_post"].items():
         lineas.append(f"  {k}: {v}")
