@@ -3,7 +3,6 @@
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query, status
-from sqlalchemy.orm import Session
 
 from src.adapters.gateways.in_memory_documentacion_sge_repository import (
     InMemoryDocumentacionSgeRepository,
@@ -54,24 +53,19 @@ from src.domain.sge.ports import (
 )
 from src.domain.telemetria.ports import RepositorioOrganizacionesPort
 from src.infrastructure.fastapi.dependencies import (
-    get_db_session,
-    get_settings_dep,
-    get_telemetria_use_case,
     get_usuario_actual,
+)
+from src.infrastructure.fastapi.dependencies_sge import (
+    get_consultar_costo_estimado_use_case,
+    get_organizaciones_repository,
 )
 from src.infrastructure.fastapi.error_handler import manejar_error_http
 from src.infrastructure.fastapi.planta_ownership import resolver_planta_permitida
-from src.infrastructure.settings.config import Settings
-from src.infrastructure.sqlalchemy.mysql_repositories import MySQLTelemetriaRepository
-from src.infrastructure.yaml.repositories.organizaciones_repository import (
-    YamlOrganizacionesRepository,
-)
 
 _repositorio_sge_singleton: RepositorioDocumentacionSgePort = InMemoryDocumentacionSgeRepository()
 _repositorio_capacitaciones_singleton: RepositorioRegistroCapacitacionesSgePort = (
     InMemoryRegistroCapacitacionesSgeRepository()
 )
-_repositorio_organizaciones_singleton: RepositorioOrganizacionesPort = YamlOrganizacionesRepository()
 
 
 def get_documentacion_sge_repository() -> RepositorioDocumentacionSgePort:
@@ -80,10 +74,6 @@ def get_documentacion_sge_repository() -> RepositorioDocumentacionSgePort:
 
 def get_registro_capacitaciones_repository() -> RepositorioRegistroCapacitacionesSgePort:
     return _repositorio_capacitaciones_singleton
-
-
-def get_organizaciones_repository() -> RepositorioOrganizacionesPort:
-    return _repositorio_organizaciones_singleton
 
 
 def get_consultar_documentacion_sge_use_case(
@@ -152,24 +142,6 @@ def get_consultar_historico_facturas_use_case(
     ],
 ) -> ConsultarHistoricoFacturasUseCase:
     return ConsultarHistoricoFacturasUseCase(repo_organizaciones=repo_org)
-
-
-def get_consultar_costo_estimado_use_case(
-    db: Annotated[Session, Depends(get_db_session)],
-    repo_org: Annotated[
-        RepositorioOrganizacionesPort,
-        Depends(get_organizaciones_repository),
-    ],
-    settings: Annotated[
-        Settings,
-        Depends(get_settings_dep),
-    ],
-) -> ConsultarCostoEstimadoUseCase:
-    return ConsultarCostoEstimadoUseCase(
-        repo_organizaciones=repo_org,
-        repo_telemetria=MySQLTelemetriaRepository(db),
-        consultar_telemetria=get_telemetria_use_case(db, settings),
-    )
 
 
 router = APIRouter(
