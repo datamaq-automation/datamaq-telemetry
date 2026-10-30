@@ -45,7 +45,12 @@ from src.domain.auth.ports import (
     RepositorioUsuariosPort,
     ServicioEmailPort,
 )
-from src.domain.auth.services import HashContrasenaService, RateLimiterService, TokenRevocationService
+from src.domain.auth.services import (
+    HashContrasenaService,
+    RateLimiterService,
+    TokenRevocationService,
+    puede_listar_usuarios,
+)
 from src.domain.oauth.ports import OAuthRepositoryPort
 from src.domain.telemetria.ports import RepositorioDispositivosPort
 from src.infrastructure.auth.email_service import SmtpEmailService
@@ -484,6 +489,13 @@ def requiere_rol_superadmin(claims: Annotated[dict[str, Any], Depends(get_usuari
 
 def requiere_rol_admin(claims: Annotated[dict[str, Any], Depends(get_usuario_actual)]) -> dict[str, Any]:
     if claims.get("rol") not in ("admin", "superadmin"):
+        raise HTTPException(status_code=403, detail="forbidden")
+    return claims
+
+
+def requiere_listado_usuarios(claims: Annotated[dict[str, Any], Depends(get_usuario_actual)]) -> dict[str, Any]:
+    """Listado de cuentas (solo lectura). `operador` solo con LISTADO_USUARIOS_OPERADOR (issue #102)."""
+    if not puede_listar_usuarios(str(claims.get("rol", "")), get_settings().LISTADO_USUARIOS_OPERADOR):
         raise HTTPException(status_code=403, detail="forbidden")
     return claims
 
