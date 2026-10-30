@@ -1,4 +1,6 @@
-"""Casos de uso del cambio de contraseña autenticado con código OTP por email."""
+"""src/application/use_cases/cambio_contrasena.py.
+
+Casos de uso del cambio de contraseña autenticado con código OTP por email."""
 
 from collections.abc import Callable
 from dataclasses import dataclass

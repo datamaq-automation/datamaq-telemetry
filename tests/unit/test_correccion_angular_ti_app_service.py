@@ -1,4 +1,6 @@
-"""Pruebas de aplicación del cálculo de corrección angular por fase de TI (issue #63).
+"""tests/unit/test_correccion_angular_ti_app_service.py.
+
+Pruebas de aplicación del cálculo de corrección angular por fase de TI (issue #63).
 
 Verifican que el servicio devuelve candidatos sin elegir uno y que no depende de persistencia.
 """

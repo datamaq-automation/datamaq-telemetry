@@ -1,4 +1,6 @@
-"""Corrección angular de TI por fase, calculada desde V, I y P.
+"""src/domain/telemetria/servicios/correccion_angular_ti.py.
+
+Corrección angular de TI por fase, calculada desde V, I y P.
 
 Convención (spec ``trafo2-los-constituyentes-fases.md``, A2): ``correccion_angular_fases: "X:alfa"``
 rota el fasor de potencia en -alfa. Si el ángulo bruto de una fase es φ_bruto y la corrección es alfa,

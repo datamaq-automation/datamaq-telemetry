@@ -1,4 +1,6 @@
-"""Penalización reactiva EDELAP T5M12 con el régimen 1992 (tg phi <= 0,62 => 0; mayor => sin precio).
+"""tests/unit/test_penalizacion_reactiva_edelap.py.
+
+Penalización reactiva EDELAP T5M12 con el régimen 1992 (tg phi <= 0,62 => 0; mayor => sin precio).
 
 Fixtures reales (Tg. Fi. por bloque, punta/valle/resto, de la factura):
 - 2024-08 (EDELAP/2024-08.pdf, Nº 0020-01914132): 0,431 / 0,438 / 0,426 => sin cargo reactivo.

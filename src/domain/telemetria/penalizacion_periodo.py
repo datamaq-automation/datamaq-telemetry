@@ -1,4 +1,6 @@
-"""Penalización por período de facturación, solo para períodos con factura y tarifa verificadas.
+"""src/domain/telemetria/penalizacion_periodo.py.
+
+Penalización por período de facturación, solo para períodos con factura y tarifa verificadas.
 
 Regla (decisión del dueño 2026-10-14, brief de tarifas 1A/2A/3A): la cifra se expone por período
 de facturación, nunca por ventana de análisis. Demanda y tg phi salen de la factura de ese período,

@@ -1,3 +1,5 @@
+"""src/infrastructure/fastapi/error_handler.py."""
+
 import re
 from typing import Any, NoReturn
 

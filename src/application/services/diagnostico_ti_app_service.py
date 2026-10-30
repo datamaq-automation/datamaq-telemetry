@@ -1,4 +1,6 @@
-"""Application Service para ejecutar diagnóstico de TI (orquestador)."""
+"""src/application/services/diagnostico_ti_app_service.py.
+
+Application Service para ejecutar diagnóstico de TI (orquestador)."""
 
 from __future__ import annotations
 

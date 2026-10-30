@@ -1,4 +1,6 @@
-"""Repositorio SQLAlchemy de validaciones OTP y auditoría del cambio de contraseña."""
+"""src/infrastructure/sqlalchemy/repositories/cambio_contrasena_repository.py.
+
+Repositorio SQLAlchemy de validaciones OTP y auditoría del cambio de contraseña."""
 
 from datetime import datetime
 

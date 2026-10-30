@@ -1,3 +1,5 @@
+"""src/infrastructure/fastapi/routes/oauth_router.py."""
+
 import uuid
 from typing import Annotated, Any
 

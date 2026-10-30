@@ -1,4 +1,6 @@
-"""Penalización por período de facturación: solo períodos con factura y tarifa verificadas."""
+"""tests/unit/test_penalizacion_periodo.py.
+
+Penalización por período de facturación: solo períodos con factura y tarifa verificadas."""
 
 from decimal import Decimal
 

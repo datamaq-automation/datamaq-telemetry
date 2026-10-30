@@ -1,4 +1,6 @@
-"""Servicio de dominio para diagnóstico de orden de fases e inversión de TI."""
+"""src/domain/telemetria/servicios/diagnostico_ti.py.
+
+Servicio de dominio para diagnóstico de orden de fases e inversión de TI."""
 
 from __future__ import annotations
 

@@ -1,4 +1,6 @@
-"""Casos de uso del cambio de contraseña autenticado (spec: cambio-contrasena-validado).
+"""tests/unit/test_cambio_contrasena_casos_uso.py.
+
+Casos de uso del cambio de contraseña autenticado (spec: cambio-contrasena-validado).
 
 Fakes en memoria: el repositorio de validaciones, de usuarios y el email se simulan; la lógica
 de HMAC, política, límites y revocación de sesiones corre real.

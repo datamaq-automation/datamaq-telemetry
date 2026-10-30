@@ -1,4 +1,6 @@
-"""Penalización por exceso de potencia con tarifa de distribuidora verificada (Edesur T3 MT, 2025-07).
+"""tests/unit/test_tarifas_distribuidora.py.
+
+Penalización por exceso de potencia con tarifa de distribuidora verificada (Edesur T3 MT, 2025-07).
 
 Fixture: factura real "Cristal Avellaneda - EDESUR/2025-07.pdf", LSP A 9904-02469153 17.
 Renglones: Cap.Sum.Conv T3 848,40 kW = 3.521.212,94; adquirida 930,00 kW;
