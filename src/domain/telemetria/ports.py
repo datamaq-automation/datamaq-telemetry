@@ -3,6 +3,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from datetime import datetime
+from typing import Any
 
 from src.domain.sge.entities import FacturaDistribuidora
 from src.domain.telemetria.entities import (
@@ -351,4 +352,28 @@ class NotificadorAlertasPort(ABC):
         dispositivo: Dispositivo,
         destinatarios: list[str],
     ) -> bool:
+        pass
+
+
+class RepositorioAuditoriaCambiosTIPort(ABC):
+    """Lectura de la auditoría de cambios de configuración de TI (TC/TI).
+
+    Devuelve diccionarios planos, no entidades ni modelos ORM, para que la capa de aplicación
+    no dependa de la persistencia. Claves de cada registro: id, device_id, tipo_cambio,
+    valor_anterior, valor_nuevo, motivo, commit_git, usuario, timestamp.
+    """
+
+    @abstractmethod
+    def listar(
+        self,
+        dispositivo_id: str | None,
+        tipo_cambio: str | None,
+        desde: datetime | None,
+        hasta: datetime | None,
+    ) -> list[dict[str, Any]]:
+        pass
+
+    @abstractmethod
+    def obtener(self, cambio_id: int) -> dict[str, Any] | None:
+        """Registro completo, con la clave ``dispositivo`` (dict con alias, ubicación y config) o None."""
         pass
