@@ -63,6 +63,7 @@ CONFIGURACIONES: dict[str, dict[str, float]] = {
 TOLERANCIA = 0.02
 HUECO_MIN = 15.0
 MARGEN_SALTO_KWH = 0.5
+REINICIO_UTC = "2026-10-30 00:10:45"
 FORMATO_FECHA = "%Y-%m-%d %H:%M:%S"
 COLUMNAS_POTENCIA = [
     "active_power_r",
@@ -282,18 +283,27 @@ def muestras_desde_filas(procesadas: list[dict[str, Any]]) -> list[Muestra]:
         if item["estado"] not in ("aplicar", "ya_corregida"):
             continue
         fila: Fila = item["fila"]
-        config = str(item["config"]) if item["config"] else "R-60_S0"
-        cfg = CONFIGURACIONES[config]
-        pr_raw, qr_raw = deshacer(float(fila["active_power_r"]), float(fila["reactive_power_r"]), cfg["R"])
-        ps_raw, qs_raw = deshacer(float(fila["active_power_s"]), float(fila["reactive_power_s"]), cfg["S"])
-        nuevo = item["nuevo"] if item["nuevo"] is not None else recalcular_fila(fila, "R-60_S0")
+        t = datetime.strptime(str(fila["recorded_at"]), FORMATO_FECHA)
+        if item["estado"] == "ya_corregida":
+            # Ya está en R:-60,S:0 en producción: se integra el valor almacenado, sin volver a rotar.
+            p_corr = float(fila["active_power_r"]) + float(fila["active_power_s"])
+            q_corr = float(fila["reactive_power_r"]) + float(fila["reactive_power_s"])
+            pr_raw, qr_raw = deshacer(float(fila["active_power_r"]), float(fila["reactive_power_r"]), DESTINO["R"])
+            ps_raw, qs_raw = deshacer(float(fila["active_power_s"]), float(fila["reactive_power_s"]), DESTINO["S"])
+        else:
+            nuevo = item["nuevo"]
+            cfg = CONFIGURACIONES[str(item["config"])]
+            pr_raw, qr_raw = deshacer(float(fila["active_power_r"]), float(fila["reactive_power_r"]), cfg["R"])
+            ps_raw, qs_raw = deshacer(float(fila["active_power_s"]), float(fila["reactive_power_s"]), cfg["S"])
+            p_corr = float(nuevo["active_power_r"] or 0) + float(nuevo["active_power_s"] or 0)
+            q_corr = float(nuevo["reactive_power_r"] or 0) + float(nuevo["reactive_power_s"] or 0)
         salida.append(
             Muestra(
-                t=datetime.strptime(str(fila["recorded_at"]), FORMATO_FECHA),
+                t=t,
                 p_raw=pr_raw + ps_raw,
                 q_raw=qr_raw + qs_raw,
-                p_corr=float(nuevo["active_power_r"] or 0) + float(nuevo["active_power_s"] or 0),
-                q_corr=float(nuevo["reactive_power_r"] or 0) + float(nuevo["reactive_power_s"] or 0),
+                p_corr=p_corr,
+                q_corr=q_corr,
             )
         )
     salida.sort(key=lambda m: m.t)
@@ -366,6 +376,7 @@ def recalcular_energia(
     muestras: list[Muestra],
     desde: str,
     desde_energia: str,
+    ambiguas: list[datetime] | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Filas nuevas de telemetry_energy (anclaje al final) y controles de la serie."""
     if not muestras:
@@ -402,6 +413,8 @@ def recalcular_energia(
     c_p = e_p(t_primera) - float(primera_integrada["net_active_energy_kwh"] or 0)
     c_q = e_q(t_primera) - float(primera_integrada["net_reactive_energy_kvarh"] or 0)
 
+    tiempos = sorted(tiempos)
+    ambiguas_ord = sorted(ambiguas or [])
     filas_salida: list[dict[str, Any]] = []
     for e in filas:
         t = datetime.strptime(str(e["recorded_at"]), FORMATO_FECHA)
@@ -414,7 +427,20 @@ def recalcular_energia(
         else:
             nueva_p = e_p(t)
             nueva_q = e_q(t)
-            marca = "en_hueco" if any(a < t < b for a, b, _ in lista_huecos) else "integrada"
+            i_prev = bisect.bisect_right(tiempos, t) - 1
+            i_next = i_prev + 1
+            cruza_ambigua = (
+                i_next < len(tiempos)
+                and i_prev >= 0
+                and tiempos[i_prev] < t < tiempos[i_next]
+                and any(tiempos[i_prev] < a < tiempos[i_next] for a in ambiguas_ord)
+            )
+            if any(a < t < b for a, b, _ in lista_huecos):
+                marca = "en_hueco"
+            elif cruza_ambigua:
+                marca = "interpolada_ambigua"
+            else:
+                marca = "integrada"
         nueva_p = round(nueva_p, 3)
         nueva_q = round(nueva_q, 3)
         antes = {c: e[c] for c in COLUMNAS_ENERGIA}
@@ -754,7 +780,10 @@ def main(argv: list[str] | None = None) -> int:
         conteo[str(item["estado"])] = conteo.get(str(item["estado"]), 0) + 1
 
     muestras = muestras_desde_filas(procesadas)
-    filas_energia, controles = recalcular_energia(energia, muestras, args.desde, args.desde_energia)
+    ambiguas = [
+        datetime.strptime(str(i["fila"]["recorded_at"]), FORMATO_FECHA) for i in procesadas if i["estado"] == "ambigua"
+    ]
+    filas_energia, controles = recalcular_energia(energia, muestras, args.desde, args.desde_energia, ambiguas=ambiguas)
     filas_energia_sql = [f for f in filas_energia if f["cambia"]]
     if args.hasta is not None:
         filas_energia_sql = [f for f in filas_energia_sql if str(f["recorded_at"]) < args.hasta]
@@ -769,6 +798,8 @@ def main(argv: list[str] | None = None) -> int:
         "energia_filas_a_actualizar": len(filas_energia_sql),
         "energia_filas_pre_desplazadas": sum(1 for f in filas_energia if f["marca"] == "pre_desplazada"),
         "energia_en_hueco": sum(1 for f in filas_energia if f["marca"] == "en_hueco"),
+        "energia_interpoladas_por_ambigua": sum(1 for f in filas_energia if f["marca"] == "interpolada_ambigua"),
+        "energia_filas_posteriores_reinicio": sum(1 for f in filas_energia if str(f["recorded_at"]) >= REINICIO_UTC),
         "huecos_mayores_15min": [(str(a), str(b), m) for a, b, m in huecos(muestras)],
         "control_energia": controles,
         "control_post": control_post(procesadas),
