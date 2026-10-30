@@ -382,6 +382,7 @@ class ConsultarNodoUnifilarUseCase:
                     potencia_aparente_total_va=p.potencia_aparente_total_va,
                     factor_desplazamiento_total=p.factor_desplazamiento_total,
                     dispositivos_sin_dato=p.dispositivos_sin_dato,
+                    dispositivos_interpolados=p.dispositivos_interpolados,
                 )
                 for p in puntos
             ],
