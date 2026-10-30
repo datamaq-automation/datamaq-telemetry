@@ -34,7 +34,7 @@ class SolicitarRecuperacionContrasenaUseCase:
         repositorio_usuarios: RepositorioUsuariosPort,
         generador_token: GeneradorTokenPort,
         servicio_email: ServicioEmailPort,
-        frontend_url: str = "https://www.datamaq.com.ar",
+        frontend_url: str = "https://app.datamaq.com.ar",
         minutos_expiracion: int = 15,
         rate_limiter: RateLimiterService | None = None,
         max_solicitudes_usuario: int = 3,

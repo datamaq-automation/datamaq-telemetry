@@ -93,7 +93,7 @@ class Settings(BaseSettings):
     SMTP_TLS: bool = False
     SMTP_FROM: str = "no-reply@datamaq.com.ar"
 
-    FRONTEND_URL: str = "https://www.datamaq.com.ar"
+    FRONTEND_URL: str = "https://app.datamaq.com.ar"
     RECUPERACION_TOKEN_EXPIRA_MINUTOS: int = 15
 
     # Notificaciones de Alertas Críticas por Email
