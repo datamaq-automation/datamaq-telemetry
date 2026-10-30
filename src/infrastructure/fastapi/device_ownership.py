@@ -1,5 +1,6 @@
 """src/infrastructure/fastapi/device_ownership.py."""
 
+from collections.abc import Callable
 from typing import Annotated, Any
 
 from fastapi import Depends, HTTPException
@@ -171,3 +172,19 @@ def verificar_propiedad_evento_disponibilidad(
     organizacion_evento = _organizacion_de_dispositivo(db, maquina.dispositivo_id)
     if not debe_recibir_evento(False, claims.get("org"), organizacion_evento):
         raise HTTPException(status_code=404, detail="evento_no_encontrado")
+
+
+VerificadorPropiedad = Callable[[dict[str, Any], str], None]
+"""Chequeo de que un dispositivo pertenece a la organización del token, con la sesión ya ligada."""
+
+
+def crear_verificador_propiedad(db: Session) -> VerificadorPropiedad:
+    def _verificar(claims: dict[str, Any], dispositivo_id: str) -> None:
+        verificar_propiedad_dispositivo(claims=claims, db=db, dispositivo_id=dispositivo_id)
+
+    return _verificar
+
+
+def get_verificador_propiedad(db: Annotated[Session, Depends(get_db_session)]) -> VerificadorPropiedad:
+    """Dependencia FastAPI: los routers reciben el verificador sin tocar la sesión."""
+    return crear_verificador_propiedad(db)
