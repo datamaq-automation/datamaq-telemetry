@@ -4,22 +4,32 @@
 Decisión: decisions/2026-10-29_correccion-angular-trafo2-banco-fijo.md (D2 potencia
 instantánea y D3 energía). Issue: datamaq-automation/datamaq#92.
 
-Método: el medidor reporta P y Q enteros. Por eso el ángulo que se aplicó a cada fila se
-identifica deshaciendo cada configuración conocida y comprobando que el resultado sea
-entero (tolerancia 0,02). El signo de R no lo da el test (0° y 180° dan enteros), así que
-la configuración se decide con R y S juntos. Con el crudo recuperado se rota con
-R:-60,S:0 y se recalculan P, Q y FP de R y S, y los totales. V, I y la aparente por fase
-no cambian.
+Potencia instantánea. El medidor reporta P y Q enteros. Por eso el ángulo aplicado a cada
+fila se identifica deshaciendo cada configuración conocida y comprobando que el resultado
+sea entero (tolerancia 0,02). El signo de R no lo da el test (0° y 180° dan enteros), así
+que la configuración se decide con R y S juntos. Con el crudo recuperado se rota con
+R:-60,S:0 y se recalculan P, Q, FP y totales. V, I y la aparente por fase no cambian.
 
-La energía (telemetry_energy, source='acc') se reemplaza por el acumulado trapezoidal de
-la potencia corregida, con interpolación lineal en cada recorded_at. Los huecos de más de
-15 min se cruzan con trapecio y quedan marcados.
+Energía (telemetry_energy, source='acc'). Se ancla AL FINAL: el valor de cada fila es
+medidor(T) - ∫ corregida (fila → T), donde T es la última fila de la entrada. Así la
+última fila no cambia y la serie empalma con la siguiente lectura del medidor. Las filas
+anteriores al inicio del recálculo (17/09 a 25/09) conservan sus diferencias medidas y se
+desplazan una constante, c = E(primera fila integrada) - medidor(primera fila integrada),
+para empalmar sin salto con la primera fila integrada.
+
+Controles de energía: para cada par de filas integradas consecutivas se compara
+Δ de la serie con la integral trapezoidal independiente del intervalo (con la P corregida
+interpolada en los bordes). Se reporta el máximo |Δ - ∫|, y cuántos pares superan un
+margen de 0,5 kWh.
+
+Entrada: el respaldo .sql (solo INSERT de telemetry_instantaneous y telemetry_energy), o
+dos CSV/TSV exportados de producción con exportar_trafo2.sql (solo lectura).
 
 Nunca se conecta a una base. El SQL lo ejecuta DevOps.
 
 Uso:
   python3 scripts/recalcular_trafo2_banco.py --en-seco
-  python3 scripts/recalcular_trafo2_banco.py --generar-sql --desde 2026-09-26 --hasta 2026-10-06
+  python3 scripts/recalcular_trafo2_banco.py --generar-sql --instantanea-csv I.tsv --energia-csv E.tsv
 """
 
 from __future__ import annotations
@@ -39,6 +49,7 @@ from typing import Any
 RAIZ = Path(__file__).resolve().parents[1]
 
 DISPOSITIVO_ID = "c91713f1-0621-4a33-9279-c5327a317d96"
+DESDE_ENERGIA_DEFAULT = "2026-09-17 00:00:00"
 DESDE_DEFAULT = "2026-09-26 00:00:00"
 RESPALDO_DEFAULT = RAIZ / "tmp" / "2026-10-29" / "telemetry.sql"
 SALIDA_DEFAULT = RAIZ / "tmp" / "2026-10-29_issue-92"
@@ -51,6 +62,7 @@ CONFIGURACIONES: dict[str, dict[str, float]] = {
 }
 TOLERANCIA = 0.02
 HUECO_MIN = 15.0
+MARGEN_SALTO_KWH = 0.5
 FORMATO_FECHA = "%Y-%m-%d %H:%M:%S"
 COLUMNAS_POTENCIA = [
     "active_power_r",
@@ -78,7 +90,7 @@ Fila = dict[str, Any]
 
 
 def rotar(p: float, q: float, grados: float) -> tuple[float, float]:
-    """Misma convención que rotar_fase_fasorial: P' = P·cos a + Q·sin a; Q' = Q·cos a - P·sin a."""
+    """Misma convención que rotar_fase_fasorial: P' = P*cos a + Q*sin a; Q' = Q*cos a - P*sin a."""
     r = math.radians(grados)
     c, s = math.cos(r), math.sin(r)
     return p * c + q * s, q * c - p * s
@@ -120,6 +132,10 @@ def _redondear_fp(x: float | None) -> float | None:
     return None if x is None else round(x, 2)
 
 
+def _opcional(valor: Any) -> float | None:
+    return None if valor is None else float(valor)
+
+
 def recalcular_fila(fila: Fila, configuracion: str) -> dict[str, float | None]:
     """Valores nuevos de las columnas de potencia para una fila con configuración conocida."""
     cfg = CONFIGURACIONES[configuracion]
@@ -150,11 +166,7 @@ def recalcular_fila(fila: Fila, configuracion: str) -> dict[str, float | None]:
     }
 
 
-def _opcional(valor: Any) -> float | None:
-    return None if valor is None else float(valor)
-
-
-# --- Lectura del respaldo ---------------------------------------------------------------
+# --- Lectura: respaldo .sql o CSV/TSV exportados -----------------------------------------
 
 _TUPLA = re.compile(r"\(([^()]*)\)")
 
@@ -182,13 +194,13 @@ def leer_respaldo(ruta: Path) -> tuple[list[Fila], list[Fila]]:
                 columnas[tabla_actual].append(linea.split("`")[1])
                 continue
             if linea.startswith("INSERT INTO `telemetry_instantaneous`"):
-                instant.extend(_filas(linea, columnas["telemetry_instantaneous"], solo_acc=False))
+                instant.extend(_filas(linea, columnas["telemetry_instantaneous"]))
             elif linea.startswith("INSERT INTO `telemetry_energy`"):
-                energia.extend(_filas(linea, columnas["telemetry_energy"], solo_acc=True))
+                energia.extend(_filas(linea, columnas["telemetry_energy"]))
     return instant, energia
 
 
-def _filas(linea: str, columnas: list[str], solo_acc: bool) -> list[Fila]:
+def _filas(linea: str, columnas: list[str]) -> list[Fila]:
     salida: list[Fila] = []
     cuerpo = linea.split("VALUES", 1)[1]
     for m in _TUPLA.finditer(cuerpo):
@@ -196,23 +208,34 @@ def _filas(linea: str, columnas: list[str], solo_acc: bool) -> list[Fila]:
         if len(valores) != len(columnas):
             raise ValueError(f"fila con {len(valores)} valores, se esperaban {len(columnas)}")
         fila: Fila = {c: (None if v == "NULL" else v) for c, v in zip(columnas, valores, strict=True)}
-        if fila["device_id"] != DISPOSITIVO_ID:
-            continue
-        if solo_acc and fila.get("source") != "acc":
-            continue
-        salida.append(fila)
+        if fila["device_id"] == DISPOSITIVO_ID:
+            salida.append(fila)
     return salida
+
+
+def leer_tabla_exportada(ruta: Path) -> list[Fila]:
+    """CSV o TSV (salida de mysql --batch). Separador detectado por la cabecera."""
+    with ruta.open(encoding="utf-8", newline="") as f:
+        cabecera = f.readline()
+        separador = "\t" if "\t" in cabecera else ","
+        f.seek(0)
+        lector = csv.DictReader(f, delimiter=separador)
+        filas: list[Fila] = []
+        for registro in lector:
+            fila: Fila = {k: (None if v in (None, "", "NULL") else v) for k, v in registro.items()}
+            if fila.get("device_id") == DISPOSITIVO_ID:
+                filas.append(fila)
+    return filas
 
 
 # --- Potencia instantánea ----------------------------------------------------------------
 
 
-def procesar_instantanea(filas: list[Fila], desde: str, hasta: str | None) -> list[dict[str, Any]]:
-    """Clasifica cada fila y calcula los valores nuevos cuando la configuración es conocida."""
+def procesar_instantanea(filas: list[Fila], desde: str) -> list[dict[str, Any]]:
+    """Clasifica cada fila desde `desde` y calcula los valores nuevos cuando la configuración es conocida."""
     salida: list[dict[str, Any]] = []
     for fila in filas:
-        marca = str(fila["recorded_at"])
-        if marca < desde or (hasta is not None and marca >= hasta):
+        if str(fila["recorded_at"]) < desde:
             continue
         if any(fila[c] is None for c in ("active_power_r", "reactive_power_r", "active_power_s", "reactive_power_s")):
             salida.append({"fila": fila, "estado": "sin_datos", "config": None, "nuevo": None})
@@ -232,6 +255,12 @@ def procesar_instantanea(filas: list[Fila], desde: str, hasta: str | None) -> li
                 {"fila": fila, "estado": "aplicar", "config": config, "nuevo": recalcular_fila(fila, str(config))}
             )
     return salida
+
+
+def filtrar_hasta(items: list[dict[str, Any]], hasta: str | None) -> list[dict[str, Any]]:
+    if hasta is None:
+        return items
+    return [i for i in items if str(i["fila"]["recorded_at"]) < hasta]
 
 
 # --- Energía -----------------------------------------------------------------------------
@@ -276,21 +305,18 @@ def _horas(delta: timedelta) -> float:
 
 
 class Acumulado:
-    """Energía acumulada (kWh o kvarh) con ancla en el valor del medidor antes del tramo.
+    """Acumulado (kWh o kvarh) de una serie de muestras, con origen en la primera muestra.
 
     Entre muestras, trapecio. Dentro de un intervalo, interpolación lineal del acumulado.
-    Entre el ancla y la primera muestra, y después de la última, se mantiene el valor
-    de la muestra más cercana.
+    Antes de la primera muestra se extiende hacia atrás con el valor de la primera muestra;
+    después de la última, se mantiene el acumulado de la última.
     """
 
-    def __init__(self, t_ancla: datetime, ancla: float, tiempos: list[datetime], valores: list[float]):
-        if not tiempos:
-            raise ValueError("sin muestras para acumular")
-        self.t_ancla = t_ancla
-        self.ancla = ancla
+    def __init__(self, tiempos: list[datetime], valores: list[float]):
+        if len(tiempos) < 2:
+            raise ValueError("se necesitan al menos dos muestras para acumular")
         self.tiempos = tiempos
         self.valores = valores
-        self.pre = valores[0] * _horas(tiempos[0] - t_ancla) / 1000.0
         self.cum: list[float] = [0.0]
         for i in range(1, len(tiempos)):
             tramo = (valores[i - 1] + valores[i]) / 2.0 * _horas(tiempos[i] - tiempos[i - 1]) / 1000.0
@@ -298,12 +324,22 @@ class Acumulado:
 
     def en(self, t: datetime) -> float:
         if t <= self.tiempos[0]:
-            return self.ancla + self.valores[0] * _horas(t - self.t_ancla) / 1000.0
+            return -self.valores[0] * _horas(self.tiempos[0] - t) / 1000.0
         if t >= self.tiempos[-1]:
-            return self.ancla + self.pre + self.cum[-1]
+            return self.cum[-1]
         i = bisect.bisect_right(self.tiempos, t) - 1
         frac = _horas(t - self.tiempos[i]) / _horas(self.tiempos[i + 1] - self.tiempos[i])
-        return self.ancla + self.pre + self.cum[i] + (self.cum[i + 1] - self.cum[i]) * frac
+        return self.cum[i] + (self.cum[i + 1] - self.cum[i]) * frac
+
+    def valor_en(self, t: datetime) -> float:
+        """Valor de la serie (potencia) interpolado linealmente en t."""
+        if t <= self.tiempos[0]:
+            return self.valores[0]
+        if t >= self.tiempos[-1]:
+            return self.valores[-1]
+        i = bisect.bisect_right(self.tiempos, t) - 1
+        frac = _horas(t - self.tiempos[i]) / _horas(self.tiempos[i + 1] - self.tiempos[i])
+        return self.valores[i] + (self.valores[i + 1] - self.valores[i]) * frac
 
 
 def huecos(muestras: list[Muestra]) -> list[tuple[datetime, datetime, float]]:
@@ -315,76 +351,133 @@ def huecos(muestras: list[Muestra]) -> list[tuple[datetime, datetime, float]]:
     return salida
 
 
-def recalcular_energia(
-    energia: list[Fila], muestras: list[Muestra], desde: str, hasta: str | None
-) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    """Filas nuevas de telemetry_energy y validación con P cruda contra el medidor."""
-    previas = [e for e in energia if str(e["recorded_at"]) < desde]
-    if not previas:
-        raise ValueError("no hay fila de energía anterior a desde: no hay ancla")
-    ancla_fila = max(previas, key=lambda e: str(e["recorded_at"]))
-    t_ancla = datetime.strptime(str(ancla_fila["recorded_at"]), FORMATO_FECHA)
-    ancla_p = float(ancla_fila["net_active_energy_kwh"] or 0)
-    ancla_q = float(ancla_fila["net_reactive_energy_kvarh"] or 0)
+def _integral_independiente(
+    muestras_t: list[datetime], muestras_v: list[float], ta: datetime, tb: datetime, serie: Acumulado
+) -> float:
+    """Trapecio en [ta, tb] con los bordes interpolados y las muestras intermedias (kWh)."""
+    puntos: list[tuple[datetime, float]] = [(ta, serie.valor_en(ta))]
+    puntos += [(t, v) for t, v in zip(muestras_t, muestras_v, strict=True) if ta < t < tb]
+    puntos.append((tb, serie.valor_en(tb)))
+    return sum((pa[1] + pb[1]) / 2.0 * _horas(pb[0] - pa[0]) / 1000.0 for pa, pb in itertools.pairwise(puntos))
 
-    objetivo = [
-        e for e in energia if str(e["recorded_at"]) >= desde and (hasta is None or str(e["recorded_at"]) < hasta)
-    ]
-    objetivo.sort(key=lambda e: str(e["recorded_at"]))
+
+def recalcular_energia(
+    energia: list[Fila],
+    muestras: list[Muestra],
+    desde: str,
+    desde_energia: str,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Filas nuevas de telemetry_energy (anclaje al final) y controles de la serie."""
     if not muestras:
         raise ValueError("sin muestras instantáneas en la ventana")
+    filas = sorted(
+        (e for e in energia if str(e["recorded_at"]) >= desde_energia),
+        key=lambda e: str(e["recorded_at"]),
+    )
+    if not filas:
+        raise ValueError("sin filas de energía desde desde_energia")
+    fila_t = filas[-1]
+    t_final = datetime.strptime(str(fila_t["recorded_at"]), FORMATO_FECHA)
+    m_final_p = float(fila_t["net_active_energy_kwh"] or 0)
+    m_final_q = float(fila_t["net_reactive_energy_kvarh"] or 0)
 
     tiempos = [m.t for m in muestras]
-    acum_p = Acumulado(t_ancla, ancla_p, tiempos, [m.p_corr for m in muestras])
-    acum_q = Acumulado(t_ancla, ancla_q, tiempos, [m.q_corr for m in muestras])
-    acum_raw = Acumulado(t_ancla, 0.0, tiempos, [m.p_raw for m in muestras])
+    acum_p = Acumulado(tiempos, [m.p_corr for m in muestras])
+    acum_q = Acumulado(tiempos, [m.q_corr for m in muestras])
+    acum_raw = Acumulado(tiempos, [m.p_raw for m in muestras])
+    cum_p_final = acum_p.en(t_final)
+    cum_q_final = acum_q.en(t_final)
     lista_huecos = huecos(muestras)
 
-    filas: list[dict[str, Any]] = []
-    for e in objetivo:
+    def e_p(t: datetime) -> float:
+        return m_final_p + acum_p.en(t) - cum_p_final
+
+    def e_q(t: datetime) -> float:
+        return m_final_q + acum_q.en(t) - cum_q_final
+
+    t_desde = datetime.strptime(desde, FORMATO_FECHA)
+    integradas = [e for e in filas if str(e["recorded_at"]) >= desde]
+    primera_integrada = integradas[0]
+    t_primera = datetime.strptime(str(primera_integrada["recorded_at"]), FORMATO_FECHA)
+    c_p = e_p(t_primera) - float(primera_integrada["net_active_energy_kwh"] or 0)
+    c_q = e_q(t_primera) - float(primera_integrada["net_reactive_energy_kvarh"] or 0)
+
+    filas_salida: list[dict[str, Any]] = []
+    for e in filas:
         t = datetime.strptime(str(e["recorded_at"]), FORMATO_FECHA)
-        neta_p = round(acum_p.en(t), 3)
-        neta_q = round(acum_q.en(t), 3)
-        en_hueco = any(a < t < b for a, b, _ in lista_huecos)
-        filas.append(
+        medido_p = float(e["net_active_energy_kwh"] or 0)
+        medido_q = float(e["net_reactive_energy_kvarh"] or 0)
+        if t < t_desde:
+            nueva_p = medido_p + c_p
+            nueva_q = medido_q + c_q
+            marca = "pre_desplazada"
+        else:
+            nueva_p = e_p(t)
+            nueva_q = e_q(t)
+            marca = "en_hueco" if any(a < t < b for a, b, _ in lista_huecos) else "integrada"
+        nueva_p = round(nueva_p, 3)
+        nueva_q = round(nueva_q, 3)
+        antes = {c: e[c] for c in COLUMNAS_ENERGIA}
+        despues = {
+            "net_active_energy_kwh": nueva_p,
+            "imported_active_energy_kwh": nueva_p,
+            "net_reactive_energy_kvarh": nueva_q,
+            "imported_reactive_energy_kvarh": nueva_q,
+        }
+        filas_salida.append(
             {
                 "id": e["id"],
                 "recorded_at": e["recorded_at"],
-                "antes": {c: e[c] for c in COLUMNAS_ENERGIA},
-                "despues": {
-                    "net_active_energy_kwh": neta_p,
-                    "imported_active_energy_kwh": neta_p,
-                    "net_reactive_energy_kvarh": neta_q,
-                    "imported_reactive_energy_kvarh": neta_q,
-                },
-                "marca": "en_hueco" if en_hueco else "ok",
+                "antes": antes,
+                "despues": despues,
+                "marca": marca,
+                "cambia": any(abs(float(antes[c] or 0) - despues[c]) > 0.0005 for c in COLUMNAS_ENERGIA),
             }
         )
-    return filas, _validar_contra_medidor(objetivo, acum_raw)
 
-
-def _validar_contra_medidor(objetivo: list[Fila], acum_raw: Acumulado) -> dict[str, Any]:
-    """Cociente medidor / integral de P cruda: ventana completa y por día (|ΔE| ≥ 50 kWh)."""
-    if len(objetivo) < 2:
-        return {"ventana": None, "dias": []}
-    tiempos = [datetime.strptime(str(e["recorded_at"]), FORMATO_FECHA) for e in objetivo]
-    med = [float(e["net_active_energy_kwh"] or 0) for e in objetivo]
-    d_med = med[-1] - med[0]
-    d_raw = acum_raw.en(tiempos[-1]) - acum_raw.en(tiempos[0])
-    ventana = {
-        "dE_medidor": round(d_med, 2),
-        "integral_cruda": round(d_raw, 2),
-        "cociente": round(d_med / d_raw, 4) if d_raw else None,
+    controles = _controles(integradas, muestras, e_p, acum_p, acum_raw, filas, c_p, t_desde)
+    controles["c_desplazamiento_pre"] = round(c_p, 3)
+    controles["fila_final"] = {
+        "recorded_at": str(fila_t["recorded_at"]),
+        "medido_kwh": m_final_p,
+        "recalculado_kwh": round(e_p(t_final), 3),
     }
+    return filas_salida, controles
+
+
+def _controles(
+    integradas: list[Fila],
+    muestras: list[Muestra],
+    e_p: Any,
+    acum_p: Acumulado,
+    acum_raw: Acumulado,
+    filas: list[Fila],
+    c_p: float,
+    t_desde: datetime,
+) -> dict[str, Any]:
+    """Validación con P cruda contra el medidor, y control de saltos de la serie resultante."""
+    tiempos_int = [datetime.strptime(str(e["recorded_at"]), FORMATO_FECHA) for e in integradas]
+    med = [float(e["net_active_energy_kwh"] or 0) for e in integradas]
+
+    ventana: dict[str, Any] = {}
+    if len(integradas) >= 2:
+        d_med = med[-1] - med[0]
+        d_raw = acum_raw.en(tiempos_int[-1]) - acum_raw.en(tiempos_int[0])
+        ventana = {
+            "dE_medidor": round(d_med, 2),
+            "integral_cruda": round(d_raw, 2),
+            "cociente": round(d_med / d_raw, 4) if d_raw else None,
+        }
+
     ultimo_por_dia: dict[str, int] = {}
-    for i, t in enumerate(tiempos):
+    for i, t in enumerate(tiempos_int):
         ultimo_por_dia[t.strftime("%Y-%m-%d")] = i
     dias: list[dict[str, Any]] = []
     previo = 0
     for dia in sorted(ultimo_por_dia):
         idx = ultimo_por_dia[dia]
         d_m = med[idx] - med[previo]
-        d_r = acum_raw.en(tiempos[idx]) - acum_raw.en(tiempos[previo])
+        d_r = acum_raw.en(tiempos_int[idx]) - acum_raw.en(tiempos_int[previo])
         if abs(d_m) >= 50.0:
             cociente = d_m / d_r if d_r else None
             dias.append(
@@ -397,10 +490,57 @@ def _validar_contra_medidor(objetivo: list[Fila], acum_raw: Acumulado) -> dict[s
                 }
             )
         previo = idx
-    return {"ventana": ventana, "dias": dias}
+
+    # Saltos: Δ de la serie entre filas integradas consecutivas vs. integral independiente.
+    m_muestras_t = [m.t for m in muestras]
+    m_muestras_v = [m.p_corr for m in muestras]
+    max_dif = 0.0
+    max_dif_en = ""
+    superan = 0
+    for a, b in itertools.pairwise(range(len(integradas))):
+        ta, tb = tiempos_int[a], tiempos_int[b]
+        delta_serie = e_p(tb) - e_p(ta)
+        integral = _integral_independiente(m_muestras_t, m_muestras_v, ta, tb, acum_p)
+        dif = abs(delta_serie - integral / 1.0)
+        if dif > max_dif:
+            max_dif = dif
+            max_dif_en = f"{integradas[a]['recorded_at']} -> {integradas[b]['recorded_at']}"
+        if dif > MARGEN_SALTO_KWH:
+            superan += 1
+
+    # Empalme: entre la última fila desplazada y la primera integrada.
+    previas = [
+        e
+        for e in filas
+        if str(e["recorded_at"]) < str(integradas[0]["recorded_at"])
+        and datetime.strptime(str(e["recorded_at"]), FORMATO_FECHA) < t_desde
+    ]
+    empalme: dict[str, Any] = {}
+    if previas:
+        ult = previas[-1]
+        salto = (float(integradas[0]["net_active_energy_kwh"] or 0) + c_p) - (
+            float(ult["net_active_energy_kwh"] or 0) + c_p
+        )
+        empalme = {
+            "ultima_pre": str(ult["recorded_at"]),
+            "primera_integrada": str(integradas[0]["recorded_at"]),
+            "salto_kwh": round(salto, 3),
+        }
+
+    return {
+        "validacion_ventana": ventana,
+        "validacion_dias": dias,
+        "max_abs_dif_delta_vs_integral_kwh": round(max_dif, 4),
+        "max_abs_dif_en": max_dif_en,
+        "pares_sobre_margen": superan,
+        "margen_kwh": MARGEN_SALTO_KWH,
+        "empalme": empalme,
+    }
 
 
 # --- Estadística de control --------------------------------------------------------------
+
+UTC_LOCAL_HORA = UTC_LOCAL
 
 
 def _angulo(p: float, q: float) -> float:
@@ -421,7 +561,7 @@ def control_post(procesadas: list[dict[str, Any]]) -> dict[str, Any]:
         pr, qr = float(nuevo["active_power_r"]), float(nuevo["reactive_power_r"])
         ps, qs = float(nuevo["active_power_s"]), float(nuevo["reactive_power_s"])
         t_utc = datetime.strptime(str(item["fila"]["recorded_at"]), FORMATO_FECHA).replace(tzinfo=timezone.utc)
-        t_loc = t_utc.astimezone(UTC_LOCAL)
+        t_loc = t_utc.astimezone(UTC_LOCAL_HORA)
         if 1 <= t_loc.hour < 6 and abs(pr + ps) < 2000:
             banco_r.append(_angulo(pr, qr))
             banco_s.append(_angulo(ps, qs))
@@ -455,17 +595,21 @@ def _fraccion(valores: list[bool]) -> float | None:
 # --- SQL ---------------------------------------------------------------------------------
 
 
-def _literal(valor: Any, decimales: int) -> str:
-    """Literal numérico SQL. El valor viene del respaldo (string) o de un float."""
+def _literal(valor: Any) -> str:
+    """Literal numérico SQL a partir del texto del respaldo o de un float."""
     if valor is None:
         return "NULL"
     if isinstance(valor, str):
         return valor
-    return f"{valor:.{decimales}f}"
+    return f"{valor:.6f}"
 
 
-def _guarda(columna: str, valor: Any, decimales: int) -> str:
-    return f"{columna} <=> {_literal(valor, decimales)}"
+def _guarda(columna: str, valor: Any) -> str:
+    return f"{columna} <=> {_literal(valor)}"
+
+
+def _device_guarda() -> str:
+    return f"device_id = '{DISPOSITIVO_ID}'"
 
 
 def sql_instantanea(filas: list[dict[str, Any]], revertir: bool) -> str:
@@ -475,10 +619,11 @@ def sql_instantanea(filas: list[dict[str, Any]], revertir: bool) -> str:
         nuevo: dict[str, float | None] = item["nuevo"]
         origen: dict[str, Any] = nuevo if revertir else fila
         destino: dict[str, Any] = fila if revertir else nuevo
-        sets = [f"{c} = {_literal(_texto(destino[c]), 2)}" for c in COLUMNAS_POTENCIA]
-        guardas = [_guarda(c, _texto(origen[c]), 2) for c in COLUMNAS_POTENCIA]
+        sets = [f"{c} = {_literal(destino[c])}" for c in COLUMNAS_POTENCIA]
+        guardas = [_guarda(c, origen[c]) for c in COLUMNAS_POTENCIA]
         lineas.append(
-            f"UPDATE telemetry_instantaneous SET {', '.join(sets)} WHERE id = {fila['id']} AND {' AND '.join(guardas)};"
+            f"UPDATE telemetry_instantaneous SET {', '.join(sets)} "
+            f"WHERE id = {fila['id']} AND {_device_guarda()} AND {' AND '.join(guardas)};"
         )
     return "\n".join(lineas) + "\n"
 
@@ -488,21 +633,13 @@ def sql_energia(filas: list[dict[str, Any]], revertir: bool) -> str:
     for item in filas:
         origen: dict[str, Any] = item["despues"] if revertir else item["antes"]
         destino: dict[str, Any] = item["antes"] if revertir else item["despues"]
-        sets = [f"{c} = {_literal(_texto(destino[c]), 3)}" for c in COLUMNAS_ENERGIA]
-        guardas = [_guarda(c, _texto(origen[c]), 3) for c in COLUMNAS_ENERGIA]
+        sets = [f"{c} = {_literal(destino[c])}" for c in COLUMNAS_ENERGIA]
+        guardas = [_guarda(c, origen[c]) for c in COLUMNAS_ENERGIA]
         lineas.append(
-            f"UPDATE telemetry_energy SET {', '.join(sets)} WHERE id = {item['id']} AND {' AND '.join(guardas)};"
+            f"UPDATE telemetry_energy SET {', '.join(sets)} "
+            f"WHERE id = {item['id']} AND {_device_guarda()} AND {' AND '.join(guardas)};"
         )
     return "\n".join(lineas) + "\n"
-
-
-def _texto(valor: Any) -> str | None:
-    """Pasa a texto un valor de fila o de cálculo, sin redondear de más."""
-    if valor is None:
-        return None
-    if isinstance(valor, float):
-        return f"{valor:.6f}"
-    return str(valor)
 
 
 def envolver_transaccion(cuerpo: str, encabezado: str, esperadas: int) -> str:
@@ -538,54 +675,114 @@ def escribir_plan_instantanea(ruta: Path, filas: list[dict[str, Any]]) -> None:
 def escribir_plan_energia(ruta: Path, filas: list[dict[str, Any]]) -> None:
     with ruta.open("w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
-        cabecera = ["id", "recorded_at", "marca"]
+        cabecera = ["id", "recorded_at", "marca", "cambia"]
         for c in COLUMNAS_ENERGIA:
             cabecera += [f"{c}_antes", f"{c}_despues"]
         w.writerow(cabecera)
         for item in filas:
-            registro: list[Any] = [item["id"], item["recorded_at"], item["marca"]]
+            registro: list[Any] = [item["id"], item["recorded_at"], item["marca"], item["cambia"]]
             for c in COLUMNAS_ENERGIA:
                 registro += [item["antes"][c], item["despues"][c]]
             w.writerow(registro)
 
 
+def _ejemplos(procesadas: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    aplicar = [i for i in procesadas if i["estado"] == "aplicar"]
+    if not aplicar:
+        return []
+    indices = sorted({0, len(aplicar) // 4, len(aplicar) // 2, (3 * len(aplicar)) // 4, len(aplicar) - 1})
+    return [aplicar[i] for i in indices][:5]
+
+
 def _formatear_resumen(resumen: dict[str, Any]) -> str:
-    lineas = [f"{k}: {v}" for k, v in resumen.items() if k != "huecos_mayores_15min"]
+    lineas = [
+        f"{k}: {v}"
+        for k, v in resumen.items()
+        if k not in ("huecos_mayores_15min", "control_energia", "control_post", "ejemplos")
+    ]
+    lineas.append("control_energia:")
+    for k, v in resumen["control_energia"].items():
+        if k != "validacion_dias":
+            lineas.append(f"  {k}: {v}")
+    lineas.append("control_post:")
+    for k, v in resumen["control_post"].items():
+        lineas.append(f"  {k}: {v}")
     lineas.append("huecos_mayores_15min:")
     for a, b, m in resumen["huecos_mayores_15min"]:
         lineas.append(f"  {a} -> {b}: {m} min")
+    lineas.append("ejemplos_instantanea:")
+    for ej in resumen["ejemplos"]:
+        lineas.append(f"  {ej}")
     return "\n".join(lineas) + "\n"
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--respaldo", type=Path, default=RESPALDO_DEFAULT)
-    parser.add_argument("--desde", default=DESDE_DEFAULT, help="Fecha UTC inclusive, AAAA-MM-DD HH:MM:SS")
-    parser.add_argument("--hasta", default=None, help="Fecha UTC exclusiva, AAAA-MM-DD HH:MM:SS")
+    fuente = parser.add_argument_group("entrada (una de las dos)")
+    fuente.add_argument("--respaldo", type=Path, default=None, help="Respaldo .sql (por defecto el del 29/10)")
+    fuente.add_argument("--instantanea-csv", type=Path, default=None, help="Export de telemetry_instantaneous")
+    fuente.add_argument("--energia-csv", type=Path, default=None, help="Export de telemetry_energy")
+    parser.add_argument("--desde", default=DESDE_DEFAULT, help="Inicio del recálculo UTC, AAAA-MM-DD HH:MM:SS")
+    parser.add_argument("--desde-energia", default=DESDE_ENERGIA_DEFAULT, help="Primera fila de energía a tocar")
+    parser.add_argument("--hasta", default=None, help="Solo se generan SQL para filas anteriores a esta fecha UTC")
     parser.add_argument("--salida", type=Path, default=SALIDA_DEFAULT)
     modo = parser.add_mutually_exclusive_group(required=True)
     modo.add_argument("--en-seco", action="store_true", help="Solo plan, sin SQL")
     modo.add_argument("--generar-sql", action="store_true", help="Plan y SQL de aplicación y reversión")
     args = parser.parse_args(argv)
 
+    if args.respaldo is not None and (args.instantanea_csv or args.energia_csv):
+        parser.error("usar --respaldo o los CSV, no ambos")
     args.salida.mkdir(parents=True, exist_ok=True)
-    instant, energia = leer_respaldo(args.respaldo)
-    procesadas = procesar_instantanea(instant, args.desde, args.hasta)
+    if args.instantanea_csv or args.energia_csv:
+        if not (args.instantanea_csv and args.energia_csv):
+            parser.error("con CSV hay que dar --instantanea-csv y --energia-csv")
+        instant = leer_tabla_exportada(args.instantanea_csv)
+        energia = leer_tabla_exportada(args.energia_csv)
+        origen = f"{args.instantanea_csv} + {args.energia_csv}"
+    else:
+        ruta = args.respaldo or RESPALDO_DEFAULT
+        instant, energia = leer_respaldo(ruta)
+        origen = str(ruta)
+    energia = [e for e in energia if e.get("source", "acc") == "acc"]
+
+    procesadas = procesar_instantanea(instant, args.desde)
+    aplicar_todas = [i for i in procesadas if i["estado"] == "aplicar"]
+    aplicar = filtrar_hasta(aplicar_todas, args.hasta)
     conteo: dict[str, int] = {}
     for item in procesadas:
         conteo[str(item["estado"])] = conteo.get(str(item["estado"]), 0) + 1
-    aplicar = [i for i in procesadas if i["estado"] == "aplicar"]
 
     muestras = muestras_desde_filas(procesadas)
-    filas_energia, validacion = recalcular_energia(energia, muestras, args.desde, args.hasta)
+    filas_energia, controles = recalcular_energia(energia, muestras, args.desde, args.desde_energia)
+    filas_energia_sql = [f for f in filas_energia if f["cambia"]]
+    if args.hasta is not None:
+        filas_energia_sql = [f for f in filas_energia_sql if str(f["recorded_at"]) < args.hasta]
+
     resumen: dict[str, Any] = {
-        "instantaneas_en_ventana": len(procesadas),
+        "origen": origen,
+        "ancla": "final (ultima fila de la entrada)",
+        "instantaneas_desde": len(procesadas),
         "estados": conteo,
-        "energia_filas": len(filas_energia),
+        "instantanea_a_actualizar": len(aplicar),
+        "energia_filas_en_serie": len(filas_energia),
+        "energia_filas_a_actualizar": len(filas_energia_sql),
+        "energia_filas_pre_desplazadas": sum(1 for f in filas_energia if f["marca"] == "pre_desplazada"),
         "energia_en_hueco": sum(1 for f in filas_energia if f["marca"] == "en_hueco"),
         "huecos_mayores_15min": [(str(a), str(b), m) for a, b, m in huecos(muestras)],
-        "validacion_energia": validacion,
+        "control_energia": controles,
         "control_post": control_post(procesadas),
+        "ejemplos": [
+            {
+                "id": e["fila"]["id"],
+                "recorded_at": e["fila"]["recorded_at"],
+                "P_R": f"{e['fila']['active_power_r']} -> {e['nuevo']['active_power_r']}",
+                "P_S": f"{e['fila']['active_power_s']} -> {e['nuevo']['active_power_s']}",
+                "P_total": f"{e['fila']['total_active_power']} -> {e['nuevo']['total_active_power']}",
+                "FP_R": f"{e['fila']['power_factor_r']} -> {e['nuevo']['power_factor_r']}",
+            }
+            for e in _ejemplos(aplicar)
+        ],
     }
     escribir_plan_instantanea(args.salida / "plan_instantanea.csv", procesadas)
     escribir_plan_energia(args.salida / "plan_energia.csv", filas_energia)
@@ -604,14 +801,14 @@ def main(argv: list[str] | None = None) -> int:
                 len(aplicar),
             ),
             "aplicar_energia.sql": envolver_transaccion(
-                sql_energia(filas_energia, revertir=False),
-                "Recalculo energia Trafo 2 (medidor 369) desde potencia corregida (#92, D3)",
-                len(filas_energia),
+                sql_energia(filas_energia_sql, revertir=False),
+                "Recalculo energia Trafo 2 (medidor 369) anclado al final (#92, D3)",
+                len(filas_energia_sql),
             ),
             "revertir_energia.sql": envolver_transaccion(
-                sql_energia(filas_energia, revertir=True),
+                sql_energia(filas_energia_sql, revertir=True),
                 "Reversion del recalculo de energia (valores originales)",
-                len(filas_energia),
+                len(filas_energia_sql),
             ),
         }
         for nombre, contenido in escritos.items():
