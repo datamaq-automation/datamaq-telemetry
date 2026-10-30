@@ -1,4 +1,6 @@
-"""Tarifas de distribuidora con fuente y vigencia (decisions/2026-10-14_brief-tarifas-distribuidora.md).
+"""src/domain/telemetria/tarifas_distribuidora.py.
+
+Tarifas de distribuidora con fuente y vigencia (decisions/2026-10-14_brief-tarifas-distribuidora.md).
 
 Solo entra un valor que se pudo verificar contra la factura original. Lo que no está verificado
 no se carga: la búsqueda devuelve None y el cálculo no inventa una cifra.

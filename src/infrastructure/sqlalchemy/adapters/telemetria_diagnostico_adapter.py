@@ -1,4 +1,6 @@
-"""Adaptador SQLAlchemy que implementa RepositorioTelemetriaPort para diagnostico_ti_app_service."""
+"""src/infrastructure/sqlalchemy/adapters/telemetria_diagnostico_adapter.py.
+
+Adaptador SQLAlchemy que implementa RepositorioTelemetriaPort para diagnostico_ti_app_service."""
 
 from __future__ import annotations
 

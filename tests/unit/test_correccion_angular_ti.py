@@ -1,4 +1,6 @@
-"""Pruebas del cálculo de corrección angular por fase (issue datamaq#29).
+"""tests/unit/test_correccion_angular_ti.py.
+
+Pruebas del cálculo de corrección angular por fase (issue datamaq#29).
 
 Usa el fixture del quiebre del Trafo 2 (medidor 369) del 2026-10-06. El corte de la rotación
 vigente es el deploy ae8f46b, 2026-10-06 02:29:53 UTC: las filas de 02:25 son anteriores, las de

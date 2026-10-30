@@ -1,4 +1,6 @@
-"""Tests del recálculo del Trafo 2 con R:-60,S:0 (datamaq-automation/datamaq#92)."""
+"""tests/unit/test_recalcular_trafo2_banco.py.
+
+Tests del recálculo del Trafo 2 con R:-60,S:0 (datamaq-automation/datamaq#92)."""
 
 from datetime import datetime, timedelta
 

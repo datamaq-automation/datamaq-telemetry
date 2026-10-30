@@ -1,4 +1,6 @@
-"""Tests para EjecutarDiagnosticoTIApplicationService."""
+"""tests/application/services/test_diagnostico_ti_app_service.py.
+
+Tests para EjecutarDiagnosticoTIApplicationService."""
 
 from __future__ import annotations
 

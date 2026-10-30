@@ -1,3 +1,5 @@
+"""src/application/use_cases/asistente/recopilar_telemetria.py."""
+
 import logging
 
 from src.domain.asistente.value_objects import IntencionUsuario

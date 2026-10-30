@@ -1,4 +1,6 @@
-"""Application Service: candidatos de corrección angular por fase de TI (issue #63).
+"""src/application/services/correccion_angular_ti_app_service.py.
+
+Application Service: candidatos de corrección angular por fase de TI (issue #63).
 
 Orquesta el cálculo de dominio sobre dos mediciones de la misma fase bajo dos correcciones
 distintas. No persiste nada y no elige un candidato: esa elección requiere Q o verificación

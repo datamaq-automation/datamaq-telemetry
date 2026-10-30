@@ -1,4 +1,6 @@
-"""X-Request-ID debe poder leerse desde JavaScript en peticiones cross-origin.
+"""tests/unit/test_cors_request_id.py.
+
+X-Request-ID debe poder leerse desde JavaScript en peticiones cross-origin.
 
 El middleware ya emite el header en todas las respuestas; CORS solo lo expone si está
 en expose_headers. El frontend lo necesita para mostrar el id en los errores (app-datamaq#29).

@@ -1,4 +1,6 @@
-"""Repositorio SQLAlchemy de cambio de contraseña sobre SQLite en memoria."""
+"""tests/unit/test_repositorio_cambio_contrasena.py.
+
+Repositorio SQLAlchemy de cambio de contraseña sobre SQLite en memoria."""
 
 from datetime import datetime, timedelta, timezone
 

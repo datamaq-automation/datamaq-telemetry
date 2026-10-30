@@ -1,4 +1,6 @@
-"""Pruebas unitarias de CORS y emisión de cookies de sesión para el origen Cybersyn.
+"""tests/unit/test_cors_cybersyn.py.
+
+Pruebas unitarias de CORS y emisión de cookies de sesión para el origen Cybersyn.
 
 Verifica:
 1. Allow-list de CORS para https://cybersyn.com.ar y https://www.cybersyn.com.ar.

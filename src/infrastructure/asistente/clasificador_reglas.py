@@ -1,3 +1,5 @@
+"""src/infrastructure/asistente/clasificador_reglas.py."""
+
 import re
 import unicodedata
 from typing import ClassVar

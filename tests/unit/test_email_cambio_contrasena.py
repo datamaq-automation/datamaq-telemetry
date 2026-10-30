@@ -1,4 +1,6 @@
-"""Emails del cambio de contraseña: el código va en el cuerpo, nunca en logs ni se filtra la contraseña."""
+"""tests/unit/test_email_cambio_contrasena.py.
+
+Emails del cambio de contraseña: el código va en el cuerpo, nunca en logs ni se filtra la contraseña."""
 
 from datetime import datetime, timezone
 from unittest.mock import MagicMock

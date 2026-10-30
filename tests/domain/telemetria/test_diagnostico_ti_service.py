@@ -1,4 +1,6 @@
-"""Tests para DiagnosticoTIService (domain service)."""
+"""tests/domain/telemetria/test_diagnostico_ti_service.py.
+
+Tests para DiagnosticoTIService (domain service)."""
 
 from __future__ import annotations
 

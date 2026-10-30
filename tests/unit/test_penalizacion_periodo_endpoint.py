@@ -1,4 +1,6 @@
-"""Endpoint /analitica/penalizaciones/planta por período de facturación (sin ventana de telemetría)."""
+"""tests/unit/test_penalizacion_periodo_endpoint.py.
+
+Endpoint /analitica/penalizaciones/planta por período de facturación (sin ventana de telemetría)."""
 
 from datetime import datetime, timezone
 from unittest.mock import MagicMock
