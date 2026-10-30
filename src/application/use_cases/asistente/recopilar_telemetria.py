@@ -1,13 +1,19 @@
 """src/application/use_cases/asistente/recopilar_telemetria.py."""
 
 import logging
+from typing import TYPE_CHECKING, Any
 
 from src.domain.asistente.value_objects import IntencionUsuario
+
+if TYPE_CHECKING:
+    from src.application.dtos.telemetria_dto import TelemetriaLatestResponseDTO
+    from src.application.use_cases.consultar_telemetria import ConsultarTelemetriaUseCase
+    from src.application.use_cases.gestionar_dispositivos import GestionarDispositivosUseCase
 
 logger = logging.getLogger(__name__)
 
 
-def _construir_resumen_telemetria(lectura) -> dict:
+def _construir_resumen_telemetria(lectura: "TelemetriaLatestResponseDTO") -> dict[str, Any]:
     instantanea = lectura.instantanea
     energia = lectura.energia
     analitica = lectura.analitica
@@ -44,9 +50,9 @@ def _construir_resumen_telemetria(lectura) -> dict:
 def recopilar_telemetria(
     intencion: IntencionUsuario,
     organizacion_id: str,
-    gestor_dispositivos,
-    consultar_telemetria,
-) -> dict:
+    gestor_dispositivos: "GestionarDispositivosUseCase",
+    consultar_telemetria: "ConsultarTelemetriaUseCase | None",
+) -> dict[str, Any]:
     """Obtiene un resumen de telemetría de hasta 20 dispositivos."""
     if intencion != IntencionUsuario.RESUMEN_TELEMETRIA or consultar_telemetria is None:
         return {}

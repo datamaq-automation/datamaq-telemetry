@@ -6,6 +6,7 @@ from src.application.dtos.maquina_dto import (
     ListaMaquinasInferidaDTO,
     MaquinaInferidaDTO,
 )
+from src.domain.cargas.entities import Carga
 from src.domain.cargas.ports import RepositorioCargasPort
 from src.domain.cargas.value_objects import OrigenFirma
 
@@ -57,7 +58,7 @@ class ConsultarMaquinasInferidaUseCase:
         )
 
     @staticmethod
-    def _mapear_a_dto(carga) -> MaquinaInferidaDTO:
+    def _mapear_a_dto(carga: Carga) -> MaquinaInferidaDTO:
         """Mapea una Carga inferida a MaquinaInferidaDTO.
 
         Args:
