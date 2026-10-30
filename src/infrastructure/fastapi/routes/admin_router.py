@@ -5,13 +5,11 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import select
-from sqlalchemy.orm import Session
 
+from src.application.use_cases.consultar_auditoria_cambios_ti import ConsultarAuditoriaCambiosTIUseCase
 from src.domain.auth.entities import UsuarioAuth
 from src.infrastructure.fastapi.dependencies import get_usuario_actual, requiere_rol_admin
-from src.infrastructure.sqlalchemy.database import get_db_session
-from src.infrastructure.sqlalchemy.models import AuditoriaChangesTIModel
+from src.infrastructure.fastapi.dependencies_auditoria_ti import get_consultar_auditoria_cambios_ti
 
 
 class AuditoriaChangesTIResponseDTO(BaseModel):
@@ -51,27 +49,19 @@ router = APIRouter(prefix="/api/v1/admin", tags=["Administración"])
 )
 async def listar_cambios_ti(
     usuario_actual: Annotated[UsuarioAuth, Depends(get_usuario_actual)],
-    db: Annotated[Session, Depends(get_db_session)],
+    auditoria: Annotated[ConsultarAuditoriaCambiosTIUseCase, Depends(get_consultar_auditoria_cambios_ti)],
     dispositivo_id: str | None = Query(None, description="Filtrar por dispositivo_id"),
     tipo_cambio: str | None = Query(None, description="Filtrar por tipo_cambio"),
     desde: datetime | None = Query(None, description="Desde (ISO 8601)"),
     hasta: datetime | None = Query(None, description="Hasta (ISO 8601)"),
 ) -> AuditoriaChangesListResponseDTO:
     """Listar cambios de TI con filtros opcionales."""
-    query = select(AuditoriaChangesTIModel)
-
-    if dispositivo_id:
-        query = query.where(AuditoriaChangesTIModel.device_id == dispositivo_id)
-    if tipo_cambio:
-        query = query.where(AuditoriaChangesTIModel.tipo_cambio == tipo_cambio)
-    if desde:
-        query = query.where(AuditoriaChangesTIModel.timestamp >= desde)
-    if hasta:
-        query = query.where(AuditoriaChangesTIModel.timestamp <= hasta)
-
-    query = query.order_by(AuditoriaChangesTIModel.timestamp.desc())
-    registros = db.scalars(query).all()
-
+    registros = auditoria.listar(
+        dispositivo_id=dispositivo_id,
+        tipo_cambio=tipo_cambio,
+        desde=desde,
+        hasta=hasta,
+    )
     return AuditoriaChangesListResponseDTO(
         total=len(registros),
         registros=[AuditoriaChangesTIResponseDTO.model_validate(r) for r in registros],
@@ -88,31 +78,19 @@ async def listar_cambios_ti(
 async def detalle_cambio_ti(
     cambio_id: int,
     usuario_actual: Annotated[UsuarioAuth, Depends(get_usuario_actual)],
-    db: Annotated[Session, Depends(get_db_session)],
+    auditoria: Annotated[ConsultarAuditoriaCambiosTIUseCase, Depends(get_consultar_auditoria_cambios_ti)],
 ) -> AuditoriaChangesTIDetailDTO:
     """Obtener detalles completos de un cambio TI."""
-    cambio = db.query(AuditoriaChangesTIModel).filter(AuditoriaChangesTIModel.id == cambio_id).first()
-    if not cambio:
+    cambio = auditoria.detalle(cambio_id)
+    if cambio is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cambio no encontrado")
 
-    # Construir URL del commit
     commit_url = None
-    if cambio.commit_git:
-        commit_url = f"https://github.com/datamaq-automation/datamaq-data/commit/{cambio.commit_git}"
+    if cambio["commit_git"]:
+        commit_url = f"https://github.com/datamaq-automation/datamaq-data/commit/{cambio['commit_git']}"
 
     return AuditoriaChangesTIDetailDTO(
         **AuditoriaChangesTIResponseDTO.model_validate(cambio).model_dump(),
         commit_url=commit_url,
-        dispositivo_detalle={
-            "id": cambio.device_id,
-            "alias": cambio.device.name if cambio.device else None,
-            "ubicacion": cambio.device.tag_location if cambio.device else None,
-            "config_actual": {
-                "correccion_angular_fases": cambio.device.ct_phase_angle_offsets if cambio.device else None,
-                "fases_con_ti": cambio.device.phases_with_ct if cambio.device else None,
-                "invertido": bool(cambio.device.ct_inverted_phases) if cambio.device else False,
-            },
-        }
-        if cambio.device
-        else None,
+        dispositivo_detalle=cambio["dispositivo"],
     )
