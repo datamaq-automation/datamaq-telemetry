@@ -12,6 +12,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.application.dtos.carga_dto import CampanaResponseDTO, CargaResponseDTO, IntervaloActividadResponseDTO
+from src.application.use_cases.gestionar_acceso_plantas import GestionarAccesoPlantasUseCase
 from src.domain.cargas.value_objects import (
     CategoriaCarga,
     EstadoCampana,
@@ -19,7 +20,9 @@ from src.domain.cargas.value_objects import (
     PatronOperacion,
     TipoCampana,
 )
+from src.domain.telemetria.entities import Planta
 from src.infrastructure.fastapi import device_ownership
+from src.infrastructure.fastapi.auth_dependencies import get_acceso_plantas_use_case
 from src.infrastructure.fastapi.dependencies import (
     get_atribucion_use_case,
     get_caracterizacion_use_case,
@@ -114,12 +117,25 @@ def dos_organizaciones(monkeypatch):
     return SimpleNamespace(cargas=cargas, caracterizacion=caracterizacion, atribucion=atribucion)
 
 
+def _acceso_sin_asignaciones() -> GestionarAccesoPlantasUseCase:
+    """Sin filas en user_facility_access el usuario ve todas las plantas de su organización (#110)."""
+    repo_accesos = MagicMock()
+    repo_accesos.listar_por_usuario.return_value = []
+    repo_org = MagicMock()
+    repo_org.listar_plantas.return_value = [
+        Planta(id="planta-a", organizacion_id="org-a", nombre="Planta A"),
+        Planta(id="planta-b", organizacion_id="org-b", nombre="Planta B"),
+    ]
+    return GestionarAccesoPlantasUseCase(repo_accesos, repo_org)
+
+
 def _cliente(rol: str, org: str, mocks: SimpleNamespace) -> TestClient:
     app = create_app()
     app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "u-1", "rol": rol, "org": org}
     app.dependency_overrides[get_cargas_use_case] = lambda: mocks.cargas
     app.dependency_overrides[get_caracterizacion_use_case] = lambda: mocks.caracterizacion
     app.dependency_overrides[get_atribucion_use_case] = lambda: mocks.atribucion
+    app.dependency_overrides[get_acceso_plantas_use_case] = _acceso_sin_asignaciones
     app.dependency_overrides[get_db_session] = lambda: None
     return TestClient(app)
 

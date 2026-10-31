@@ -7,14 +7,18 @@ los endpoints (device_ownership), con el YAML de plantas simulado.
 
 from datetime import datetime, timezone
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
 
 from src.application.dtos.carga_dto import CargaResponseDTO
+from src.application.use_cases.gestionar_acceso_plantas import GestionarAccesoPlantasUseCase
 from src.domain.cargas.entities import NaturalezaElectrica, PatronOperacion
 from src.domain.cargas.value_objects import CategoriaCarga
+from src.domain.telemetria.entities import Planta
 from src.infrastructure.fastapi import device_ownership
+from src.infrastructure.fastapi.auth_dependencies import get_acceso_plantas_use_case
 from src.infrastructure.fastapi.dependencies import get_cargas_use_case, get_usuario_actual
 from src.infrastructure.fastapi.server import create_app
 from src.infrastructure.sqlalchemy.database import get_db_session
@@ -68,10 +72,23 @@ def dos_organizaciones(monkeypatch):
     return _UseCaseFalso([_carga("carga-a", "dispositivo-a"), _carga("carga-b", "dispositivo-b")])
 
 
+def _acceso_sin_asignaciones() -> GestionarAccesoPlantasUseCase:
+    """Sin filas en user_facility_access el usuario ve todas las plantas de su organización (#110)."""
+    repo_accesos = MagicMock()
+    repo_accesos.listar_por_usuario.return_value = []
+    repo_org = MagicMock()
+    repo_org.listar_plantas.return_value = [
+        Planta(id="planta-a", organizacion_id="org-a", nombre="Planta A"),
+        Planta(id="planta-b", organizacion_id="org-b", nombre="Planta B"),
+    ]
+    return GestionarAccesoPlantasUseCase(repo_accesos, repo_org)
+
+
 def _cliente(rol: str, org: str | None, use_case: _UseCaseFalso) -> TestClient:
     app = create_app()
     app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "u-1", "rol": rol, "org": org}
     app.dependency_overrides[get_cargas_use_case] = lambda: use_case
+    app.dependency_overrides[get_acceso_plantas_use_case] = _acceso_sin_asignaciones
     app.dependency_overrides[get_db_session] = lambda: None
     return TestClient(app)
 
