@@ -5,6 +5,7 @@ Una corrección es otra fila con otra `--vigencia-desde`: nunca se edita una fil
 vigente más reciente (ver `RepositorioParametrosRegulatoriosSqlAlchemy`).
 
 Aplicar en la base real es decisión del dueño y de DevOps. Los tests usan una base SQLite de prueba.
+No registra auditoría de cambios todavía (seguimiento: datamaq#112).
 """
 
 import argparse
