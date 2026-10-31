@@ -124,8 +124,8 @@ def _es_stdlib_o_interno(module_name: str) -> bool:
 def verify_architecture_layers(root_dir: Path | None = None, incluir_controladores: bool = True) -> list[str]:
     """Verifica el cumplimiento de la regla de dependencias entre capas.
 
-    `incluir_controladores` activa la regla de routers delgados (sin ORM). Es opcional porque hoy hay
-    routers que todavía importan SQLAlchemy; `scripts/verify_architecture.py` la omite para no romper CI.
+    `incluir_controladores` activa la regla de routers delgados (sin ORM). Está activa por defecto y el
+    gate la corre completa desde #95; el parámetro queda para poder desactivarla en pruebas puntuales.
     """
     root = root_dir or find_project_root()
     src_dir = root / "src"

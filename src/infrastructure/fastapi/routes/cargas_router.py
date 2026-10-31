@@ -3,9 +3,8 @@
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
 
 from src.application.dtos.carga_dto import (
     AnalisisConsumoResponseDTO,
@@ -36,9 +35,12 @@ from src.infrastructure.fastapi.dependencies import (
     get_usuario_actual,
     requiere_rol_escritura,
 )
-from src.infrastructure.fastapi.device_ownership import verificar_propiedad_dispositivo
+from src.infrastructure.fastapi.device_ownership import (
+    VerificadorPropiedadDispositivo,
+    get_verificador_propiedad_dispositivo,
+    verificar_propiedad_dispositivo,
+)
 from src.infrastructure.fastapi.error_handler import manejar_error_http
-from src.infrastructure.sqlalchemy.database import get_db_session
 
 router = APIRouter(
     prefix="/api/v1/cargas",
@@ -49,94 +51,85 @@ router = APIRouter(
 )
 
 
-def _pertenece_a_la_organizacion(claims: dict, db: Session, dispositivo_id: str) -> bool:
+def _pertenece_a_la_organizacion(verificador: VerificadorPropiedadDispositivo, dispositivo_id: str) -> bool:
     """Misma regla que el resto de los endpoints de dispositivo: superadmin y el acceso global pasan."""
-    try:
-        verificar_propiedad_dispositivo(claims=claims, db=db, dispositivo_id=dispositivo_id)
-    except HTTPException:
-        return False
-    return True
+    return verificador.pertenece(dispositivo_id)
 
 
-def _exigir_acceso_a_carga(claims: dict, db: Session, use_case: GestionarCargasUseCase, carga_id: str) -> None:
+def _exigir_acceso_a_carga(
+    verificador: VerificadorPropiedadDispositivo, use_case: GestionarCargasUseCase, carga_id: str
+) -> None:
     """Lee el dispositivo de la carga y exige que sea de la organización del token (404 si no lo es)."""
     try:
         dispositivo_id = use_case.obtener_carga(carga_id).dispositivo_id
     except Exception as e:
         manejar_error_http(e)
-    verificar_propiedad_dispositivo(claims=claims, db=db, dispositivo_id=dispositivo_id)
+    verificador.exigir(dispositivo_id)
 
 
 def verificar_acceso_a_carga(
     carga_id: str,
-    claims: Annotated[dict, Depends(get_usuario_actual)],
-    db: Annotated[Session, Depends(get_db_session)],
+    verificador: Annotated[VerificadorPropiedadDispositivo, Depends(get_verificador_propiedad_dispositivo)],
     use_case: Annotated[GestionarCargasUseCase, Depends(get_cargas_use_case)],
 ) -> None:
-    _exigir_acceso_a_carga(claims, db, use_case, carga_id)
+    _exigir_acceso_a_carga(verificador, use_case, carga_id)
 
 
 def verificar_acceso_a_intervalo(
     intervalo_id: int,
-    claims: Annotated[dict, Depends(get_usuario_actual)],
-    db: Annotated[Session, Depends(get_db_session)],
+    verificador: Annotated[VerificadorPropiedadDispositivo, Depends(get_verificador_propiedad_dispositivo)],
     use_case: Annotated[AtribuirConsumoUseCase, Depends(get_atribucion_use_case)],
 ) -> None:
     try:
         dispositivo_id = use_case.dispositivo_de_intervalo(intervalo_id)
     except Exception as e:
         manejar_error_http(e)
-    verificar_propiedad_dispositivo(claims=claims, db=db, dispositivo_id=dispositivo_id)
+    verificador.exigir(dispositivo_id)
 
 
 def verificar_alta_de_carga(
     dto: CargaCreateDTO,
-    claims: Annotated[dict, Depends(get_usuario_actual)],
-    db: Annotated[Session, Depends(get_db_session)],
+    verificador: Annotated[VerificadorPropiedadDispositivo, Depends(get_verificador_propiedad_dispositivo)],
 ) -> None:
-    verificar_propiedad_dispositivo(claims=claims, db=db, dispositivo_id=dto.dispositivo_id)
+    verificador.exigir(dto.dispositivo_id)
 
 
 def verificar_alta_de_campana(
     dto: CampanaCreateDTO,
-    claims: Annotated[dict, Depends(get_usuario_actual)],
-    db: Annotated[Session, Depends(get_db_session)],
+    verificador: Annotated[VerificadorPropiedadDispositivo, Depends(get_verificador_propiedad_dispositivo)],
     cargas: Annotated[GestionarCargasUseCase, Depends(get_cargas_use_case)],
 ) -> None:
-    verificar_propiedad_dispositivo(claims=claims, db=db, dispositivo_id=dto.dispositivo_id)
+    verificador.exigir(dto.dispositivo_id)
     if dto.carga_id is not None:
-        _exigir_acceso_a_carga(claims, db, cargas, dto.carga_id)
+        _exigir_acceso_a_carga(verificador, cargas, dto.carga_id)
 
 
 def verificar_correccion_de_intervalo(
     dto: CorregirIntervaloRequestDTO,
-    claims: Annotated[dict, Depends(get_usuario_actual)],
-    db: Annotated[Session, Depends(get_db_session)],
+    verificador: Annotated[VerificadorPropiedadDispositivo, Depends(get_verificador_propiedad_dispositivo)],
     cargas: Annotated[GestionarCargasUseCase, Depends(get_cargas_use_case)],
 ) -> None:
     # Reimputar a una carga ajena cambia también el medidor de la carga: se exige la misma organización (#42).
     if dto.carga_id is not None:
-        _exigir_acceso_a_carga(claims, db, cargas, dto.carga_id)
+        _exigir_acceso_a_carga(verificador, cargas, dto.carga_id)
 
 
 def verificar_acceso_a_campana(
     campana_id: str,
-    claims: Annotated[dict, Depends(get_usuario_actual)],
-    db: Annotated[Session, Depends(get_db_session)],
+    verificador: Annotated[VerificadorPropiedadDispositivo, Depends(get_verificador_propiedad_dispositivo)],
     use_case: Annotated[CaracterizarCargaUseCase, Depends(get_caracterizacion_use_case)],
 ) -> None:
     try:
         dispositivo_id = use_case.obtener(campana_id).dispositivo_id
     except Exception as e:
         manejar_error_http(e)
-    verificar_propiedad_dispositivo(claims=claims, db=db, dispositivo_id=dispositivo_id)
+    verificador.exigir(dispositivo_id)
 
 
 @router.get("", response_model=list[CargaResponseDTO])
 def listar_cargas(
     use_case: Annotated[GestionarCargasUseCase, Depends(get_cargas_use_case)],
-    claims: Annotated[dict, Depends(get_usuario_actual)],
-    db: Annotated[Session, Depends(get_db_session)],
+    verificador: Annotated[VerificadorPropiedadDispositivo, Depends(get_verificador_propiedad_dispositivo)],
     device_id: Annotated[str | None, Query(description="Filtrar por dispositivo (UUID o MAC).")] = None,
     solo_activas: bool = False,
 ):
@@ -151,7 +144,7 @@ def listar_cargas(
     resultado = []
     for carga in cargas:
         if carga.dispositivo_id not in permitidos:
-            permitidos[carga.dispositivo_id] = _pertenece_a_la_organizacion(claims, db, carga.dispositivo_id)
+            permitidos[carga.dispositivo_id] = _pertenece_a_la_organizacion(verificador, carga.dispositivo_id)
         if permitidos[carga.dispositivo_id]:
             resultado.append(carga)
     return resultado

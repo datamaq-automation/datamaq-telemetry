@@ -47,7 +47,7 @@ from src.domain.auth.ports import (
 )
 from src.domain.auth.services import HashContrasenaService, RateLimiterService, TokenRevocationService
 from src.domain.oauth.ports import OAuthRepositoryPort
-from src.domain.telemetria.ports import RepositorioDispositivosPort
+from src.domain.telemetria.ports import RepositorioDispositivosPort, RepositorioTelemetriaPort
 from src.infrastructure.auth.email_service import SmtpEmailService
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
 from src.infrastructure.fastapi.acceso_oauth import integracion_oauth_vigente
@@ -139,6 +139,13 @@ def get_telemetria_use_case(
         repo_suscripciones=MySQLSuscripcionesRepository(db),
         billing_habilitado=settings.BILLING_HABILITADO,
     )
+
+
+def get_repositorio_telemetria(
+    db: Annotated[Session, Depends(get_db_session)],
+) -> RepositorioTelemetriaPort:
+    """Repositorio de telemetría sobre la Session de la request (cacheada por get_db_session)."""
+    return MySQLTelemetriaRepository(db)
 
 
 def get_exportar_telemetria_use_case(
