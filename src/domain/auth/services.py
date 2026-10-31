@@ -133,7 +133,7 @@ class RateLimiterService:
 
     MAX_CLAVES: int = 10000
 
-    def __init__(self, max_intentos: int, ventana_segundos: int):
+    def __init__(self, max_intentos: int, ventana_segundos: int) -> None:
         self.max_intentos = max_intentos
         self.ventana_segundos = ventana_segundos
         self._intentos: dict[str, list[datetime]] = {}
@@ -181,7 +181,7 @@ class RateLimiterService:
 class TokenRevocationService:
     """Mantiene en memoria el registro de timestamps de revocación de sesiones por usuario."""
 
-    def __init__(self, ventana_retencion_segundos: int = 7200):
+    def __init__(self, ventana_retencion_segundos: int = 7200) -> None:
         self.ventana_retencion_segundos = ventana_retencion_segundos
         self._revocaciones: dict[str, int] = {}
 

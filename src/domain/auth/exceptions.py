@@ -4,7 +4,7 @@
 class DominioAuthException(Exception):
     """Excepción base del dominio de autenticación."""
 
-    def __init__(self, mensaje: str, usuario: str | None = None):
+    def __init__(self, mensaje: str, usuario: str | None = None) -> None:
         super().__init__(mensaje)
         self.mensaje = mensaje
         self.usuario = usuario
@@ -25,7 +25,7 @@ class UsuarioInactivoError(DominioAuthException):
 class DemasiadosIntentosError(DominioAuthException):
     """Lanzada cuando se excede el límite de intentos de inicio de sesión."""
 
-    def __init__(self, mensaje: str, usuario: str | None = None, retry_after_seg: int | None = None):
+    def __init__(self, mensaje: str, usuario: str | None = None, retry_after_seg: int | None = None) -> None:
         super().__init__(mensaje, usuario=usuario)
         self.retry_after_seg = retry_after_seg
 
