@@ -3,7 +3,6 @@
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query, status
-from sqlalchemy.orm import Session
 
 from src.adapters.gateways.in_memory_documentacion_sge_repository import (
     InMemoryDocumentacionSgeRepository,
@@ -45,6 +44,7 @@ from src.application.use_cases.consultar_documentacion_sge import (
 from src.application.use_cases.consultar_historico_facturas import (
     ConsultarHistoricoFacturasUseCase,
 )
+from src.application.use_cases.consultar_telemetria import ConsultarTelemetriaUseCase
 from src.application.use_cases.registrar_acuse_capacitacion import (
     RegistrarAcuseCapacitacionUseCase,
 )
@@ -52,17 +52,14 @@ from src.domain.sge.ports import (
     RepositorioDocumentacionSgePort,
     RepositorioRegistroCapacitacionesSgePort,
 )
-from src.domain.telemetria.ports import RepositorioOrganizacionesPort
+from src.domain.telemetria.ports import RepositorioOrganizacionesPort, RepositorioTelemetriaPort
 from src.infrastructure.fastapi.dependencies import (
-    get_db_session,
-    get_settings_dep,
+    get_repositorio_telemetria,
     get_telemetria_use_case,
     get_usuario_actual,
 )
 from src.infrastructure.fastapi.error_handler import manejar_error_http
 from src.infrastructure.fastapi.planta_ownership import resolver_planta_permitida
-from src.infrastructure.settings.config import Settings
-from src.infrastructure.sqlalchemy.mysql_repositories import MySQLTelemetriaRepository
 from src.infrastructure.yaml.repositories.organizaciones_repository import (
     YamlOrganizacionesRepository,
 )
@@ -155,20 +152,23 @@ def get_consultar_historico_facturas_use_case(
 
 
 def get_consultar_costo_estimado_use_case(
-    db: Annotated[Session, Depends(get_db_session)],
     repo_org: Annotated[
         RepositorioOrganizacionesPort,
         Depends(get_organizaciones_repository),
     ],
-    settings: Annotated[
-        Settings,
-        Depends(get_settings_dep),
+    repo_telemetria: Annotated[
+        RepositorioTelemetriaPort,
+        Depends(get_repositorio_telemetria),
+    ],
+    consultar_telemetria: Annotated[
+        ConsultarTelemetriaUseCase,
+        Depends(get_telemetria_use_case),
     ],
 ) -> ConsultarCostoEstimadoUseCase:
     return ConsultarCostoEstimadoUseCase(
         repo_organizaciones=repo_org,
-        repo_telemetria=MySQLTelemetriaRepository(db),
-        consultar_telemetria=get_telemetria_use_case(db, settings),
+        repo_telemetria=repo_telemetria,
+        consultar_telemetria=consultar_telemetria,
     )
 
 
