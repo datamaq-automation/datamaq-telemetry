@@ -96,16 +96,27 @@ def verificar_propiedad_dispositivo(
 class VerificadorPropiedadDispositivo:
     """Verificación de propiedad de dispositivo para llamadas imperativas desde un router.
 
-    No pasa acceso_plantas: las llamadas imperativas solo aplican el filtro de organización
-    (el Depends del router sí inyecta acceso_plantas para ids en ruta o query).
+    Aplica el mismo chequeo que el Depends de router de `verificar_propiedad_dispositivo`, incluida la
+    asignación por planta (user_facility_access, #110). Sin acceso_plantas solo aplica el filtro de organización.
     """
 
-    def __init__(self, claims: dict[str, Any], db: Session) -> None:
+    def __init__(
+        self,
+        claims: dict[str, Any],
+        db: Session,
+        acceso_plantas: GestionarAccesoPlantasUseCase | None = None,
+    ) -> None:
         self._claims = claims
         self._db = db
+        self._acceso_plantas = acceso_plantas
 
     def exigir(self, dispositivo_id: str | None) -> None:
-        verificar_propiedad_dispositivo(claims=self._claims, db=self._db, dispositivo_id=dispositivo_id)
+        verificar_propiedad_dispositivo(
+            claims=self._claims,
+            db=self._db,
+            acceso_plantas=self._acceso_plantas,
+            dispositivo_id=dispositivo_id,
+        )
 
     def pertenece(self, dispositivo_id: str | None) -> bool:
         try:
@@ -118,8 +129,9 @@ class VerificadorPropiedadDispositivo:
 def get_verificador_propiedad_dispositivo(
     claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
     db: Annotated[Session, Depends(get_db_session)],
+    acceso_plantas: Annotated[GestionarAccesoPlantasUseCase, Depends(get_acceso_plantas_use_case)],
 ) -> VerificadorPropiedadDispositivo:
-    return VerificadorPropiedadDispositivo(claims, db)
+    return VerificadorPropiedadDispositivo(claims, db, acceso_plantas)
 
 
 def verificar_propiedad_maquina(
