@@ -37,7 +37,7 @@ class GestionarDispositivosUseCase:
         repo_organizaciones: RepositorioOrganizacionesPort,
         repo_planes: RepositorioPlanesPort | None = None,
         repo_suscripciones: RepositorioSuscripcionesPort | None = None,
-    ):
+    ) -> None:
         self.repo_dispositivos = repo_dispositivos
         self.repo_organizaciones = repo_organizaciones
         self.repo_planes = repo_planes

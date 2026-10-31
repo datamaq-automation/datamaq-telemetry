@@ -24,7 +24,7 @@ class ConsultarAnaliticaPlantaUseCase:
         self,
         consultar_telemetria: ConsultarTelemetriaUseCase,
         repo_organizaciones: RepositorioOrganizacionesPort | None = None,
-    ):
+    ) -> None:
         """Args:
         consultar_telemetria: ConsultarTelemetriaUseCase para extraer histórico.
         repo_organizaciones: RepositorioOrganizacionesPort para resolver dispositivos de la planta.

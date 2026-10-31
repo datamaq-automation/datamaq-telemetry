@@ -64,7 +64,7 @@ class CoordenadasZona:
     ancho_porcentaje: float
     alto_porcentaje: float
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         for nombre, val in (
             ("x_porcentaje", self.x_porcentaje),
             ("y_porcentaje", self.y_porcentaje),
@@ -80,7 +80,7 @@ class PosicionLayout:
     x_porcentaje: float
     y_porcentaje: float
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         for nombre, val in (
             ("x_porcentaje", self.x_porcentaje),
             ("y_porcentaje", self.y_porcentaje),
@@ -93,7 +93,7 @@ class PosicionLayout:
 class MacAddress:
     valor: str
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         limpio = self.valor.replace(":", "").replace("-", "").upper()
         if not re.fullmatch(r"^[0-9A-F]{12}$", limpio):
             raise MacAddressInvalidaError(f"MAC address inválida: {self.valor}")
@@ -107,7 +107,7 @@ class MacAddress:
 class Tension:
     voltios: float
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.voltios < 0.0 or self.voltios > 1000.0:
             raise TensionInvalidaError(f"Tensión fuera de rango (0-1000V): {self.voltios}")
 
@@ -136,7 +136,7 @@ class PotenciaAparente:
 class FactorPotencia:
     valor: float
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.valor < -1.0 or self.valor > 1.0:
             raise FactorPotenciaInvalidoError(f"Factor de potencia fuera de [-1.0, 1.0]: {self.valor}")
 

@@ -22,7 +22,7 @@ class GestionarAccesoPlantasUseCase:
         repo_organizaciones: RepositorioOrganizacionesPort,
         repo_usuarios: RepositorioUsuariosPort | None = None,
         roles_globales: frozenset[str] = ROLES_ACCESO_GLOBAL,
-    ):
+    ) -> None:
         self.repo_accesos = repo_accesos
         self.repo_organizaciones = repo_organizaciones
         self.repo_usuarios = repo_usuarios

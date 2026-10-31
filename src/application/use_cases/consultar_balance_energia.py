@@ -10,7 +10,7 @@ from src.domain.telemetria.ports import RepositorioOrganizacionesPort
 
 
 class ConsultarBalanceEnergiaUseCase:
-    def __init__(self, repo_organizaciones: RepositorioOrganizacionesPort):
+    def __init__(self, repo_organizaciones: RepositorioOrganizacionesPort) -> None:
         self._repo_org = repo_organizaciones
 
     def ejecutar(

@@ -139,7 +139,7 @@ class FiltroDeduplicacionService:
     ventana temporal configurada. Thread-safe vía un ``threading.Lock`` interno.
     """
 
-    def __init__(self, ventana_segundos: int = 120):
+    def __init__(self, ventana_segundos: int = 120) -> None:
         self._ventana_segundos = ventana_segundos
         self._vistos: dict[str, datetime] = {}
         self._lock = threading.Lock()

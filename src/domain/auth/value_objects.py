@@ -12,7 +12,7 @@ _EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
 class NombreUsuario:
     valor: str
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         limpio = self.valor.strip().lower()
         if not limpio:
             raise NombreUsuarioInvalidoError("El nombre de usuario no puede estar vacío.")

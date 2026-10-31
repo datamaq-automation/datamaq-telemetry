@@ -16,7 +16,7 @@ class FiltroPersistenciaTemporalService:
     Thread-safe vía `threading.Lock`.
     """
 
-    def __init__(self, min_lecturas: int = 2, min_segundos: float = 3.0):
+    def __init__(self, min_lecturas: int = 2, min_segundos: float = 3.0) -> None:
         self._min_lecturas = min_lecturas
         self._min_segundos = min_segundos
         self._estados: dict[str, dict[str, Any]] = {}

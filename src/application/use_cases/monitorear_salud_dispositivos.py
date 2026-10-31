@@ -42,7 +42,7 @@ class MonitorearSaludDispositivosUseCase:
         logger: LoggerPort | None = None,
         regla: ReglaAlertaConectividad | None = None,
         generar_alerta: bool = True,
-    ):
+    ) -> None:
         """`generar_alerta=False` solo marca OFFLINE, sin abrir la alerta PÉRDIDA_COMUNICACIÓN (#19: su texto y su
         activación los decide el dueño; en producción la controla DISPOSITIVO_OFFLINE_ALERTA_HABILITADA)."""
         self._repo_dispositivos = repo_dispositivos

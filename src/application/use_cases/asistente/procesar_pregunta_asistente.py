@@ -54,7 +54,7 @@ class ProcesarPreguntaAsistenteUseCase:
         gestor_alertas: GestionarAlertasUseCase,
         gestor_dispositivos: GestionarDispositivosUseCase,
         consultar_telemetria: ConsultarTelemetriaUseCase | None = None,
-    ):
+    ) -> None:
         self._clasificador = clasificador
         self._generador = generador
         self._repo_conversaciones = repo_conversaciones

@@ -14,7 +14,7 @@ class ExportarTelemetriaUseCase:
         self,
         repo_telemetria: RepositorioTelemetriaPort,
         repo_dispositivos: RepositorioDispositivosPort | None = None,
-    ):
+    ) -> None:
         self.repo_telemetria = repo_telemetria
         self.repo_dispositivos = repo_dispositivos
 

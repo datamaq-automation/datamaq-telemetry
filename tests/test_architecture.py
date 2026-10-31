@@ -295,15 +295,16 @@ def verify_type_annotations(root_dir: Path | None = None) -> list[str]:
                 for node in ast.walk(tree):
                     if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                         func_name = node.name
-                        # Ignorar métodos mágicos especiales excepto __init__
-                        if func_name.startswith("__") and func_name.endswith("__") and func_name != "__init__":
-                            continue
 
-                        # 1. Verificar retorno tipado (excepto __init__)
-                        if func_name != "__init__" and node.returns is None:
+                        # 1. Verificar retorno tipado en TODA función, incluidos __init__ y dunders (SRS batería 6, #95)
+                        if node.returns is None:
                             errors.append(
                                 f"[FALTA TYPE HINT RETORNO] {rel_path}:{node.lineno} la función '{func_name}' no especifica tipo de retorno ('-> Type')."
                             )
+
+                        # Los dunders distintos de __init__ no se exigen en parámetros
+                        if func_name.startswith("__") and func_name.endswith("__") and func_name != "__init__":
+                            continue
 
                         # 2. Verificar argumentos tipados (excepto self y cls)
                         for arg in node.args.args:
@@ -566,6 +567,27 @@ def test_all_functions_have_type_annotations():
     assert not errors, f"\n❌ Se detectaron {len(errors)} funciones sin tipado estricto:\n\n" + "\n".join(
         f"  • {err}" for err in errors
     )
+
+
+def test_init_y_post_init_sin_retorno_se_rechazan(tmp_path: Path):
+    """La exención de retorno de __init__ y de los dunder se eliminó (#95): sin '-> None' es violación."""
+    dominio = tmp_path / "src" / "domain" / "x"
+    dominio.mkdir(parents=True)
+    (dominio / "sin_retorno.py").write_text(
+        "class A:\n    def __init__(self, nombre: str):\n        self.nombre = nombre\n"
+        "\n\nclass B:\n    def __post_init__(self):\n        pass\n",
+        encoding="utf-8",
+    )
+    (dominio / "con_retorno.py").write_text(
+        "class C:\n    def __init__(self, nombre: str) -> None:\n        self.nombre = nombre\n",
+        encoding="utf-8",
+    )
+
+    errors = verify_type_annotations(tmp_path)
+
+    assert any("sin_retorno.py" in err and "'__init__'" in err for err in errors), errors
+    assert any("sin_retorno.py" in err and "'__post_init__'" in err for err in errors), errors
+    assert not any("con_retorno.py" in err for err in errors), errors
 
 
 def test_no_hardcoded_secrets():

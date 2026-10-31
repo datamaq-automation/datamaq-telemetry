@@ -17,7 +17,7 @@ class GenerarCheckoutSuscripcionUseCase:
         repo_organizaciones: RepositorioOrganizacionesPort,
         proveedor_pagos: ProveedorPagosPort,
         back_url: str,
-    ):
+    ) -> None:
         self.repo_planes = repo_planes
         self.repo_organizaciones = repo_organizaciones
         self.proveedor_pagos = proveedor_pagos

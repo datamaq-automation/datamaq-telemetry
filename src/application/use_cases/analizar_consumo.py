@@ -43,7 +43,7 @@ class AnalizarConsumoUseCase:
 
     MULTIPLO_MINIMO_DETECTABLE = 2.0
 
-    def __init__(self, repo_serie: RepositorioSeriePotenciaPort):
+    def __init__(self, repo_serie: RepositorioSeriePotenciaPort) -> None:
         self.repo_serie = repo_serie
 
     @staticmethod

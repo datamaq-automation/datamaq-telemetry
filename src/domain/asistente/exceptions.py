@@ -4,7 +4,7 @@
 class DominioAsistenteException(Exception):
     """Excepción base del dominio del asistente conversacional."""
 
-    def __init__(self, mensaje: str):
+    def __init__(self, mensaje: str) -> None:
         self.mensaje = mensaje
         super().__init__(mensaje)
 

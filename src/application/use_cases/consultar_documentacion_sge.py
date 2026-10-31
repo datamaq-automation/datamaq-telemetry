@@ -16,7 +16,7 @@ ROLES_PREVIEW_PERMITIDOS: frozenset[str] = frozenset(
 class ConsultarDocumentacionSgeUseCase:
     """Caso de uso para consultar artículos y procedimientos operativos del SGE ISO 50001."""
 
-    def __init__(self, repositorio: RepositorioDocumentacionSgePort):
+    def __init__(self, repositorio: RepositorioDocumentacionSgePort) -> None:
         self._repo = repositorio
 
     def ejecutar(

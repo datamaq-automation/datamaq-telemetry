@@ -23,7 +23,7 @@ class MonitorearPotenciaYAlarmaUseCase:
         repo_organizaciones: RepositorioOrganizacionesPort,
         buffer_telemetria: BufferTelemetriaEnVivoPort,
         publisher: PublicadorAlarmaPort | None = None,
-    ):
+    ) -> None:
         """Si ``publisher`` es None, la evaluación es de solo lectura: no publica nada."""
         self._repo_org = repo_organizaciones
         self._buffer = buffer_telemetria

@@ -45,7 +45,7 @@ class SolicitarCambioContrasenaUseCase:
         clave_otp: str,
         codigo_service: type[GeneradorCodigoOTP] = GeneradorCodigoOTP,
         ahora: Callable[[], datetime] = _ahora_utc,
-    ):
+    ) -> None:
         self.repo = repo
         self.usuarios = usuarios
         self.hash_service = hash_service
@@ -111,7 +111,7 @@ class ConfirmarCambioContrasenaUseCase:
         clave_otp: str,
         codigo_service: type[GeneradorCodigoOTP] = GeneradorCodigoOTP,
         ahora: Callable[[], datetime] = _ahora_utc,
-    ):
+    ) -> None:
         self.repo = repo
         self.usuarios = usuarios
         self.hash_service = hash_service

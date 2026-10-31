@@ -56,7 +56,7 @@ class ConsultarTelemetriaUseCase:
         buffer_en_vivo: BufferTelemetriaEnVivoPort | None = None,
         repo_suscripciones: RepositorioSuscripcionesPort | None = None,
         billing_habilitado: bool = True,
-    ):
+    ) -> None:
         self.repo_telemetria = repo_telemetria
         self.repo_dispositivos = repo_dispositivos
         self.repo_organizaciones = repo_organizaciones

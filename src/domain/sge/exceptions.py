@@ -4,7 +4,7 @@
 class DominioSgeException(Exception):
     """Excepción base del dominio SGE ISO 50001."""
 
-    def __init__(self, mensaje: str):
+    def __init__(self, mensaje: str) -> None:
         self.mensaje = mensaje
         super().__init__(mensaje)
 

@@ -19,7 +19,7 @@ class GestionarSuscripcionesUseCase:
     """Ventana entre el vencimiento y la baja efectiva a modo_free (rango acordado: 5-7 días),
     para dar margen a los reintentos automáticos de cobro del proveedor de pagos."""
 
-    def __init__(self, repo_suscripciones: RepositorioSuscripcionesPort, repo_planes: RepositorioPlanesPort):
+    def __init__(self, repo_suscripciones: RepositorioSuscripcionesPort, repo_planes: RepositorioPlanesPort) -> None:
         self.repo_suscripciones = repo_suscripciones
         self.repo_planes = repo_planes
 
