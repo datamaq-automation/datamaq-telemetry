@@ -103,5 +103,9 @@ def manejar_404(request: Request, exc: Exception) -> JSONResponse:
         if client_ip:
             extra["ip"] = client_ip
 
-        logger.warning(evento, **extra)
+        # ruta_no_encontrada es un 404 de cliente (ruido normal): INFO. La sonda sigue en WARNING.
+        if es_sonda:
+            logger.warning(evento, **extra)
+        else:
+            logger.info(evento, **extra)
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail}, headers=exc.headers)
