@@ -113,6 +113,10 @@ jobs:
         if: steps.changes.outputs.is_config_only != 'true'
         run: pytest tests/test_empty_inits.py -q
 
+      - name: "Arquitectura (test_architecture: capas, routers delgados, tipado)"
+        if: steps.changes.outputs.is_config_only != 'true'
+        run: pytest tests/test_architecture.py -q
+
       - name: Estilo (ruff check)
         if: steps.changes.outputs.is_config_only != 'true'
         run: ruff check .

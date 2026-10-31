@@ -28,6 +28,7 @@ pytest tests/integration -n auto -q
 
 echo "==> [6/6] Reglas de Arquitectura y Tamaño de Código"
 python scripts/verify_architecture.py
+pytest tests/test_architecture.py -q
 python scripts/verify_code_size.py
 
 echo "Gauntlet superado."
