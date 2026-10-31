@@ -35,6 +35,10 @@ class MySQLUsuariosRepository(RepositorioUsuariosPort):
         model = self.db.query(UserModel).filter(UserModel.id == usuario_id).first()
         return self._to_entity(model) if model else None
 
+    def listar_todos(self) -> list[UsuarioAuth]:
+        modelos = self.db.query(UserModel).order_by(UserModel.username).all()
+        return [self._to_entity(m) for m in modelos]
+
     def guardar(self, usuario: UsuarioAuth) -> UsuarioAuth:
         model = self.db.query(UserModel).filter(UserModel.id == usuario.id).first()
         if not model:
