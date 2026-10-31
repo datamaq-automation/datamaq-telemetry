@@ -94,6 +94,6 @@ def test_error_handler_404_registra_ip_real_sin_spoofing(monkeypatch):
     exc = StarletteHTTPException(status_code=404, detail="Not Found")
     manejar_404(request, exc)
 
-    assert mock_logger.warning.called
-    kwargs = mock_logger.warning.call_args[1]
+    assert mock_logger.info.called
+    kwargs = mock_logger.info.call_args[1]
     assert kwargs.get("ip") == "203.0.113.9"
