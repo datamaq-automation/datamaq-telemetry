@@ -127,7 +127,7 @@ class ConsultarAnaliticaPlantaUseCase:
             banco_sugerido = None
             escalones = []
             razon_no_recomendacion = "Sobrecompensación reactiva sostenida (régimen capacitivo)"
-        elif fp_prom is not None and fp_prom > 0.95:
+        elif fp_prom is not None and fp_prom > _FP_LIMITE_PENALIZACION:
             banco_sugerido = None
             escalones = []
             razon_no_recomendacion = "Factor de potencia superior a 0.95 (sin penalización ENRE)"
