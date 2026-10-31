@@ -93,6 +93,35 @@ def verificar_propiedad_dispositivo(
             raise HTTPException(status_code=404, detail="dispositivo_no_encontrado") from err
 
 
+class VerificadorPropiedadDispositivo:
+    """Verificación de propiedad de dispositivo para llamadas imperativas desde un router.
+
+    No pasa acceso_plantas: las llamadas imperativas solo aplican el filtro de organización
+    (el Depends del router sí inyecta acceso_plantas para ids en ruta o query).
+    """
+
+    def __init__(self, claims: dict[str, Any], db: Session) -> None:
+        self._claims = claims
+        self._db = db
+
+    def exigir(self, dispositivo_id: str | None) -> None:
+        verificar_propiedad_dispositivo(claims=self._claims, db=self._db, dispositivo_id=dispositivo_id)
+
+    def pertenece(self, dispositivo_id: str | None) -> bool:
+        try:
+            self.exigir(dispositivo_id)
+        except HTTPException:
+            return False
+        return True
+
+
+def get_verificador_propiedad_dispositivo(
+    claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
+    db: Annotated[Session, Depends(get_db_session)],
+) -> VerificadorPropiedadDispositivo:
+    return VerificadorPropiedadDispositivo(claims, db)
+
+
 def verificar_propiedad_maquina(
     claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
     db: Annotated[Session, Depends(get_db_session)],
