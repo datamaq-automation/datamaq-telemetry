@@ -6,6 +6,7 @@ Dos cosas que fija este archivo:
    (LookupError) si falta un parámetro regulatorio.
 """
 
+import dataclasses
 from datetime import date
 from decimal import Decimal
 
@@ -19,6 +20,8 @@ from src.adapters.gateways.parametros_regulatorios_iniciales import (
     PARAMETROS_REGULATORIOS_INICIALES,
     TARIFAS_CAPACIDAD_INICIALES,
 )
+from src.domain.telemetria.penalizacion_periodo import MOTIVO_PERIODO_SIN_TARIFA, calcular_penalizacion_periodo
+from src.domain.telemetria.tarifas_distribuidora import calcular_penalizacion_reactiva_edelap
 from src.infrastructure.sqlalchemy.models_parametros_regulatorios import (
     FacturaVerificadaModel,
     ParametroRegulatorioModel,
@@ -231,3 +234,54 @@ def test_correccion_de_factura_gana_la_fila_mas_nueva(sesion_sqlite):
 
     assert factura is not None
     assert factura.adquirida_kw == Decimal("940.00")
+
+
+# --- 4. Un parámetro faltante no es un 500: el período queda sin cifra y con su motivo ----------------------
+
+
+class _RepoSinParametros(RepositorioParametrosRegulatoriosEnMemoria):
+    def factor_recargo_exceso(self, distribuidora: str, tarifa: str) -> Decimal:
+        raise LookupError("factor sin cargar")
+
+    def limite_tg_fi_regimen_1992(self, distribuidora: str, tarifa: str) -> Decimal:
+        raise LookupError("límite sin cargar")
+
+
+def test_parametro_faltante_en_recargo_da_periodo_sin_cifra_con_motivo():
+    penalizacion = calcular_penalizacion_periodo(_RepoSinParametros(), PLANTA_DURAX, "2025-07")
+
+    assert penalizacion.importe_ars is None
+    assert penalizacion.motivo_sin_precio == MOTIVO_PERIODO_SIN_TARIFA
+    assert penalizacion.distribuidora == "Edesur"
+
+
+def test_parametro_faltante_en_limite_reactivo_da_periodo_sin_cifra_con_motivo():
+    penalizacion = calcular_penalizacion_periodo(_RepoSinParametros(), PLANTA_UPP, "2024-08")
+
+    assert penalizacion.importe_ars is None
+    assert penalizacion.motivo_sin_precio == MOTIVO_PERIODO_SIN_TARIFA
+
+
+def test_tarifa_escrita_distinto_no_tira_500_y_queda_sin_cifra():
+    """data/organizaciones.yml escribe 'T3-MT'; la carga inicial usa 'T3 MT'. Sin cifra, no error."""
+
+    class _RepoTarifaDistinta(RepositorioParametrosRegulatoriosEnMemoria):
+        def obtener_factura_verificada(self, planta_id, periodo):
+            factura = super().obtener_factura_verificada(planta_id, periodo)
+            return dataclasses.replace(factura, tarifa="T3-MT") if factura else None
+
+    penalizacion = calcular_penalizacion_periodo(_RepoTarifaDistinta(), PLANTA_DURAX, "2025-07")
+
+    assert penalizacion.importe_ars is None
+    assert penalizacion.motivo_sin_precio == MOTIVO_PERIODO_SIN_TARIFA
+
+
+def test_el_texto_del_regimen_sigue_al_limite_recibido():
+    reactiva = calcular_penalizacion_reactiva_edelap(
+        periodo="2025-01",
+        fuente_archivo="sintético",
+        tg_fi_por_bloque=(Decimal("0.10"),),
+        limite_tg_fi=Decimal("0.70"),
+    )
+
+    assert reactiva.regimen == "contrato nacional 1992 (tg phi <= 0,70)"

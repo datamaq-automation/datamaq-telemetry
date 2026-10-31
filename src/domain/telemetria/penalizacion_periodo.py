@@ -52,10 +52,28 @@ class PenalizacionPeriodo:
     motivo_sin_precio: str | None
 
 
+def _sin_cifra(planta_id: str, periodo: str, factura: FacturaVerificada) -> PenalizacionPeriodo:
+    """Período con factura verificada pero sin cifra: el motivo es el mismo que sin factura."""
+    return PenalizacionPeriodo(
+        planta_id=planta_id,
+        periodo=periodo,
+        distribuidora=factura.distribuidora,
+        tarifa=factura.tarifa,
+        fuente_archivo=factura.fuente_archivo,
+        concepto=None,
+        importe_ars=None,
+        motivo_sin_precio=MOTIVO_PERIODO_SIN_TARIFA,
+    )
+
+
 def calcular_penalizacion_periodo(
     repo: RepositorioParametrosRegulatoriosPort, planta_id: str, periodo: str
 ) -> PenalizacionPeriodo:
-    """Penalización del período de facturación, con su distribuidora, tarifa y fuente."""
+    """Penalización del período de facturación, con su distribuidora, tarifa y fuente.
+
+    Un parámetro regulatorio faltante (LookupError del repositorio, p. ej. una tarifa escrita distinto en el YAML)
+    no es un error del sistema: el período queda sin cifra y con el motivo de siempre.
+    """
     factura = repo.obtener_factura_verificada(planta_id, periodo)
     if factura is None:
         return PenalizacionPeriodo(
@@ -70,11 +88,15 @@ def calcular_penalizacion_periodo(
         )
 
     if factura.distribuidora == "EDELAP" and factura.tg_fi_por_bloque is not None:
+        try:
+            limite = repo.limite_tg_fi_regimen_1992(factura.distribuidora, factura.tarifa)
+        except LookupError:
+            return _sin_cifra(planta_id, periodo, factura)
         reactiva = calcular_penalizacion_reactiva_edelap(
             periodo=periodo,
             fuente_archivo=factura.fuente_archivo,
             tg_fi_por_bloque=factura.tg_fi_por_bloque,
-            limite_tg_fi=repo.limite_tg_fi_regimen_1992(factura.distribuidora, factura.tarifa),
+            limite_tg_fi=limite,
         )
         return PenalizacionPeriodo(
             planta_id=planta_id,
@@ -89,11 +111,15 @@ def calcular_penalizacion_periodo(
 
     tarifa_capacidad = obtener_tarifa_capacidad(repo, factura.distribuidora, periodo)
     if factura.adquirida_kw is not None and tarifa_capacidad is not None:
+        try:
+            factor = repo.factor_recargo_exceso(factura.distribuidora, factura.tarifa)
+        except LookupError:
+            return _sin_cifra(planta_id, periodo, factura)
         recargo = calcular_recargo_exceso_potencia(
             tarifa_capacidad.csc_kw,
             factura.adquirida_kw,
             tarifa_capacidad,
-            factor_recargo=repo.factor_recargo_exceso(factura.distribuidora, factura.tarifa),
+            factor_recargo=factor,
         )
         if recargo is not None:
             return PenalizacionPeriodo(
@@ -107,13 +133,4 @@ def calcular_penalizacion_periodo(
                 motivo_sin_precio=None,
             )
 
-    return PenalizacionPeriodo(
-        planta_id=planta_id,
-        periodo=periodo,
-        distribuidora=factura.distribuidora,
-        tarifa=factura.tarifa,
-        fuente_archivo=factura.fuente_archivo,
-        concepto=None,
-        importe_ars=None,
-        motivo_sin_precio=MOTIVO_PERIODO_SIN_TARIFA,
-    )
+    return _sin_cifra(planta_id, periodo, factura)

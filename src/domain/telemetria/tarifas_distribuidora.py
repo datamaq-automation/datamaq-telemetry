@@ -89,7 +89,7 @@ def calcular_penalizacion_reactiva_edelap(
         "tarifa": "T5M12",
         "periodo": periodo,
         "fuente_archivo": fuente_archivo,
-        "regimen": "contrato nacional 1992 (tg phi <= 0,62)",
+        "regimen": f"contrato nacional 1992 (tg phi <= {str(limite_tg_fi).replace('.', ',')})",
         "tg_fi_maximo": tg_fi_maximo,
     }
     if tg_fi_maximo <= limite_tg_fi:

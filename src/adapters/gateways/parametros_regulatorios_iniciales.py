@@ -78,6 +78,6 @@ PARAMETROS_REGULATORIOS_INICIALES: Final[tuple[dict[str, Any], ...]] = (
         "tarifa": "T5M12",
         "vigencia_desde": None,
         "fuente_archivo": "decisions/2026-10-14_regimen-reactiva-edelap.md",
-        "fuente_metodo": "transcripcion_verificada",
+        "fuente_metodo": "Decisión registrada: contrato nacional de 1992 (decisions/2026-10-14_regimen-reactiva-edelap.md)",
     },
 )
