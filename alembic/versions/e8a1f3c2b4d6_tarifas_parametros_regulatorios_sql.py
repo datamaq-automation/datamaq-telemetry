@@ -22,11 +22,86 @@ from decimal import Decimal
 import sqlalchemy as sa
 
 from alembic import op
-from src.adapters.gateways.parametros_regulatorios_iniciales import (
-    FACTURAS_VERIFICADAS_INICIALES,
-    PARAMETROS_REGULATORIOS_INICIALES,
-    TARIFAS_CAPACIDAD_INICIALES,
-)
+
+# Datos de la carga inicial, congelados en esta migración (datamaq#111). NO importar de src/: una migración
+# aplicada no puede cambiar si cambia un módulo. Los valores son los literales de #111 (ver revisión de la decisión).
+_TARIFAS_CAPACIDAD = [
+    {
+        "distribuidora": "Edesur",
+        "tarifa": "T3 MT",
+        "periodo": "2025-07",
+        "fuente_archivo": "Cristal Avellaneda - EDESUR/2025-07.pdf",
+        "vigencia_desde": "2025-07-01",
+        "importe_capacidad_convenida_ars": "3521212.94",
+        "csc_kw": "848.40",
+        "fuente_metodo": "Factura Edesur 2025-07 (LSP A 9904-02469153 17), renglón 'Cap.Sum.Conv T3'. "
+        "Carga inicial de #111 (literal previo en tarifas_distribuidora.py).",
+    }
+]
+
+_FACTURAS_VERIFICADAS = [
+    {
+        "planta_id": "c64fd625-0037-4caa-b68a-800e8e0ee548",
+        "distribuidora": "Edesur",
+        "tarifa": "T3 MT",
+        "periodo": "2025-07",
+        "fuente_archivo": "Cristal Avellaneda - EDESUR/2025-07.pdf",
+        "adquirida_kw": "930.00",
+        "tg_fi_bloque_punta": None,
+        "tg_fi_bloque_valle": None,
+        "tg_fi_bloque_resto": None,
+        "fuente_metodo": "Durax / Cristal Avellaneda, demanda adquirida de la factura verificada contra "
+        "el PDF. Carga inicial de #111 (literal previo en penalizacion_periodo.py).",
+    },
+    {
+        "planta_id": "4f68f653-a604-4834-8154-31f938248572",
+        "distribuidora": "EDELAP",
+        "tarifa": "T5M12",
+        "periodo": "2024-08",
+        "fuente_archivo": "Papelera platense - EDELAP/2024-08.pdf",
+        "adquirida_kw": None,
+        "tg_fi_bloque_punta": "0.431",
+        "tg_fi_bloque_valle": "0.438",
+        "tg_fi_bloque_resto": "0.426",
+        "fuente_metodo": "UPP / Papelera platense, tg phi de la factura y Tg. Fi. punta/valle/resto "
+        "verificados contra el PDF. Carga inicial de #111 (literal previo).",
+    },
+    {
+        "planta_id": "4f68f653-a604-4834-8154-31f938248572",
+        "distribuidora": "EDELAP",
+        "tarifa": "T5M12",
+        "periodo": "2023-12",
+        "fuente_archivo": "Papelera platense - EDELAP/2023-12.pdf",
+        "adquirida_kw": None,
+        "tg_fi_bloque_punta": "0.483",
+        "tg_fi_bloque_valle": "0.492",
+        "tg_fi_bloque_resto": "0.481",
+        "fuente_metodo": "UPP / Papelera platense, tg phi de la factura y Tg. Fi. punta/valle/resto "
+        "verificados contra el PDF. Carga inicial de #111 (literal previo).",
+    },
+]
+
+_PARAMETROS_REGULATORIOS = [
+    {
+        "clave": "factor_recargo_exceso",
+        "valor": "1.5",
+        "distribuidora": "Edesur",
+        "tarifa": "T3 MT",
+        "vigencia_desde": None,
+        "fuente_archivo": "Cristal Avellaneda - EDESUR/2025-07.pdf",
+        "fuente_metodo": "transcripcion_verificada",
+    },
+    {
+        "clave": "limite_tg_fi_regimen_1992",
+        "valor": "0.62",
+        "distribuidora": "EDELAP",
+        "tarifa": "T5M12",
+        "vigencia_desde": None,
+        "fuente_archivo": "decisions/2026-10-14_regimen-reactiva-edelap.md",
+        "fuente_metodo": "Decisión registrada: contrato nacional de 1992 "
+        "(decisions/2026-10-14_regimen-reactiva-edelap.md)",
+    },
+]
 
 revision: str = "e8a1f3c2b4d6"
 down_revision: str | Sequence[str] | None = "d5f2a9c1e7b3"
@@ -114,7 +189,7 @@ def upgrade() -> None:
                 "importe_capacidad_convenida_ars": _decimal(f["importe_capacidad_convenida_ars"]),
                 "csc_kw": _decimal(f["csc_kw"]),
             }
-            for f in TARIFAS_CAPACIDAD_INICIALES
+            for f in _TARIFAS_CAPACIDAD
         ],
     )
 
@@ -146,7 +221,7 @@ def upgrade() -> None:
                 "tg_fi_bloque_valle": _decimal(f["tg_fi_bloque_valle"]),
                 "tg_fi_bloque_resto": _decimal(f["tg_fi_bloque_resto"]),
             }
-            for f in FACTURAS_VERIFICADAS_INICIALES
+            for f in _FACTURAS_VERIFICADAS
         ],
     )
 
@@ -172,7 +247,7 @@ def upgrade() -> None:
                 "fuente_archivo": p["fuente_archivo"],
                 "fuente_metodo": p["fuente_metodo"],
             }
-            for p in PARAMETROS_REGULATORIOS_INICIALES
+            for p in _PARAMETROS_REGULATORIOS
         ],
     )
 
