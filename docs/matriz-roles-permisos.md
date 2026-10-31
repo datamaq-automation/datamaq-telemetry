@@ -1,7 +1,7 @@
 <!-- Generado por scripts/generate_matriz_roles.py. No editar a mano: regenerar. -->
 # Matriz de roles y permisos (generada desde el código)
 
-Endpoints analizados: **122**. Roles válidos (`ROLES_VALIDOS`): `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `solo_lectura`, `superadmin`.
+Endpoints analizados: **123**. Roles válidos (`ROLES_VALIDOS`): `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `solo_lectura`, `superadmin`.
 
 Cómo se lee: "Roles que pasan" es lo que deja el guard de rol que la ruta declara (evaluado con la condición real del guard). Si la columna "Chequeo manual" dice `sí`, el cuerpo de la ruta o de una dependencia propia compara el rol o usa `ROLES_ACCESO_GLOBAL`: ese recorte no está en la columna y hay que leer la ruta para saberlo.
 
@@ -12,6 +12,7 @@ Con `AUTH_REQUIRED` apagado, `get_usuario_actual` devuelve `{"sub": "anon", "rol
 | Guard | Roles que pasan |
 |---|---|
 | `no_permitido_para_invitados_2fa` | `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `superadmin` |
+| `requiere_listado_usuarios` | `admin`, `superadmin` |
 | `requiere_rol_admin` | `admin`, `superadmin` |
 | `requiere_rol_auditor_o_superadmin` | `auditor`, `superadmin` |
 | `requiere_rol_escritura` | `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `superadmin` |
@@ -127,6 +128,7 @@ Con `AUTH_REQUIRED` apagado, `get_usuario_actual` devuelve `{"sub": "anon", "rol
 | GET | `/api/v1/telemetria/instantaneous/{device_id}` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/telemetria_router.py:get_instantaneous_history` |
 | GET | `/api/v1/telemetria/latest/{device_id}` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/telemetria_router.py:get_latest_telemetry` |
 | GET | `/api/v1/tuya/notificador/estado` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/notificador_router.py:estado_alarma` |
+| GET | `/api/v1/usuarios` | `requiere_listado_usuarios` | `admin`, `superadmin` | — | no | `src/infrastructure/fastapi/routes/usuarios_router.py:listar_usuarios` |
 | POST | `/api/v1/usuarios` | `requiere_rol_admin` | `admin`, `superadmin` | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/usuarios_router.py:crear_usuario` |
 | GET | `/api/v1/usuarios/integraciones` | — | todos (sin guard) | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/oauth_router.py:listar_integraciones_usuario` |
 | DELETE | `/api/v1/usuarios/integraciones/{client_id}` | — | todos (sin guard) | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/oauth_router.py:revocar_integracion_usuario` |

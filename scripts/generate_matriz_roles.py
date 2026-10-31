@@ -19,6 +19,7 @@ import ast
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+from types import SimpleNamespace
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 RUTAS_DIR = ROOT_DIR / "src" / "infrastructure" / "fastapi" / "routes"
@@ -34,6 +35,7 @@ GUARDS_DE_ROL = {
     "requiere_rol_admin",
     "requiere_rol_escritura",
     "no_permitido_para_invitados_2fa",
+    "requiere_listado_usuarios",
 }
 DEPENDENCIA_AUTH = "get_usuario_actual"
 NOMBRES_DE_ROL_EN_CODIGO = {
@@ -44,6 +46,11 @@ NOMBRES_DE_ROL_EN_CODIGO = {
     "ingeniero",
     "auditor",
 }
+
+
+def _settings_de_produccion() -> SimpleNamespace:
+    """Flags de configuración en su valor de producción (apagados): la matriz documenta la postura de producción."""
+    return SimpleNamespace(LISTADO_USUARIOS_OPERADOR=False)
 
 
 def leer_roles_validos() -> list[str]:
@@ -63,7 +70,8 @@ def roles_que_pasan(funcion: ast.FunctionDef, roles: list[str]) -> set[str]:
     condiciones = [n.test for n in funcion.body if isinstance(n, ast.If)]
     permitidos: set[str] = set()
     for rol in roles:
-        contexto = {"claims": {"rol": rol}}
+        # get_settings() devuelve la configuración de producción (flags apagados), no la del entorno actual.
+        contexto = {"claims": {"rol": rol}, "get_settings": _settings_de_produccion}
         rechazado = any(eval(compile(ast.Expression(c), "<guard>", "eval"), {}, contexto) for c in condiciones)
         if not rechazado:
             permitidos.add(rol)
