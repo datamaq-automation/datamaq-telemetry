@@ -9,6 +9,7 @@ Recargo Exceso Potencia T3 122,40 kW = 508.010,91.
 
 from decimal import Decimal
 
+from src.adapters.gateways.in_memory_parametros_regulatorios import RepositorioParametrosRegulatoriosEnMemoria
 from src.domain.telemetria.tarifas_distribuidora import (
     calcular_recargo_exceso_potencia,
     obtener_tarifa_capacidad,
@@ -16,10 +17,12 @@ from src.domain.telemetria.tarifas_distribuidora import (
 
 CSC_KW = Decimal("848.40")
 ADQUIRIDA_KW = Decimal("930.00")
+REPO = RepositorioParametrosRegulatoriosEnMemoria()
+FACTOR = REPO.factor_recargo_exceso("Edesur", "T3 MT")
 
 
 def test_tarifa_edesur_2025_07_tiene_fuente_y_vigencia():
-    tarifa = obtener_tarifa_capacidad("Edesur", "2025-07")
+    tarifa = obtener_tarifa_capacidad(REPO, "Edesur", "2025-07")
 
     assert tarifa is not None
     assert tarifa.tarifa == "T3 MT"
@@ -28,7 +31,7 @@ def test_tarifa_edesur_2025_07_tiene_fuente_y_vigencia():
 
 
 def test_valor_unitario_ponderado_coincide_con_la_factura():
-    tarifa = obtener_tarifa_capacidad("Edesur", "2025-07")
+    tarifa = obtener_tarifa_capacidad(REPO, "Edesur", "2025-07")
 
     # (6 x 4127,92 + 24 x 4156,04) / 30 = 4150,416
     assert tarifa is not None
@@ -36,9 +39,9 @@ def test_valor_unitario_ponderado_coincide_con_la_factura():
 
 
 def test_recargo_exceso_2025_07_coincide_con_la_factura():
-    tarifa = obtener_tarifa_capacidad("Edesur", "2025-07")
+    tarifa = obtener_tarifa_capacidad(REPO, "Edesur", "2025-07")
 
-    recargo = calcular_recargo_exceso_potencia(CSC_KW, ADQUIRIDA_KW, tarifa)
+    recargo = calcular_recargo_exceso_potencia(CSC_KW, ADQUIRIDA_KW, tarifa, FACTOR)
 
     assert recargo is not None
     assert recargo.exceso_kw == Decimal("81.60")
@@ -53,9 +56,9 @@ def test_recargo_exceso_2025_07_coincide_con_la_factura():
 
 
 def test_sin_exceso_el_recargo_es_cero():
-    tarifa = obtener_tarifa_capacidad("Edesur", "2025-07")
+    tarifa = obtener_tarifa_capacidad(REPO, "Edesur", "2025-07")
 
-    recargo = calcular_recargo_exceso_potencia(CSC_KW, Decimal("800.00"), tarifa)
+    recargo = calcular_recargo_exceso_potencia(CSC_KW, Decimal("800.00"), tarifa, FACTOR)
 
     assert recargo is not None
     assert recargo.exceso_kw == Decimal("0")
@@ -63,10 +66,10 @@ def test_sin_exceso_el_recargo_es_cero():
 
 
 def test_periodo_sin_tarifa_verificada_devuelve_none():
-    assert obtener_tarifa_capacidad("Edesur", "2025-06") is None
-    assert calcular_recargo_exceso_potencia(CSC_KW, ADQUIRIDA_KW, None) is None
+    assert obtener_tarifa_capacidad(REPO, "Edesur", "2025-06") is None
+    assert calcular_recargo_exceso_potencia(CSC_KW, ADQUIRIDA_KW, None, FACTOR) is None
 
 
 def test_distribuidora_sin_tarifa_cargada_devuelve_none():
     # EDELAP no tiene precio verificado: la penalización queda sin calcular.
-    assert obtener_tarifa_capacidad("EDELAP", "2024-08") is None
+    assert obtener_tarifa_capacidad(REPO, "EDELAP", "2024-08") is None

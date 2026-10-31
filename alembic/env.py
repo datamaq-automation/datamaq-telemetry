@@ -19,6 +19,7 @@ from src.infrastructure.sqlalchemy import oauth_models  # noqa: F401  isort:skip
 
 # Idem para el consumo MQTT por equipo y hora (#93).
 from src.infrastructure.sqlalchemy import models_consumo_mqtt  # noqa: F401  isort:skip
+from src.infrastructure.sqlalchemy import models_parametros_regulatorios  # noqa: F401  isort:skip
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

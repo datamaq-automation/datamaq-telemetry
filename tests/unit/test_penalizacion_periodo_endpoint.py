@@ -7,10 +7,12 @@ from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient
 
+from src.adapters.gateways.in_memory_parametros_regulatorios import RepositorioParametrosRegulatoriosEnMemoria
 from src.application.dtos.analitica_dto import AnaliticaPenalizacionesPlantaDTO
 from src.domain.telemetria.penalizacion_periodo import MOTIVO_PERIODO_SIN_TARIFA
 from src.infrastructure.fastapi.dependencies import (
     get_consultar_analitica_planta_use_case,
+    get_parametros_regulatorios_repository,
     get_usuario_actual,
 )
 from src.infrastructure.fastapi.planta_ownership import resolver_planta_permitida
@@ -30,6 +32,7 @@ def _cliente() -> TestClient:
         "sub": "usr-test-123",
     }
     app.dependency_overrides[resolver_planta_permitida] = lambda planta_id=None: planta_id
+    app.dependency_overrides[get_parametros_regulatorios_repository] = RepositorioParametrosRegulatoriosEnMemoria
     return TestClient(app)
 
 
