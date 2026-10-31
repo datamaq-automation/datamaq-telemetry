@@ -531,14 +531,3 @@ def get_monitorear_potencia_use_case(
     repo_org = YamlOrganizacionesRepository()
     buffer = global_telemetria_buffer
     return MonitorearPotenciaYAlarmaUseCase(repo_org, buffer)
-
-
-def get_consultar_maquinas_inferidas_use_case(
-    db: Annotated[Session, Depends(get_db_session)],
-) -> Any:
-    from src.application.use_cases.consultar_maquinas_inferidas import (
-        ConsultarMaquinasInferidaUseCase,
-    )
-
-    repo_cargas = MySQLCargasRepository(db)
-    return ConsultarMaquinasInferidaUseCase(repo_cargas)
