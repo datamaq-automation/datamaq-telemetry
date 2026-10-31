@@ -47,8 +47,6 @@ class Settings(BaseSettings):
     API_SOLO_LECTURA_EXCEPCIONES: str = ""
     # Roles con visibilidad de todas las organizaciones, además de superadmin. Solo api-dev (decisión 2026-10-29).
     ROLES_ACCESO_GLOBAL_EXTRA: str = ""
-    # Permite a `operador` listar las cuentas (solo lectura). Solo api-dev (decisión 2026-10-30, issue #102).
-    LISTADO_USUARIOS_OPERADOR: bool = False
     MQTT_CLEAN_SESSION: bool = False
     MQTT_RECONNECT_MIN_DELAY_SEG: int = 1
     MQTT_RECONNECT_MAX_DELAY_SEG: int = 60
@@ -164,8 +162,6 @@ class Settings(BaseSettings):
         es_produccion = self.APP_ENV == "production"
         if es_produccion and self.ROLES_ACCESO_GLOBAL_EXTRA.strip():
             raise ValueError("ROLES_ACCESO_GLOBAL_EXTRA no puede usarse en producción")
-        if es_produccion and self.LISTADO_USUARIOS_OPERADOR:
-            raise ValueError("LISTADO_USUARIOS_OPERADOR no puede usarse en producción")
 
         if self.API_EXPOSE_DOCS is None:
             object.__setattr__(self, "API_EXPOSE_DOCS", not es_produccion)

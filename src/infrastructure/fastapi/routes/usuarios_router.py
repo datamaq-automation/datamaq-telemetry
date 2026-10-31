@@ -9,10 +9,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from src.application.dtos.audit_dto import RegistrarAuditLogDTO
 from src.application.dtos.auth_dto import AsignarPlantasRequestDTO, PlantaAccesoDTO
-from src.application.dtos.usuario_listado_dto import UsuarioListadoDTO
 from src.application.use_cases.gestionar_acceso_plantas import GestionarAccesoPlantasUseCase
 from src.application.use_cases.gestionar_auditoria import RegistrarEventoAuditoriaUseCase
-from src.application.use_cases.listar_usuarios import ListarUsuariosUseCase
 from src.domain.auth.entities import UsuarioAuth
 from src.domain.auth.ports import RepositorioUsuariosPort
 from src.domain.auth.services import HashContrasenaService
@@ -21,7 +19,6 @@ from src.infrastructure.fastapi.dependencies import (
     get_registrar_auditoria_use_case,
     get_usuario_actual,
     get_usuarios_repository,
-    requiere_listado_usuarios,
     requiere_rol_admin,
 )
 from src.infrastructure.fastapi.error_handler import manejar_error_http
@@ -115,18 +112,6 @@ def crear_usuario(
         organizacion_id=guardado.organizacion_id,
         esta_activo=guardado.esta_activo,
     )
-
-
-@router.get(
-    "",
-    response_model=list[UsuarioListadoDTO],
-    dependencies=[Depends(requiere_listado_usuarios)],
-)
-def listar_usuarios(
-    repo_usuarios: Annotated[RepositorioUsuariosPort, Depends(get_usuarios_repository)],
-) -> list[UsuarioListadoDTO]:
-    """Listado global de cuentas, solo lectura. Lo ven admin/superadmin y operador con LISTADO_USUARIOS_OPERADOR."""
-    return ListarUsuariosUseCase(repo_usuarios).ejecutar()
 
 
 @router.delete(
