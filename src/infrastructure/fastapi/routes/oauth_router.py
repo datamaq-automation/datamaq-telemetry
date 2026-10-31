@@ -38,6 +38,7 @@ from src.infrastructure.fastapi.dependencies import (
     get_oauth_repository,
     get_usuario_actual,
     get_usuarios_repository,
+    requiere_rol_escritura,
 )
 from src.infrastructure.settings.config import Settings, get_settings
 
@@ -170,7 +171,11 @@ def obtener_consent_info_oauth(
     )
 
 
-@router.post("/api/v1/oauth/consent", response_model=OAuthConsentProcessResponseDTO)
+@router.post(
+    "/api/v1/oauth/consent",
+    response_model=OAuthConsentProcessResponseDTO,
+    dependencies=[Depends(requiere_rol_escritura)],
+)
 def procesar_consentimiento_oauth(
     dto: OAuthConsentProcessRequestDTO,
     claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
@@ -206,7 +211,11 @@ def procesar_consentimiento_oauth(
         )
 
 
-@router.post("/api/v1/oauth/authorize", response_model=OAuthAuthorizeResponseDTO)
+@router.post(
+    "/api/v1/oauth/authorize",
+    response_model=OAuthAuthorizeResponseDTO,
+    dependencies=[Depends(requiere_rol_escritura)],
+)
 def autorizar_consentimiento_oauth(
     dto: OAuthAuthorizeRequestDTO,
     claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
@@ -296,7 +305,7 @@ def listar_integraciones_usuario(
     return uc.listar(str(claims["sub"]))
 
 
-@router.delete("/api/v1/usuarios/integraciones/{client_id}")
+@router.delete("/api/v1/usuarios/integraciones/{client_id}", dependencies=[Depends(requiere_rol_escritura)])
 def revocar_integracion_usuario(
     client_id: str,
     claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],

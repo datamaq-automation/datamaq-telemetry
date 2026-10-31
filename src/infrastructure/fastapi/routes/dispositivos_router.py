@@ -175,7 +175,7 @@ def update_dispositivo(
         manejar_error_http(e)
 
 
-@router.post("/{device_id}/realtime")
+@router.post("/{device_id}/realtime", dependencies=[Depends(requiere_rol_escritura)])
 def activate_realtime_mode(
     device_id: str,
     use_case: Annotated[GestionarDispositivosUseCase, Depends(get_dispositivos_use_case)],
