@@ -61,7 +61,7 @@ class IngestarTelemetriaUseCase:
         permitir_auto_registro: bool = True,
         disponibilidad_use_case: GestionarDisponibilidadUseCase | None = None,
         capturador_campana: CapturadorCampanaIngesta | None = None,
-    ):
+    ) -> None:
         self.repo_dispositivos = repo_dispositivos
         self.repo_telemetria = repo_telemetria
         self.publicador = publicador

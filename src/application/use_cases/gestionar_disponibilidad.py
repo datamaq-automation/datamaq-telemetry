@@ -55,7 +55,7 @@ class GestionarDisponibilidadUseCase:
         repo_paradas: RepositorioParadasProgramadasPort,
         repo_dispositivos: RepositorioDispositivosPort | None = None,
         repo_organizaciones: RepositorioOrganizacionesPort | None = None,
-    ):
+    ) -> None:
         self.repo_maquinas = repo_maquinas
         self.repo_eventos = repo_eventos
         self.repo_paradas = repo_paradas

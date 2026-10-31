@@ -13,7 +13,7 @@ class GestionarUsuariosUseCase:
         self,
         repo_usuarios: RepositorioUsuariosPort,
         hash_service: HashContrasenaService,
-    ):
+    ) -> None:
         self.repo_usuarios = repo_usuarios
         self.hash_service = hash_service
 

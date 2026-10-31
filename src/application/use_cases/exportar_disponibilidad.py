@@ -19,7 +19,7 @@ class ExportarDisponibilidadUseCase:
         self,
         repo_maquinas: RepositorioMaquinasPort,
         repo_eventos: RepositorioEventosDisponibilidadPort,
-    ):
+    ) -> None:
         self.repo_maquinas = repo_maquinas
         self.repo_eventos = repo_eventos
 

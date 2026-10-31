@@ -49,7 +49,7 @@ class CaracterizarCargaUseCase:
         repo_dispositivos: RepositorioDispositivosPort,
         registro: RegistroCampanasActivas,
         comando_rafaga: ComandoRafagaPort | None = None,
-    ):
+    ) -> None:
         self.repo_campanas = repo_campanas
         self.repo_cargas = repo_cargas
         self.repo_dispositivos = repo_dispositivos

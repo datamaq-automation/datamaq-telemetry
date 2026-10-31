@@ -17,7 +17,7 @@ class ExportarCargasUseCase:
         self,
         repo_cargas: RepositorioCargasPort,
         repo_intervalos: RepositorioIntervalosActividadPort,
-    ):
+    ) -> None:
         self.repo_cargas = repo_cargas
         self.repo_intervalos = repo_intervalos
 

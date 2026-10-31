@@ -17,7 +17,7 @@ class PurgarTelemetriaExpiradaUseCase:
         self,
         repo_telemetria: RepositorioTelemetriaPort,
         logger: LoggerPort | None = None,
-    ):
+    ) -> None:
         self.repo_telemetria = repo_telemetria
         self.logger = logger
 

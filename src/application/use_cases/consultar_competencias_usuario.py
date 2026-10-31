@@ -27,7 +27,7 @@ class ConsultarCompetenciasUsuarioUseCase:
         self,
         repo_documentacion: RepositorioDocumentacionSgePort,
         repo_capacitaciones: RepositorioRegistroCapacitacionesSgePort,
-    ):
+    ) -> None:
         self._repo_documentacion = repo_documentacion
         self._repo_capacitaciones = repo_capacitaciones
 

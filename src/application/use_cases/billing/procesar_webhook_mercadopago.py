@@ -26,7 +26,7 @@ class ProcesarWebhookMercadoPagoUseCase:
         proveedor_pagos: ProveedorPagosPort,
         registro_eventos: RegistroEventosWebhookPort,
         gestionar_suscripciones: GestionarSuscripcionesUseCase,
-    ):
+    ) -> None:
         self.proveedor_pagos = proveedor_pagos
         self.registro_eventos = registro_eventos
         self.gestionar_suscripciones = gestionar_suscripciones

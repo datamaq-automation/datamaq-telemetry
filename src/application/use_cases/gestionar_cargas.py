@@ -29,7 +29,7 @@ class GestionarCargasUseCase:
     este catálogo es esa inyección.
     """
 
-    def __init__(self, repo_cargas: RepositorioCargasPort):
+    def __init__(self, repo_cargas: RepositorioCargasPort) -> None:
         self.repo_cargas = repo_cargas
 
     def _obtener_o_fallar(self, carga_id: str) -> Carga:

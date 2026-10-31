@@ -53,7 +53,7 @@ class AutenticarUsuarioUseCase:
         repo_planes: RepositorioPlanesPort | None = None,
         repo_organizaciones: RepositorioOrganizacionesPort | None = None,
         billing_habilitado: bool = True,
-    ):
+    ) -> None:
         self.repo_usuarios = repo_usuarios
         self.hash_service = hash_service
         self.token_service = token_service

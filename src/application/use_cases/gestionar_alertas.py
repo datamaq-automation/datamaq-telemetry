@@ -18,7 +18,7 @@ class GestionarAlertasUseCase:
         repo_telemetria: RepositorioTelemetriaPort,
         publicador: PublicadorEventosPort | None = None,
         repo_dispositivos: RepositorioDispositivosPort | None = None,
-    ):
+    ) -> None:
         self.repo_telemetria = repo_telemetria
         self.publicador = publicador
         self.repo_dispositivos = repo_dispositivos

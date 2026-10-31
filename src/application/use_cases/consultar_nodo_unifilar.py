@@ -138,7 +138,7 @@ class ConsultarNodoUnifilarUseCase:
         repo_organizaciones: RepositorioOrganizacionesPort,
         repo_telemetria: RepositorioTelemetriaPort,
         consultar_telemetria: ConsultarTelemetriaUseCase,
-    ):
+    ) -> None:
         self.repo_organizaciones = repo_organizaciones
         self.repo_telemetria = repo_telemetria
         self.consultar_telemetria = consultar_telemetria

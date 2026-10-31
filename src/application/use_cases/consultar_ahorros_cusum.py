@@ -16,7 +16,7 @@ class LineaBaseNoEncontradaError(Exception):
 
 
 class ConsultarAhorrosCusumUseCase:
-    def __init__(self, repo_organizaciones: RepositorioOrganizacionesPort):
+    def __init__(self, repo_organizaciones: RepositorioOrganizacionesPort) -> None:
         self._repo_org = repo_organizaciones
 
     def ejecutar(
