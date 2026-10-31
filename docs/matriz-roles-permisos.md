@@ -1,7 +1,7 @@
 <!-- Generado por scripts/generate_matriz_roles.py. No editar a mano: regenerar. -->
 # Matriz de roles y permisos (generada desde el código)
 
-Endpoints analizados: **123**. Roles válidos (`ROLES_VALIDOS`): `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `solo_lectura`, `superadmin`.
+Endpoints analizados: **121**. Roles válidos (`ROLES_VALIDOS`): `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `solo_lectura`, `superadmin`.
 
 Cómo se lee: "Roles que pasan" es lo que deja el guard de rol que la ruta declara (evaluado con la condición real del guard). Si la columna "Chequeo manual" dice `sí`, el cuerpo de la ruta o de una dependencia propia compara el rol o usa `ROLES_ACCESO_GLOBAL`: ese recorte no está en la columna y hay que leer la ruta para saberlo.
 
@@ -86,7 +86,6 @@ Con `AUTH_REQUIRED` apagado, `get_usuario_actual` devuelve `{"sub": "anon", "rol
 | PATCH | `/api/v1/dispositivos/{device_id}` | `requiere_rol_escritura` | `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `superadmin` | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/dispositivos_router.py:update_dispositivo` |
 | PUT | `/api/v1/dispositivos/{device_id}` | `requiere_rol_escritura` | `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `superadmin` | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/dispositivos_router.py:update_dispositivo` |
 | POST | `/api/v1/dispositivos/{device_id}/realtime` | `requiere_rol_escritura` | `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `superadmin` | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/dispositivos_router.py:activate_realtime_mode` |
-| GET | `/api/v1/dispositivos/{dispositivo_id}/maquinas/inferidas` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/maquinas_router.py:obtener_maquinas_inferidas` |
 | GET | `/api/v1/nodo/unifilar/{nodo_id}` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/planta_estructura_router.py:resumen_nodo_unifilar_directo` |
 | POST | `/api/v1/oauth/authorize` | `requiere_rol_escritura` | `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `superadmin` | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/oauth_router.py:autorizar_consentimiento_oauth` |
 | POST | `/api/v1/oauth/consent` | `requiere_rol_escritura` | `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `superadmin` | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/oauth_router.py:procesar_consentimiento_oauth` |
@@ -107,7 +106,6 @@ Con `AUTH_REQUIRED` apagado, `get_usuario_actual` devuelve `{"sub": "anon", "rol
 | GET | `/api/v1/plantas/{planta_id}/unifilar/nodos/{nodo_id}` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/planta_estructura_router.py:resumen_nodo_unifilar` |
 | GET | `/api/v1/plantas/{planta_id}/unifilar/nodos/{nodo_id}/resumen` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/planta_estructura_router.py:resumen_nodo_unifilar` |
 | GET | `/api/v1/plantas/{planta_id}/unifilar/nodos/{nodo_id}/resumen/historico` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/planta_estructura_router.py:historico_nodo_unifilar` |
-| POST | `/api/v1/produccion/enpi/calcular-sec` | — | todos (sin guard) | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/produccion_router.py:calcular_sec` |
 | POST | `/api/v1/produccion/lecturas` | — | todos (sin guard) | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/produccion_router.py:registrar_lectura` |
 | POST | `/api/v1/sge/competencias/acuse` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/sge_router.py:registrar_acuse_capacitacion` |
 | GET | `/api/v1/sge/competencias/mis-capacitaciones` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/sge_router.py:consultar_mis_competencias` |
