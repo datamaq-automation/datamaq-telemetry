@@ -178,3 +178,45 @@ class TestMonitorearPotenciaYAlarmaUseCase:
         resultado = use_case._obtener_potencia_adquirida_viva("planta_test")
 
         assert resultado is None
+
+
+class TestEstadoAlarmaSinEfectos:
+    """Issue #98 paso 1: el GET evalúa sin publicar ni instanciar cliente MQTT."""
+
+    @staticmethod
+    def _repo_con_potencia_alta() -> MagicMock:
+        repo_org = MagicMock()
+        repo_org.obtener_planta_por_id.return_value = MagicMock()
+        repo_org.obtener_nodos_unifilar.return_value = []
+        factura = MagicMock()
+        factura.tipo_dato = "potencia"
+        factura.potencia_contratada_punta_kw = 10.0
+        factura.potencia_contratada_fuera_punta_kw = None
+        repo_org.obtener_facturas_planta.return_value = [factura]
+        return repo_org
+
+    @pytest.mark.asyncio
+    async def test_get_sin_publisher_no_publica_y_devuelve_estado_evaluado(self):
+        """Sin publisher, una evaluación que activaría la alarma devuelve alarmaActiva=True y no publica."""
+        use_case = MonitorearPotenciaYAlarmaUseCase(self._repo_con_potencia_alta(), MagicMock())
+        use_case._obtener_potencia_adquirida_viva = MagicMock(return_value=9500.0)
+
+        resultado = await use_case.ejecutar("planta_test")
+
+        assert resultado.alarma_activa is True
+        assert use_case._publisher is None
+
+    def test_dependencia_get_no_instancia_tuya_publisher(self):
+        """La DI del GET no construye TuyaPublisher (no crea cliente MQTT)."""
+        from unittest.mock import patch
+
+        from src.infrastructure.fastapi import dependencies
+
+        with (
+            patch("src.infrastructure.tuya.tuya_publisher.TuyaPublisher") as publisher_cls,
+            patch.object(dependencies, "YamlOrganizacionesRepository"),
+        ):
+            use_case = dependencies.get_monitorear_potencia_use_case(MagicMock())
+
+        publisher_cls.assert_not_called()
+        assert use_case._publisher is None

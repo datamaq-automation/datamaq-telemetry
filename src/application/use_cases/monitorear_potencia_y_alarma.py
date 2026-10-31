@@ -22,8 +22,9 @@ class MonitorearPotenciaYAlarmaUseCase:
         self,
         repo_organizaciones: RepositorioOrganizacionesPort,
         buffer_telemetria: BufferTelemetriaEnVivoPort,
-        publisher: PublicadorAlarmaPort,
+        publisher: PublicadorAlarmaPort | None = None,
     ):
+        """Si ``publisher`` es None, la evaluación es de solo lectura: no publica nada."""
         self._repo_org = repo_organizaciones
         self._buffer = buffer_telemetria
         self._publisher = publisher
@@ -61,18 +62,25 @@ class MonitorearPotenciaYAlarmaUseCase:
 
         alarma_nueva = resultado_eval["alarma_activar"]
 
-        if alarma_nueva != self._estado_alarma_anterior:
-            exito = await self._publisher.publicar_alarma_sonora(alarma_nueva)
-            if exito:
-                self._estado_alarma_anterior = alarma_nueva
-                logger.info(
-                    f"Alarma {'activada' if alarma_nueva else 'desactivada'} ({resultado_eval['porcentaje_uso']:.1f}%)"
-                )
-            else:
-                logger.error("Fallo al publicar comando de alarma")
+        publisher = self._publisher
+        if publisher is None:
+            # Solo lectura: se devuelve el estado evaluado, sin efectos externos.
+            alarma_activa = alarma_nueva
+        else:
+            alarma_activa = self._estado_alarma_anterior
+            if alarma_nueva != self._estado_alarma_anterior:
+                exito = await publisher.publicar_alarma_sonora(alarma_nueva)
+                if exito:
+                    self._estado_alarma_anterior = alarma_nueva
+                    alarma_activa = alarma_nueva
+                    logger.info(
+                        f"Alarma {'activada' if alarma_nueva else 'desactivada'} ({resultado_eval['porcentaje_uso']:.1f}%)"
+                    )
+                else:
+                    logger.error("Fallo al publicar comando de alarma")
 
         return NotificadorEstadoDTO(
-            alarmaActiva=self._estado_alarma_anterior,
+            alarmaActiva=alarma_activa,
             potenciaAdquiridaW=potencia_adquirida_w,
             potenciaContratadaW=potencia_contratada_w,
             porcentajeUso=resultado_eval["porcentaje_uso"],

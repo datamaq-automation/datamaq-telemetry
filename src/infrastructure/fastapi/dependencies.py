@@ -511,12 +511,11 @@ def get_monitorear_potencia_use_case(
     from src.application.use_cases.monitorear_potencia_y_alarma import (
         MonitorearPotenciaYAlarmaUseCase,
     )
-    from src.infrastructure.tuya.tuya_publisher import TuyaPublisher
 
+    # Lectura pura: sin publisher, el GET no publica ni instancia TuyaPublisher (Issue #98).
     repo_org = YamlOrganizacionesRepository()
     buffer = global_telemetria_buffer
-    publisher = TuyaPublisher()
-    return MonitorearPotenciaYAlarmaUseCase(repo_org, buffer, publisher)
+    return MonitorearPotenciaYAlarmaUseCase(repo_org, buffer)
 
 
 def get_consultar_maquinas_inferidas_use_case(
