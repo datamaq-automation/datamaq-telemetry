@@ -12,11 +12,14 @@ Ninguna factura de data/ supera 0,62, así que el caso "sin precio" usa un valor
 
 from decimal import Decimal
 
+from src.adapters.gateways.in_memory_parametros_regulatorios import RepositorioParametrosRegulatoriosEnMemoria
 from src.domain.telemetria.tarifas_distribuidora import (
-    LIMITE_TG_FI_REGIMEN_1992,
     MOTIVO_REACTIVA_NO_VERIFICADA,
     calcular_penalizacion_reactiva_edelap,
 )
+
+REPO = RepositorioParametrosRegulatoriosEnMemoria()
+LIMITE_TG_FI_REGIMEN_1992 = REPO.limite_tg_fi_regimen_1992("EDELAP", "T5M12")
 
 
 def test_factura_real_2024_08_tg_fi_bajo_limite_da_penalizacion_cero():
@@ -24,6 +27,7 @@ def test_factura_real_2024_08_tg_fi_bajo_limite_da_penalizacion_cero():
         periodo="2024-08",
         fuente_archivo="Papelera platense - EDELAP/2024-08.pdf",
         tg_fi_por_bloque=(Decimal("0.431"), Decimal("0.438"), Decimal("0.426")),
+        limite_tg_fi=LIMITE_TG_FI_REGIMEN_1992,
     )
 
     assert penalizacion.importe_ars == Decimal("0.00")
@@ -40,6 +44,7 @@ def test_factura_real_2023_12_tg_fi_bajo_limite_da_penalizacion_cero():
         periodo="2023-12",
         fuente_archivo="Papelera platense - EDELAP/2023-12.pdf",
         tg_fi_por_bloque=(Decimal("0.483"), Decimal("0.492"), Decimal("0.481")),
+        limite_tg_fi=LIMITE_TG_FI_REGIMEN_1992,
     )
 
     assert penalizacion.importe_ars == Decimal("0.00")
@@ -51,6 +56,7 @@ def test_tg_fi_superior_al_limite_queda_sin_precio_con_motivo():
         periodo="2025-01",
         fuente_archivo="sintético (tg phi sobre el límite)",
         tg_fi_por_bloque=(Decimal("0.63"), Decimal("0.50"), Decimal("0.40")),
+        limite_tg_fi=LIMITE_TG_FI_REGIMEN_1992,
     )
 
     assert penalizacion.importe_ars is None
@@ -65,6 +71,7 @@ def test_tg_fi_exactamente_en_el_limite_cuenta_como_bajo_limite():
         periodo="2025-01",
         fuente_archivo="sintético (en el límite)",
         tg_fi_por_bloque=(Decimal("0.62"),),
+        limite_tg_fi=LIMITE_TG_FI_REGIMEN_1992,
     )
 
     assert penalizacion.importe_ars == Decimal("0.00")

@@ -5,11 +5,15 @@ Penalización por período de facturación, solo para períodos con factura y ta
 Regla (decisión del dueño 2026-10-14, brief de tarifas 1A/2A/3A): la cifra se expone por período
 de facturación, nunca por ventana de análisis. Demanda y tg phi salen de la factura de ese período,
 no de una estimación. Un período sin factura verificada devuelve motivo, sin importe.
+
+Desde datamaq#111 las facturas verificadas, las tarifas y los parámetros regulatorios salen del puerto
+`RepositorioParametrosRegulatoriosPort`: este módulo no contiene datos de negocio.
 """
 
 from dataclasses import dataclass
 from decimal import Decimal
 
+from src.domain.telemetria.parametros_regulatorios import RepositorioParametrosRegulatoriosPort
 from src.domain.telemetria.tarifas_distribuidora import (
     calcular_penalizacion_reactiva_edelap,
     calcular_recargo_exceso_potencia,
@@ -34,36 +38,6 @@ class FacturaVerificada:
     tg_fi_por_bloque: tuple[Decimal, ...] | None = None
 
 
-# Papelera platense UPP (planta 4f68f653-...), EDELAP T5M12: tg phi de la factura, Tg. Fi. punta/valle/resto.
-# Cristal Avellaneda / Durax (planta c64fd625-...), Edesur T3 MT: demanda adquirida de la factura.
-_FACTURAS_VERIFICADAS: tuple[FacturaVerificada, ...] = (
-    FacturaVerificada(
-        planta_id="c64fd625-0037-4caa-b68a-800e8e0ee548",
-        distribuidora="Edesur",
-        tarifa="T3 MT",
-        periodo="2025-07",
-        fuente_archivo="Cristal Avellaneda - EDESUR/2025-07.pdf",
-        adquirida_kw=Decimal("930.00"),
-    ),
-    FacturaVerificada(
-        planta_id="4f68f653-a604-4834-8154-31f938248572",
-        distribuidora="EDELAP",
-        tarifa="T5M12",
-        periodo="2024-08",
-        fuente_archivo="Papelera platense - EDELAP/2024-08.pdf",
-        tg_fi_por_bloque=(Decimal("0.431"), Decimal("0.438"), Decimal("0.426")),
-    ),
-    FacturaVerificada(
-        planta_id="4f68f653-a604-4834-8154-31f938248572",
-        distribuidora="EDELAP",
-        tarifa="T5M12",
-        periodo="2023-12",
-        fuente_archivo="Papelera platense - EDELAP/2023-12.pdf",
-        tg_fi_por_bloque=(Decimal("0.483"), Decimal("0.492"), Decimal("0.481")),
-    ),
-)
-
-
 @dataclass(frozen=True)
 class PenalizacionPeriodo:
     """Cifra de penalización de un período. importe_ars None = sin cifra, con motivo."""
@@ -78,16 +52,11 @@ class PenalizacionPeriodo:
     motivo_sin_precio: str | None
 
 
-def _factura_verificada(planta_id: str, periodo: str) -> FacturaVerificada | None:
-    for factura in _FACTURAS_VERIFICADAS:
-        if factura.planta_id == planta_id and factura.periodo == periodo:
-            return factura
-    return None
-
-
-def calcular_penalizacion_periodo(planta_id: str, periodo: str) -> PenalizacionPeriodo:
+def calcular_penalizacion_periodo(
+    repo: RepositorioParametrosRegulatoriosPort, planta_id: str, periodo: str
+) -> PenalizacionPeriodo:
     """Penalización del período de facturación, con su distribuidora, tarifa y fuente."""
-    factura = _factura_verificada(planta_id, periodo)
+    factura = repo.obtener_factura_verificada(planta_id, periodo)
     if factura is None:
         return PenalizacionPeriodo(
             planta_id=planta_id,
@@ -105,6 +74,7 @@ def calcular_penalizacion_periodo(planta_id: str, periodo: str) -> PenalizacionP
             periodo=periodo,
             fuente_archivo=factura.fuente_archivo,
             tg_fi_por_bloque=factura.tg_fi_por_bloque,
+            limite_tg_fi=repo.limite_tg_fi_regimen_1992(factura.distribuidora, factura.tarifa),
         )
         return PenalizacionPeriodo(
             planta_id=planta_id,
@@ -117,9 +87,14 @@ def calcular_penalizacion_periodo(planta_id: str, periodo: str) -> PenalizacionP
             motivo_sin_precio=reactiva.motivo_sin_precio,
         )
 
-    tarifa_capacidad = obtener_tarifa_capacidad(factura.distribuidora, periodo)
+    tarifa_capacidad = obtener_tarifa_capacidad(repo, factura.distribuidora, periodo)
     if factura.adquirida_kw is not None and tarifa_capacidad is not None:
-        recargo = calcular_recargo_exceso_potencia(tarifa_capacidad.csc_kw, factura.adquirida_kw, tarifa_capacidad)
+        recargo = calcular_recargo_exceso_potencia(
+            tarifa_capacidad.csc_kw,
+            factura.adquirida_kw,
+            tarifa_capacidad,
+            factor_recargo=repo.factor_recargo_exceso(factura.distribuidora, factura.tarifa),
+        )
         if recargo is not None:
             return PenalizacionPeriodo(
                 planta_id=planta_id,

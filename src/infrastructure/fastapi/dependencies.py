@@ -47,6 +47,7 @@ from src.domain.auth.ports import (
 )
 from src.domain.auth.services import HashContrasenaService, RateLimiterService, TokenRevocationService
 from src.domain.oauth.ports import OAuthRepositoryPort
+from src.domain.telemetria.parametros_regulatorios import RepositorioParametrosRegulatoriosPort
 from src.domain.telemetria.ports import RepositorioDispositivosPort, RepositorioTelemetriaPort
 from src.infrastructure.auth.email_service import SmtpEmailService
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
@@ -69,6 +70,9 @@ from src.infrastructure.sqlalchemy.mysql_repositories import (
     MySQLSuscripcionesRepository,
     MySQLTelemetriaRepository,
     MySQLUsuariosRepository,
+)
+from src.infrastructure.sqlalchemy.repositories.parametros_regulatorios_repository import (
+    RepositorioParametrosRegulatoriosSqlAlchemy,
 )
 from src.infrastructure.yaml.repositories.organizaciones_repository import (
     YamlOrganizacionesRepository,
@@ -232,9 +236,17 @@ def get_procesar_pregunta_asistente_use_case(
     )
 
 
+def get_parametros_regulatorios_repository(
+    db: Annotated[Session, Depends(get_db_session)],
+) -> RepositorioParametrosRegulatoriosPort:
+    """Tarifas, facturas verificadas y parámetros regulatorios desde la base (datamaq#111)."""
+    return RepositorioParametrosRegulatoriosSqlAlchemy(db)
+
+
 def get_consultar_analitica_planta_use_case(
     db: Annotated[Session, Depends(get_db_session)],
     settings: Annotated[Settings, Depends(get_settings_dep)],
+    repo_parametros: Annotated[RepositorioParametrosRegulatoriosPort, Depends(get_parametros_regulatorios_repository)],
 ) -> Any:
     from src.application.use_cases.consultar_analitica_planta import (
         ConsultarAnaliticaPlantaUseCase,
@@ -245,6 +257,7 @@ def get_consultar_analitica_planta_use_case(
     return ConsultarAnaliticaPlantaUseCase(
         consultar_telemetria=consultar_telemetria,
         repo_organizaciones=YamlOrganizacionesRepository(),
+        repo_parametros=repo_parametros,
     )
 
 

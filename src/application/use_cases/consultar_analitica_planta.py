@@ -10,6 +10,7 @@ from src.application.use_cases.consultar_telemetria import ConsultarTelemetriaUs
 from src.domain.telemetria.analizador_reactiva import (
     DimensionadorCompensacionService,
 )
+from src.domain.telemetria.parametros_regulatorios import RepositorioParametrosRegulatoriosPort
 from src.domain.telemetria.penalizacion_periodo import calcular_penalizacion_periodo
 from src.domain.telemetria.ports import RepositorioOrganizacionesPort
 
@@ -24,13 +25,17 @@ class ConsultarAnaliticaPlantaUseCase:
         self,
         consultar_telemetria: ConsultarTelemetriaUseCase,
         repo_organizaciones: RepositorioOrganizacionesPort | None = None,
+        repo_parametros: RepositorioParametrosRegulatoriosPort | None = None,
     ) -> None:
         """Args:
         consultar_telemetria: ConsultarTelemetriaUseCase para extraer histórico.
         repo_organizaciones: RepositorioOrganizacionesPort para resolver dispositivos de la planta.
+        repo_parametros: tarifas, facturas verificadas y parámetros regulatorios (datamaq#111). Obligatorio
+            para la penalización por período de facturación.
         """
         self.consultar_telemetria = consultar_telemetria
         self.repo_organizaciones = repo_organizaciones
+        self.repo_parametros = repo_parametros
 
     @staticmethod
     def _extraer_series_p_q_fp(puntos: list) -> tuple[list[float], list[float], list[float]]:
@@ -157,9 +162,12 @@ class ConsultarAnaliticaPlantaUseCase:
             return self._penalizacion_por_periodo(planta_id, periodo_facturacion)
         return self._penalizacion_por_ventana(planta_id, periodo_dias)
 
-    @staticmethod
-    def _penalizacion_por_periodo(planta_id: str, periodo_facturacion: str) -> AnaliticaPenalizacionesPlantaDTO:
-        penalizacion = calcular_penalizacion_periodo(planta_id, periodo_facturacion)
+    def _penalizacion_por_periodo(self, planta_id: str, periodo_facturacion: str) -> AnaliticaPenalizacionesPlantaDTO:
+        if self.repo_parametros is None:
+            raise RuntimeError(
+                "ConsultarAnaliticaPlantaUseCase necesita repo_parametros para el período de facturación"
+            )
+        penalizacion = calcular_penalizacion_periodo(self.repo_parametros, planta_id, periodo_facturacion)
         importe = penalizacion.importe_ars
         return AnaliticaPenalizacionesPlantaDTO(
             planta_id=planta_id,
