@@ -171,7 +171,11 @@ def obtener_consent_info_oauth(
     )
 
 
-@router.post("/api/v1/oauth/consent", response_model=OAuthConsentProcessResponseDTO)
+@router.post(
+    "/api/v1/oauth/consent",
+    response_model=OAuthConsentProcessResponseDTO,
+    dependencies=[Depends(requiere_rol_escritura)],
+)
 def procesar_consentimiento_oauth(
     dto: OAuthConsentProcessRequestDTO,
     claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
@@ -207,7 +211,11 @@ def procesar_consentimiento_oauth(
         )
 
 
-@router.post("/api/v1/oauth/authorize", response_model=OAuthAuthorizeResponseDTO)
+@router.post(
+    "/api/v1/oauth/authorize",
+    response_model=OAuthAuthorizeResponseDTO,
+    dependencies=[Depends(requiere_rol_escritura)],
+)
 def autorizar_consentimiento_oauth(
     dto: OAuthAuthorizeRequestDTO,
     claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
