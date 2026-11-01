@@ -491,7 +491,9 @@ def get_usuario_actual(
 
 
 def requiere_rol_auditor_o_superadmin(claims: Annotated[dict[str, Any], Depends(get_usuario_actual)]) -> dict[str, Any]:
-    if claims.get("rol") not in ("superadmin", "auditor"):
+    # El rol auditor se retiró (decisión 2026-10-31, datamaq#122): el registro de auditoría es solo del superadmin.
+    # El nombre se conserva por compatibilidad con la matriz de roles y los tests que lo importan.
+    if claims.get("rol") != "superadmin":
         raise HTTPException(status_code=403, detail="forbidden")
     return claims
 
@@ -520,7 +522,7 @@ def no_permitido_para_invitados_2fa(claims: Annotated[dict[str, Any], Depends(ge
 
 def requiere_rol_escritura(claims: Annotated[dict[str, Any], Depends(get_usuario_actual)]) -> dict[str, Any]:
     # Allowlist: un rol retirado (p. ej. invitado en un token viejo) no escribe.
-    if claims.get("rol") not in ("superadmin", "admin", "operador", "mantenimiento", "ingeniero", "auditor"):
+    if claims.get("rol") not in ("superadmin", "admin", "operador", "mantenimiento", "ingeniero"):
         raise HTTPException(status_code=403, detail="forbidden")
     return claims
 

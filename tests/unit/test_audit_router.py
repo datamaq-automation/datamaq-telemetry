@@ -48,22 +48,6 @@ def test_audit_logs_acceso_superadmin(client: TestClient):
         app.dependency_overrides.clear()
 
 
-def test_audit_logs_acceso_auditor(client: TestClient):
-    app = client.app
-    app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "u-audit", "rol": "auditor"}
-
-    mock_use_case = MagicMock()
-    mock_use_case.ejecutar.return_value = []
-    app.dependency_overrides[get_consultar_auditoria_use_case] = lambda: mock_use_case
-
-    try:
-        resp = client.get("/api/v1/audit/logs")
-        assert resp.status_code == 200
-        assert resp.json() == []
-    finally:
-        app.dependency_overrides.clear()
-
-
 def test_audit_logs_rechaza_operador(client: TestClient):
     app = client.app
     app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "u-op", "rol": "operador"}

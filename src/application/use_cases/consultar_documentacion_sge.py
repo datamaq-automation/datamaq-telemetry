@@ -8,7 +8,6 @@ ROLES_PREVIEW_PERMITIDOS: frozenset[str] = frozenset(
     {
         "superadmin",
         "admin",
-        "auditor",
     }
 )
 
