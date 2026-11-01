@@ -1,4 +1,4 @@
-"""Issue #121: /auth/me debe responder a todo rol que ROLES_VALIDOS admite (incluido solo_lectura).
+"""tests/unit/test_me_roles_validos.py — Issue #121: /auth/me responde a todo rol que ROLES_VALIDOS admite (incluido solo_lectura).
 
 Antes, MeResponseDTO.rol era un Literal sin solo_lectura: un token válido con ese rol
 hacía fallar la validación del DTO y /auth/me no respondía 200.
