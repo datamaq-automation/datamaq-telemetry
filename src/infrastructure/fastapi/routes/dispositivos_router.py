@@ -48,6 +48,11 @@ def list_dispositivos(
         if organizacion_id is None:
             # Sin organización asignada: no hay nada que listar (fail-closed).
             return []
+        if planta_id is None:
+            # Con alguna planta permitida, `resolver_planta_permitida` devuelve siempre una (la activa). Un None
+            # acá quiere decir "ninguna permitida" (fail-close, #85), no "todas": el repositorio lee None como
+            # "todas las plantas de la organización" (datamaq#125).
+            return []
     return use_case.listar_dispositivos(planta_id, organizacion_id=organizacion_id)
 
 

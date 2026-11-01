@@ -79,7 +79,9 @@ def _cliente(
 
 
 def test_listar_dispositivos_usuario_con_org():
-    client, mocks = _cliente(rol="admin", org="org-1")
+    # Un usuario de organización siempre llega con una planta efectiva: None significaría "ninguna permitida"
+    # (datamaq#125), no "todas".
+    client, mocks = _cliente(rol="admin", org="org-1", planta_id_permitida="planta-1")
     mocks["dispositivos"].listar_dispositivos.return_value = [
         _dispositivo_dto(id="dev-1", device_uid="00:11:22:33:44:55"),
         _dispositivo_dto(id="dev-2", device_uid="00:11:22:33:44:56"),
@@ -92,7 +94,7 @@ def test_listar_dispositivos_usuario_con_org():
     assert len(data) == 2
     assert data[0]["id"] == "dev-1"
     assert data[1]["id"] == "dev-2"
-    mocks["dispositivos"].listar_dispositivos.assert_called_once_with(None, organizacion_id="org-1")
+    mocks["dispositivos"].listar_dispositivos.assert_called_once_with("planta-1", organizacion_id="org-1")
 
 
 def test_listar_dispositivos_con_filtro_planta():
