@@ -17,6 +17,7 @@ from src.domain.telemetria.value_objects import MacAddress
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
 from src.infrastructure.fastapi import routes as _routes  # noqa: F401  (carga el paquete)
 from src.infrastructure.fastapi.dependencies import get_usuario_actual
+from src.infrastructure.fastapi.device_ownership import verificar_propiedad_dispositivo
 from src.infrastructure.fastapi.middleware import registrar_guard_solo_lectura
 from src.infrastructure.fastapi.routes import dispositivos_router as router_mod
 
@@ -58,6 +59,9 @@ def _app(claims: dict, monkeypatch) -> FastAPI:
     app.include_router(router_mod.router)
     app.dependency_overrides[get_usuario_actual] = lambda: claims
     app.dependency_overrides[router_mod.get_dispositivos_use_case] = lambda: _use_case()
+    # La propiedad por planta (datamaq#126) tiene su batería en test_realtime_por_planta.py; acá se prueba solo el
+    # filtro por organización del caso de uso (#99), que la ruta conserva.
+    app.dependency_overrides[verificar_propiedad_dispositivo] = lambda: None
     listener = MagicMock()
     listener.activar_tiempo_real_dispositivo.return_value = True
     monkeypatch.setattr(router_mod, "get_mqtt_listener", lambda: listener)
