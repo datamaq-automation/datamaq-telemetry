@@ -17,7 +17,6 @@ from src.infrastructure.fastapi.dependencies import (
 from src.infrastructure.fastapi.server import create_app
 from tests.unit.test_purga_cotas_superadmin import SpyRepo
 
-
 AHORA_TEST = datetime.now(timezone.utc)
 
 
@@ -148,7 +147,7 @@ def test_confirmar_sin_auditoria_no_borra(cliente_y_estado) -> None:
 
 
 def test_confirmar_registra_intencion_antes_y_resultado_despues(cliente_y_estado) -> None:
-    cliente, repo, auditoria, _, _ = cliente_y_estado
+    cliente, _, auditoria, _, _ = cliente_y_estado
     resp = cliente.post("/api/v1/system/purge", json={"confirmar": True})
     assert resp.status_code == 200
     acciones = [e.accion for e in auditoria.eventos]
