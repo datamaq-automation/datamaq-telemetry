@@ -188,3 +188,43 @@ def test_auditoria_de_purga_real_usa_accion_ejecutada() -> None:
         simulado=False,
     )
     assert dto.accion == "PURGA_EJECUTADA"
+
+
+# --- Revisión del padre: la validación usa los cortes EFECTIVOS -----------------------------------
+
+
+def test_override_que_recorta_energia_exige_confirmacion_aunque_energia_explicita_sea_mayor() -> None:
+    # _calcular_cortes aplica el override a TODAS las tablas: la energía se recorta a 40 días.
+    # La validación debe verlo, aunque dias_retencion_energia=2000 parezca cumplir el piso.
+    dto = PurgaSolicitudDTO(
+        dias_retencion_override=40,
+        dias_retencion_instantaneas=100,
+        dias_retencion_energia=2000,
+        confirmar=True,
+    )
+    with pytest.raises(CotasPurgaError):
+        validar_cotas_purga(dto, AHORA)
+
+
+def test_corte_hasta_reciente_exige_confirmacion_en_todas_las_tablas() -> None:
+    with pytest.raises(CotasPurgaError):
+        validar_cotas_purga(PurgaSolicitudDTO(corte_hasta=AHORA - timedelta(days=10), confirmar=True), AHORA)
+
+
+# --- Revisión del padre: auditoría de intención antes de borrar -----------------------------------
+
+
+def test_auditoria_de_intencion_se_registra_antes_del_borrado_y_luego_el_resultado() -> None:
+    from src.application.use_cases.purgar_telemetria import construir_auditoria_purga
+
+    evento = construir_auditoria_purga(
+        actor_usuario_id="u-1",
+        actor_email=None,
+        actor_ip=None,
+        parametros={},
+        total_registros=None,
+        simulado=False,
+        accion="PURGA_SOLICITADA",
+    )
+    assert evento.accion == "PURGA_SOLICITADA"
+    assert evento.metadatos["total_registros"] is None

@@ -3,7 +3,7 @@
 Dependencias sobrescritas: caso de uso con repositorio espía y auditoría en memoria.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -16,6 +16,9 @@ from src.infrastructure.fastapi.dependencies import (
 )
 from src.infrastructure.fastapi.server import create_app
 from tests.unit.test_purga_cotas_superadmin import SpyRepo
+
+
+AHORA_TEST = datetime.now(timezone.utc)
 
 
 class AuditoriaEnMemoria:
@@ -98,3 +101,55 @@ def test_corte_hasta_futuro_da_422(cliente_y_estado) -> None:
     resp = cliente.post("/api/v1/system/purge", json={"corte_hasta": futuro, "confirmar": True})
     assert resp.status_code == 422
     assert repo.borrados == []
+
+
+class AuditoriaQueFalla:
+    def ejecutar(self, dto) -> None:
+        raise RuntimeError("auditoría caída")
+
+
+def test_override_40_con_energia_2000_y_confirmar_da_422(cliente_y_estado) -> None:
+    cliente, repo, _, _, _ = cliente_y_estado
+    resp = cliente.post(
+        "/api/v1/system/purge",
+        json={
+            "dias_retencion_override": 40,
+            "dias_retencion_instantaneas": 100,
+            "dias_retencion_energia": 2000,
+            "confirmar": True,
+        },
+    )
+    assert resp.status_code == 422
+    assert repo.borrados == []
+
+
+def test_corte_hasta_reciente_con_confirmar_da_422(cliente_y_estado) -> None:
+    cliente, repo, _, _, _ = cliente_y_estado
+    reciente = (AHORA_TEST - timedelta(days=10)).isoformat()
+    resp = cliente.post("/api/v1/system/purge", json={"corte_hasta": reciente, "confirmar": True})
+    assert resp.status_code == 422
+    assert repo.borrados == []
+
+
+def test_auditoria_de_intencion_que_falla_no_borra(cliente_y_estado) -> None:
+    cliente, repo, _, _, app = cliente_y_estado
+    app.dependency_overrides[get_registrar_auditoria_use_case] = lambda: AuditoriaQueFalla()
+    resp = cliente.post("/api/v1/system/purge", json={"confirmar": True})
+    assert resp.status_code >= 500
+    assert repo.borrados == []
+
+
+def test_confirmar_sin_auditoria_no_borra(cliente_y_estado) -> None:
+    cliente, repo, _, _, app = cliente_y_estado
+    app.dependency_overrides[get_registrar_auditoria_use_case] = lambda: None
+    resp = cliente.post("/api/v1/system/purge", json={"confirmar": True})
+    assert resp.status_code >= 500
+    assert repo.borrados == []
+
+
+def test_confirmar_registra_intencion_antes_y_resultado_despues(cliente_y_estado) -> None:
+    cliente, repo, auditoria, _, _ = cliente_y_estado
+    resp = cliente.post("/api/v1/system/purge", json={"confirmar": True})
+    assert resp.status_code == 200
+    acciones = [e.accion for e in auditoria.eventos]
+    assert acciones == ["PURGA_SOLICITADA", "PURGA_EJECUTADA"]
