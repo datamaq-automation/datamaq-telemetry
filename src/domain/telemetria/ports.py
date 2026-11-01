@@ -164,6 +164,20 @@ class RepositorioTelemetriaPort(ABC):
     ) -> list[LecturaPotenciaTemporal]:
         pass
 
+    # Conteos de la simulación de purga (datamaq#119). No abstractos: los fakes que no simulan
+    # no los implementan. Quien los llame sin implementarlos recibe NotImplementedError.
+    def contar_instantaneas_anteriores_a(self, fecha_limite: datetime) -> int:
+        raise NotImplementedError("contar_instantaneas_anteriores_a no implementado en este repositorio")
+
+    def contar_energias_anteriores_a(self, fecha_limite: datetime) -> int:
+        raise NotImplementedError("contar_energias_anteriores_a no implementado en este repositorio")
+
+    def contar_status_logs_anteriores_a(self, fecha_limite: datetime) -> int:
+        raise NotImplementedError("contar_status_logs_anteriores_a no implementado en este repositorio")
+
+    def contar_alertas_resueltas_anteriores_a(self, fecha_limite: datetime) -> int:
+        raise NotImplementedError("contar_alertas_resueltas_anteriores_a no implementado en este repositorio")
+
     @abstractmethod
     def purgar_instantaneas_anteriores_a(self, fecha_limite: datetime, batch_size: int = 1000) -> int:
         pass

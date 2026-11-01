@@ -377,6 +377,38 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
         filas = q.all()
         return [LecturaPotenciaTemporal(momento=fila[0], potencia_w=float(fila[1])) for fila in filas]
 
+    def contar_instantaneas_anteriores_a(self, fecha_limite: datetime) -> int:
+        return int(
+            self.db.query(func.count(TelemetryInstantaneousModel.id))
+            .filter(TelemetryInstantaneousModel.recorded_at < fecha_limite)
+            .scalar()
+            or 0
+        )
+
+    def contar_energias_anteriores_a(self, fecha_limite: datetime) -> int:
+        return int(
+            self.db.query(func.count(TelemetryEnergyModel.id))
+            .filter(TelemetryEnergyModel.recorded_at < fecha_limite)
+            .scalar()
+            or 0
+        )
+
+    def contar_status_logs_anteriores_a(self, fecha_limite: datetime) -> int:
+        return int(
+            self.db.query(func.count(DeviceStatusLogModel.id))
+            .filter(DeviceStatusLogModel.recorded_at < fecha_limite)
+            .scalar()
+            or 0
+        )
+
+    def contar_alertas_resueltas_anteriores_a(self, fecha_limite: datetime) -> int:
+        return int(
+            self.db.query(func.count(DeviceAlertModel.id))
+            .filter(DeviceAlertModel.is_resolved.is_(True), DeviceAlertModel.resolved_at < fecha_limite)
+            .scalar()
+            or 0
+        )
+
     def purgar_instantaneas_anteriores_a(self, fecha_limite: datetime, batch_size: int = 1000) -> int:
         ids = [
             row[0]
