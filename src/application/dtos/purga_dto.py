@@ -27,3 +27,17 @@ class PurgaResultadoDTO(BaseModel):
     total_registros_eliminados: int = 0
     duracion_segundos: float = 0.0
     ejecutado_en: FechaHoraUTC
+    simulado: bool = Field(default=False, description="true si no se borró nada (solo conteo)")
+
+
+class PurgaSolicitudDTO(PurgaRequestDTO):
+    """Cuerpo de `POST /api/v1/system/purge` (datamaq#119).
+
+    Sin `confirmar` la ruta simula: cuenta lo que borraría y no borra nada.
+    `confirmar_retencion_menor` habilita recortar por debajo del piso de retención de una tabla.
+    """
+
+    confirmar: bool = Field(default=False, description="true para borrar; false (default) simula")
+    confirmar_retencion_menor: bool = Field(
+        default=False, description="true para recortar por debajo del piso de retención de alguna tabla"
+    )
