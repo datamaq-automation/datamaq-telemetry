@@ -282,7 +282,7 @@ def test_registrar_dispositivo_error_inesperado_500():
 
 def test_actualizar_dispositivo_put_exitoso():
     client, mocks = _cliente(rol="admin")
-    mocks["dispositivos"].actualizar_dispositivo.return_value = _dispositivo_dto(
+    mocks["dispositivos"].actualizar_dispositivo_de_organizacion.return_value = _dispositivo_dto(
         id="dev-1", nombre="Nombre Modificado PUT"
     )
 
@@ -296,8 +296,8 @@ def test_actualizar_dispositivo_put_exitoso():
     assert response.status_code == 200
     data = response.json()
     assert data["nombre"] == "Nombre Modificado PUT"
-    mocks["dispositivos"].actualizar_dispositivo.assert_called_once()
-    device_id_llamado, dto_llamado = mocks["dispositivos"].actualizar_dispositivo.call_args[0]
+    mocks["dispositivos"].actualizar_dispositivo_de_organizacion.assert_called_once()
+    device_id_llamado, dto_llamado = mocks["dispositivos"].actualizar_dispositivo_de_organizacion.call_args[0]
     assert device_id_llamado == "dev-1"
     assert dto_llamado.nombre == "Nombre Modificado PUT"
 
@@ -308,12 +308,12 @@ def test_actualizar_dispositivo_put_rol_invitado_403():
     response = client.put("/api/v1/dispositivos/dev-1", json={"nombre": "Nuevo"})
 
     assert response.status_code == 403
-    mocks["dispositivos"].actualizar_dispositivo.assert_not_called()
+    mocks["dispositivos"].actualizar_dispositivo_de_organizacion.assert_not_called()
 
 
 def test_actualizar_dispositivo_put_no_encontrado_404():
     client, mocks = _cliente(rol="admin")
-    mocks["dispositivos"].actualizar_dispositivo.side_effect = DispositivoNoEncontradoError(
+    mocks["dispositivos"].actualizar_dispositivo_de_organizacion.side_effect = DispositivoNoEncontradoError(
         "Dispositivo 'dev-404' no encontrado."
     )
 
@@ -325,7 +325,7 @@ def test_actualizar_dispositivo_put_no_encontrado_404():
 
 def test_actualizar_dispositivo_put_limite_excedido_422():
     client, mocks = _cliente(rol="admin")
-    mocks["dispositivos"].actualizar_dispositivo.side_effect = LimiteDispositivosExcedidoError(
+    mocks["dispositivos"].actualizar_dispositivo_de_organizacion.side_effect = LimiteDispositivosExcedidoError(
         "Cupo máximo alcanzado al cambiar de planta."
     )
 
@@ -337,7 +337,7 @@ def test_actualizar_dispositivo_put_limite_excedido_422():
 
 def test_actualizar_dispositivo_put_error_inesperado_500():
     client, mocks = _cliente(rol="admin")
-    mocks["dispositivos"].actualizar_dispositivo.side_effect = RuntimeError("Falla no controlada")
+    mocks["dispositivos"].actualizar_dispositivo_de_organizacion.side_effect = RuntimeError("Falla no controlada")
 
     response = client.put("/api/v1/dispositivos/dev-1", json={"nombre": "Nuevo"})
 
@@ -346,7 +346,9 @@ def test_actualizar_dispositivo_put_error_inesperado_500():
 
 def test_actualizar_dispositivo_patch_exitoso():
     client, mocks = _cliente(rol="admin")
-    mocks["dispositivos"].actualizar_dispositivo.return_value = _dispositivo_dto(id="dev-1", esta_activo=False)
+    mocks["dispositivos"].actualizar_dispositivo_de_organizacion.return_value = _dispositivo_dto(
+        id="dev-1", esta_activo=False
+    )
 
     payload = {"esta_activo": False}
     response = client.patch("/api/v1/dispositivos/dev-1", json=payload)
@@ -354,8 +356,8 @@ def test_actualizar_dispositivo_patch_exitoso():
     assert response.status_code == 200
     data = response.json()
     assert data["esta_activo"] is False
-    mocks["dispositivos"].actualizar_dispositivo.assert_called_once()
-    device_id_llamado, dto_llamado = mocks["dispositivos"].actualizar_dispositivo.call_args[0]
+    mocks["dispositivos"].actualizar_dispositivo_de_organizacion.assert_called_once()
+    device_id_llamado, dto_llamado = mocks["dispositivos"].actualizar_dispositivo_de_organizacion.call_args[0]
     assert device_id_llamado == "dev-1"
     assert dto_llamado.esta_activo is False
 
@@ -366,12 +368,12 @@ def test_actualizar_dispositivo_patch_rol_invitado_403():
     response = client.patch("/api/v1/dispositivos/dev-1", json={"esta_activo": False})
 
     assert response.status_code == 403
-    mocks["dispositivos"].actualizar_dispositivo.assert_not_called()
+    mocks["dispositivos"].actualizar_dispositivo_de_organizacion.assert_not_called()
 
 
 def test_actualizar_dispositivo_patch_no_encontrado_404():
     client, mocks = _cliente(rol="admin")
-    mocks["dispositivos"].actualizar_dispositivo.side_effect = DispositivoNoEncontradoError(
+    mocks["dispositivos"].actualizar_dispositivo_de_organizacion.side_effect = DispositivoNoEncontradoError(
         "Dispositivo no encontrado."
     )
 

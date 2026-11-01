@@ -19,6 +19,7 @@ from src.domain.telemetria.entities import Dispositivo, Suscripcion
 from src.domain.telemetria.exceptions import (
     DispositivoNoEncontradoError,
     LimiteDispositivosExcedidoError,
+    PlantaNoEncontradaError,
 )
 from src.domain.telemetria.ports import (
     RepositorioDispositivosPort,
@@ -133,6 +134,26 @@ class GestionarDispositivosUseCase:
         entity = DispositivoMapper.create_dto_to_entity(dto, str(uuid.uuid4()))
         saved = self.repo_dispositivos.guardar(entity)
         return self._enriquecer_dispositivo(saved)
+
+    def actualizar_dispositivo_de_organizacion(
+        self,
+        id_o_uid: str,
+        dto: DispositivoUpdateDTO,
+        organizacion_id: str | None,
+        es_superadmin: bool = False,
+    ) -> DispositivoResponseDTO:
+        """Actualiza solo si el dispositivo es de la organización de quien llama (datamaq#118).
+
+        Un dispositivo ajeno responde como inexistente, igual que la lectura. La planta de destino tiene que
+        pertenecer a la misma organización. El superadmin no tiene filtro.
+        """
+        if not es_superadmin:
+            self.obtener_dispositivo_de_organizacion(id_o_uid, organizacion_id)
+            if dto.planta_id is not None:
+                planta = self.repo_organizaciones.obtener_planta_por_id(dto.planta_id)
+                if planta is None or planta.organizacion_id != organizacion_id:
+                    raise PlantaNoEncontradaError(f"Planta {dto.planta_id} no encontrada.")
+        return self.actualizar_dispositivo(id_o_uid, dto)
 
     def actualizar_dispositivo(self, id_o_uid: str, dto: DispositivoUpdateDTO) -> DispositivoResponseDTO:
         dev = self.repo_dispositivos.obtener_por_id(id_o_uid)

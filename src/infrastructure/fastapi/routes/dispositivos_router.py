@@ -150,6 +150,11 @@ def _auditar_cambios_dispositivo(
             pass
 
 
+def _es_superadmin_o_sin_auth(claims: dict | None) -> bool:
+    """Sin filtro: superadmin, o modo sin autenticación (desarrollo), igual que device_ownership."""
+    return (claims or {}).get("rol") == "superadmin" or not get_settings().AUTH_REQUIRED
+
+
 @router.put("/{device_id}", response_model=DispositivoResponseDTO, dependencies=[Depends(requiere_rol_escritura)])
 @router.patch("/{device_id}", response_model=DispositivoResponseDTO, dependencies=[Depends(requiere_rol_escritura)])
 def update_dispositivo(
@@ -168,7 +173,12 @@ def update_dispositivo(
             except Exception:
                 dev_previo = None
 
-        resultado = use_case.actualizar_dispositivo(device_id, dto)
+        resultado = use_case.actualizar_dispositivo_de_organizacion(
+            device_id,
+            dto,
+            organizacion_id=(claims or {}).get("org"),
+            es_superadmin=_es_superadmin_o_sin_auth(claims),
+        )
         _auditar_cambios_dispositivo(audit_use_case, dev_previo, dto, device_id, claims, request)
         return resultado
     except Exception as e:
