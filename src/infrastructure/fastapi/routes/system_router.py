@@ -5,7 +5,7 @@ import os
 from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 from src.application.dtos.build_info_dto import BuildInfoResponseDTO
 from src.application.dtos.purga_dto import PurgaResultadoDTO, PurgaSolicitudDTO
@@ -164,27 +164,53 @@ def trigger_purge(
 ):
     """Purga de telemetría (datamaq#119). Solo superadmin. Sin `confirmar` simula: cuenta y no borra.
     Cada llamada queda en auditoría con quién, parámetros y cantidades."""
+    solicitud = dto or PurgaSolicitudDTO()
+    # Fail-closed: un borrado sin auditoría no se ejecuta (datamaq#119).
+    if solicitud.confirmar and audit_use_case is None:
+        raise HTTPException(status_code=503, detail="auditoria_no_disponible_purga_no_ejecutada")
     try:
-        solicitud = dto or PurgaSolicitudDTO()
         validar_cotas_purga(solicitud, datetime.now(timezone.utc))
-        resultado = use_case.ejecutar(solicitud) if solicitud.confirmar else use_case.simular(solicitud)
-        evento = construir_auditoria_purga(
+        actor = dict(
             actor_usuario_id=str(claims.get("sub") or "") or None,
             actor_email=claims.get("usuario"),
             actor_ip=request.client.host if request is not None and request.client is not None else None,
-            parametros={
-                "dias_retencion_override": solicitud.dias_retencion_override,
-                "dias_retencion_instantaneas": solicitud.dias_retencion_instantaneas,
-                "dias_retencion_energia": solicitud.dias_retencion_energia,
-                "corte_hasta": solicitud.corte_hasta,
-                "batch_size": solicitud.batch_size,
-                "confirmar_retencion_menor": solicitud.confirmar_retencion_menor,
-            },
-            total_registros=resultado.total_registros_eliminados,
-            simulado=resultado.simulado,
         )
-        if audit_use_case is not None:
-            audit_use_case.ejecutar(evento)
+        parametros = {
+            "dias_retencion_override": solicitud.dias_retencion_override,
+            "dias_retencion_instantaneas": solicitud.dias_retencion_instantaneas,
+            "dias_retencion_energia": solicitud.dias_retencion_energia,
+            "corte_hasta": solicitud.corte_hasta,
+            "batch_size": solicitud.batch_size,
+            "confirmar_retencion_menor": solicitud.confirmar_retencion_menor,
+        }
+        if not solicitud.confirmar:
+            resultado = use_case.simular(solicitud)
+            if audit_use_case is not None:
+                audit_use_case.ejecutar(
+                    construir_auditoria_purga(
+                        **actor,
+                        parametros=parametros,
+                        total_registros=resultado.total_registros_eliminados,
+                        simulado=True,
+                    )
+                )
+            return resultado
+        # Confirmado: la intención queda registrada ANTES del borrado; si falla, no se borra.
+        audit_use_case.ejecutar(  # type: ignore[union-attr]
+            construir_auditoria_purga(
+                **actor, parametros=parametros, total_registros=None, simulado=False, accion="PURGA_SOLICITADA"
+            )
+        )
+        resultado = use_case.ejecutar(solicitud)
+        audit_use_case.ejecutar(  # type: ignore[union-attr]
+            construir_auditoria_purga(
+                **actor,
+                parametros=parametros,
+                total_registros=resultado.total_registros_eliminados,
+                simulado=False,
+                accion="PURGA_EJECUTADA",
+            )
+        )
         return resultado
     except Exception as e:
         manejar_error_http(e)
