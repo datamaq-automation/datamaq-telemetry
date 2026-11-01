@@ -13,14 +13,13 @@ from src.application.dtos.audit_dto import RegistrarAuditLogDTO
 from src.application.dtos.purga_dto import PurgaRequestDTO, PurgaResultadoDTO, PurgaSolicitudDTO
 from src.domain.telemetria.exceptions import CortePurgaFuturoError, DominioTelemetriaException
 from src.domain.telemetria.ports import LoggerPort, RepositorioTelemetriaPort
-from src.domain.telemetria.services import PoliticaRetencionService
-
-# Piso de retención por tabla (datamaq#119). La ruta HTTP exige confirmación explícita para
-# recortar por debajo de estos valores.
-PISO_INSTANTANEAS_DIAS = 45
-PISO_ENERGIA_DIAS = 5 * 365  # 1825: línea base ISO 50001
-PISO_LOGS_DIAS = 7
-PISO_ALERTAS_DIAS = 30
+from src.domain.telemetria.servicios.politicas_suscripcion import (
+    PISO_ALERTAS_DIAS,
+    PISO_ENERGIA_DIAS,
+    PISO_INSTANTANEAS_DIAS,
+    PISO_LOGS_DIAS,
+    PoliticaRetencionService,
+)
 
 
 class PurgaInvalidaError(DominioTelemetriaException):
@@ -41,28 +40,57 @@ def _rechazar_no_positivos(dto: PurgaRequestDTO) -> None:
             raise PurgaInvalidaError(f"{nombre} debe ser mayor que 0 (recibido {valor}).")
 
 
+TOLERANCIA_PISO = timedelta(minutes=1)
+
+
+def calcular_cortes(dto: PurgaRequestDTO, ahora: datetime) -> dict[str, datetime]:
+    """Cortes efectivos por tabla. Precedencia: corte_hasta > dias_retencion_override > explícitos y defaults.
+    La validación de cotas y el borrado usan esta misma función, para que no puedan divergir."""
+    if dto.corte_hasta is not None:
+        if dto.corte_hasta > ahora:
+            raise CortePurgaFuturoError(f"corte_hasta ({dto.corte_hasta.isoformat()}) es posterior a ahora")
+        return {
+            "instantaneas": dto.corte_hasta,
+            "energia": dto.corte_hasta,
+            "logs": dto.corte_hasta,
+            "alertas": dto.corte_hasta,
+        }
+    if dto.dias_retencion_override is not None:
+        corte = ahora - timedelta(days=dto.dias_retencion_override)
+        return {"instantaneas": corte, "energia": corte, "logs": corte, "alertas": corte}
+    # Defaults de la política (ISO 27001 A.8.10, ISO 50001, 7 y 30 días): mismas constantes que el piso.
+    dias_inst = (
+        dto.dias_retencion_instantaneas if dto.dias_retencion_instantaneas is not None else PISO_INSTANTANEAS_DIAS
+    )
+    dias_ene = dto.dias_retencion_energia if dto.dias_retencion_energia is not None else PISO_ENERGIA_DIAS
+    return {
+        "instantaneas": ahora - timedelta(days=dias_inst),
+        "energia": ahora - timedelta(days=dias_ene),
+        "logs": PoliticaRetencionService.fecha_corte_status_logs(ahora),
+        "alertas": PoliticaRetencionService.fecha_corte_alertas_resueltas(ahora),
+    }
+
+
 def validar_cotas_purga(dto: PurgaSolicitudDTO, ahora: datetime) -> None:
-    """Cotas de la ruta HTTP. Cero o negativos: PurgaInvalidaError. Bajo el piso sin
-    `confirmar_retencion_menor`: CotasPurgaError."""
+    """Cotas de la ruta HTTP sobre los cortes EFECTIVOS. Cero o negativos: PurgaInvalidaError.
+    Una tabla cuyo corte efectivo queda más reciente que su piso exige confirmar_retencion_menor."""
     _rechazar_no_positivos(dto)
     if dto.corte_hasta is not None and dto.corte_hasta > ahora:
         raise PurgaInvalidaError("corte_hasta no puede ser posterior a ahora.")
     if dto.confirmar_retencion_menor:
         return
-
+    cortes = calcular_cortes(dto, ahora)
     bajo_piso: list[str] = []
-    override = dto.dias_retencion_override
-    for tabla, explicito, piso in (
-        ("instantáneas", dto.dias_retencion_instantaneas, PISO_INSTANTANEAS_DIAS),
-        ("energía", dto.dias_retencion_energia, PISO_ENERGIA_DIAS),
-        ("status logs", None, PISO_LOGS_DIAS),
-        ("alertas resueltas", None, PISO_ALERTAS_DIAS),
+    for tabla, clave, piso in (
+        ("instantáneas", "instantaneas", PISO_INSTANTANEAS_DIAS),
+        ("energía", "energia", PISO_ENERGIA_DIAS),
+        ("status logs", "logs", PISO_LOGS_DIAS),
+        ("alertas resueltas", "alertas", PISO_ALERTAS_DIAS),
     ):
-        dias = explicito if explicito is not None else override
-        if dias is not None and dias < piso:
-            bajo_piso.append(f"{tabla} ({dias} días < piso {piso})")
-    if dto.corte_hasta is not None and dto.corte_hasta > ahora - timedelta(days=PISO_ENERGIA_DIAS):
-        bajo_piso.append(f"corte_hasta ({dto.corte_hasta.isoformat()}) más reciente que el piso de energía")
+        limite = ahora - timedelta(days=piso)
+        if cortes[clave] > limite + TOLERANCIA_PISO:
+            dias_efectivos = (ahora - cortes[clave]).days
+            bajo_piso.append(f"{tabla} ({dias_efectivos} días efectivos < piso {piso})")
     if bajo_piso:
         raise CotasPurgaError(
             "La purga recorta por debajo del piso de retención sin confirmación explícita: "
@@ -76,14 +104,15 @@ def construir_auditoria_purga(
     actor_email: str | None,
     actor_ip: str | None,
     parametros: dict[str, Any],
-    total_registros: int,
+    total_registros: int | None,
     simulado: bool,
+    accion: str | None = None,
 ) -> RegistrarAuditLogDTO:
     """Evento de auditoría de la purga: quién, con qué parámetros y cuántos registros."""
     parametros_serializables = {k: (v.isoformat() if isinstance(v, datetime) else v) for k, v in parametros.items()}
     return RegistrarAuditLogDTO(
         categoria="SISTEMA",
-        accion="PURGA_SIMULADA" if simulado else "PURGA_EJECUTADA",
+        accion=accion or ("PURGA_SIMULADA" if simulado else "PURGA_EJECUTADA"),
         resultado="EXITO",
         actor_usuario_id=actor_usuario_id,
         actor_email=actor_email,
@@ -103,30 +132,7 @@ class PurgarTelemetriaExpiradaUseCase:
         self.logger = logger
 
     def _calcular_cortes(self, dto: PurgaRequestDTO, ahora: datetime) -> dict[str, datetime]:
-        """Fechas de corte por tabla según la política (corte_hasta, override o defaults)."""
-        if dto.corte_hasta is not None:
-            if dto.corte_hasta > ahora:
-                raise CortePurgaFuturoError(f"corte_hasta ({dto.corte_hasta.isoformat()}) es posterior a ahora")
-            return {
-                "instantaneas": dto.corte_hasta,
-                "energia": dto.corte_hasta,
-                "logs": dto.corte_hasta,
-                "alertas": dto.corte_hasta,
-            }
-        if dto.dias_retencion_override is not None:
-            corte = ahora - timedelta(days=dto.dias_retencion_override)
-            return {"instantaneas": corte, "energia": corte, "logs": corte, "alertas": corte}
-        # Por defecto: 45 días para instantáneas crudas (ISO 27001 A.8.10),
-        # 5 años (1825 días) para agregados energéticos (ISO 50001),
-        # 7 días para status logs y 30 días para alertas resueltas.
-        dias_inst = dto.dias_retencion_instantaneas if dto.dias_retencion_instantaneas is not None else 45
-        dias_ene = dto.dias_retencion_energia if dto.dias_retencion_energia is not None else (5 * 365)
-        return {
-            "instantaneas": ahora - timedelta(days=dias_inst),
-            "energia": ahora - timedelta(days=dias_ene),
-            "logs": PoliticaRetencionService.fecha_corte_status_logs(ahora, dias=7),
-            "alertas": PoliticaRetencionService.fecha_corte_alertas_resueltas(ahora, dias=30),
-        }
+        return calcular_cortes(dto, ahora)
 
     def simular(self, dto: PurgaRequestDTO) -> PurgaResultadoDTO:
         """Cuenta los registros que borraría `ejecutar` con los mismos parámetros. No borra nada."""
