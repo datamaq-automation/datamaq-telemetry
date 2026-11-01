@@ -1,6 +1,10 @@
 """tests/integration/test_security_api.py — Auth obligatoria en routers y rol admin en purge."""
 
-from src.infrastructure.fastapi.dependencies import get_usuario_actual, requiere_rol_admin
+from src.infrastructure.fastapi.dependencies import (
+    get_usuario_actual,
+    requiere_rol_admin,
+    requiere_rol_superadmin,
+)
 from src.infrastructure.fastapi.server import create_app
 
 
@@ -37,11 +41,13 @@ def test_create_app_requiere_auth_en_telemetria():
         assert get_usuario_actual in _callables(ruta.dependant)
 
 
-def test_purge_requiere_admin():
+def test_purge_requiere_superadmin():
+    # datamaq#119: la purga borra datos de todas las organizaciones; solo superadmin.
     app = create_app()
     purge = [r for r in _rutas_api(app) if r.path == "/api/v1/system/purge"]
     assert len(purge) == 1
-    assert requiere_rol_admin in _callables(purge[0].dependant)
+    assert requiere_rol_superadmin in _callables(purge[0].dependant)
+    assert requiere_rol_admin not in _callables(purge[0].dependant)
 
 
 def test_login_y_health_son_publicos():

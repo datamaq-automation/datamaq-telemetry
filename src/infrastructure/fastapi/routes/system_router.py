@@ -5,15 +5,21 @@ import os
 from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 from src.application.dtos.build_info_dto import BuildInfoResponseDTO
-from src.application.dtos.purga_dto import PurgaRequestDTO, PurgaResultadoDTO
-from src.application.use_cases.purgar_telemetria import PurgarTelemetriaExpiradaUseCase
+from src.application.dtos.purga_dto import PurgaResultadoDTO, PurgaSolicitudDTO
+from src.application.use_cases.gestionar_auditoria import RegistrarEventoAuditoriaUseCase
+from src.application.use_cases.purgar_telemetria import (
+    PurgarTelemetriaExpiradaUseCase,
+    construir_auditoria_purga,
+    validar_cotas_purga,
+)
 from src.infrastructure.fastapi.dependencies import (
     get_mqtt_listener,
     get_purga_use_case,
-    requiere_rol_admin,
+    get_registrar_auditoria_use_case,
+    requiere_rol_superadmin,
 )
 from src.infrastructure.fastapi.error_handler import manejar_error_http
 from src.infrastructure.settings.config import Settings, get_settings
@@ -150,12 +156,61 @@ def websocket_status():
 
 @router.post("/api/v1/system/purge", response_model=PurgaResultadoDTO)
 def trigger_purge(
-    claims: Annotated[dict, Depends(requiere_rol_admin)],
+    claims: Annotated[dict, Depends(requiere_rol_superadmin)],
     use_case: Annotated[PurgarTelemetriaExpiradaUseCase, Depends(get_purga_use_case)],
-    dto: PurgaRequestDTO | None = None,
+    audit_use_case: Annotated[RegistrarEventoAuditoriaUseCase | None, Depends(get_registrar_auditoria_use_case)],
+    dto: PurgaSolicitudDTO | None = None,
+    request: Request = None,  # type: ignore[assignment]
 ):
+    """Purga de telemetría (datamaq#119). Solo superadmin. Sin `confirmar` simula: cuenta y no borra.
+    Cada llamada queda en auditoría con quién, parámetros y cantidades."""
+    solicitud = dto or PurgaSolicitudDTO()
+    # Fail-closed: un borrado sin auditoría no se ejecuta (datamaq#119).
+    if solicitud.confirmar and audit_use_case is None:
+        raise HTTPException(status_code=503, detail="auditoria_no_disponible_purga_no_ejecutada")
     try:
-        req = dto or PurgaRequestDTO()
-        return use_case.ejecutar(req)
+        validar_cotas_purga(solicitud, datetime.now(timezone.utc))
+        actor = dict(
+            actor_usuario_id=str(claims.get("sub") or "") or None,
+            actor_email=claims.get("usuario"),
+            actor_ip=request.client.host if request is not None and request.client is not None else None,
+        )
+        parametros = {
+            "dias_retencion_override": solicitud.dias_retencion_override,
+            "dias_retencion_instantaneas": solicitud.dias_retencion_instantaneas,
+            "dias_retencion_energia": solicitud.dias_retencion_energia,
+            "corte_hasta": solicitud.corte_hasta,
+            "batch_size": solicitud.batch_size,
+            "confirmar_retencion_menor": solicitud.confirmar_retencion_menor,
+        }
+        if not solicitud.confirmar:
+            resultado = use_case.simular(solicitud)
+            if audit_use_case is not None:
+                audit_use_case.ejecutar(
+                    construir_auditoria_purga(
+                        **actor,
+                        parametros=parametros,
+                        total_registros=resultado.total_registros_eliminados,
+                        simulado=True,
+                    )
+                )
+            return resultado
+        # Confirmado: la intención queda registrada ANTES del borrado; si falla, no se borra.
+        audit_use_case.ejecutar(  # type: ignore[union-attr]
+            construir_auditoria_purga(
+                **actor, parametros=parametros, total_registros=None, simulado=False, accion="PURGA_SOLICITADA"
+            )
+        )
+        resultado = use_case.ejecutar(solicitud)
+        audit_use_case.ejecutar(  # type: ignore[union-attr]
+            construir_auditoria_purga(
+                **actor,
+                parametros=parametros,
+                total_registros=resultado.total_registros_eliminados,
+                simulado=False,
+                accion="PURGA_EJECUTADA",
+            )
+        )
+        return resultado
     except Exception as e:
         manejar_error_http(e)

@@ -5,6 +5,13 @@ from datetime import datetime, timedelta, timezone
 from src.domain.telemetria.entities import PlanTelemetria
 from src.domain.telemetria.value_objects import ModoFreeTier
 
+# Piso de retención por tabla (datamaq#119). Única fuente: la purga de la aplicación y los
+# defaults de PoliticaRetencionService salen de acá, para que no puedan divergir.
+PISO_INSTANTANEAS_DIAS = 45  # ISO 27001 A.8.10 (política de la plataforma)
+PISO_ENERGIA_DIAS = 5 * 365  # 1825: línea base ISO 50001
+PISO_LOGS_DIAS = 7
+PISO_ALERTAS_DIAS = 30
+
 
 class PoliticaRetencionService:
     @staticmethod
@@ -16,11 +23,11 @@ class PoliticaRetencionService:
         return ahora - timedelta(days=plan.retencion_dias)
 
     @staticmethod
-    def fecha_corte_status_logs(ahora: datetime, dias: int = 7) -> datetime:
+    def fecha_corte_status_logs(ahora: datetime, dias: int = PISO_LOGS_DIAS) -> datetime:
         return ahora - timedelta(days=dias)
 
     @staticmethod
-    def fecha_corte_alertas_resueltas(ahora: datetime, dias: int = 30) -> datetime:
+    def fecha_corte_alertas_resueltas(ahora: datetime, dias: int = PISO_ALERTAS_DIAS) -> datetime:
         return ahora - timedelta(days=dias)
 
 
