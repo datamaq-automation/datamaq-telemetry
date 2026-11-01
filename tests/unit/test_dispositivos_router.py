@@ -346,7 +346,9 @@ def test_actualizar_dispositivo_put_error_inesperado_500():
 
 def test_actualizar_dispositivo_patch_exitoso():
     client, mocks = _cliente(rol="admin")
-    mocks["dispositivos"].actualizar_dispositivo_de_organizacion.return_value = _dispositivo_dto(id="dev-1", esta_activo=False)
+    mocks["dispositivos"].actualizar_dispositivo_de_organizacion.return_value = _dispositivo_dto(
+        id="dev-1", esta_activo=False
+    )
 
     payload = {"esta_activo": False}
     response = client.patch("/api/v1/dispositivos/dev-1", json=payload)

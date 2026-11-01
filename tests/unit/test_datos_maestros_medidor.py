@@ -194,7 +194,9 @@ def test_patch_rechaza_campo_gobernado_y_acepta_el_resto():
 def test_patch_gobernado_responde_422_por_http():
     app = create_app()
     use_case = MagicMock()
-    use_case.actualizar_dispositivo_de_organizacion.side_effect = CampoGestionadoPorYamlError("Gestionado por YAML: fases_con_ti.")
+    use_case.actualizar_dispositivo_de_organizacion.side_effect = CampoGestionadoPorYamlError(
+        "Gestionado por YAML: fases_con_ti."
+    )
     app.dependency_overrides[get_dispositivos_use_case] = lambda: use_case
     app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "u", "rol": "admin", "org": "o"}
     resp = TestClient(app).patch("/api/v1/dispositivos/dev-1", json={"fases_con_ti": "R"})
