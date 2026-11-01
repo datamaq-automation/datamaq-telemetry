@@ -27,6 +27,7 @@ from src.infrastructure.sqlalchemy.models import (
     TelemetryEnergyModel,
     TelemetryInstantaneousModel,
 )
+from src.infrastructure.sqlalchemy.repositories.telemetria_conteos_purga import ConteosPurgaSqlMixin
 from src.infrastructure.sqlalchemy.repositories.telemetria_mappers import (
     alerta_a_modelo,
     alerta_to_entity,
@@ -38,7 +39,7 @@ from src.infrastructure.sqlalchemy.repositories.telemetria_thd_actualizador impo
 )
 
 
-class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
+class MySQLTelemetriaRepository(ConteosPurgaSqlMixin, RepositorioTelemetriaPort):
     _instantanea_to_entity = staticmethod(instantanea_to_entity)
     _energia_to_entity = staticmethod(energia_to_entity)
     _alerta_to_entity = staticmethod(alerta_to_entity)
@@ -376,38 +377,6 @@ class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
             q = q.limit(limite)
         filas = q.all()
         return [LecturaPotenciaTemporal(momento=fila[0], potencia_w=float(fila[1])) for fila in filas]
-
-    def contar_instantaneas_anteriores_a(self, fecha_limite: datetime) -> int:
-        return int(
-            self.db.query(func.count(TelemetryInstantaneousModel.id))
-            .filter(TelemetryInstantaneousModel.recorded_at < fecha_limite)
-            .scalar()
-            or 0
-        )
-
-    def contar_energias_anteriores_a(self, fecha_limite: datetime) -> int:
-        return int(
-            self.db.query(func.count(TelemetryEnergyModel.id))
-            .filter(TelemetryEnergyModel.recorded_at < fecha_limite)
-            .scalar()
-            or 0
-        )
-
-    def contar_status_logs_anteriores_a(self, fecha_limite: datetime) -> int:
-        return int(
-            self.db.query(func.count(DeviceStatusLogModel.id))
-            .filter(DeviceStatusLogModel.recorded_at < fecha_limite)
-            .scalar()
-            or 0
-        )
-
-    def contar_alertas_resueltas_anteriores_a(self, fecha_limite: datetime) -> int:
-        return int(
-            self.db.query(func.count(DeviceAlertModel.id))
-            .filter(DeviceAlertModel.is_resolved.is_(True), DeviceAlertModel.resolved_at < fecha_limite)
-            .scalar()
-            or 0
-        )
 
     def purgar_instantaneas_anteriores_a(self, fecha_limite: datetime, batch_size: int = 1000) -> int:
         ids = [
