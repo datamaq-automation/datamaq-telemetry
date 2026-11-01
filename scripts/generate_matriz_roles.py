@@ -42,7 +42,6 @@ NOMBRES_DE_ROL_EN_CODIGO = {
     "operador",
     "mantenimiento",
     "ingeniero",
-    "auditor",
 }
 
 
