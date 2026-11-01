@@ -27,6 +27,7 @@ from src.infrastructure.sqlalchemy.models import (
     TelemetryEnergyModel,
     TelemetryInstantaneousModel,
 )
+from src.infrastructure.sqlalchemy.repositories.telemetria_conteos_purga import ConteosPurgaSqlMixin
 from src.infrastructure.sqlalchemy.repositories.telemetria_mappers import (
     alerta_a_modelo,
     alerta_to_entity,
@@ -38,7 +39,7 @@ from src.infrastructure.sqlalchemy.repositories.telemetria_thd_actualizador impo
 )
 
 
-class MySQLTelemetriaRepository(RepositorioTelemetriaPort):
+class MySQLTelemetriaRepository(ConteosPurgaSqlMixin, RepositorioTelemetriaPort):
     _instantanea_to_entity = staticmethod(instantanea_to_entity)
     _energia_to_entity = staticmethod(energia_to_entity)
     _alerta_to_entity = staticmethod(alerta_to_entity)
