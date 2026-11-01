@@ -185,7 +185,12 @@ def update_dispositivo(
         manejar_error_http(e)
 
 
-@router.post("/{device_id}/realtime", dependencies=[Depends(requiere_rol_escritura)])
+@router.post(
+    "/{device_id}/realtime",
+    # Primero el rol, después la propiedad (organización y planta, como el resto de las rutas /{device_id}): sin
+    # esto un usuario restringido a una planta ordenaba una ráfaga sobre un medidor de otra (datamaq#126).
+    dependencies=[Depends(requiere_rol_escritura), Depends(verificar_propiedad_dispositivo)],
+)
 def activate_realtime_mode(
     device_id: str,
     use_case: Annotated[GestionarDispositivosUseCase, Depends(get_dispositivos_use_case)],
