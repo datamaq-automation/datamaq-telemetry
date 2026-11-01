@@ -115,7 +115,7 @@ Con `AUTH_REQUIRED` apagado, `get_usuario_actual` devuelve `{"sub": "anon", "rol
 | GET | `/api/v1/sge/plantas/{planta_id}/facturas-distribuidora` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/sge_router.py:obtener_facturas_distribuidora` |
 | GET | `/api/v1/sge/plantas/{planta_id}/linea-base` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/sge_router.py:obtener_lineas_base` |
 | POST | `/api/v1/suscripciones/checkout` | `requiere_rol_admin` | `admin`, `superadmin` | — | no | `src/infrastructure/fastapi/routes/billing_router.py:crear_checkout_suscripcion` |
-| POST | `/api/v1/system/purge` | `requiere_rol_admin` | `admin`, `superadmin` | — | no | `src/infrastructure/fastapi/routes/system_router.py:trigger_purge` |
+| POST | `/api/v1/system/purge` | `requiere_rol_superadmin` | `superadmin` | — | no | `src/infrastructure/fastapi/routes/system_router.py:trigger_purge` |
 | GET | `/api/v1/system/ws-status` | — | todos (sin guard) | sin dependencia de auth detectada | no | `src/infrastructure/fastapi/routes/system_router.py:websocket_status` |
 | GET | `/api/v1/telemetria/alerts/{device_id}` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/telemetria_router.py:get_alerts_history` |
 | GET | `/api/v1/telemetria/energy/{device_id}` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/telemetria_router.py:get_energy_history` |

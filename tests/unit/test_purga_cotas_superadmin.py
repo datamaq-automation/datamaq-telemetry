@@ -6,6 +6,7 @@ usado por scripts/purge_telemetry.py y por el timer no cambia.
 """
 
 from datetime import datetime, timedelta, timezone
+from typing import ClassVar
 
 import pytest
 
@@ -27,7 +28,7 @@ AHORA = datetime(2026, 10, 31, 12, 0, tzinfo=timezone.utc)
 class SpyRepo(MockTelemetriaRepo):
     """Cuenta lo que la simulación contaría y registra cualquier borrado."""
 
-    CONTEOS = {"inst": 7, "energia": 3, "logs": 2, "alertas": 1}
+    CONTEOS: ClassVar[dict[str, int]] = {"inst": 7, "energia": 3, "logs": 2, "alertas": 1}
 
     def __init__(self) -> None:
         super().__init__()
