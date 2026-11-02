@@ -1,6 +1,6 @@
 """src/domain/telemetria/servicios/arbol_unifilar.py."""
 
-from collections import defaultdict
+from collections import defaultdict, deque
 
 from src.domain.telemetria.entities import NodoUnifilar
 from src.domain.telemetria.exceptions import (
@@ -72,9 +72,9 @@ class ArbolUnifilarService:
         raiz = self.obtener(nodo_id)
         resultado: list[NodoUnifilar] = []
         visitados: set[str] = set()
-        pendientes = [raiz]
+        pendientes = deque([raiz])
         while pendientes:
-            nodo = pendientes.pop(0)
+            nodo = pendientes.popleft()
             if nodo.id in visitados:
                 continue
             visitados.add(nodo.id)
