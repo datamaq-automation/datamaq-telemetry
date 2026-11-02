@@ -384,10 +384,15 @@ class RepositorioAuditoriaCambiosTIPort(ABC):
         tipo_cambio: str | None,
         desde: datetime | None,
         hasta: datetime | None,
+        organizacion_id: str | None = None,
     ) -> list[dict[str, Any]]:
+        """Cambios más recientes primero. Con ``organizacion_id`` solo los de medidores de plantas de esa organización
+        (un medidor sin planta no pertenece a ninguna); ``None`` es SIN filtro y solo lo pide el caso de uso."""
         pass
 
     @abstractmethod
-    def obtener(self, cambio_id: int) -> dict[str, Any] | None:
-        """Registro completo, con la clave ``dispositivo`` (dict con alias, ubicación y config) o None."""
+    def obtener(self, cambio_id: int, organizacion_id: str | None = None) -> dict[str, Any] | None:
+        """Registro completo, con la clave ``dispositivo`` (dict con alias, ubicación y config) o None.
+
+        Con ``organizacion_id``, None también si el medidor no es de esa organización. ``None`` es SIN filtro."""
         pass

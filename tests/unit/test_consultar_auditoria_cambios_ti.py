@@ -11,17 +11,20 @@ class _RepositorioFalso(RepositorioAuditoriaCambiosTIPort):
     def __init__(self, registros: list[dict[str, Any]]) -> None:
         self.registros = registros
         self.filtros_recibidos: dict[str, Any] = {}
+        self.organizacion_pedida_en_obtener: Any = "no se llamó"
 
-    def listar(self, dispositivo_id, tipo_cambio, desde, hasta):
+    def listar(self, dispositivo_id, tipo_cambio, desde, hasta, organizacion_id=None):
         self.filtros_recibidos = {
             "dispositivo_id": dispositivo_id,
             "tipo_cambio": tipo_cambio,
             "desde": desde,
             "hasta": hasta,
+            "organizacion_id": organizacion_id,
         }
         return list(self.registros)
 
-    def obtener(self, cambio_id: int):
+    def obtener(self, cambio_id: int, organizacion_id=None):
+        self.organizacion_pedida_en_obtener = organizacion_id
         return next((r for r in self.registros if r["id"] == cambio_id), None)
 
 
@@ -44,7 +47,7 @@ def test_listar_pasa_los_filtros_al_repositorio():
     desde = datetime(2026, 10, 1, tzinfo=timezone.utc)
 
     resultado = ConsultarAuditoriaCambiosTIUseCase(repo).listar(
-        dispositivo_id="c91713f1", tipo_cambio="correccion_angular", desde=desde
+        dispositivo_id="c91713f1", tipo_cambio="correccion_angular", desde=desde, todas_las_organizaciones=True
     )
 
     assert [r["id"] for r in resultado] == [1]
@@ -53,20 +56,70 @@ def test_listar_pasa_los_filtros_al_repositorio():
         "tipo_cambio": "correccion_angular",
         "desde": desde,
         "hasta": None,
+        "organizacion_id": None,
     }
 
 
 def test_listar_sin_filtros_no_filtra():
     repo = _RepositorioFalso([])
-    ConsultarAuditoriaCambiosTIUseCase(repo).listar()
-    assert repo.filtros_recibidos == {"dispositivo_id": None, "tipo_cambio": None, "desde": None, "hasta": None}
+    ConsultarAuditoriaCambiosTIUseCase(repo).listar(todas_las_organizaciones=True)
+    assert repo.filtros_recibidos == {
+        "dispositivo_id": None,
+        "tipo_cambio": None,
+        "desde": None,
+        "hasta": None,
+        "organizacion_id": None,
+    }
 
 
 def test_detalle_devuelve_el_registro_existente():
     repo = _RepositorioFalso([_registro(7)])
-    assert ConsultarAuditoriaCambiosTIUseCase(repo).detalle(7)["valor_nuevo"] == "R:-60,S:0"
+    assert (
+        ConsultarAuditoriaCambiosTIUseCase(repo).detalle(7, todas_las_organizaciones=True)["valor_nuevo"] == "R:-60,S:0"
+    )
 
 
 def test_detalle_devuelve_none_si_no_existe():
     repo = _RepositorioFalso([_registro(7)])
-    assert ConsultarAuditoriaCambiosTIUseCase(repo).detalle(99) is None
+    assert ConsultarAuditoriaCambiosTIUseCase(repo).detalle(99, todas_las_organizaciones=True) is None
+
+
+# --- Alcance por organización (datamaq#128) -----------------------------------------------------------------------
+
+
+def test_listar_sin_organizacion_ni_alcance_total_no_consulta_el_repositorio():
+    repo = _RepositorioFalso([_registro(1)])
+
+    assert ConsultarAuditoriaCambiosTIUseCase(repo).listar() == []
+    assert ConsultarAuditoriaCambiosTIUseCase(repo).listar(organizacion_id="") == []
+    assert repo.filtros_recibidos == {}
+
+
+def test_listar_con_organizacion_se_la_pasa_al_repositorio():
+    repo = _RepositorioFalso([_registro(1)])
+
+    ConsultarAuditoriaCambiosTIUseCase(repo).listar(organizacion_id="org-a")
+
+    assert repo.filtros_recibidos["organizacion_id"] == "org-a"
+
+
+def test_alcance_total_no_filtra_aunque_venga_una_organizacion():
+    repo = _RepositorioFalso([_registro(1)])
+
+    ConsultarAuditoriaCambiosTIUseCase(repo).listar(organizacion_id="org-a", todas_las_organizaciones=True)
+
+    assert repo.filtros_recibidos["organizacion_id"] is None
+
+
+def test_detalle_sin_organizacion_ni_alcance_total_no_consulta_el_repositorio():
+    repo = _RepositorioFalso([_registro(7)])
+
+    assert ConsultarAuditoriaCambiosTIUseCase(repo).detalle(7) is None
+    assert repo.organizacion_pedida_en_obtener == "no se llamó"
+
+
+def test_detalle_con_organizacion_se_la_pasa_al_repositorio():
+    repo = _RepositorioFalso([_registro(7)])
+
+    assert ConsultarAuditoriaCambiosTIUseCase(repo).detalle(7, organizacion_id="org-a") is not None
+    assert repo.organizacion_pedida_en_obtener == "org-a"

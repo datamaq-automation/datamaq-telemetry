@@ -1,15 +1,15 @@
 """src/infrastructure/fastapi/routes/admin_router.py — Router de auditoría y administración."""
 
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict
 
 from src.application.use_cases.consultar_auditoria_cambios_ti import ConsultarAuditoriaCambiosTIUseCase
-from src.domain.auth.entities import UsuarioAuth
 from src.infrastructure.fastapi.dependencies import get_usuario_actual, requiere_rol_admin
 from src.infrastructure.fastapi.dependencies_auditoria_ti import get_consultar_auditoria_cambios_ti
+from src.infrastructure.settings.config import get_settings
 
 
 class AuditoriaChangesTIResponseDTO(BaseModel):
@@ -40,6 +40,12 @@ class AuditoriaChangesListResponseDTO(BaseModel):
 router = APIRouter(prefix="/api/v1/admin", tags=["Administración"])
 
 
+def _alcance(claims: dict[str, Any]) -> dict[str, Any]:
+    """Organización del token y si ve todas: solo el superadmin, o el modo sin autenticación (desarrollo)."""
+    todas = claims.get("rol") == "superadmin" or not get_settings().AUTH_REQUIRED
+    return {"organizacion_id": claims.get("org"), "todas_las_organizaciones": todas}
+
+
 @router.get(
     "/auditoria/cambios-ti",
     response_model=AuditoriaChangesListResponseDTO,
@@ -48,7 +54,7 @@ router = APIRouter(prefix="/api/v1/admin", tags=["Administración"])
     dependencies=[Depends(requiere_rol_admin)],
 )
 async def listar_cambios_ti(
-    usuario_actual: Annotated[UsuarioAuth, Depends(get_usuario_actual)],
+    usuario_actual: Annotated[dict[str, Any], Depends(get_usuario_actual)],
     auditoria: Annotated[ConsultarAuditoriaCambiosTIUseCase, Depends(get_consultar_auditoria_cambios_ti)],
     dispositivo_id: str | None = Query(None, description="Filtrar por dispositivo_id"),
     tipo_cambio: str | None = Query(None, description="Filtrar por tipo_cambio"),
@@ -61,6 +67,7 @@ async def listar_cambios_ti(
         tipo_cambio=tipo_cambio,
         desde=desde,
         hasta=hasta,
+        **_alcance(usuario_actual),
     )
     return AuditoriaChangesListResponseDTO(
         total=len(registros),
@@ -77,11 +84,11 @@ async def listar_cambios_ti(
 )
 async def detalle_cambio_ti(
     cambio_id: int,
-    usuario_actual: Annotated[UsuarioAuth, Depends(get_usuario_actual)],
+    usuario_actual: Annotated[dict[str, Any], Depends(get_usuario_actual)],
     auditoria: Annotated[ConsultarAuditoriaCambiosTIUseCase, Depends(get_consultar_auditoria_cambios_ti)],
 ) -> AuditoriaChangesTIDetailDTO:
     """Obtener detalles completos de un cambio TI."""
-    cambio = auditoria.detalle(cambio_id)
+    cambio = auditoria.detalle(cambio_id, **_alcance(usuario_actual))
     if cambio is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cambio no encontrado")
 
