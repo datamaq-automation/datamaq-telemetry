@@ -1,7 +1,7 @@
 """src/infrastructure/fastapi/routes/usuarios_router.py — Router de administración de usuarios."""
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -17,6 +17,7 @@ from src.domain.auth.services import HashContrasenaService
 from src.infrastructure.fastapi.auth_dependencies import get_acceso_plantas_use_case
 from src.infrastructure.fastapi.dependencies import (
     get_registrar_auditoria_use_case,
+    get_token_revocation_service,
     get_usuario_actual,
     get_usuarios_repository,
     requiere_rol_admin,
@@ -131,8 +132,12 @@ def dar_baja_usuario(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado.")
 
     _verificar_baja_permitida(claims, usuario)
+    # La baja corta también las sesiones abiertas (datamaq#127), igual que «cerrar todas las sesiones».
+    ahora = datetime.now(timezone.utc)
     usuario.esta_activo = False
+    usuario.sesiones_revocadas_antes_de = ahora
     repo_usuarios.guardar(usuario)
+    get_token_revocation_service().revocar_usuario(usuario.id, int(ahora.timestamp()))
 
     if audit_use_case is not None:
         try:
