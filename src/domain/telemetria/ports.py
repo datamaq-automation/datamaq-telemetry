@@ -415,3 +415,17 @@ class RepositorioFactoryPort(ABC):
     def planes(self) -> RepositorioPlanesPort:
         """Crea o provee el repositorio de planes de telemetría."""
         pass
+
+
+class NotificadoresFactoryPort(ABC):
+    """Abstract Factory para la familia de salida de eventos y notificaciones."""
+
+    @abstractmethod
+    def notificador_alertas(self) -> NotificadorAlertasPort:
+        """Crea o provee el notificador de alertas (email/notificaciones externas)."""
+        pass
+
+    @abstractmethod
+    def publicador_eventos(self) -> PublicadorEventosPort:
+        """Crea o provee el publicador de eventos y telemetría en tiempo real."""
+        pass

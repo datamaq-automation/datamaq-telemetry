@@ -13,7 +13,7 @@ from paho.mqtt.enums import CallbackAPIVersion
 from src.adapters.gateways.dispositivos_datos_maestros_gateway import DispositivosConDatosMaestrosGateway
 from src.application.use_cases.gestionar_disponibilidad import GestionarDisponibilidadUseCase
 from src.application.use_cases.ingestar_telemetria import IngestarTelemetriaUseCase
-from src.domain.telemetria.ports import PublicadorEventosPort
+from src.domain.telemetria.ports import NotificadoresFactoryPort, PublicadorEventosPort
 from src.domain.telemetria.services import FiltroDeduplicacionService
 from src.domain.telemetria.servicios.consumo_mqtt import AcumuladorConsumoHorario, uid_desde_topico
 from src.infrastructure.paho_mqtt.ingesta_sin_escritura import sin_escritura_si
@@ -34,24 +34,21 @@ from src.infrastructure.yaml.repositories.organizaciones_repository import YamlO
 logger = get_logger("mqtt_listener")
 
 
-def _configurar_notificador_alertas(settings, session_factory) -> None:
+def _configurar_notificador_alertas(
+    settings,
+    session_factory,
+    notificadores_factory: NotificadoresFactoryPort | None = None,
+) -> None:
     from src.application.use_cases.ingesta.procesador_alertas_ingesta import (
         ProcesadorAlertasIngesta,
     )
-    from src.infrastructure.auth.email_service import SmtpEmailService
     from src.infrastructure.paho_mqtt.verificador_notificaciones import (
         construir_verificador_notificaciones,
     )
+    from src.infrastructure.settings.notificadores_factory import ProduccionNotificadoresFactory
 
-    notificador = SmtpEmailService(
-        host=settings.SMTP_HOST,
-        port=settings.SMTP_PORT,
-        user=settings.SMTP_USER,
-        password=settings.SMTP_PASSWORD,
-        use_tls=settings.SMTP_TLS,
-        from_email=settings.SMTP_FROM,
-        app_env=settings.APP_ENV,
-    )
+    factory = notificadores_factory or ProduccionNotificadoresFactory(settings)
+    notificador = factory.notificador_alertas()
     dests = [d.strip() for d in settings.ALERTAS_EMAIL_DESTINATARIOS.split(",") if d.strip()]
     verificador_plan = construir_verificador_notificaciones(
         session_factory, billing_habilitado=settings.BILLING_HABILITADO
