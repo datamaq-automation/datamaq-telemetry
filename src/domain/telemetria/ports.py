@@ -204,8 +204,12 @@ class RepositorioTelemetriaPort(ABC):
         desde: datetime | None = None,
         hasta: datetime | None = None,
         organizacion_id: str | None = None,
+        plantas_ids: list[str] | None = None,
     ) -> list[AlertaDispositivo]:
-        """Con `organizacion_id`, solo alertas de dispositivos de plantas de esa organización."""
+        """Con `organizacion_id`, solo alertas de dispositivos de plantas de esa organización.
+
+        Con `plantas_ids`, solo las de dispositivos de esas plantas; el filtro va ANTES del límite. `None` es sin
+        filtro por planta y una lista vacía no devuelve nada (datamaq#137)."""
         pass
 
     @abstractmethod

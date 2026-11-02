@@ -200,14 +200,17 @@ class MySQLTelemetriaRepository(ConteosPurgaSqlMixin, RepositorioTelemetriaPort)
         desde: datetime | None = None,
         hasta: datetime | None = None,
         organizacion_id: str | None = None,
+        plantas_ids: list[str] | None = None,
     ) -> list[AlertaDispositivo]:
         q = self.db.query(DeviceAlertModel)
-        if organizacion_id:
-            q = (
-                q.join(DeviceModel, DeviceAlertModel.device_id == DeviceModel.id)
-                .join(FacilityModel, DeviceModel.facility_id == FacilityModel.id)
-                .filter(FacilityModel.organization_id == organizacion_id)
+        if organizacion_id or plantas_ids is not None:
+            q = q.join(DeviceModel, DeviceAlertModel.device_id == DeviceModel.id).join(
+                FacilityModel, DeviceModel.facility_id == FacilityModel.id
             )
+        if organizacion_id:
+            q = q.filter(FacilityModel.organization_id == organizacion_id)
+        if plantas_ids is not None:
+            q = q.filter(FacilityModel.id.in_(plantas_ids))
         if dispositivo_id:
             q = q.filter(DeviceAlertModel.device_id == dispositivo_id)
         if solo_abiertas:
