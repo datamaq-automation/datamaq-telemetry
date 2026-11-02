@@ -8,13 +8,13 @@ from src.application.use_cases.asistente.procesar_pregunta_asistente import (
     ProcesarPreguntaAsistenteUseCase,
 )
 from src.infrastructure.asistente.clasificador_reglas import (
-    ClasificadorIntencionReglasAdapter,
+    ClasificadorIntencionPorReglas,
 )
 from src.infrastructure.groq.groq_adapter import GroqRespuestaAdapter
 
 
 def test_clasificador_intencion_reglas():
-    clasificador = ClasificadorIntencionReglasAdapter()
+    clasificador = ClasificadorIntencionPorReglas()
 
     res1 = clasificador.clasificar("¿Por qué recibí una alerta de desconexión en el Trafo Usina?")
     assert res1.nombre == "EXPLICAR_ALERTAS"
@@ -34,7 +34,7 @@ def test_clasificador_intencion_reglas():
 
 def test_procesar_pregunta_asistente_aislamiento_y_sin_alucinaciones():
     # 1. Mocks de dependencias
-    clasificador = ClasificadorIntencionReglasAdapter()
+    clasificador = ClasificadorIntencionPorReglas()
     generador = GroqRespuestaAdapter(api_key="mock-key")
 
     repo_conv = MagicMock()
@@ -170,7 +170,7 @@ def test_asistente_incluye_telemetria_en_contexto():
 
 
 def test_clasificador_maneja_preguntas_vacias_y_ambiguas():
-    clasificador = ClasificadorIntencionReglasAdapter()
+    clasificador = ClasificadorIntencionPorReglas()
 
     # Una pregunta vacía no debe activar ninguna intención.
     vacia = clasificador.clasificar("")

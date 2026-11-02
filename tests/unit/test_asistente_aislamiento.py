@@ -15,7 +15,7 @@ from src.application.use_cases.asistente.procesar_pregunta_asistente import Proc
 from src.application.use_cases.gestionar_alertas import GestionarAlertasUseCase
 from src.application.use_cases.gestionar_dispositivos import GestionarDispositivosUseCase
 from src.domain.asistente.entities import RespuestaAsistente
-from src.infrastructure.asistente.clasificador_reglas import ClasificadorIntencionReglasAdapter
+from src.infrastructure.asistente.clasificador_reglas import ClasificadorIntencionPorReglas
 from src.infrastructure.fastapi.dependencies import get_procesar_pregunta_asistente_use_case, get_usuario_actual
 from src.infrastructure.fastapi.routes.asistente_router import router as asistente_router
 from src.infrastructure.fastapi.server import create_app
@@ -78,7 +78,7 @@ def _use_case(db: Session, generador: GeneradorQueCaptura) -> ProcesarPreguntaAs
     repo_conv = MagicMock()
     repo_conv.crear_conversacion.return_value = MagicMock(id="conv-1")
     return ProcesarPreguntaAsistenteUseCase(
-        clasificador=ClasificadorIntencionReglasAdapter(),
+        clasificador=ClasificadorIntencionPorReglas(),
         generador=generador,
         repo_conversaciones=repo_conv,
         gestor_alertas=GestionarAlertasUseCase(MySQLTelemetriaRepository(db)),
