@@ -25,15 +25,7 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from src.domain.telemetria.exceptions import FacturaDistribuidoraIlegibleError  # noqa: E402
-from src.infrastructure.pdfplumber.parser_factura_distribuidora import (  # noqa: E402
-    ParserFacturaEnergiaCammesa,
-    ParserFacturaPotenciaEdelap,
-)
-
-_PARSERS = {
-    "potencia": ParserFacturaPotenciaEdelap,
-    "energia": ParserFacturaEnergiaCammesa,
-}
+from src.infrastructure.pdfplumber.factura_parser_factory import FacturaParserFactory  # noqa: E402
 
 
 def _bloque_yaml(f) -> str:
@@ -92,12 +84,21 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("ruta_pdf", help="Ruta al PDF de la factura")
     parser.add_argument("planta_id", help="ID de la planta (data/organizaciones.yml)")
-    parser.add_argument("--tipo", choices=sorted(_PARSERS), required=True, help="potencia (EdeLAP) o energia (CAMMESA)")
+    parser.add_argument(
+        "--tipo",
+        choices=["potencia", "energia", "edelap", "cammesa"],
+        default=None,
+        help="potencia (EdeLAP) o energia (CAMMESA). Si se omite, se autodetecta por contenido del PDF.",
+    )
     args = parser.parse_args()
 
     try:
-        factura = _PARSERS[args.tipo]().parsear(args.ruta_pdf, args.planta_id)
-    except FacturaDistribuidoraIlegibleError as e:
+        if args.tipo:
+            parser_factura = FacturaParserFactory.crear_por_tipo(args.tipo)
+        else:
+            parser_factura = FacturaParserFactory.detectar_y_crear(args.ruta_pdf)
+        factura = parser_factura.parsear(args.ruta_pdf, args.planta_id)
+    except (FacturaDistribuidoraIlegibleError, ValueError) as e:
         print(f"[ERROR] No se pudo parsear la factura: {e}", file=sys.stderr)
         return 1
 
