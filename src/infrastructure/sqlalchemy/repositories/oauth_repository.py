@@ -243,7 +243,8 @@ class MySQLOAuthRepository(OAuthRepositoryPort):
                 client_id=client_id,
                 client_name=client_name or "Cliente Dinámico",
                 redirect_uris=",".join(sorted(uris_nuevas)),
-                is_trusted=True,
+                # Solo el cliente oficial de Claude es confiable; un alta dinámica (dyn-*) no hereda esa marca (datamaq#131).
+                is_trusted=client_id == CLIENT_ID_CLAUDE,
                 created_at=ahora,
             )
             self.db.add(model)
