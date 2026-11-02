@@ -333,6 +333,10 @@ def test_actualizar_dispositivo_put_no_encontrado_404():
 
 def test_actualizar_dispositivo_put_limite_excedido_422():
     client, mocks = _cliente(rol="operador")
+    # La planta destino se valida con la política de plantas (datamaq#133): acá la permite y lo que se prueba es el cupo.
+    acceso = MagicMock()
+    acceso.resolver_planta_permitida.return_value = "otra-planta"
+    client.app.dependency_overrides[get_acceso_plantas_use_case] = lambda: acceso
     mocks["dispositivos"].actualizar_dispositivo_de_organizacion.side_effect = LimiteDispositivosExcedidoError(
         "Cupo máximo alcanzado al cambiar de planta."
     )
