@@ -92,3 +92,21 @@ class TestValidar:
     def test_ciclo(self):
         with pytest.raises(EstructuraUnifilarInvalidaError):
             ArbolUnifilarService([_nodo("a", parent_id="b"), _nodo("b", parent_id="a")]).validar()
+
+    def test_mismo_device_id_en_dos_nodos_no_lanza_silencioso(self):
+        """Dos nodos con el mismo device_id son un error de configuración: validar() lo rechaza (datamaq#147)."""
+        arbol = ArbolUnifilarService(
+            [
+                _nodo("mt"),
+                _nodo("trafo-a", parent_id="mt", device_id="dev-1", orden=0),
+                _nodo("trafo-b", parent_id="mt", device_id="dev-1", orden=1),
+            ]
+        )
+        with pytest.raises(EstructuraUnifilarInvalidaError, match="dev-1"):
+            arbol.validar()
+
+    def test_nodo_virtual_sin_hijos_no_lanza_silencioso(self):
+        """Un nodo sin device_id y sin hijos no tiene medición posible: validar() lo rechaza (datamaq#147)."""
+        arbol = ArbolUnifilarService([_nodo("mt"), _nodo("tgbt", parent_id="mt")])
+        with pytest.raises(EstructuraUnifilarInvalidaError, match="tgbt"):
+            arbol.validar()
