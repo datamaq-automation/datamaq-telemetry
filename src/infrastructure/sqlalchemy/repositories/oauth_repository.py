@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from src.domain.oauth.entities import OAuthClient, OAuthCode, OAuthRefreshToken
 from src.domain.oauth.ports import OAuthRepositoryPort
+from src.domain.oauth.services import CLIENT_ID_CLAUDE, URIS_REDIRECT_CLAUDE_POR_DEFECTO
 from src.infrastructure.sqlalchemy.models import (
     OAuthClientModel,
     OAuthCodeModel,
@@ -15,14 +16,9 @@ from src.infrastructure.sqlalchemy.models import (
 
 CLIENTES_PREDETERMINADOS = [
     {
-        "client_id": "claude-ai",
+        "client_id": CLIENT_ID_CLAUDE,
         "client_name": "Claude (Anthropic)",
-        "redirect_uris": (
-            "https://claude.ai/api/mcp/oauth/callback,"
-            "https://claude.ai/api/mcp/oauth_callback,"
-            "https://claude.com/api/mcp/oauth/callback,"
-            "https://claude.com/api/mcp/oauth_callback"
-        ),
+        "redirect_uris": ",".join(URIS_REDIRECT_CLAUDE_POR_DEFECTO),
     },
     {
         "client_id": "datamaq-mcp-client",
@@ -88,11 +84,9 @@ class MySQLOAuthRepository(OAuthRepositoryPort):
         if not model:
             return None
 
-        uris_set = set(u.strip() for u in model.redirect_uris.split(",") if u.strip())
-        for c in CLIENTES_PREDETERMINADOS:
-            if c["client_id"] == client_id:
-                uris_set.update(u.strip() for u in c["redirect_uris"].split(",") if u.strip())
-        uris = tuple(sorted(uris_set))
+        # Las URIs guardadas se devuelven tal cual. Para claude-ai no son la fuente de verdad: AutorizarConsentimiento
+        # y RegistrarClienteOAuth usan la lista cerrada configurada (datamaq#131).
+        uris = tuple(sorted(u.strip() for u in model.redirect_uris.split(",") if u.strip()))
         return OAuthClient(
             client_id=model.client_id,
             client_name=model.client_name,
@@ -236,16 +230,14 @@ class MySQLOAuthRepository(OAuthRepositoryPort):
         return list(integraciones.values())
 
     def registrar_o_actualizar_cliente(self, client_id: str, client_name: str, redirect_uris: list[str]) -> OAuthClient:
+        """Registra un cliente nuevo. Si el client_id ya existe lo devuelve SIN modificarlo (datamaq#131).
+
+        El nombre es histórico: ya no actualiza. Quien registra no puede ampliar las redirect_uris de un cliente existente
+        ni cambiarle el nombre; antes se hacía la unión de URIs, y así un anónimo agregaba la suya a `claude-ai`.
+        """
         model = self.db.query(OAuthClientModel).filter(OAuthClientModel.client_id == client_id).first()
         uris_nuevas = set(u.strip() for u in redirect_uris if u.strip())
-        if model:
-            uris_existentes = set(u.strip() for u in model.redirect_uris.split(",") if u.strip())
-            todas = sorted(uris_existentes.union(uris_nuevas))
-            model.redirect_uris = ",".join(todas)
-            if client_name and model.client_name != client_name and client_name != "Claude":
-                model.client_name = client_name
-            self.db.commit()
-        else:
+        if not model:
             ahora = datetime.now(timezone.utc)
             model = OAuthClientModel(
                 client_id=client_id,
