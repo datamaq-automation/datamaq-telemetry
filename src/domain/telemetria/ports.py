@@ -391,3 +391,41 @@ class RepositorioAuditoriaCambiosTIPort(ABC):
     def obtener(self, cambio_id: int) -> dict[str, Any] | None:
         """Registro completo, con la clave ``dispositivo`` (dict con alias, ubicación y config) o None."""
         pass
+
+
+class RepositorioFactoryPort(ABC):
+    """Abstract Factory para la familia de repositorios nucleares de telemetría y suscripciones."""
+
+    @abstractmethod
+    def dispositivos(self) -> RepositorioDispositivosPort:
+        """Crea o provee el repositorio de dispositivos."""
+        pass
+
+    @abstractmethod
+    def telemetria(self) -> RepositorioTelemetriaPort:
+        """Crea o provee el repositorio de lecturas y eventos de telemetría."""
+        pass
+
+    @abstractmethod
+    def suscripciones(self) -> RepositorioSuscripcionesPort:
+        """Crea o provee el repositorio de suscripciones comerciales."""
+        pass
+
+    @abstractmethod
+    def planes(self) -> RepositorioPlanesPort:
+        """Crea o provee el repositorio de planes de telemetría."""
+        pass
+
+
+class NotificadoresFactoryPort(ABC):
+    """Abstract Factory para la familia de salida de eventos y notificaciones."""
+
+    @abstractmethod
+    def notificador_alertas(self) -> NotificadorAlertasPort:
+        """Crea o provee el notificador de alertas (email/notificaciones externas)."""
+        pass
+
+    @abstractmethod
+    def publicador_eventos(self) -> PublicadorEventosPort:
+        """Crea o provee el publicador de eventos y telemetría en tiempo real."""
+        pass
