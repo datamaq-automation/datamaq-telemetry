@@ -10,9 +10,11 @@ from src.application.dtos.dispositivo_dto import (
     DispositivoResponseDTO,
     DispositivoUpdateDTO,
 )
+from src.application.use_cases.gestionar_acceso_plantas import GestionarAccesoPlantasUseCase
 from src.application.use_cases.gestionar_auditoria import RegistrarEventoAuditoriaUseCase
 from src.application.use_cases.gestionar_dispositivos import GestionarDispositivosUseCase
 from src.domain.auth.services import roles_de_acceso_global
+from src.infrastructure.fastapi.auth_dependencies import get_acceso_plantas_use_case
 from src.infrastructure.fastapi.dependencies import (
     get_dispositivos_use_case,
     get_mqtt_listener,
@@ -70,7 +72,14 @@ def get_dispositivo(
 def register_dispositivo(
     dto: DispositivoCreateDTO,
     use_case: Annotated[GestionarDispositivosUseCase, Depends(get_dispositivos_use_case)],
+    claims: Annotated[dict, Depends(get_usuario_actual)],
+    acceso_plantas: Annotated[GestionarAccesoPlantasUseCase, Depends(get_acceso_plantas_use_case)],
 ):
+    # La planta destino tiene que ser una que el usuario puede ver: de su organización y de sus plantas asignadas.
+    # Una ajena o inexistente responde 404. El superadmin no tiene filtro (datamaq#132). Sin planta_id el alta sigue
+    # permitida, como antes: queda como pregunta para el dueño.
+    if dto.planta_id is not None and not _es_superadmin_o_sin_auth(claims):
+        resolver_planta_permitida(claims=claims, acceso_plantas=acceso_plantas, planta_id=dto.planta_id)
     try:
         return use_case.registrar_dispositivo(dto)
     except Exception as e:
