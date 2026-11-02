@@ -45,6 +45,8 @@ class GestionarPlantaEstructuraUseCase:
             return UnifilarPlantaDTO(planta_id="", nombre_planta="", nodos=[])
         nodos = self.repo_organizaciones.obtener_nodos_unifilar(planta.id)
         nombres_maquina = self._nombres_maquina_por_dispositivo(planta, nodos)
+        # Constructor directo a propósito: esta vista muestra el unifilar aunque sea inválido
+        # (topologia_valida=False). La fábrica lo rechazaría (datamaq#146).
         arbol = ArbolUnifilarService(nodos)
         try:
             arbol.validar()

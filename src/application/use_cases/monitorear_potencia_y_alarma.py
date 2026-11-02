@@ -126,7 +126,7 @@ class MonitorearPotenciaYAlarmaUseCase:
             from src.domain.telemetria.servicios.arbol_unifilar import ArbolUnifilarService
             from src.domain.telemetria.value_objects import TipoNodoUnifilar
 
-            arbol = ArbolUnifilarService(nodos)
+            arbol = ArbolUnifilarService.desde(nodos)
             nodo_raiz = next(
                 (n for n in nodos if n.tipo in (TipoNodoUnifilar.TGBT, TipoNodoUnifilar.TRANSFORMADOR)),
                 None,

@@ -12,6 +12,7 @@ from src.application.use_cases.agregacion_dispositivos import calcular_datos_des
 from src.application.use_cases.consultar_nodo_unifilar import ConsultarNodoUnifilarUseCase
 from src.application.use_cases.consultar_telemetria import ConsultarTelemetriaUseCase
 from src.domain.telemetria.entities import Dispositivo, LecturaInstantanea, MedicionFase, NodoUnifilar, Planta
+from src.domain.telemetria.exceptions import EstructuraUnifilarInvalidaError
 from src.domain.telemetria.value_objects import MacAddress, PotenciaActiva, TipoNodoUnifilar
 
 DEV_ID = "dev-nav"
@@ -218,6 +219,7 @@ def nodo_use_case():
             tipo=TipoNodoUnifilar.SECCIONAL,
             tension_nominal_v=380.0,
             parent_id="mt",
+            device_id="c",
         ),
     ]
     return ConsultarNodoUnifilarUseCase(repo_org, MagicMock(), MagicMock())
@@ -235,8 +237,8 @@ def test_nodo_filtra_puntos_anteriores_al_corte_mas_reciente(nodo_use_case):
     c1 = datetime(2026, 9, 1, 0, 0, tzinfo=timezone.utc)
     c2 = datetime(2026, 9, 1, 1, 0, tzinfo=timezone.utc)
     consultar = nodo_use_case.consultar_telemetria
-    consultar.datos_desde.side_effect = {"a": c1, "b": c2}.get
-    # "a" tiene datos desde c1; "b" recién desde c2: antes de c2 la suma estaría incompleta.
+    consultar.datos_desde.side_effect = {"a": c1, "b": c2, "c": c2}.get
+    # "a" tiene datos desde c1; "b" y "c" recién desde c2: antes de c2 la suma estaría incompleta.
     consultar.listar_instantaneas.side_effect = lambda dev, **kw: [
         _lectura_dto(dev, c2 + timedelta(minutes=5)),
         _lectura_dto(dev, c1 + timedelta(minutes=5)),
@@ -249,8 +251,27 @@ def test_nodo_filtra_puntos_anteriores_al_corte_mas_reciente(nodo_use_case):
     assert consultar.listar_instantaneas.call_args.kwargs["hasta"] == c2 + timedelta(hours=1)
 
 
-def test_nodo_sin_medidores_frontera_no_informa_datos_desde(nodo_use_case):
+def test_nodo_sin_telemetria_no_devuelve_puntos(nodo_use_case):
+    """Un nodo medido sin telemetria: sin puntos, y el corte de retención de su medidor como datos_desde."""
     historico = nodo_use_case.historico("p", "vacio", "o", "5m", 24)
 
-    assert historico.datos_desde is None
     assert historico.puntos == []
+    assert historico.datos_desde is not None
+
+
+def test_planta_con_virtual_sin_hijos_se_rechaza_al_navegar(nodo_use_case):
+    """Un nodo virtual sin hijos vuelve inválido el unifilar: la navegación lo rechaza (datamaq#146)."""
+    nodo_use_case.repo_organizaciones.obtener_nodos_unifilar.return_value = [
+        *nodo_use_case.repo_organizaciones.obtener_nodos_unifilar.return_value,
+        NodoUnifilar(
+            id="huerfano",
+            planta_id="p",
+            nombre="huerfano",
+            tipo=TipoNodoUnifilar.SECCIONAL,
+            tension_nominal_v=380.0,
+            parent_id="mt",
+        ),
+    ]
+
+    with pytest.raises(EstructuraUnifilarInvalidaError, match="huerfano"):
+        nodo_use_case.historico("p", "mt", "o", "5m", 24)

@@ -159,7 +159,7 @@ class ConsultarNodoUnifilarUseCase:
         desde la que se proyecta el agregado.
         """
         planta = self._resolver_planta(planta_id, organizacion_id)
-        arbol = ArbolUnifilarService(self.repo_organizaciones.obtener_nodos_unifilar(planta.id))
+        arbol = ArbolUnifilarService.desde(self.repo_organizaciones.obtener_nodos_unifilar(planta.id))
         return arbol.obtener(nodo_id), arbol.nodos_medidores_frontera(nodo_id)
 
     def _calcular_compensacion_historica(
