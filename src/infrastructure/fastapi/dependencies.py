@@ -48,7 +48,11 @@ from src.domain.auth.ports import (
 from src.domain.auth.services import HashContrasenaService, RateLimiterService, TokenRevocationService
 from src.domain.oauth.ports import OAuthRepositoryPort
 from src.domain.telemetria.parametros_regulatorios import RepositorioParametrosRegulatoriosPort
-from src.domain.telemetria.ports import RepositorioDispositivosPort, RepositorioTelemetriaPort
+from src.domain.telemetria.ports import (
+    RepositorioDispositivosPort,
+    RepositorioFactoryPort,
+    RepositorioTelemetriaPort,
+)
 from src.infrastructure.auth.email_service import SmtpEmailService
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
 from src.infrastructure.fastapi.acceso_oauth import integracion_oauth_vigente
@@ -74,6 +78,7 @@ from src.infrastructure.sqlalchemy.mysql_repositories import (
 from src.infrastructure.sqlalchemy.repositories.parametros_regulatorios_repository import (
     RepositorioParametrosRegulatoriosSqlAlchemy,
 )
+from src.infrastructure.sqlalchemy.repository_factory import SQLAlchemyRepositorioFactory
 from src.infrastructure.yaml.repositories.organizaciones_repository import (
     YamlOrganizacionesRepository,
 )
@@ -190,16 +195,22 @@ def get_dispositivos_use_case(
     )
 
 
-def get_planes_use_case(
+def get_repositorio_factory(
     db: Annotated[Session, Depends(get_db_session)],
+) -> RepositorioFactoryPort:
+    return SQLAlchemyRepositorioFactory(db)
+
+
+def get_planes_use_case(
+    repo_factory: Annotated[RepositorioFactoryPort, Depends(get_repositorio_factory)],
 ) -> GestionarPlanesUseCase:
-    return GestionarPlanesUseCase(MySQLPlanesRepository(db))
+    return GestionarPlanesUseCase(repo_factory.planes())
 
 
 def get_purga_use_case(
-    db: Annotated[Session, Depends(get_db_session)],
+    repo_factory: Annotated[RepositorioFactoryPort, Depends(get_repositorio_factory)],
 ) -> PurgarTelemetriaExpiradaUseCase:
-    repo_telem = MySQLTelemetriaRepository(db)
+    repo_telem = repo_factory.telemetria()
     logger = get_logger("purga_telemetria")
     return PurgarTelemetriaExpiradaUseCase(repo_telem, logger=logger)
 
