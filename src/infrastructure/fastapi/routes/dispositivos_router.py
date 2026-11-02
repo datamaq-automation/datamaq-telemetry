@@ -10,9 +10,11 @@ from src.application.dtos.dispositivo_dto import (
     DispositivoResponseDTO,
     DispositivoUpdateDTO,
 )
+from src.application.use_cases.gestionar_acceso_plantas import GestionarAccesoPlantasUseCase
 from src.application.use_cases.gestionar_auditoria import RegistrarEventoAuditoriaUseCase
 from src.application.use_cases.gestionar_dispositivos import GestionarDispositivosUseCase
 from src.domain.auth.services import roles_de_acceso_global
+from src.infrastructure.fastapi.auth_dependencies import get_acceso_plantas_use_case
 from src.infrastructure.fastapi.dependencies import (
     get_dispositivos_use_case,
     get_mqtt_listener,
@@ -155,16 +157,31 @@ def _es_superadmin_o_sin_auth(claims: dict | None) -> bool:
     return (claims or {}).get("rol") == "superadmin" or not get_settings().AUTH_REQUIRED
 
 
-@router.put("/{device_id}", response_model=DispositivoResponseDTO, dependencies=[Depends(requiere_rol_escritura)])
-@router.patch("/{device_id}", response_model=DispositivoResponseDTO, dependencies=[Depends(requiere_rol_escritura)])
+# Primero el rol, después la propiedad del medidor (organización y planta, como el resto de las rutas /{device_id}):
+# sin esto un usuario restringido a una planta editaba un medidor de otra (datamaq#133). Las dependencias van en línea
+# en cada decorador: el generador de la matriz de roles solo lee listas literales.
+@router.put(
+    "/{device_id}",
+    response_model=DispositivoResponseDTO,
+    dependencies=[Depends(requiere_rol_escritura), Depends(verificar_propiedad_dispositivo)],
+)
+@router.patch(
+    "/{device_id}",
+    response_model=DispositivoResponseDTO,
+    dependencies=[Depends(requiere_rol_escritura), Depends(verificar_propiedad_dispositivo)],
+)
 def update_dispositivo(
     device_id: str,
     dto: DispositivoUpdateDTO,
     use_case: Annotated[GestionarDispositivosUseCase, Depends(get_dispositivos_use_case)],
+    acceso_plantas: Annotated[GestionarAccesoPlantasUseCase, Depends(get_acceso_plantas_use_case)],
     claims: Annotated[dict | None, Depends(get_usuario_actual)] = None,
     audit_use_case: Annotated[RegistrarEventoAuditoriaUseCase | None, Depends(get_registrar_auditoria_use_case)] = None,
     request: Request = None,  # type: ignore[assignment]
 ):
+    # Mover el medidor a otra planta: la de destino también tiene que ser una planta permitida del usuario.
+    if dto.planta_id is not None and not _es_superadmin_o_sin_auth(claims):
+        resolver_planta_permitida(claims=claims or {}, acceso_plantas=acceso_plantas, planta_id=dto.planta_id)
     try:
         dev_previo = None
         if audit_use_case is not None:

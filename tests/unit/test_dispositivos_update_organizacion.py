@@ -16,7 +16,9 @@ from src.application.use_cases.gestionar_dispositivos import GestionarDispositiv
 from src.domain.telemetria.entities import Dispositivo
 from src.domain.telemetria.exceptions import DispositivoNoEncontradoError, PlantaNoEncontradaError
 from src.domain.telemetria.value_objects import MacAddress
+from src.infrastructure.fastapi.auth_dependencies import get_acceso_plantas_use_case
 from src.infrastructure.fastapi.dependencies import get_registrar_auditoria_use_case, get_usuario_actual
+from src.infrastructure.fastapi.device_ownership import verificar_propiedad_dispositivo
 from src.infrastructure.fastapi.routes import dispositivos_router as router_mod
 
 ORG_A = "org-a"
@@ -150,6 +152,10 @@ def _app(claims: dict, monkeypatch) -> FastAPI:
     app.include_router(router_mod.router)
     app.dependency_overrides[get_usuario_actual] = lambda: claims
     app.dependency_overrides[get_registrar_auditoria_use_case] = lambda: None
+    # Este archivo prueba la regla de organización del caso de uso (#118); la propiedad por planta y la política de
+    # plantas tienen su batería en test_edicion_dispositivo_por_planta.py (datamaq#133).
+    app.dependency_overrides[verificar_propiedad_dispositivo] = lambda: None
+    app.dependency_overrides[get_acceso_plantas_use_case] = lambda: MagicMock()
     repo = _RepoDispositivos()
     app.dependency_overrides[router_mod.get_dispositivos_use_case] = lambda: _use_case(repo)
     monkeypatch.setattr(router_mod, "get_mqtt_listener", lambda: MagicMock())

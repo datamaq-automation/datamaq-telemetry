@@ -12,7 +12,9 @@ from src.domain.telemetria.entities import Dispositivo, InstalacionMedidor, Nodo
 from src.domain.telemetria.exceptions import CampoGestionadoPorYamlError
 from src.domain.telemetria.servicios.datos_maestros_medidor import DatosMaestrosMedidorService
 from src.domain.telemetria.value_objects import MacAddress, TipoNodoUnifilar
+from src.infrastructure.fastapi.auth_dependencies import get_acceso_plantas_use_case
 from src.infrastructure.fastapi.dependencies import get_dispositivos_use_case, get_usuario_actual
+from src.infrastructure.fastapi.device_ownership import verificar_propiedad_dispositivo
 from src.infrastructure.fastapi.server import create_app
 from src.infrastructure.yaml.repositories.organizaciones_repository import YamlOrganizacionesRepository
 
@@ -199,6 +201,9 @@ def test_patch_gobernado_responde_422_por_http():
     )
     app.dependency_overrides[get_dispositivos_use_case] = lambda: use_case
     app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "u", "rol": "admin", "org": "o"}
+    # Acá se prueba el 422 por campo gobernado por YAML; la propiedad por planta tiene su batería (datamaq#133).
+    app.dependency_overrides[verificar_propiedad_dispositivo] = lambda: None
+    app.dependency_overrides[get_acceso_plantas_use_case] = lambda: MagicMock()
     resp = TestClient(app).patch("/api/v1/dispositivos/dev-1", json={"fases_con_ti": "R"})
     assert resp.status_code == 422
     assert "Gestionado por YAML" in resp.json()["detail"]
