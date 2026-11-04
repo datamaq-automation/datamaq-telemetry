@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from src.application.use_cases.gestionar_acceso_plantas import GestionarAccesoPlantasUseCase
 from src.domain.telemetria.exceptions import PlantaNoEncontradaError
 from src.domain.telemetria.services import debe_recibir_evento
-from src.domain.telemetria.value_objects import MacAddress
+from src.domain.telemetria.servicios.identificador_medidor import parsear_identificador_medidor
 from src.infrastructure.fastapi.auth_dependencies import get_acceso_plantas_use_case
 from src.infrastructure.fastapi.dependencies import get_usuario_actual, repo_dispositivos_resuelto
 from src.infrastructure.settings.config import get_settings
@@ -70,7 +70,8 @@ def verificar_propiedad_dispositivo(
     dispositivo = repo_dispositivos.obtener_por_id(id_dispositivo)
     if dispositivo is None:
         try:
-            dispositivo = repo_dispositivos.obtener_por_uid(MacAddress(id_dispositivo))
+            ident = parsear_identificador_medidor(id_dispositivo)
+            dispositivo = repo_dispositivos.obtener_por_uid(ident.mac, ident.medidor_id)
         except Exception:
             dispositivo = None
     if dispositivo is None:

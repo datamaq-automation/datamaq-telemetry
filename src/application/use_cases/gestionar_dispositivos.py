@@ -28,7 +28,7 @@ from src.domain.telemetria.ports import (
     RepositorioSuscripcionesPort,
 )
 from src.domain.telemetria.servicios.datos_maestros_medidor import DatosMaestrosMedidorService
-from src.domain.telemetria.value_objects import MacAddress
+from src.domain.telemetria.servicios.identificador_medidor import parsear_identificador_medidor
 
 
 class GestionarDispositivosUseCase:
@@ -107,8 +107,8 @@ class GestionarDispositivosUseCase:
         dev = self.repo_dispositivos.obtener_por_id(id_o_uid)
         if not dev:
             try:
-                mac_vo = MacAddress(id_o_uid)
-                dev = self.repo_dispositivos.obtener_por_uid(mac_vo)
+                ident = parsear_identificador_medidor(id_o_uid)
+                dev = self.repo_dispositivos.obtener_por_uid(ident.mac, ident.medidor_id)
             except Exception:
                 pass
         if not dev:
@@ -159,8 +159,8 @@ class GestionarDispositivosUseCase:
         dev = self.repo_dispositivos.obtener_por_id(id_o_uid)
         if not dev:
             try:
-                mac_vo = MacAddress(id_o_uid)
-                dev = self.repo_dispositivos.obtener_por_uid(mac_vo)
+                ident = parsear_identificador_medidor(id_o_uid)
+                dev = self.repo_dispositivos.obtener_por_uid(ident.mac, ident.medidor_id)
             except Exception:
                 pass
         if not dev:

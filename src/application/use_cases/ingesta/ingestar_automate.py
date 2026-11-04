@@ -82,7 +82,9 @@ class IngestarAutomateUseCase:
                 disp.marcar_online(ahora)
                 return disp
 
-            disp = self.repo_dispositivos.obtener_por_uid(mac_vo)
+            disp = self.repo_dispositivos.obtener_por_uid(
+                mac_vo
+            )  # Automate: un solo medidor por MAC (default del puerto)
             if not disp:
                 if not self.permitir_auto_registro:
                     return None

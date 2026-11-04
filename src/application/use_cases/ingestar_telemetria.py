@@ -37,6 +37,49 @@ from src.domain.telemetria.ports import (
 from src.domain.telemetria.servicios.analizador_calidad_metrologica import AnalizadorMetrologicoService
 
 
+def _validar_coherencia_fasorial(
+    lectura: Any,
+    dispositivo_id: str,
+    recorded_at: datetime,
+    repo_telemetria: RepositorioTelemetriaPort,
+    logger: LoggerPort | None,
+) -> None:
+    """Capa 1: Valida coherencia fasorial. Registra anomalía si error_s > 15%."""
+    try:
+        errores = []
+        for fase in ["r", "s", "t"]:
+            p = getattr(lectura, f"potencia_activa_{fase}", None)
+            q = getattr(lectura, f"potencia_reactiva_{fase}", None)
+            s = getattr(lectura, f"potencia_aparente_{fase}", None)
+
+            if p is None or q is None or s is None:
+                continue
+
+            p_val = float(p.vatios) if hasattr(p, "vatios") else float(p)
+            q_val = float(q.var) if hasattr(q, "var") else float(q)
+            s_val = float(s.va) if hasattr(s, "va") else float(s)
+
+            s_teorica = math.sqrt(p_val**2 + q_val**2)
+            if s_teorica > 0:
+                error_pct = 100.0 * abs(s_val - s_teorica) / s_teorica
+                errores.append(error_pct)
+
+        if errores:
+            max_error = max(errores)
+            if max_error > 15.0:  # Umbral: 15%
+                repo_telemetria.guardar_anomalia(dispositivo_id, max_error, recorded_at)
+                if logger:
+                    logger.warning(
+                        "coherencia_baja_detectada",
+                        device_id=dispositivo_id,
+                        error_s_pct=round(max_error, 2),
+                        recorded_at=recorded_at.isoformat(),
+                    )
+    except Exception as e:
+        if logger:
+            logger.error("error_validar_coherencia", error=str(e))
+
+
 class IngestarTelemetriaUseCase:
     """Caso de uso de orquestación de ingesta y normalización de telemetría MQTT."""
 
@@ -114,6 +157,10 @@ class IngestarTelemetriaUseCase:
         partes = topico.split("/")
         if len(partes) < 4:
             return
+        # Pro15 (`pro15/{MAC}/{sub}/v1`) tiene su propio despacho por medidor. Acá `partes[2]` sería el
+        # subtópico (`inst`), y el resolvedor lo registraría como dispositivo. Nunca se toma por MAC.
+        if partes[0] == "pro15":
+            return
 
         mac_raw = partes[2]
         subtopico = partes[3]
@@ -136,6 +183,21 @@ class IngestarTelemetriaUseCase:
         if dispositivo is None:
             return
 
+        self.procesar_con_dispositivo(topico, mac_raw, subtopico, payload, dispositivo, recorded_at)
+
+    def procesar_con_dispositivo(
+        self,
+        topico: str,
+        mac_raw: str,
+        subtopico: str,
+        payload: dict[str, Any],
+        dispositivo: Dispositivo,
+        recorded_at: datetime,
+    ) -> None:
+        """Despacha un subtópico ya resuelto a su dispositivo (un medidor concreto).
+
+        Lo usa el despacho Pro15, que resuelve (MAC, medidor_id) antes de llamar acá.
+        """
         if subtopico == "inst":
             self._procesar_instantanea(topico, mac_raw, payload, dispositivo, recorded_at)
         elif subtopico in ("acc", "energyio"):
@@ -291,39 +353,7 @@ class IngestarTelemetriaUseCase:
         recorded_at: datetime,
     ) -> None:
         """Capa 1: Valida coherencia fasorial. Flag si error_s > 15%."""
-        try:
-            errores = []
-            for fase in ["r", "s", "t"]:
-                p = getattr(lectura, f"potencia_activa_{fase}", None)
-                q = getattr(lectura, f"potencia_reactiva_{fase}", None)
-                s = getattr(lectura, f"potencia_aparente_{fase}", None)
-
-                if p is None or q is None or s is None:
-                    continue
-
-                p_val = float(p.vatios) if hasattr(p, "vatios") else float(p)
-                q_val = float(q.var) if hasattr(q, "var") else float(q)
-                s_val = float(s.va) if hasattr(s, "va") else float(s)
-
-                s_teorica = math.sqrt(p_val**2 + q_val**2)
-                if s_teorica > 0:
-                    error_pct = 100.0 * abs(s_val - s_teorica) / s_teorica
-                    errores.append(error_pct)
-
-            if errores:
-                max_error = max(errores)
-                if max_error > 15.0:  # Umbral: 15%
-                    self.repo_telemetria.guardar_anomalia(dispositivo_id, max_error, recorded_at)
-                    if self.logger:
-                        self.logger.warning(
-                            "coherencia_baja_detectada",
-                            device_id=dispositivo_id,
-                            error_s_pct=round(max_error, 2),
-                            recorded_at=recorded_at.isoformat(),
-                        )
-        except Exception as e:
-            if self.logger:
-                self.logger.error("error_validar_coherencia", error=str(e))
+        _validar_coherencia_fasorial(lectura, dispositivo_id, recorded_at, self.repo_telemetria, self.logger)
 
 
 __all__ = [
