@@ -154,3 +154,19 @@ def bloques_por_subtopico(subtopico: str, payload: Any) -> list[BloquePro15]:
     }
     conversor = conversores.get(subtopico)
     return conversor(payload) if conversor else []
+
+
+def device_info_pro15_a_formato_ingesta(device_info: Any) -> dict[str, Any] | None:
+    """`device_info` del Pro15 → claves que lee el resolvedor (serial_number, device_fw, device_model).
+
+    El Pro15 manda `sn`, `fw` y `model`; el resolvedor espera otros nombres. Sin este mapeo el equipo
+    se registraría como `SmartPlus` y sin serie ni firmware.
+    """
+    if not isinstance(device_info, dict):
+        return None
+    mapeado: dict[str, Any] = {}
+    for origen, destino in (("sn", "serial_number"), ("fw", "device_fw"), ("model", "device_model")):
+        valor = device_info.get(origen)
+        if isinstance(valor, str) and valor.strip():
+            mapeado[destino] = valor.strip()
+    return mapeado or None
