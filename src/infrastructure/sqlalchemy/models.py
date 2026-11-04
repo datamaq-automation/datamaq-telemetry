@@ -78,12 +78,15 @@ class FacilityModel(Base):
 
 class DeviceModel(Base):
     __tablename__ = "devices"
+    __table_args__ = (UniqueConstraint("device_uid", "medidor_id", name="uq_devices_uid_medidor"),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     facility_id: Mapped[str | None] = mapped_column(
         String(36), ForeignKey("facilities.id", ondelete="SET NULL"), nullable=True
     )
-    device_uid: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    device_uid: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    # Pro15: una MAC con varios medidores internos (0, 1, …). Equipos de un medidor: 0. Ver migración f1a2b3c4d5e6.
+    medidor_id: Mapped[int] = mapped_column(nullable=False, default=0, server_default="0")
     serial_number: Mapped[str | None] = mapped_column(String(64), nullable=True)
     name: Mapped[str] = mapped_column(String(100), default="Nuevo Powermeter", nullable=False)
     model: Mapped[str] = mapped_column(String(50), default="SmartPlus", nullable=False)
