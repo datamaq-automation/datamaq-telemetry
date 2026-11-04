@@ -227,6 +227,8 @@ class Dispositivo:
     device_uid: MacAddress
     nombre: str
     modelo: str = "SmartPlus"
+    # Medidor interno dentro de la MAC (Pro15: 0 y 1). Equipos de un solo medidor: 0.
+    medidor_id: int = 0
     planta_id: str | None = None
     numero_serie: str | None = None
     version_hw: str | None = None

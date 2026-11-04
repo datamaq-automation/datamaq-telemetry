@@ -33,7 +33,7 @@ class MockDispositivosRepo(RepositorioDispositivosPort):
     def obtener_por_id(self, dispositivo_id: str) -> Dispositivo | None:
         return self.dispositivos.get(dispositivo_id)
 
-    def obtener_por_uid(self, uid: MacAddress) -> Dispositivo | None:
+    def obtener_por_uid(self, uid: MacAddress, medidor_id: int = 0) -> Dispositivo | None:
         return None
 
     def listar(self, planta_id: str | None = None, organizacion_id: str | None = None) -> list[Dispositivo]:

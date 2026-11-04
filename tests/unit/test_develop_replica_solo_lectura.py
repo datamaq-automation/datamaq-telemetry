@@ -32,7 +32,7 @@ class _Repo:
         self.llamadas.append("guardar")
         return dispositivo
 
-    def obtener_por_uid(self, uid):
+    def obtener_por_uid(self, uid, medidor_id=0):
         self.llamadas.append("obtener_por_uid")
         return "dispositivo"
 

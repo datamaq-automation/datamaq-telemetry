@@ -6,6 +6,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
+from typing import Any
 
 import paho.mqtt.client as mqtt
 from paho.mqtt.enums import CallbackAPIVersion
@@ -54,6 +55,57 @@ def _configurar_notificador_alertas(
         session_factory, billing_habilitado=settings.BILLING_HABILITADO
     )
     ProcesadorAlertasIngesta.configurar_notificador(notificador, dests, verificador_plan=verificador_plan)
+
+
+def _despachar_mensaje_mqtt(
+    topic: str,
+    payload: dict | list,
+    repo_disp: Any,
+    repo_telem: Any,
+    disponibilidad_use_case: Any,
+    publicador: PublicadorEventosPort | None,
+    permitir_auto_registro: bool,
+) -> None:
+    if topic.startswith("auto24v4m/"):
+        from src.application.use_cases.ingesta.ingestar_automate import IngestarAutomateUseCase
+
+        automate_use_case = IngestarAutomateUseCase(
+            repo_dispositivos=repo_disp,
+            disponibilidad_use_case=disponibilidad_use_case,
+            logger=logger,
+            permitir_auto_registro=permitir_auto_registro,
+        )
+        automate_use_case.ejecutar(topic, payload)
+    elif topic.startswith("pro15/"):
+        # Pro15: un topic con varios medidores (lista por medidor). Su despacho resuelve (MAC, medidor_id).
+        from src.application.use_cases.ingesta.ingestar_pro15 import IngestarPro15UseCase
+
+        telemetria = IngestarTelemetriaUseCase(
+            repo_dispositivos=repo_disp,
+            repo_telemetria=repo_telem,
+            publicador=publicador,
+            logger=logger,
+            permitir_auto_registro=permitir_auto_registro,
+            disponibilidad_use_case=disponibilidad_use_case,
+        )
+        IngestarPro15UseCase(
+            repo_dispositivos=repo_disp,
+            repo_telemetria=repo_telem,
+            telemetria=telemetria,
+            publicador=publicador,
+            logger=logger,
+            permitir_auto_registro=permitir_auto_registro,
+        ).ejecutar(topic, payload)
+    elif isinstance(payload, dict):
+        use_case = IngestarTelemetriaUseCase(
+            repo_dispositivos=repo_disp,
+            repo_telemetria=repo_telem,
+            publicador=publicador,
+            logger=logger,
+            permitir_auto_registro=permitir_auto_registro,
+            disponibilidad_use_case=disponibilidad_use_case,
+        )
+        use_case.ejecutar(topic, payload)
 
 
 class MQTTListener:
@@ -223,26 +275,15 @@ class MQTTListener:
                 repo_paradas=MySQLParadasProgramadasRepository(db),
             )
 
-            if topic.startswith("auto24v4m/"):
-                from src.application.use_cases.ingesta.ingestar_automate import IngestarAutomateUseCase
-
-                automate_use_case = IngestarAutomateUseCase(
-                    repo_dispositivos=repo_disp,
-                    disponibilidad_use_case=disponibilidad_use_case,
-                    logger=logger,
-                    permitir_auto_registro=self.settings.MQTT_AUTO_REGISTER_DEVICES,
-                )
-                automate_use_case.ejecutar(topic, payload)
-            elif isinstance(payload, dict):
-                use_case = IngestarTelemetriaUseCase(
-                    repo_dispositivos=repo_disp,
-                    repo_telemetria=repo_telem,
-                    publicador=self.publicador,
-                    logger=logger,
-                    permitir_auto_registro=self.settings.MQTT_AUTO_REGISTER_DEVICES,
-                    disponibilidad_use_case=disponibilidad_use_case,
-                )
-                use_case.ejecutar(topic, payload)
+            _despachar_mensaje_mqtt(
+                topic=topic,
+                payload=payload,
+                repo_disp=repo_disp,
+                repo_telem=repo_telem,
+                disponibilidad_use_case=disponibilidad_use_case,
+                publicador=self.publicador,
+                permitir_auto_registro=self.settings.MQTT_AUTO_REGISTER_DEVICES,
+            )
         finally:
             db.close()
 

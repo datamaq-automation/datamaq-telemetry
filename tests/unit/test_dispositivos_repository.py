@@ -24,6 +24,7 @@ def _crear_device_model(
     id: str = DEVICE_ID,
     facility_id: str | None = PLANTA_ID,
     device_uid: str = MAC_STR,
+    medidor_id: int = 0,
     serial_number: str | None = "SN-12345",
     name: str = "Medidor Principal",
     model: str = "SmartPlus",
@@ -43,6 +44,7 @@ def _crear_device_model(
         id=id,
         facility_id=facility_id,
         device_uid=device_uid,
+        medidor_id=medidor_id,
         serial_number=serial_number,
         name=name,
         model=model,
@@ -144,33 +146,50 @@ class TestMySQLDispositivosRepositoryObtener:
         repo = MySQLDispositivosRepository(session)
         uid = MacAddress("AA:BB:CC:DD:EE:01")
         model = _crear_device_model(device_uid=uid.valor, name="Medidor Tablero 2")
-        query.first.return_value = model
+        query.one_or_none.return_value = model
 
         resultado = repo.obtener_por_uid(uid)
 
         session.query.assert_called_once_with(DeviceModel)
         assert query.filter.call_count == 1
-        filter_expr = query.filter.call_args[0][0]
-        assert filter_expr.compare(DeviceModel.device_uid == uid.valor)
+        filter_args = query.filter.call_args[0]
+        assert any(expr.compare(DeviceModel.device_uid == uid.valor) for expr in filter_args)
+        assert any(expr.compare(DeviceModel.medidor_id == 0) for expr in filter_args)
 
         assert resultado is not None
         assert resultado.id == DEVICE_ID
         assert resultado.device_uid == uid
         assert resultado.nombre == "Medidor Tablero 2"
+        assert resultado.medidor_id == 0
 
     def test_obtener_por_uid_inexistente_retorna_none(self, mock_db: tuple[MagicMock, MagicMock]):
         session, query = mock_db
         repo = MySQLDispositivosRepository(session)
         uid = MacAddress("11:22:33:44:55:66")
-        query.first.return_value = None
+        query.one_or_none.return_value = None
 
         resultado = repo.obtener_por_uid(uid)
 
         session.query.assert_called_once_with(DeviceModel)
         assert query.filter.call_count == 1
-        filter_expr = query.filter.call_args[0][0]
-        assert filter_expr.compare(DeviceModel.device_uid == uid.valor)
+        filter_args = query.filter.call_args[0]
+        assert any(expr.compare(DeviceModel.device_uid == uid.valor) for expr in filter_args)
+        assert any(expr.compare(DeviceModel.medidor_id == 0) for expr in filter_args)
         assert resultado is None
+
+    def test_obtener_por_uid_con_medidor_especifico(self, mock_db: tuple[MagicMock, MagicMock]):
+        session, query = mock_db
+        repo = MySQLDispositivosRepository(session)
+        uid = MacAddress("AA:BB:CC:DD:EE:01")
+        model = _crear_device_model(device_uid=uid.valor, medidor_id=1, name="Trafo 2")
+        query.one_or_none.return_value = model
+
+        resultado = repo.obtener_por_uid(uid, medidor_id=1)
+
+        filter_args = query.filter.call_args[0]
+        assert any(expr.compare(DeviceModel.medidor_id == 1) for expr in filter_args)
+        assert resultado is not None
+        assert resultado.medidor_id == 1
 
 
 class TestMySQLDispositivosRepositoryListar:

@@ -33,7 +33,7 @@ Por lo tanto, **todo medidor debe configurarse así y no hay alternativa válida
 | Seguridad | `TLS-SERVER-AUTH` |
 | Certificado CA | **ISRG Root X1** (Let's Encrypt) — [`isrg_root_x1.pem`](../isrg_root_x1.pem) en la raíz del repo |
 | Usuario MQTT | `datamaq_device` |
-| Contraseña MQTT | valor de `MQTT_PASSWORD` en `/var/www/datamaq-telemetry/.env` del VPS (**no se versiona**) |
+| Contraseña MQTT | la clave de `datamaq_device`, que **no** es la de `MQTT_PASSWORD` del `.env` (esa es la de `datamaq-backend`, desde el hardening del 2026-11-03). Se entrega fuera del repo (**no se versiona**). |
 | Client ID | la MAC del equipo, mayúsculas sin separadores (ej. `D48C49F03564`) |
 | Keepalive Wi-Fi | `30` s |
 
@@ -109,7 +109,7 @@ Desde el navegador en `http://192.168.4.1/home.html`:
    * **Seguridad:** `TLS-SERVER-AUTH`
    * **Client ID:** la MAC del equipo (ej. `D48C49F03564`)
    * **Usuario:** `datamaq_device`
-   * **Contraseña:** la de `MQTT_PASSWORD` del `.env` de producción
+   * **Contraseña:** la clave de `datamaq_device` (no la de `MQTT_PASSWORD` del `.env` de producción, que es la de `datamaq-backend`)
 3. Sección **Certificado CA MQTT:** pegar el contenido de `isrg_root_x1.pem`.
 4. **Guardar MQTT** y luego reiniciar el equipo desde la sección **Reinicio**.
 

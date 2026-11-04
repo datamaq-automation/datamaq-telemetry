@@ -35,7 +35,8 @@ class RepositorioDispositivosPort(ABC):
         pass
 
     @abstractmethod
-    def obtener_por_uid(self, uid: MacAddress) -> Dispositivo | None:
+    def obtener_por_uid(self, uid: MacAddress, medidor_id: int = 0) -> Dispositivo | None:
+        """Medidor `medidor_id` dentro de la MAC. Con (uid, medidor_id) la fila es única: nunca devuelve otra."""
         pass
 
     @abstractmethod
