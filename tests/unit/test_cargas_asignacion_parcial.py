@@ -100,7 +100,7 @@ def org_con_asignacion_parcial(monkeypatch):
         def obtener_por_id(self, id_):
             return dispositivos.get(id_)
 
-        def obtener_por_uid(self, _uid):
+        def obtener_por_uid(self, _uid, medidor_id=0):
             return None
 
     monkeypatch.setattr(device_ownership, "repo_dispositivos_resuelto", lambda db: _RepoDispositivosFalso())

@@ -42,7 +42,7 @@ class _RepoDispositivos:
     def obtener_por_id(self, dispositivo_id):
         return self.disp.get(dispositivo_id)
 
-    def obtener_por_uid(self, uid):
+    def obtener_por_uid(self, uid, medidor_id=0):
         return next((d for d in self.disp.values() if d.device_uid.valor == uid.valor), None)
 
     def listar(self, planta_id=None, organizacion_id=None):

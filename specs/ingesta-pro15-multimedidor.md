@@ -37,7 +37,7 @@ Hecho en `src/domain/telemetria/servicios/pro15_payload.py` (stdlib, puro, sin e
 
 ## 3. Casos de Uso & DTOs
 
-**Modelo de identidad (propuesta, no aplicada):**
+**Modelo de identidad (Opción A, aprobada técnicamente por el padre el 2026-11-03; implementada en código, no ejecutada):**
 
 - Hoy `devices.device_uid` es `String(64) UNIQUE` (`src/infrastructure/sqlalchemy/models.py`) y `MacAddress` acepta solo 12 hex. Una MAC es un dispositivo, así que los dos trafos se pisarían.
 - Opción A (**recomendada**): nueva columna `medidor_id` (entero, nullable; `NULL` para todos los equipos actuales) y restricción única `(device_uid, medidor_id)` en lugar de `device_uid` única. Los dos trafos son dos filas con la misma MAC y `medidor_id` 0 y 1. El `device_uid` queda igual, así que los equipos `m/wifi/#` no cambian.
@@ -48,6 +48,12 @@ Hecho en `src/domain/telemetria/servicios/pro15_payload.py` (stdlib, puro, sin e
 **Despacho (pendiente):** en `MQTTListener._ejecutar_ingesta`, los tópicos `pro15/…` van a un caso de uso nuevo `IngestarPro15UseCase` (patrón de `IngestarAutomateUseCase`), igual que `auto24v4m/`. Por cada bloque: resuelve dispositivo (MAC, `medidor_id`), y reusa `IngestarTelemetriaUseCase` para `inst`/`acc`/`energyio`/`thd` con el bloque convertido. `onoff`/`status` van a su manejo existente (heartbeat / log de estado).
 
 **Modelo del `device_info` (pendiente):** el resolvedor lee `device_model` y `hw_model` (`resolvedor_dispositivo.py`), pero el Pro15 manda `model` y `fw`. Hay que mapear `model`→`modelo` y `fw`→`version_fw`. Sin ese cambio el equipo se registra como `SmartPlus`.
+
+**Propiedad y organización por medidor (decisión del padre, 2026-11-03):** cada medidor se resuelve por su fila `(device_uid, medidor_id)`. No se hereda de la MAC. El esquema lo permite: la fila trae `facility_id`, y el repositorio resuelve `(uid, medidor)` con `one_or_none`. Lo que falta no es de esquema sino de exposición:
+
+- **Medidor 1 no es direccionable por MAC.** Las rutas y casos de uso que reciben solo una MAC (`device_ownership`, `consultar_telemetria`, `gestionar_dispositivos` x2, `ingestar_automate`, `resolver_organizacion_id`) resuelven el medidor 0 por default. Un medidor 1 solo se alcanza por su `id` interno.
+- **Pendiente de API:** exponer el `id` del medidor (o `MAC/medidor`) en las rutas. Bloquea activar la ingesta del Pro15 en producción, **no** el desarrollo.
+- **Deuda de tests:** ~20 fakes de `RepositorioDispositivosPort` tienen la firma `obtener_por_uid(self, uid)`. Se actualizan a `(self, uid, medidor_id=0)` cuando se habilite la ejecución de tests.
 
 **Garantía de no regresión:** el despacho de `m/wifi/#` y `auto24v4m/#` no cambia. `pro15/` se evalúa antes del caso genérico solo por prefijo exacto.
 

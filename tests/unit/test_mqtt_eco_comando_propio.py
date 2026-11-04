@@ -18,7 +18,7 @@ class _RepoDisp:
         if dispositivo is not None:
             self.dispositivos[dispositivo.id] = dispositivo
 
-    def obtener_por_uid(self, uid: MacAddress) -> Dispositivo | None:
+    def obtener_por_uid(self, uid: MacAddress, medidor_id: int = 0) -> Dispositivo | None:
         for d in self.dispositivos.values():
             if d.device_uid.valor == uid.valor:
                 return d
