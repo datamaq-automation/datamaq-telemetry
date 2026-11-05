@@ -133,17 +133,13 @@ def get_rate_limiter() -> RateLimiterService:
 
 def get_telemetria_use_case(
     db: Annotated[Session, Depends(get_db_session)],
-    settings: Annotated[Settings, Depends(get_settings_dep)],
+    settings: Annotated[Settings, Depends(get_settings_dep)] | None = None,
 ) -> ConsultarTelemetriaUseCase:
-    repo_disp = repo_dispositivos_resuelto(db)
-    repo_telem = MySQLTelemetriaRepository(db)
-    repo_org = YamlOrganizacionesRepository()
-    repo_planes = MySQLPlanesRepository(db)
     return ConsultarTelemetriaUseCase(
-        repo_telem,
-        repo_disp,
-        repo_org,
-        repo_planes,
+        MySQLTelemetriaRepository(db),
+        repo_dispositivos_resuelto(db),
+        YamlOrganizacionesRepository(),
+        MySQLPlanesRepository(db),
         buffer_en_vivo=global_telemetria_buffer,
         repo_suscripciones=MySQLSuscripcionesRepository(db),
         billing_habilitado=False,
@@ -161,8 +157,7 @@ def get_exportar_telemetria_use_case(
     db: Annotated[Session, Depends(get_db_session)],
 ) -> ExportarTelemetriaUseCase:
     return ExportarTelemetriaUseCase(
-        repo_telemetria=MySQLTelemetriaRepository(db),
-        repo_dispositivos=repo_dispositivos_resuelto(db),
+        repo_telemetria=MySQLTelemetriaRepository(db), repo_dispositivos=repo_dispositivos_resuelto(db)
     )
 
 
@@ -170,8 +165,7 @@ def get_exportar_disponibilidad_use_case(
     db: Annotated[Session, Depends(get_db_session)],
 ) -> ExportarDisponibilidadUseCase:
     return ExportarDisponibilidadUseCase(
-        repo_maquinas=MySQLMaquinasRepository(db),
-        repo_eventos=MySQLEventosDisponibilidadRepository(db),
+        repo_maquinas=MySQLMaquinasRepository(db), repo_eventos=MySQLEventosDisponibilidadRepository(db)
     )
 
 
@@ -179,8 +173,7 @@ def get_exportar_cargas_use_case(
     db: Annotated[Session, Depends(get_db_session)],
 ) -> ExportarCargasUseCase:
     return ExportarCargasUseCase(
-        repo_cargas=MySQLCargasRepository(db),
-        repo_intervalos=MySQLIntervalosActividadRepository(db),
+        repo_cargas=MySQLCargasRepository(db), repo_intervalos=MySQLIntervalosActividadRepository(db)
     )
 
 
@@ -550,6 +543,4 @@ def get_monitorear_potencia_use_case(
     )
 
     # Lectura pura: sin publisher, el GET no publica ni instancia TuyaPublisher (Issue #98).
-    repo_org = YamlOrganizacionesRepository()
-    buffer = global_telemetria_buffer
-    return MonitorearPotenciaYAlarmaUseCase(repo_org, buffer)
+    return MonitorearPotenciaYAlarmaUseCase(YamlOrganizacionesRepository(), global_telemetria_buffer)
