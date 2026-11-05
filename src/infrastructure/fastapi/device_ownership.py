@@ -138,6 +138,7 @@ def get_verificador_propiedad_dispositivo(
 def verificar_propiedad_maquina(
     claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
     db: Annotated[Session, Depends(get_db_session)],
+    acceso_plantas: Annotated[GestionarAccesoPlantasUseCase | None, Depends(get_acceso_plantas_use_case)] = None,
     maquina_id: str | None = None,
 ) -> None:
     """Rechaza con 404 si la máquina pedida no pertenece a la organización del usuario
@@ -158,6 +159,20 @@ def verificar_propiedad_maquina(
     organizacion_maquina = _organizacion_de_dispositivo(db, maquina.dispositivo_id)
     if not debe_recibir_evento(False, claims.get("org"), organizacion_maquina):
         raise HTTPException(status_code=404, detail="maquina_no_encontrada")
+
+    if acceso_plantas is not None and maquina.dispositivo_id:
+        repo_dispositivos = repo_dispositivos_resuelto(db)
+        dispositivo = repo_dispositivos.obtener_por_id(maquina.dispositivo_id)
+        if dispositivo is not None and dispositivo.planta_id:
+            try:
+                acceso_plantas.resolver_planta_permitida(
+                    usuario_id=str(claims.get("sub") or "") or None,
+                    rol=str(claims.get("rol") or ""),
+                    organizacion_id=claims.get("org"),
+                    planta_id=dispositivo.planta_id,
+                )
+            except PlantaNoEncontradaError as err:
+                raise HTTPException(status_code=404, detail="maquina_no_encontrada") from err
 
 
 def verificar_propiedad_alerta(
@@ -188,6 +203,7 @@ def verificar_propiedad_alerta(
 def verificar_propiedad_evento_disponibilidad(
     claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
     db: Annotated[Session, Depends(get_db_session)],
+    acceso_plantas: Annotated[GestionarAccesoPlantasUseCase | None, Depends(get_acceso_plantas_use_case)] = None,
     evento_id: int | None = None,
 ) -> None:
     """Rechaza con 404 si el evento de disponibilidad pedido no pertenece a la organización
@@ -213,3 +229,17 @@ def verificar_propiedad_evento_disponibilidad(
     organizacion_evento = _organizacion_de_dispositivo(db, maquina.dispositivo_id)
     if not debe_recibir_evento(False, claims.get("org"), organizacion_evento):
         raise HTTPException(status_code=404, detail="evento_no_encontrado")
+
+    if acceso_plantas is not None and maquina.dispositivo_id:
+        repo_dispositivos = repo_dispositivos_resuelto(db)
+        dispositivo = repo_dispositivos.obtener_por_id(maquina.dispositivo_id)
+        if dispositivo is not None and dispositivo.planta_id:
+            try:
+                acceso_plantas.resolver_planta_permitida(
+                    usuario_id=str(claims.get("sub") or "") or None,
+                    rol=str(claims.get("rol") or ""),
+                    organizacion_id=claims.get("org"),
+                    planta_id=dispositivo.planta_id,
+                )
+            except PlantaNoEncontradaError as err:
+                raise HTTPException(status_code=404, detail="evento_no_encontrado") from err

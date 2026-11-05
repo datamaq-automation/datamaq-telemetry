@@ -10,11 +10,13 @@ from src.application.dtos.organizacion_dto import (
 )
 from src.application.use_cases.gestionar_acceso_plantas import GestionarAccesoPlantasUseCase
 from src.application.use_cases.gestionar_dispositivos import GestionarDispositivosUseCase
+from src.domain.auth.services import roles_de_acceso_global
 from src.infrastructure.fastapi.auth_dependencies import get_acceso_plantas_use_case
 from src.infrastructure.fastapi.dependencies import (
     get_dispositivos_use_case,
     get_usuario_actual,
 )
+from src.infrastructure.settings.config import get_settings
 
 router = APIRouter(
     prefix="/api/v1",
@@ -30,7 +32,7 @@ def list_organizaciones(
 ):
     rol = claims.get("rol")
     orgs = use_case.listar_organizaciones()
-    if rol == "superadmin":
+    if rol in roles_de_acceso_global(get_settings().ROLES_ACCESO_GLOBAL_EXTRA):
         return orgs
     claim_org = claims.get("org")
     if claim_org is None:
@@ -46,7 +48,8 @@ def list_plantas(
     organizacion_id: str | None = None,
 ):
     rol = claims.get("rol")
-    if rol == "superadmin":
+    es_global = rol in roles_de_acceso_global(get_settings().ROLES_ACCESO_GLOBAL_EXTRA)
+    if es_global:
         target_org = organizacion_id
     else:
         claim_org = claims.get("org")
@@ -57,7 +60,7 @@ def list_plantas(
         target_org = claim_org
 
     plantas = use_case.listar_plantas(target_org)
-    if rol == "superadmin":
+    if es_global:
         return plantas
 
     permitidas = acceso_plantas.resolver(claims.get("sub"), str(rol or ""), target_org)

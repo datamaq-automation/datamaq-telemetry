@@ -81,3 +81,10 @@ def test_obtener_incluye_el_dispositivo_con_su_configuracion(db: Session):
 
 def test_obtener_devuelve_none_si_no_existe(db: Session):
     assert AuditoriaCambiosTIRepository(db).obtener(99) is None
+
+
+def test_listar_paginacion_limite_y_offset(db: Session):
+    repo = AuditoriaCambiosTIRepository(db)
+    assert [r["id"] for r in repo.listar(None, None, None, None, limite=1, offset=0)] == [1]
+    assert [r["id"] for r in repo.listar(None, None, None, None, limite=1, offset=1)] == [2]
+    assert [r["id"] for r in repo.listar(None, None, None, None, limite=1, offset=2)] == []

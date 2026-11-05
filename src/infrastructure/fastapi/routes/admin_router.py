@@ -60,6 +60,8 @@ async def listar_cambios_ti(
     tipo_cambio: str | None = Query(None, description="Filtrar por tipo_cambio"),
     desde: datetime | None = Query(None, description="Desde (ISO 8601)"),
     hasta: datetime | None = Query(None, description="Hasta (ISO 8601)"),
+    limite: int = Query(50, ge=1, le=500, description="Límite de resultados"),
+    offset: int = Query(0, ge=0, description="Desplazamiento para paginación"),
 ) -> AuditoriaChangesListResponseDTO:
     """Listar cambios de TI con filtros opcionales."""
     registros = auditoria.listar(
@@ -67,6 +69,8 @@ async def listar_cambios_ti(
         tipo_cambio=tipo_cambio,
         desde=desde,
         hasta=hasta,
+        limite=limite,
+        offset=offset,
         **_alcance(usuario_actual),
     )
     return AuditoriaChangesListResponseDTO(
