@@ -115,7 +115,7 @@ Con `AUTH_REQUIRED` apagado, `get_usuario_actual` devuelve `{"sub": "anon", "rol
 | GET | `/api/v1/sge/plantas/{planta_id}/facturas-distribuidora` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/sge_router.py:obtener_facturas_distribuidora` |
 | GET | `/api/v1/sge/plantas/{planta_id}/linea-base` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/sge_router.py:obtener_lineas_base` |
 | POST | `/api/v1/system/purge` | `requiere_rol_superadmin` | `superadmin` | — | no | `src/infrastructure/fastapi/routes/system_router.py:trigger_purge` |
-| GET | `/api/v1/system/ws-status` | — | todos (sin guard) | sin dependencia de auth detectada | no | `src/infrastructure/fastapi/routes/system_router.py:websocket_status` |
+| GET | `/api/v1/system/ws-status` | `requiere_rol_superadmin` | `superadmin` | — | no | `src/infrastructure/fastapi/routes/system_router.py:websocket_status` |
 | GET | `/api/v1/telemetria/alerts/{device_id}` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/telemetria_router.py:get_alerts_history` |
 | GET | `/api/v1/telemetria/energy/{device_id}` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/telemetria_router.py:get_energy_history` |
 | GET | `/api/v1/telemetria/exportar/csv` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/telemetria_router.py:exportar_telemetria_csv` |
@@ -128,7 +128,7 @@ Con `AUTH_REQUIRED` apagado, `get_usuario_actual` devuelve `{"sub": "anon", "rol
 | DELETE | `/api/v1/usuarios/integraciones/{client_id}` | `requiere_rol_escritura` | `admin`, `ingeniero`, `mantenimiento`, `operador`, `superadmin` | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/oauth_router.py:revocar_integracion_usuario` |
 | DELETE | `/api/v1/usuarios/{usuario_id}` | `requiere_rol_admin` | `admin`, `superadmin` | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/usuarios_router.py:dar_baja_usuario` |
 | GET | `/api/v1/usuarios/{usuario_id}/plantas` | `requiere_rol_admin` | `admin`, `superadmin` | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/usuarios_router.py:listar_plantas_usuario` |
-| PUT | `/api/v1/usuarios/{usuario_id}/plantas` | `requiere_rol_admin` | `admin`, `superadmin` | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/usuarios_router.py:asignar_plantas_usuario` |
+| PUT | `/api/v1/usuarios/{usuario_id}/plantas` | `requiere_rol_admin` | `admin`, `superadmin` | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/usuarios_router.py:asignar_plantas_usuario` |
 | PATCH | `/api/v1/usuarios/{usuario_id}/rol` | `requiere_rol_admin` | `admin`, `superadmin` | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/usuarios_router.py:cambiar_rol_usuario` |
 | GET | `/favicon.ico` | — | todos (sin guard) | sin dependencia de auth detectada | no | `src/infrastructure/fastapi/routes/system_router.py:favicon` |
 | GET | `/health` | — | todos (sin guard) | sin dependencia de auth detectada | no | `src/infrastructure/fastapi/routes/system_router.py:health_check` |
