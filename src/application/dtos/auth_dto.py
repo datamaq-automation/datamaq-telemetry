@@ -6,15 +6,8 @@ from pydantic import BaseModel, Field
 
 from src.application.dtos.tipos import FechaHoraUTC
 
-# Fuente única de los roles de usuario: MeResponseDTO.rol y ROLES_VALIDOS se derivan de aquí (Issue #121).
-RolUsuario = Literal[
-    "superadmin",
-    "admin",
-    "operador",
-    "mantenimiento",
-    "ingeniero",
-    "solo_lectura",
-]
+# Fuente única de los roles de usuario: MeResponseDTO.rol y ROLES_VALIDOS se derivan de aquí (Issue #121, #170).
+RolUsuario = Literal["superadmin", "operador"]
 ROLES_VALIDOS: frozenset[str] = frozenset(get_args(RolUsuario))
 
 

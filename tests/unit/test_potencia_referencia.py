@@ -182,7 +182,7 @@ def _cliente_dispositivo() -> tuple[TestClient, MagicMock]:
     use_case = MagicMock()
     use_case.historico_instantaneas.return_value = HistoricoInstantaneasDTO(lecturas=[], datos_desde=INICIO)
     app.dependency_overrides[get_telemetria_use_case] = lambda: use_case
-    app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "u1", "rol": "admin", "org": "org-1"}
+    app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "u1", "rol": "operador", "org": "org-1"}
     app.dependency_overrides[verificar_propiedad_dispositivo] = lambda: None
     return TestClient(app), use_case
 
@@ -193,7 +193,7 @@ def _cliente_nodo() -> tuple[TestClient, MagicMock]:
     use_case.historico.return_value = HistoricoNodoUnifilarDTO(puntos=[], datos_desde=INICIO)
     app.dependency_overrides[get_consultar_nodo_unifilar_use_case] = lambda: use_case
     app.dependency_overrides[resolver_planta_permitida] = lambda planta_id=None: planta_id
-    app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "u1", "rol": "admin", "org": "org-1"}
+    app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "u1", "rol": "operador", "org": "org-1"}
     return TestClient(app), use_case
 
 

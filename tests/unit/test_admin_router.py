@@ -17,12 +17,12 @@ def _cliente_admin():
     mock_auditoria = MagicMock()
     app.dependency_overrides[get_usuario_actual] = lambda: {
         "sub": "admin-1",
-        "rol": "admin",
+        "rol": "superadmin",
         "org": "org-1",
     }
     app.dependency_overrides[requiere_rol_admin] = lambda: {
         "sub": "admin-1",
-        "rol": "admin",
+        "rol": "superadmin",
         "org": "org-1",
     }
     app.dependency_overrides[get_consultar_auditoria_cambios_ti] = lambda: mock_auditoria

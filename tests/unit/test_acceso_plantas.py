@@ -98,7 +98,7 @@ def test_politica_ignora_filas_de_otra_organizacion_e_inexistentes():
         AccesoPlantaUsuario("u-1", "planta-borrada", puede_cambiar=True),
         AccesoPlantaUsuario("u-1", "planta-garin", puede_cambiar=False),
     ]
-    resultado = PoliticaAccesoPlantasService.resolver("admin", "org-a", PLANTAS, accesos)
+    resultado = PoliticaAccesoPlantasService.resolver("operador", "org-a", PLANTAS, accesos)
     assert [(p.id, puede) for p, puede in resultado] == [("planta-garin", False)]
 
 
@@ -237,7 +237,7 @@ def test_me_con_asignaciones_invalidas_devuelve_plantas_vacias_y_sin_planta_acti
 
 def test_me_sin_colaborador_de_plantas_mantiene_contrato_anterior():
     auth = AutenticarUsuarioUseCase(RepoUsuariosEnMemoria([]), HashContrasenaService(), MagicMock(), 480)
-    dto = auth.me({"usuario": "u1", "rol": "admin"})
+    dto = auth.me({"usuario": "u1", "rol": "operador"})
     assert dto.plantas == []
     assert dto.planta_activa_id is None
 
@@ -257,7 +257,7 @@ def _cliente(rol: str, org: str, usuarios: list[UsuarioAuth]) -> tuple[TestClien
 
 
 def test_router_put_y_get_plantas_usuario():
-    client, accesos = _cliente("admin", "org-a", [_usuario()])
+    client, accesos = _cliente("superadmin", "org-a", [_usuario()])
     body = {"plantas": [{"planta_id": "planta-garin", "puede_cambiar": False}]}
     resp = client.put("/api/v1/usuarios/u-1/plantas", json=body)
     assert resp.status_code == 200
@@ -269,7 +269,7 @@ def test_router_put_y_get_plantas_usuario():
 
 
 def test_router_admin_no_administra_usuarios_de_otra_organizacion():
-    client, _ = _cliente("admin", "org-b", [_usuario()])
+    client, _ = _cliente("operador", "org-b", [_usuario()])
     resp = client.put("/api/v1/usuarios/u-1/plantas", json={"plantas": []})
     assert resp.status_code == 403
 
@@ -283,7 +283,7 @@ def test_router_superadmin_administra_cualquier_organizacion():
 def test_router_operador_recibe_403_y_planta_ajena_404():
     client, _ = _cliente("operador", "org-a", [_usuario()])
     assert client.get("/api/v1/usuarios/u-1/plantas").status_code == 403
-    client, _ = _cliente("admin", "org-a", [_usuario()])
+    client, _ = _cliente("superadmin", "org-a", [_usuario()])
     resp = client.put("/api/v1/usuarios/u-1/plantas", json={"plantas": [{"planta_id": "planta-ajena"}]})
     assert resp.status_code == 404
     assert client.get("/api/v1/usuarios/inexistente/plantas").status_code == 404

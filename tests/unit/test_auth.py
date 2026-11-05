@@ -421,11 +421,11 @@ def _use_case_me() -> AutenticarUsuarioUseCase:
     return AutenticarUsuarioUseCase(MockRepositorioUsuarios(), HashContrasenaService(), MockTokenService(), 480)
 
 
-def test_me_rol_admin():
-    dto = _use_case_me().me({"usuario": "operador@planta.local", "rol": "admin"})
+def test_me_rol_superadmin():
+    dto = _use_case_me().me({"usuario": "operador@planta.local", "rol": "superadmin"})
     assert isinstance(dto, MeResponseDTO)
     assert dto.usuario == "operador@planta.local"
-    assert dto.rol == "admin"
+    assert dto.rol == "superadmin"
 
 
 def test_me_roles_operador_y_superadmin():
@@ -436,7 +436,7 @@ def test_me_roles_operador_y_superadmin():
 
 def test_me_rechaza_roles_retirados():
     use_case = _use_case_me()
-    for rol in ("invitado", "invitado_global"):
+    for rol in ("invitado", "invitado_global", "admin"):
         try:
             use_case.me({"usuario": "u1", "rol": rol})
             raise AssertionError(f"Se esperaba CredencialesInvalidasError para {rol}")
@@ -455,22 +455,22 @@ def test_me_rol_ausente_o_invalido():
 
 
 def test_me_sin_usuario_usa_sub():
-    dto = _use_case_me().me({"sub": "anon", "rol": "admin"})
+    dto = _use_case_me().me({"sub": "anon", "rol": "superadmin"})
     assert dto.usuario == "anon"
-    assert dto.rol == "admin"
+    assert dto.rol == "superadmin"
 
 
 def test_me_sin_usuario_ni_sub():
-    dto = _use_case_me().me({"rol": "admin"})
+    dto = _use_case_me().me({"rol": "superadmin"})
     assert dto.usuario == "anon"
-    assert dto.rol == "admin"
+    assert dto.rol == "superadmin"
 
 
 def test_me_handler_exitoso():
     use_case = _use_case_me()
-    dto = me_handler({"usuario": "u1", "rol": "admin"}, use_case, MagicMock())
+    dto = me_handler({"usuario": "u1", "rol": "superadmin"}, use_case, MagicMock())
     assert dto.usuario == "u1"
-    assert dto.rol == "admin"
+    assert dto.rol == "superadmin"
 
 
 def test_me_handler_rol_invalido():

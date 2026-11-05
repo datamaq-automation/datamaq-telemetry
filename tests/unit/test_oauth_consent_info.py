@@ -44,7 +44,7 @@ PLANTAS_ORG = [
 
 
 def test_planta_activa_es_la_primera_permitida_al_usuario():
-    client, _, acceso = _cliente({"sub": "usr-1", "rol": "admin", "org": "org-001"}, PLANTAS_ORG)
+    client, _, acceso = _cliente({"sub": "usr-1", "rol": "operador", "org": "org-001"}, PLANTAS_ORG)
 
     res = client.get("/api/v1/oauth/consent-info?client_id=claude-ai&scope=read:telemetria")
 
@@ -52,11 +52,11 @@ def test_planta_activa_es_la_primera_permitida_al_usuario():
     data = res.json()
     assert data["planta_activa_id"] == "planta-a"
     assert data["planta_activa_nombre"] == "Planta A"
-    acceso.resolver.assert_called_once_with("usr-1", "admin", "org-001")
+    acceso.resolver.assert_called_once_with("usr-1", "operador", "org-001")
 
 
 def test_sin_plantas_permitidas_los_campos_de_planta_van_en_null():
-    client, _, _ = _cliente({"sub": "usr-1", "rol": "admin"}, [])
+    client, _, _ = _cliente({"sub": "usr-1", "rol": "operador"}, [])
 
     data = client.get("/api/v1/oauth/consent-info?client_id=claude-ai").json()
 
@@ -66,7 +66,7 @@ def test_sin_plantas_permitidas_los_campos_de_planta_van_en_null():
 
 
 def test_scope_desconocido_se_descarta_y_no_se_describe_como_lectura():
-    client, _, _ = _cliente({"sub": "usr-1", "rol": "admin", "org": "org-001"}, PLANTAS_ORG)
+    client, _, _ = _cliente({"sub": "usr-1", "rol": "operador", "org": "org-001"}, PLANTAS_ORG)
 
     res = client.get("/api/v1/oauth/consent-info?client_id=claude-ai&scope=read:alertas read:todo")
 
@@ -76,7 +76,7 @@ def test_scope_desconocido_se_descarta_y_no_se_describe_como_lectura():
 
 
 def test_solo_scopes_desconocidos_muestra_los_defaults():
-    client, _, _ = _cliente({"sub": "usr-1", "rol": "admin", "org": "org-001"}, PLANTAS_ORG)
+    client, _, _ = _cliente({"sub": "usr-1", "rol": "operador", "org": "org-001"}, PLANTAS_ORG)
 
     res = client.get("/api/v1/oauth/consent-info?client_id=claude-ai&scope=read:todo")
 
@@ -90,7 +90,7 @@ def test_solo_scopes_desconocidos_muestra_los_defaults():
 
 
 def test_scopes_validos_muestran_su_descripcion_conocida():
-    client, _, _ = _cliente({"sub": "usr-1", "rol": "admin", "org": "org-001"}, PLANTAS_ORG)
+    client, _, _ = _cliente({"sub": "usr-1", "rol": "operador", "org": "org-001"}, PLANTAS_ORG)
 
     data = client.get("/api/v1/oauth/consent-info?client_id=claude-ai&scope=read:alertas").json()
 
@@ -100,7 +100,7 @@ def test_scopes_validos_muestran_su_descripcion_conocida():
 
 
 def test_consent_con_scope_desconocido_emite_con_la_interseccion():
-    client, repo, _ = _cliente({"sub": "usr-1", "rol": "admin", "org": "org-001"}, PLANTAS_ORG)
+    client, repo, _ = _cliente({"sub": "usr-1", "rol": "operador", "org": "org-001"}, PLANTAS_ORG)
 
     res = client.post(
         "/api/v1/oauth/consent",
@@ -120,7 +120,7 @@ def test_consent_con_scope_desconocido_emite_con_la_interseccion():
 
 @pytest.mark.parametrize("scope", ["read:telemetria", "read:analitica read:alertas"])
 def test_consent_con_scope_valido_sigue_emitiendo_redirect(scope):
-    client, repo, _ = _cliente({"sub": "usr-1", "rol": "admin", "org": "org-001"}, PLANTAS_ORG)
+    client, repo, _ = _cliente({"sub": "usr-1", "rol": "operador", "org": "org-001"}, PLANTAS_ORG)
 
     res = client.post(
         "/api/v1/oauth/consent",

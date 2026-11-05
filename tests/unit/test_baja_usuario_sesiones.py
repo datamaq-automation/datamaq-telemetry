@@ -49,7 +49,7 @@ def _autenticar(repo: _RepoUsuarios, token: str) -> dict:
 
 
 def _dar_de_baja(repo: _RepoUsuarios, usuario_id: str) -> None:
-    admin = {"sub": "admin-baja", "usuario": "admin@planta.local", "rol": "admin", "org": "org-a"}
+    admin = {"sub": "admin-baja", "usuario": "admin@planta.local", "rol": "superadmin", "org": "org-a"}
     dar_baja_usuario(usuario_id=usuario_id, claims=admin, repo_usuarios=repo, audit_use_case=None)
 
 

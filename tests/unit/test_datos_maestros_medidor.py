@@ -198,7 +198,7 @@ def test_patch_gobernado_responde_422_por_http():
         "Gestionado por YAML: fases_con_ti."
     )
     app.dependency_overrides[get_dispositivos_use_case] = lambda: use_case
-    app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "u", "rol": "admin", "org": "o"}
+    app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "u", "rol": "operador", "org": "o"}
     resp = TestClient(app).patch("/api/v1/dispositivos/dev-1", json={"fases_con_ti": "R"})
     assert resp.status_code == 422
     assert "Gestionado por YAML" in resp.json()["detail"]

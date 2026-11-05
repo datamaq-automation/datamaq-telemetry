@@ -33,7 +33,7 @@ MEDIDOR_PRUEBA = "d48c49f0-3564-4000-8000-000000000001"
 AHORA = datetime(2026, 9, 7, 10, 0, tzinfo=timezone.utc)
 
 
-def _cliente_atribucion(use_case: MagicMock, rol: str = "admin") -> TestClient:
+def _cliente_atribucion(use_case: MagicMock, rol: str = "operador") -> TestClient:
     app = create_app()
     # La propiedad del medidor (#41) tiene sus propios tests; acá se prueba el comportamiento de cargas.
     app.dependency_overrides[verificar_propiedad_dispositivo] = lambda: None
@@ -85,8 +85,8 @@ def test_inicializar_presets_requiere_escritura_y_device_id():
     resp_inv = cliente_invitado.post(f"/api/v1/cargas/presets/inicializar?device_id={MEDIDOR_PRUEBA}")
     assert resp_inv.status_code == 403
 
-    # 2. Con admin pero sin device_id -> 422 Unprocessable Entity
-    cliente_admin = _cliente_atribucion(use_case, rol="admin")
+    # 2. Con operador pero sin device_id -> 422 Unprocessable Entity
+    cliente_admin = _cliente_atribucion(use_case, rol="operador")
     resp_sin_device = cliente_admin.post("/api/v1/cargas/presets/inicializar")
     assert resp_sin_device.status_code == 422
 

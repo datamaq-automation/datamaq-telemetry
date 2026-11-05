@@ -150,7 +150,7 @@ def _cliente(usuario: dict | None = None) -> tuple[TestClient, dict[str, MagicMo
     app.dependency_overrides[get_alertas_use_case] = lambda: mocks["alertas"]
     app.dependency_overrides[get_exportar_telemetria_use_case] = lambda: mocks["exportar"]
     app.dependency_overrides[get_usuario_actual] = lambda: (
-        usuario if usuario is not None else {"sub": "u1", "rol": "admin", "org": "org-1"}
+        usuario if usuario is not None else {"sub": "u1", "rol": "operador", "org": "org-1"}
     )
     app.dependency_overrides[verificar_propiedad_dispositivo] = lambda: None
     return TestClient(app), mocks

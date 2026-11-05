@@ -120,7 +120,7 @@ def test_listar_maquinas_filtra_por_organizacion_del_usuario():
 
 def test_registrar_maquina_sin_organizacion_devuelve_403():
     app = create_app()
-    app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "test-user", "rol": "admin"}
+    app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "test-user", "rol": "operador"}
     app.dependency_overrides[get_maquinas_use_case] = lambda: MagicMock()
 
     client = TestClient(app)
@@ -131,7 +131,7 @@ def test_registrar_maquina_sin_organizacion_devuelve_403():
 
 def test_registrar_parada_programada_sin_organizacion_devuelve_403():
     app = create_app()
-    app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "test-user", "rol": "admin"}
+    app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "test-user", "rol": "operador"}
     app.dependency_overrides[get_disponibilidad_use_case] = lambda: MagicMock()
 
     client = TestClient(app)

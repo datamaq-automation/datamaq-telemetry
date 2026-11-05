@@ -124,16 +124,13 @@ def test_excepciones_desde_config_vacio_y_con_comas():
     assert excepciones_desde_config(" /a , /b ,") == frozenset({"/a", "/b"})
 
 
-def test_rol_solo_lectura_existe_y_no_pasa_el_guard_de_escritura():
-    assert "solo_lectura" in ROLES_VALIDOS
+def test_rol_solo_lectura_no_pasa_el_guard_de_escritura():
+    assert "solo_lectura" not in ROLES_VALIDOS
     with pytest.raises(Exception) as excinfo:
         requiere_rol_escritura({"rol": "solo_lectura"})
     assert getattr(excinfo.value, "status_code", None) == 403
 
 
-from fastapi import HTTPException  # noqa: E402
-
-from src.infrastructure.fastapi.dependencies import no_permitido_para_invitados_2fa  # noqa: E402
 from src.infrastructure.fastapi.middleware import registrar_guard_solo_lectura  # noqa: E402
 from src.infrastructure.fastapi.solo_lectura_middleware import (  # noqa: E402
     BASE_COPIA_DEV,
@@ -186,9 +183,3 @@ def test_con_la_misma_excepcion_en_otra_base_el_login_se_bloquea():
     respuesta = cliente.post(LOGIN)
     assert respuesta.status_code == 403
     assert "solo lectura" in respuesta.json()["detail"]
-
-
-def test_2fa_niega_el_rol_solo_lectura():
-    with pytest.raises(HTTPException) as excinfo:
-        no_permitido_para_invitados_2fa({"rol": "solo_lectura"})
-    assert excinfo.value.status_code == 403

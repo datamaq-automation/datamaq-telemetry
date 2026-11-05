@@ -122,7 +122,7 @@ def _perfil_dto() -> PerfilConsumoResponseDTO:
     )
 
 
-def _cliente(use_case: MagicMock, rol: str = "admin") -> TestClient:
+def _cliente(use_case: MagicMock, rol: str = "operador") -> TestClient:
     app = create_app()
     # La propiedad del medidor (#41) tiene sus propios tests; acá se prueba el comportamiento de cargas.
     app.dependency_overrides[verificar_propiedad_dispositivo] = lambda: None
@@ -274,7 +274,7 @@ def test_perfil_no_se_confunde_con_el_id_de_una_carga():
     app.dependency_overrides[verificar_acceso_a_intervalo] = lambda: None
     app.dependency_overrides[get_cargas_use_case] = lambda: cargas
     app.dependency_overrides[get_analisis_consumo_use_case] = lambda: analisis
-    app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "u1", "rol": "admin"}
+    app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "u1", "rol": "operador"}
 
     resp = TestClient(app).get(f"/api/v1/cargas/perfil?device_id={MEDIDOR_CASA}&dias=7")
 
@@ -297,7 +297,7 @@ def test_el_perfil_expone_linea_base_ciclos_y_advertencia_de_cadencia():
     app.dependency_overrides[verificar_correccion_de_intervalo] = lambda: None
     app.dependency_overrides[verificar_acceso_a_intervalo] = lambda: None
     app.dependency_overrides[get_analisis_consumo_use_case] = lambda: analisis
-    app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "u1", "rol": "admin"}
+    app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "u1", "rol": "operador"}
 
     cuerpo = TestClient(app).get(f"/api/v1/cargas/perfil?device_id={MEDIDOR_CASA}").json()
 
@@ -343,7 +343,7 @@ def _campana_dto(**kwargs) -> CampanaResponseDTO:
     return CampanaResponseDTO(**base)
 
 
-def _cliente_campanas(use_case: MagicMock, rol: str = "admin") -> TestClient:
+def _cliente_campanas(use_case: MagicMock, rol: str = "operador") -> TestClient:
     app = create_app()
     # La propiedad del medidor (#41) tiene sus propios tests; acá se prueba el comportamiento de cargas.
     app.dependency_overrides[verificar_propiedad_dispositivo] = lambda: None
@@ -400,7 +400,7 @@ def test_la_ruta_de_campana_no_colisiona_con_la_de_una_carga():
     app.dependency_overrides[verificar_acceso_a_intervalo] = lambda: None
     app.dependency_overrides[get_cargas_use_case] = lambda: cargas
     app.dependency_overrides[get_caracterizacion_use_case] = lambda: campanas
-    app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "u1", "rol": "admin"}
+    app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "u1", "rol": "operador"}
     cliente = TestClient(app)
 
     assert cliente.get("/api/v1/cargas/campanas/camp-1").status_code == 200
@@ -468,7 +468,7 @@ def test_el_invitado_no_puede_abrir_campanas():
     use_case.iniciar_activa.assert_not_called()
 
 
-def _cliente_atribucion(use_case: MagicMock, rol: str = "admin") -> TestClient:
+def _cliente_atribucion(use_case: MagicMock, rol: str = "operador") -> TestClient:
     app = create_app()
     # La propiedad del medidor (#41) tiene sus propios tests; acá se prueba el comportamiento de cargas.
     app.dependency_overrides[verificar_propiedad_dispositivo] = lambda: None

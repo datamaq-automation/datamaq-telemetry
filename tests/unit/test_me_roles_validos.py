@@ -56,8 +56,8 @@ def test_me_ruta_responde_200_para_todo_rol_valido(rol: str):
     assert response.json()["rol"] == rol
 
 
-def test_me_ruta_solo_lectura_responde_200():
-    """Caso reportado: un usuario solo_lectura no puede cargar su sesión."""
+def test_me_ruta_rol_extinto_rechaza_401():
+    """Un usuario con rol extinto como solo_lectura no es admitido."""
     repo = _RepoUsuariosEnMemoria([])
     app = create_app()
     app.dependency_overrides[get_usuarios_repository] = lambda: repo
@@ -70,5 +70,4 @@ def test_me_ruta_solo_lectura_responde_200():
 
     response = TestClient(app).get("/api/v1/auth/me")
 
-    assert response.status_code == 200
-    assert response.json()["rol"] == "solo_lectura"
+    assert response.status_code == 401

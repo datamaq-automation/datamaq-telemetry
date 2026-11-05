@@ -33,15 +33,11 @@ GUARDS_DE_ROL = {
     "requiere_rol_auditor_o_superadmin",
     "requiere_rol_admin",
     "requiere_rol_escritura",
-    "no_permitido_para_invitados_2fa",
 }
 DEPENDENCIA_AUTH = "get_usuario_actual"
 NOMBRES_DE_ROL_EN_CODIGO = {
     "superadmin",
-    "admin",
     "operador",
-    "mantenimiento",
-    "ingeniero",
 }
 
 
@@ -250,7 +246,7 @@ def generar() -> str:
         'real del guard). Si la columna "Chequeo manual" dice `sí`, el cuerpo de la ruta o de una dependencia propia '
         "compara el rol o usa `ROLES_ACCESO_GLOBAL`: ese recorte no está en la columna y hay que leer la ruta para saberlo.",
         "",
-        'Con `AUTH_REQUIRED` apagado, `get_usuario_actual` devuelve `{"sub": "anon", "rol": "admin"}`: '
+        'Con `AUTH_REQUIRED` apagado, `get_usuario_actual` devuelve `{"sub": "anon", "rol": "superadmin"}`: '
         "todos los guards dejan pasar y la matriz no aplica. Es un comportamiento de desarrollo.",
         "",
         "## Resumen por guard",
