@@ -62,6 +62,7 @@ def favicon():
 
 
 @router.get("/health/live")
+@router.head("/health/live")
 def liveness_check():
     """Sonda de liveness: valida que el proceso está activo."""
     return {
@@ -71,6 +72,7 @@ def liveness_check():
 
 
 @router.get("/health/ready")
+@router.head("/health/ready")
 def readiness_check(response: Response):
     """Sonda de readiness: valida BD, migraciones y datamaq-data."""
     listener = get_mqtt_listener()
@@ -101,6 +103,7 @@ def readiness_check(response: Response):
 
 
 @router.get("/health")
+@router.head("/health")
 def health_check(response: Response):
     """Chequeo general de salud (compatibilidad con monitores heredados)."""
     return readiness_check(response)
