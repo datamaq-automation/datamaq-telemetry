@@ -11,6 +11,7 @@ from src.domain.telemetria.exceptions import (
     DispositivoNoEncontradoError,
     LimiteDispositivosExcedidoError,
 )
+from src.infrastructure.fastapi.auth_dependencies import get_acceso_plantas_use_case
 from src.infrastructure.fastapi.dependencies import (
     get_dispositivos_use_case,
     get_usuario_actual,
@@ -179,6 +180,10 @@ def test_obtener_dispositivo_error_inesperado_500():
 
 def test_registrar_dispositivo_exitoso():
     client, mocks = _cliente(rol="admin")
+    # La planta destino se valida con la política de plantas (datamaq#132): acá la permite.
+    acceso = MagicMock()
+    acceso.resolver_planta_permitida.return_value = "planta-1"
+    client.app.dependency_overrides[get_acceso_plantas_use_case] = lambda: acceso
     mocks["dispositivos"].registrar_dispositivo.return_value = _dispositivo_dto(
         id="dev-nuevo",
         device_uid="00:11:22:33:44:55",
@@ -199,6 +204,7 @@ def test_registrar_dispositivo_exitoso():
     response = client.post("/api/v1/dispositivos", json=payload)
 
     assert response.status_code == 200
+    acceso.resolver_planta_permitida.assert_called_once_with("u1", "admin", "org-1", "planta-1")
     data = response.json()
     assert data["id"] == "dev-nuevo"
     assert data["device_uid"] == "00:11:22:33:44:55"
