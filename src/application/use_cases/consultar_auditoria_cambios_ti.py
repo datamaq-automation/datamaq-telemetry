@@ -21,6 +21,8 @@ class ConsultarAuditoriaCambiosTIUseCase:
         *,
         organizacion_id: str | None = None,
         todas_las_organizaciones: bool = False,
+        limite: int = 50,
+        offset: int = 0,
     ) -> list[dict[str, Any]]:
         """Cambios más recientes primero, con los filtros opcionales.
 
@@ -34,6 +36,8 @@ class ConsultarAuditoriaCambiosTIUseCase:
             desde=desde,
             hasta=hasta,
             organizacion_id=None if todas_las_organizaciones else organizacion_id,
+            limite=limite,
+            offset=offset,
         )
 
     def detalle(

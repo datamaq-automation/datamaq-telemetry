@@ -48,6 +48,8 @@ class AuditoriaCambiosTIRepository(RepositorioAuditoriaCambiosTIPort):
         desde: datetime | None,
         hasta: datetime | None,
         organizacion_id: str | None = None,
+        limite: int = 50,
+        offset: int = 0,
     ) -> list[dict[str, Any]]:
         query = _de_la_organizacion(select(AuditoriaChangesTIModel), organizacion_id)
         if dispositivo_id:
@@ -58,7 +60,7 @@ class AuditoriaCambiosTIRepository(RepositorioAuditoriaCambiosTIPort):
             query = query.where(AuditoriaChangesTIModel.timestamp >= desde)
         if hasta:
             query = query.where(AuditoriaChangesTIModel.timestamp <= hasta)
-        query = query.order_by(AuditoriaChangesTIModel.timestamp.desc())
+        query = query.order_by(AuditoriaChangesTIModel.timestamp.desc()).limit(limite).offset(offset)
         return [_a_registro(c) for c in self._db.scalars(query).all()]
 
     def obtener(self, cambio_id: int, organizacion_id: str | None = None) -> dict[str, Any] | None:

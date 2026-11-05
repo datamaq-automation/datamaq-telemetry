@@ -386,6 +386,8 @@ class RepositorioAuditoriaCambiosTIPort(ABC):
         desde: datetime | None,
         hasta: datetime | None,
         organizacion_id: str | None = None,
+        limite: int = 50,
+        offset: int = 0,
     ) -> list[dict[str, Any]]:
         """Cambios más recientes primero. Con ``organizacion_id`` solo los de medidores de plantas de esa organización
         (un medidor sin planta no pertenece a ninguna); ``None`` es SIN filtro y solo lo pide el caso de uso."""

@@ -284,6 +284,58 @@ def test_logout_elimina_cookie():
     assert "max-age=0" in cookie_header.lower() or "expires=" in cookie_header.lower()
 
 
+def test_logout_revoca_token_en_memoria_y_rechaza_subsecuentes():
+    from datetime import timedelta
+
+    from src.infrastructure.auth.jwt_token_service import JwtTokenService
+    from src.infrastructure.fastapi.dependencies import get_usuarios_repository
+
+    settings = Settings(API_SECRET_KEY="test-secret-key" * 2, AUTH_REQUIRED=True)
+    token_service = JwtTokenService(settings.API_SECRET_KEY)
+    usuario_id = "user-revocacion-logout"
+    expira = datetime.now(timezone.utc) + timedelta(hours=1)
+    token = token_service.generar(
+        usuario_id=usuario_id,
+        usuario="operador@planta.local",
+        expira_en=expira,
+        rol="operador",
+        organizacion_id="org-1",
+    )
+
+    mock_repo_usuarios = MagicMock()
+    mock_usuario = MagicMock()
+    mock_usuario.id = usuario_id
+    mock_usuario.esta_activo = True
+    mock_usuario.sesiones_revocadas_antes_de = None
+    mock_repo_usuarios.obtener_por_id.return_value = mock_usuario
+
+    app = create_app(settings=settings)
+    app.dependency_overrides[get_settings_dep] = lambda: settings
+    app.dependency_overrides[get_usuarios_repository] = lambda: mock_repo_usuarios
+
+    client = TestClient(app)
+
+    # 1. Llamar a logout con el token
+    resp_logout = client.post(
+        "/api/v1/auth/logout",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp_logout.status_code == 200
+    assert resp_logout.json() == {"detail": "sesion_cerrada"}
+
+    # 2. Verificar que se persistió en usuario
+    assert mock_usuario.sesiones_revocadas_antes_de is not None
+    mock_repo_usuarios.guardar.assert_called_once_with(mock_usuario)
+
+    # 3. Petición subsecuente con el mismo token es rechazada con 401
+    resp_me = client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp_me.status_code == 401
+    assert resp_me.json()["detail"] == "credenciales_invalidas"
+
+
 # ==============================================================================
 # 5. ME
 # ==============================================================================

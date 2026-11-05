@@ -24,8 +24,11 @@ from src.application.use_cases.exportar_disponibilidad import (
 )
 from src.application.use_cases.gestionar_disponibilidad import GestionarDisponibilidadUseCase
 from src.application.use_cases.gestionar_maquinas import GestionarMaquinasUseCase
+from src.domain.auth.services import roles_de_acceso_global
+from src.domain.telemetria.ports import RepositorioDispositivosPort
 from src.infrastructure.fastapi.dependencies import (
     get_disponibilidad_use_case,
+    get_dispositivos_repository,
     get_exportar_disponibilidad_use_case,
     get_maquinas_use_case,
     get_usuario_actual,
@@ -36,6 +39,7 @@ from src.infrastructure.fastapi.device_ownership import (
     verificar_propiedad_maquina,
 )
 from src.infrastructure.fastapi.error_handler import manejar_error_http
+from src.infrastructure.settings.config import get_settings
 
 router = APIRouter(
     prefix="/api/v1/disponibilidad",
@@ -54,11 +58,26 @@ def _organizacion_de_claims(claims: dict[str, Any]) -> str | None:
 def listar_maquinas(
     use_case: Annotated[GestionarMaquinasUseCase, Depends(get_maquinas_use_case)],
     claims: Annotated[dict, Depends(get_usuario_actual)],
+    repo_dispositivos: Annotated[RepositorioDispositivosPort, Depends(get_dispositivos_repository)],
 ):
     if claims.get("rol") != "superadmin" and not claims.get("org"):
         return []
     try:
-        return use_case.listar_maquinas(_organizacion_de_claims(claims))
+        maquinas = use_case.listar_maquinas(_organizacion_de_claims(claims))
+        rol = claims.get("rol")
+        es_global = rol in roles_de_acceso_global(get_settings().ROLES_ACCESO_GLOBAL_EXTRA)
+        plantas_usuario = claims.get("plantas")
+        if not es_global and plantas_usuario is not None:
+            plantas_permitidas = set(plantas_usuario)
+            maquinas_filtradas: list[MaquinaResponseDTO] = []
+            for m in maquinas:
+                if not m.dispositivo_id:
+                    continue
+                disp = repo_dispositivos.obtener_por_id(m.dispositivo_id)
+                if disp is not None and disp.planta_id in plantas_permitidas:
+                    maquinas_filtradas.append(m)
+            return maquinas_filtradas
+        return maquinas
     except Exception as e:
         manejar_error_http(e)
 

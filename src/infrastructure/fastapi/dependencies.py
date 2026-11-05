@@ -98,6 +98,10 @@ def repo_dispositivos_resuelto(db: Session) -> RepositorioDispositivosPort:
     return DispositivosConDatosMaestrosGateway(MySQLDispositivosRepository(db), YamlOrganizacionesRepository())
 
 
+def get_dispositivos_repository(db: Annotated[Session, Depends(get_db_session)]) -> RepositorioDispositivosPort:
+    return repo_dispositivos_resuelto(db)
+
+
 def registrar_mqtt_listener(listener: MQTTListener) -> None:
     """Registra el listener MQTT activo para que /health consulte su estado."""
     global _mqtt_listener_registrado

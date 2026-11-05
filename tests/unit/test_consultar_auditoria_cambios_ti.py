@@ -13,13 +13,15 @@ class _RepositorioFalso(RepositorioAuditoriaCambiosTIPort):
         self.filtros_recibidos: dict[str, Any] = {}
         self.organizacion_pedida_en_obtener: Any = "no se llamó"
 
-    def listar(self, dispositivo_id, tipo_cambio, desde, hasta, organizacion_id=None):
+    def listar(self, dispositivo_id, tipo_cambio, desde, hasta, organizacion_id=None, limite=50, offset=0):
         self.filtros_recibidos = {
             "dispositivo_id": dispositivo_id,
             "tipo_cambio": tipo_cambio,
             "desde": desde,
             "hasta": hasta,
             "organizacion_id": organizacion_id,
+            "limite": limite,
+            "offset": offset,
         }
         return list(self.registros)
 
@@ -57,6 +59,8 @@ def test_listar_pasa_los_filtros_al_repositorio():
         "desde": desde,
         "hasta": None,
         "organizacion_id": None,
+        "limite": 50,
+        "offset": 0,
     }
 
 
@@ -69,7 +73,16 @@ def test_listar_sin_filtros_no_filtra():
         "desde": None,
         "hasta": None,
         "organizacion_id": None,
+        "limite": 50,
+        "offset": 0,
     }
+
+
+def test_listar_propaga_limite_y_offset():
+    repo = _RepositorioFalso([])
+    ConsultarAuditoriaCambiosTIUseCase(repo).listar(todas_las_organizaciones=True, limite=25, offset=10)
+    assert repo.filtros_recibidos["limite"] == 25
+    assert repo.filtros_recibidos["offset"] == 10
 
 
 def test_detalle_devuelve_el_registro_existente():

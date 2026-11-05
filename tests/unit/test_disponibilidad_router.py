@@ -1,6 +1,6 @@
 # tests/unit/test_disponibilidad_router.py
 from datetime import datetime, timezone
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
 
@@ -190,3 +190,117 @@ def test_exportar_disponibilidad_csv_endpoint():
     response = client.get("/api/v1/disponibilidad/maquinas/maq-1/exportar/csv?dias=30")
     assert response.status_code == 200
     assert "text/csv" in response.headers["content-type"]
+
+
+def test_listar_maquinas_filtradas_por_plantas_asignadas():
+    app = create_app()
+    mock_maquinas_uc = MagicMock()
+    maq1 = _maquina_response_dto(id="m-1", dispositivo_id="dev-planta-1")
+    maq2 = _maquina_response_dto(id="m-2", dispositivo_id="dev-planta-2")
+    mock_maquinas_uc.listar_maquinas.return_value = [maq1, maq2]
+
+    mock_repo_disp = MagicMock()
+    disp1 = MagicMock()
+    disp1.planta_id = "planta-1"
+    disp2 = MagicMock()
+    disp2.planta_id = "planta-2"
+    mock_repo_disp.obtener_por_id.side_effect = lambda did: disp1 if did == "dev-planta-1" else disp2
+
+    app.dependency_overrides[get_maquinas_use_case] = lambda: mock_maquinas_uc
+    app.dependency_overrides[get_usuario_actual] = lambda: {
+        "sub": "u-op",
+        "rol": "operador",
+        "org": "org-1",
+        "plantas": ["planta-1"],
+    }
+    from src.infrastructure.fastapi.dependencies import get_dispositivos_repository
+
+    app.dependency_overrides[get_dispositivos_repository] = lambda: mock_repo_disp
+
+    client = TestClient(app)
+    resp = client.get("/api/v1/disponibilidad/maquinas")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 1
+    assert data[0]["id"] == "m-1"
+
+
+def test_verificar_propiedad_maquina_rechaza_404_si_planta_no_permitida():
+    import pytest
+    from fastapi import HTTPException
+
+    from src.domain.telemetria.exceptions import PlantaNoEncontradaError
+    from src.infrastructure.fastapi.device_ownership import verificar_propiedad_maquina
+
+    mock_db = MagicMock()
+    mock_maquina = MagicMock()
+    mock_maquina.dispositivo_id = "dev-1"
+
+    mock_disp = MagicMock()
+    mock_disp.planta_id = "planta-ajena"
+
+    mock_acceso_plantas = MagicMock()
+    mock_acceso_plantas.resolver_planta_permitida.side_effect = PlantaNoEncontradaError("Planta no permitida")
+
+    claims = {"sub": "u-1", "rol": "operador", "org": "org-1"}
+
+    with (
+        patch("src.infrastructure.fastapi.device_ownership.MySQLMaquinasRepository") as mock_repo_m,
+        patch("src.infrastructure.fastapi.device_ownership._organizacion_de_dispositivo", return_value="org-1"),
+        patch("src.infrastructure.fastapi.device_ownership.repo_dispositivos_resuelto") as mock_repo_d,
+    ):
+        mock_repo_m.return_value.obtener_por_id.return_value = mock_maquina
+        mock_repo_d.return_value.obtener_por_id.return_value = mock_disp
+
+        with pytest.raises(HTTPException) as exc_info:
+            verificar_propiedad_maquina(
+                claims=claims,
+                db=mock_db,
+                acceso_plantas=mock_acceso_plantas,
+                maquina_id="maq-1",
+            )
+        assert exc_info.value.status_code == 404
+        assert exc_info.value.detail == "maquina_no_encontrada"
+
+
+def test_verificar_propiedad_evento_disponibilidad_rechaza_404_si_planta_no_permitida():
+    import pytest
+    from fastapi import HTTPException
+
+    from src.domain.telemetria.exceptions import PlantaNoEncontradaError
+    from src.infrastructure.fastapi.device_ownership import verificar_propiedad_evento_disponibilidad
+
+    mock_db = MagicMock()
+    mock_evento = MagicMock()
+    mock_evento.maquina_id = "maq-1"
+
+    mock_maquina = MagicMock()
+    mock_maquina.dispositivo_id = "dev-1"
+
+    mock_disp = MagicMock()
+    mock_disp.planta_id = "planta-ajena"
+
+    mock_acceso_plantas = MagicMock()
+    mock_acceso_plantas.resolver_planta_permitida.side_effect = PlantaNoEncontradaError("Planta no permitida")
+
+    claims = {"sub": "u-1", "rol": "operador", "org": "org-1"}
+
+    with (
+        patch("src.infrastructure.fastapi.device_ownership.MySQLEventosDisponibilidadRepository") as mock_repo_e,
+        patch("src.infrastructure.fastapi.device_ownership.MySQLMaquinasRepository") as mock_repo_m,
+        patch("src.infrastructure.fastapi.device_ownership._organizacion_de_dispositivo", return_value="org-1"),
+        patch("src.infrastructure.fastapi.device_ownership.repo_dispositivos_resuelto") as mock_repo_d,
+    ):
+        mock_repo_e.return_value.obtener_por_id.return_value = mock_evento
+        mock_repo_m.return_value.obtener_por_id.return_value = mock_maquina
+        mock_repo_d.return_value.obtener_por_id.return_value = mock_disp
+
+        with pytest.raises(HTTPException) as exc_info:
+            verificar_propiedad_evento_disponibilidad(
+                claims=claims,
+                db=mock_db,
+                acceso_plantas=mock_acceso_plantas,
+                evento_id=10,
+            )
+        assert exc_info.value.status_code == 404
+        assert exc_info.value.detail == "evento_no_encontrado"

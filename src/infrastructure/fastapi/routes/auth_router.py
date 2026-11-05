@@ -168,22 +168,39 @@ def login(
 def logout(
     response: Response,
     settings: Annotated[Settings, Depends(get_settings_dep)],
+    repo_usuarios: Annotated[RepositorioUsuariosPort | None, Depends(get_usuarios_repository)] = None,
     request: Request = None,  # type: ignore[assignment]
     audit_use_case: Annotated[RegistrarEventoAuditoriaUseCase | None, Depends(get_registrar_auditoria_use_case)] = None,
 ) -> dict[str, str]:
     _eliminar_cookie(response, settings, request=request)
-    if audit_use_case is not None and request is not None:
+    ahora = datetime.now(timezone.utc)
+    usuario_id = None
+    ip = ""
+    user_agent = ""
+    if request is not None:
         try:
             ip = _obtener_ip_cliente(request)
             user_agent = request.headers.get("User-Agent", "")
             token = request.cookies.get(settings.AUTH_COOKIE_NOMBRE) or request.headers.get(
                 "Authorization", ""
             ).replace("Bearer ", "")
-            usuario_id = None
             if token:
                 c = JwtTokenService(settings.API_SECRET_KEY).verificar(token)
                 if c:
                     usuario_id = str(c.get("sub", ""))
+        except Exception:
+            pass
+
+    if usuario_id:
+        if repo_usuarios is not None:
+            usuario = repo_usuarios.obtener_por_id(usuario_id)
+            if usuario is not None:
+                usuario.sesiones_revocadas_antes_de = ahora
+                repo_usuarios.guardar(usuario)
+        get_token_revocation_service().revocar_usuario(usuario_id, int(ahora.timestamp()))
+
+    if audit_use_case is not None and request is not None:
+        try:
             audit_use_case.ejecutar(
                 RegistrarAuditLogDTO(
                     categoria="AUTH",
