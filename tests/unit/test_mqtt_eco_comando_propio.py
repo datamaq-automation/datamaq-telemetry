@@ -134,6 +134,18 @@ def test_listener_descarta_el_eco_conf_com_antes_de_la_ingesta():
     logger.debug.assert_called_once_with("mqtt_eco_comando_propio_descartado", topico=msg.topic)
 
 
+def test_listener_descarta_keepalive_pro15_antes_de_la_ingesta():
+    listener = _listener_falso()
+    for payload in (b"", b"1", b"ping"):
+        msg = MagicMock(topic="pro15/8C8C291C3FB4/ka", payload=payload)
+        with patch("src.infrastructure.paho_mqtt.mqtt_listener.logger") as logger:
+            listener._on_message(None, None, msg)
+        listener._executor.submit.assert_not_called()
+        logger.error.assert_not_called()
+        logger.info.assert_not_called()
+        logger.debug.assert_called_once_with("mqtt_keepalive_descartado", topico=msg.topic)
+
+
 def test_listener_procesa_conf_rta_del_medidor():
     listener = _listener_falso()
     msg = MagicMock(topic="m/wifi/AABBCCDDEEFF/conf/rta", payload=b'{"status": "ok"}')
