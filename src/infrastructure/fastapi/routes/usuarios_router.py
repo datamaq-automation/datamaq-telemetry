@@ -8,7 +8,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.application.dtos.audit_dto import RegistrarAuditLogDTO
-from src.application.dtos.auth_dto import AsignarPlantasRequestDTO, PlantaAccesoDTO
+from src.application.dtos.auth_dto import (
+    AsignarPlantasRequestDTO,
+    PlantaAccesoDTO,
+    RolUsuario,
+)
 from src.application.use_cases.gestionar_acceso_plantas import GestionarAccesoPlantasUseCase
 from src.application.use_cases.gestionar_auditoria import RegistrarEventoAuditoriaUseCase
 from src.domain.auth.entities import UsuarioAuth
@@ -24,16 +28,19 @@ from src.infrastructure.fastapi.dependencies import (
 )
 from src.infrastructure.fastapi.error_handler import manejar_error_http
 from src.infrastructure.settings.config import get_settings
+from src.infrastructure.settings.logger import get_logger
+
+logger = get_logger("usuarios")
 
 
 class CrearUsuarioRequestDTO(BaseModel):
     usuario: str = Field(..., min_length=3, max_length=50)
-    rol: str = Field("operador", description="operador, admin, mantenimiento, ingeniero, etc.")
+    rol: RolUsuario = Field("operador", description="operador, admin, mantenimiento, ingeniero, etc.")
     organizacion_id: str | None = None
 
 
 class CambiarRolUsuarioDTO(BaseModel):
-    rol: str = Field(..., min_length=2, max_length=50, description="Nuevo rol asignado")
+    rol: RolUsuario = Field(..., description="Nuevo rol asignado")
 
 
 class UsuarioResponseDTO(BaseModel):
@@ -103,8 +110,11 @@ def crear_usuario(
                     },
                 )
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(
+                "error_auditoria_usuario",
+                extra={"error": str(e), "accion": "ALTA", "usuario_id": guardado.id},
+            )
 
     return UsuarioResponseDTO(
         id=guardado.id,
@@ -153,8 +163,11 @@ def dar_baja_usuario(
                     metadatos={"usuario": usuario.usuario},
                 )
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(
+                "error_auditoria_usuario",
+                extra={"error": str(e), "accion": "BAJA", "usuario_id": usuario_id},
+            )
 
 
 @router.patch(
@@ -193,8 +206,11 @@ def cambiar_rol_usuario(
                     metadatos={"rol_anterior": anterior_rol, "rol_nuevo": dto.rol},
                 )
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(
+                "error_auditoria_usuario",
+                extra={"error": str(e), "accion": "CAMBIO_ROL", "usuario_id": usuario_id},
+            )
 
     return UsuarioResponseDTO(
         id=guardado.id,
@@ -215,8 +231,11 @@ def _verificar_misma_organizacion(claims: dict, usuario_id: str, repo_usuarios: 
     """Un admin solo administra usuarios de su propia organización; superadmin, cualquiera."""
     if claims.get("rol") == "superadmin":
         return
+    admin_org = claims.get("org")
+    if not admin_org:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
     usuario = repo_usuarios.obtener_por_id(usuario_id)
-    if usuario is not None and usuario.organizacion_id != claims.get("org"):
+    if usuario is not None and (usuario.organizacion_id is None or usuario.organizacion_id != admin_org):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
 
 
@@ -224,6 +243,8 @@ def _verificar_alta_permitida(dto: CrearUsuarioRequestDTO, claims: dict) -> None
     """Un admin crea usuarios solo en su organización y nunca con rol superadmin (#40)."""
     if claims.get("rol") == "superadmin":
         return
+    if not claims.get("org"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
     if dto.rol == "superadmin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
     if dto.organizacion_id is not None and dto.organizacion_id != claims.get("org"):
@@ -270,6 +291,17 @@ def asignar_plantas_usuario(
 ) -> list[PlantaAccesoDTO]:
     """Reemplaza el conjunto de plantas asignadas; lista vacía restaura el acceso por defecto a toda la org."""
     _verificar_misma_organizacion(claims, usuario_id, repo_usuarios)
+    if claims.get("rol") != "superadmin":
+        if usuario_id == claims.get("sub"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="admin_no_puede_modificar_sus_propias_plantas",
+            )
+        plantas_admin = claims.get("plantas")
+        if plantas_admin is not None:
+            solicitadas = {p.planta_id if hasattr(p, "planta_id") else str(p) for p in dto.plantas}
+            if not solicitadas.issubset(set(plantas_admin)):
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
     try:
         return use_case.asignar(usuario_id, dto)
     except Exception as e:

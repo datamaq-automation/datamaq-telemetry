@@ -23,6 +23,7 @@ from src.infrastructure.fastapi.dependencies import (
 )
 from src.infrastructure.fastapi.error_handler import manejar_error_http
 from src.infrastructure.settings.config import Settings, get_settings
+from src.infrastructure.settings.logger import get_logger
 from src.infrastructure.sqlalchemy.database import (
     verificar_conexion_db,
     verificar_estado_migraciones,
@@ -30,6 +31,7 @@ from src.infrastructure.sqlalchemy.database import (
 from src.infrastructure.yaml.loaders import cargar_organizaciones_completas
 
 router = APIRouter(tags=["Sistema"])
+logger = get_logger("system")
 
 
 def _validar_datamaq_data() -> dict:
@@ -49,8 +51,9 @@ def _validar_datamaq_data() -> dict:
             "organizaciones": len(organizaciones),
             "plantas_totales": total_plantas,
         }
-    except Exception as e:
-        return {"valido": False, "razon": f"excepcion: {e!s}"}
+    except Exception:
+        logger.error("error_validacion_datamaq_data", exc_info=True)
+        return {"valido": False, "razon": "error_interno_validacion"}
 
 
 @router.get("/favicon.ico", include_in_schema=False)
@@ -144,7 +147,7 @@ def health_build(settings: Annotated[Settings, Depends(get_settings)]) -> BuildI
 
 
 @router.get("/api/v1/system/ws-status")
-def websocket_status():
+def websocket_status(claims: Annotated[dict, Depends(requiere_rol_superadmin)]):
     """Estado y métricas de observabilidad de los WebSockets en vivo."""
     from src.infrastructure.fastapi.server import obtener_metricas_ws
 

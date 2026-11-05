@@ -1,6 +1,6 @@
 """tests/unit/test_usuarios_router.py — Tests unitarios para el endpoint POST /api/v1/usuarios."""
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
 
@@ -280,3 +280,98 @@ def test_admin_no_cambia_rol_de_un_superadmin_403():
 
     assert response.status_code == 403
     repo.guardar.assert_not_called()
+
+
+def test_crear_usuario_rol_invalido_retorna_422():
+    repo = _repo_sin_usuario_previo()
+    client = _app_con_repo({"sub": "admin-1", "rol": "admin", "org": "org-1"}, repo)
+
+    response = client.post("/api/v1/usuarios", json={"usuario": "tecnico_invalido", "rol": "hacker"})
+
+    assert response.status_code == 422
+    repo.guardar.assert_not_called()
+
+
+def test_cambiar_rol_invalido_retorna_422():
+    repo = MagicMock()
+    repo.obtener_por_id.return_value = _usuario_existente("operador")
+    client = _app_con_repo({"sub": "admin-1", "rol": "admin", "org": "org-1"}, repo)
+
+    response = client.patch("/api/v1/usuarios/user-x/rol", json={"rol": "hacker"})
+
+    assert response.status_code == 422
+    repo.guardar.assert_not_called()
+
+
+def test_admin_sin_organizacion_administrando_usuario_sin_organizacion_retorna_403():
+    repo = MagicMock()
+    repo.obtener_por_id.return_value = _usuario_existente("operador", organizacion_id=None)
+    client = _app_con_repo({"sub": "admin-sin-org", "rol": "admin", "org": None}, repo)
+
+    response = client.delete("/api/v1/usuarios/user-x")
+
+    assert response.status_code == 403
+    repo.guardar.assert_not_called()
+
+
+def test_admin_sin_organizacion_alta_retorna_403():
+    repo = _repo_sin_usuario_previo()
+    client = _app_con_repo({"sub": "admin-sin-org", "rol": "admin", "org": None}, repo)
+
+    response = client.post("/api/v1/usuarios", json={"usuario": "tecnico_4", "rol": "operador"})
+
+    assert response.status_code == 403
+    repo.guardar.assert_not_called()
+
+
+def test_admin_reasignandose_sus_propias_plantas_retorna_403():
+    repo = MagicMock()
+    repo.obtener_por_id.return_value = _usuario_existente("admin", organizacion_id="org-1")
+    client = _app_con_repo({"sub": "admin-1", "rol": "admin", "org": "org-1"}, repo)
+
+    response = client.put(
+        "/api/v1/usuarios/admin-1/plantas",
+        json={"plantas": [{"planta_id": "planta-1", "puede_cambiar": True}]},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "admin_no_puede_modificar_sus_propias_plantas"
+
+
+def test_admin_con_plantas_restringidas_asignando_planta_ajena_retorna_403():
+    repo = MagicMock()
+    repo.obtener_por_id.return_value = _usuario_existente("operador", organizacion_id="org-1")
+    client = _app_con_repo(
+        {"sub": "admin-1", "rol": "admin", "org": "org-1", "plantas": ["planta-1"]},
+        repo,
+    )
+
+    response = client.put(
+        "/api/v1/usuarios/user-x/plantas",
+        json={"plantas": [{"planta_id": "planta-2", "puede_cambiar": True}]},
+    )
+
+    assert response.status_code == 403
+
+
+def test_fallo_auditoria_en_crear_usuario_emite_warning():
+    from src.infrastructure.fastapi.dependencies import (
+        get_registrar_auditoria_use_case,
+        get_usuarios_repository,
+    )
+
+    app = create_app()
+    mock_repo = _repo_sin_usuario_previo()
+    mock_audit = MagicMock()
+    mock_audit.ejecutar.side_effect = RuntimeError("db auditoria caida")
+
+    app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "admin-1", "rol": "admin", "org": "org-1"}
+    app.dependency_overrides[get_usuarios_repository] = lambda: mock_repo
+    app.dependency_overrides[get_registrar_auditoria_use_case] = lambda: mock_audit
+
+    client = TestClient(app)
+    with patch("src.infrastructure.fastapi.routes.usuarios_router.logger") as mock_logger:
+        response = client.post("/api/v1/usuarios", json={"usuario": "tecnico_log", "rol": "operador"})
+        assert response.status_code == 201
+        mock_logger.warning.assert_called_once()
+        assert mock_logger.warning.call_args[0][0] == "error_auditoria_usuario"
