@@ -8,7 +8,7 @@ from src.domain.asistente.entities import IntencionClasificada
 from src.domain.asistente.ports import ClasificadorIntencionPort
 
 
-class ClasificadorIntencionReglasAdapter(ClasificadorIntencionPort):
+class ClasificadorIntencionPorReglas(ClasificadorIntencionPort):
     """Clasificador determinístico y ligero en CPU local."""
 
     PATRONES: ClassVar[dict[str, list[tuple[str, int]]]] = {
