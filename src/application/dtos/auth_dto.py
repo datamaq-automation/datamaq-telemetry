@@ -13,7 +13,6 @@ RolUsuario = Literal[
     "operador",
     "mantenimiento",
     "ingeniero",
-    "auditor",
     "solo_lectura",
 ]
 ROLES_VALIDOS: frozenset[str] = frozenset(get_args(RolUsuario))
