@@ -25,10 +25,10 @@ from src.infrastructure.fastapi.dependencies import (
 )
 from src.infrastructure.fastapi.server import create_app
 
-ROLES_VIGENTES = {"superadmin", "admin", "operador", "mantenimiento", "ingeniero", "solo_lectura"}
+ROLES_VIGENTES = {"superadmin", "operador"}
 
 
-def test_roles_validos_son_seis_y_no_incluyen_auditor():
+def test_roles_validos_son_dos_y_no_incluyen_auditor():
     assert ROLES_VALIDOS == ROLES_VIGENTES
     assert "auditor" not in ROLES_VALIDOS
 

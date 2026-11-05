@@ -168,6 +168,6 @@ def test_sin_auth_requerida_se_resuelve_como_rol_global(cliente, monkeypatch):
     monkeypatch.setattr(
         "src.infrastructure.fastapi.planta_ownership.get_settings", lambda: MagicMock(AUTH_REQUIRED=False)
     )
-    client = crear({"sub": "anon", "rol": "admin"})
+    client = crear({"sub": "anon", "rol": "superadmin"})
     assert client.get("/api/v1/plantas/b1/unifilar").json()["planta_id"] == "b1"
     assert client.get("/api/v1/planta/unifilar").json()["planta_id"] == "a1"

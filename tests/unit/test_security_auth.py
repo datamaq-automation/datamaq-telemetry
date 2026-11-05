@@ -130,9 +130,17 @@ def test_requiere_rol_admin_rechaza_operador():
         assert e.status_code == 403
 
 
-def test_requiere_rol_admin_acepta_admin():
-    claims = deps.requiere_rol_admin({"rol": "admin"})
-    assert claims["rol"] == "admin"
+def test_requiere_rol_admin_acepta_superadmin():
+    claims = deps.requiere_rol_admin({"rol": "superadmin"})
+    assert claims["rol"] == "superadmin"
+
+
+def test_requiere_rol_admin_rechaza_admin_extinto():
+    try:
+        deps.requiere_rol_admin({"rol": "admin"})
+        raise AssertionError("Se esperaba HTTPException 403")
+    except HTTPException as e:
+        assert e.status_code == 403
 
 
 def test_get_usuario_actual_anonimo_sin_auth_required(monkeypatch):
@@ -142,7 +150,7 @@ def test_get_usuario_actual_anonimo_sin_auth_required(monkeypatch):
     claims = deps.get_usuario_actual(None)
 
     assert claims["sub"] == "anon"
-    assert claims["rol"] == "admin"
+    assert claims["rol"] == "superadmin"
 
 
 # --- Presenter 429 ---

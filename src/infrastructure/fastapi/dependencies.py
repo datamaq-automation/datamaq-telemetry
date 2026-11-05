@@ -462,7 +462,7 @@ def get_usuario_actual(
 ) -> dict[str, Any]:
     settings = get_settings()
     if not settings.AUTH_REQUIRED:
-        return {"sub": "anon", "rol": "admin"}
+        return {"sub": "anon", "rol": "superadmin"}
     token = extraer_token(datamaq_token, authorization)
     if token is None:
         raise HTTPException(status_code=401, detail="credenciales_invalidas")
@@ -517,24 +517,14 @@ def requiere_rol_superadmin(claims: Annotated[dict[str, Any], Depends(get_usuari
 
 
 def requiere_rol_admin(claims: Annotated[dict[str, Any], Depends(get_usuario_actual)]) -> dict[str, Any]:
-    if claims.get("rol") not in ("admin", "superadmin"):
+    # Redirigido a superadmin (decisión 2026-11-05, datamaq#170): endpoints de administración exclusivos de superadmin.
+    if claims.get("rol") != "superadmin":
         raise HTTPException(status_code=403, detail="forbidden")
-    return claims
-
-
-# TODO(#65): compatibilidad temporal de roles retirados; quitar con el Issue.
-def no_permitido_para_invitados_2fa(claims: Annotated[dict[str, Any], Depends(get_usuario_actual)]) -> dict[str, Any]:
-    # TODO(#65): quitar con los roles de compatibilidad.
-    # Inline: el generador de la matriz evalúa esta condición sin constantes de módulo.
-    # solo_lectura (decisión 2026-10-29, D3): la cuenta de la copia tampoco activa 2FA.
-    if claims.get("rol") in ("invitado", "invitado_global", "solo_lectura"):
-        raise HTTPException(status_code=403, detail="2fa_no_disponible_para_invitado")
-    return claims
+    return requiere_rol_superadmin(claims)
 
 
 def requiere_rol_escritura(claims: Annotated[dict[str, Any], Depends(get_usuario_actual)]) -> dict[str, Any]:
-    # Allowlist: un rol retirado (p. ej. invitado en un token viejo) no escribe.
-    if claims.get("rol") not in ("superadmin", "admin", "operador", "mantenimiento", "ingeniero"):
+    if claims.get("rol") not in ("superadmin", "operador"):
         raise HTTPException(status_code=403, detail="forbidden")
     return claims
 

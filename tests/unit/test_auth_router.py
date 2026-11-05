@@ -91,7 +91,7 @@ def _cliente(
         app.dependency_overrides[get_usuario_actual] = lambda: {
             "sub": "user-uuid-default",
             "usuario": "admin@planta.local",
-            "rol": "admin",
+            "rol": "operador",
         }
 
     if settings is not None:
@@ -342,11 +342,11 @@ def test_logout_revoca_token_en_memoria_y_rechaza_subsecuentes():
 
 
 def test_me_exitoso():
-    claims = {"usuario": "admin@planta.local", "rol": "admin", "sub": "u-123"}
+    claims = {"usuario": "admin@planta.local", "rol": "operador", "sub": "u-123"}
     client, mocks = _cliente(claims=claims)
     mocks["auth"].me.return_value = MeResponseDTO(
         usuario="admin@planta.local",
-        rol="admin",
+        rol="operador",
         totp_enabled=True,
         organizacion_id="org-uuid-1",
         organizacion_nombre="Planta Central",
@@ -356,7 +356,7 @@ def test_me_exitoso():
     assert response.status_code == 200
     data = response.json()
     assert data["usuario"] == "admin@planta.local"
-    assert data["rol"] == "admin"
+    assert data["rol"] == "operador"
     assert data["totp_enabled"] is True
     assert data["organizacion_id"] == "org-uuid-1"
     assert data["organizacion_nombre"] == "Planta Central"

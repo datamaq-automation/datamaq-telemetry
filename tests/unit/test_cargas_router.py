@@ -88,7 +88,7 @@ def _campana_response_dto(**kwargs) -> CampanaResponseDTO:
     return CampanaResponseDTO(**base)
 
 
-def _cliente(rol: str = "admin") -> tuple[TestClient, dict[str, MagicMock]]:
+def _cliente(rol: str = "operador") -> tuple[TestClient, dict[str, MagicMock]]:
     app = create_app()
     mocks = {
         "cargas": MagicMock(),

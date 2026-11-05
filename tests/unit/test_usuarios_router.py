@@ -8,7 +8,7 @@ from src.infrastructure.fastapi.dependencies import get_usuario_actual
 from src.infrastructure.fastapi.server import create_app
 
 
-def _cliente(rol: str = "admin", org: str = "org-1") -> tuple[TestClient, MagicMock]:
+def _cliente(rol: str = "superadmin", org: str = "org-1") -> tuple[TestClient, MagicMock]:
     app = create_app()
     mock_repo = MagicMock()
     app.dependency_overrides[get_usuario_actual] = lambda: {
@@ -28,7 +28,7 @@ def test_crear_usuario_exitoso_como_admin():
 
     app.dependency_overrides[get_usuario_actual] = lambda: {
         "sub": "usuario-admin",
-        "rol": "admin",
+        "rol": "superadmin",
         "org": "org-1",
     }
     from src.infrastructure.fastapi.dependencies import get_usuarios_repository
@@ -87,7 +87,7 @@ def test_dar_baja_usuario_exitoso_y_auditoria():
     app.dependency_overrides[get_usuario_actual] = lambda: {
         "sub": "usuario-admin",
         "usuario": "admin@planta.local",
-        "rol": "admin",
+        "rol": "superadmin",
         "org": "org-1",
     }
     from src.infrastructure.fastapi.dependencies import (
@@ -129,7 +129,7 @@ def test_cambiar_rol_usuario_exitoso_y_auditoria():
     app.dependency_overrides[get_usuario_actual] = lambda: {
         "sub": "usuario-admin",
         "usuario": "admin@planta.local",
-        "rol": "admin",
+        "rol": "superadmin",
         "org": "org-1",
     }
     from src.infrastructure.fastapi.dependencies import (
@@ -141,17 +141,17 @@ def test_cambiar_rol_usuario_exitoso_y_auditoria():
     app.dependency_overrides[get_registrar_auditoria_use_case] = lambda: mock_audit
 
     client = TestClient(app)
-    response = client.patch("/api/v1/usuarios/user-rol/rol", json={"rol": "mantenimiento"})
+    response = client.patch("/api/v1/usuarios/user-rol/rol", json={"rol": "superadmin"})
 
     assert response.status_code == 200
-    assert response.json()["rol"] == "mantenimiento"
+    assert response.json()["rol"] == "superadmin"
     mock_audit.ejecutar.assert_called_once()
     evento = mock_audit.ejecutar.call_args[0][0]
     assert evento.categoria == "USUARIOS"
     assert evento.accion == "CAMBIO_ROL"
     assert evento.resultado == "EXITO"
     assert evento.metadatos["rol_anterior"] == "operador"
-    assert evento.metadatos["rol_nuevo"] == "mantenimiento"
+    assert evento.metadatos["rol_nuevo"] == "superadmin"
 
 
 def _baja_de_superadmin(rol_actor: str) -> tuple[TestClient, MagicMock, MagicMock]:
@@ -172,7 +172,7 @@ def _baja_de_superadmin(rol_actor: str) -> tuple[TestClient, MagicMock, MagicMoc
 
 
 def test_admin_no_da_de_baja_a_un_superadmin_403_sin_desactivar():
-    client, repo, usuario = _baja_de_superadmin("admin")
+    client, repo, usuario = _baja_de_superadmin("operador")
 
     response = client.delete("/api/v1/usuarios/user-x")
 
@@ -208,7 +208,7 @@ def _repo_sin_usuario_previo() -> MagicMock:
 
 def test_admin_no_crea_superadmin_403_sin_guardar():
     repo = _repo_sin_usuario_previo()
-    client = _app_con_repo({"sub": "admin-1", "rol": "admin", "org": "org-1"}, repo)
+    client = _app_con_repo({"sub": "admin-1", "rol": "operador", "org": "org-1"}, repo)
 
     response = client.post("/api/v1/usuarios", json={"usuario": "nuevo_root", "rol": "superadmin"})
 
@@ -218,7 +218,7 @@ def test_admin_no_crea_superadmin_403_sin_guardar():
 
 def test_admin_no_crea_usuario_en_otra_organizacion_403_sin_guardar():
     repo = _repo_sin_usuario_previo()
-    client = _app_con_repo({"sub": "admin-1", "rol": "admin", "org": "org-1"}, repo)
+    client = _app_con_repo({"sub": "admin-1", "rol": "operador", "org": "org-1"}, repo)
 
     response = client.post(
         "/api/v1/usuarios", json={"usuario": "intruso", "rol": "operador", "organizacion_id": "org-2"}
@@ -230,7 +230,7 @@ def test_admin_no_crea_usuario_en_otra_organizacion_403_sin_guardar():
 
 def test_admin_crea_operador_en_su_organizacion_201():
     repo = _repo_sin_usuario_previo()
-    client = _app_con_repo({"sub": "admin-1", "rol": "admin", "org": "org-1"}, repo)
+    client = _app_con_repo({"sub": "admin-1", "rol": "superadmin", "org": "org-1"}, repo)
 
     response = client.post(
         "/api/v1/usuarios", json={"usuario": "tecnico_3", "rol": "operador", "organizacion_id": "org-1"}
@@ -263,7 +263,7 @@ def _usuario_existente(rol: str, organizacion_id: str = "org-1") -> MagicMock:
 def test_admin_no_asigna_superadmin_con_cambio_de_rol_403():
     repo = MagicMock()
     repo.obtener_por_id.return_value = _usuario_existente("operador")
-    client = _app_con_repo({"sub": "admin-1", "rol": "admin", "org": "org-1"}, repo)
+    client = _app_con_repo({"sub": "admin-1", "rol": "operador", "org": "org-1"}, repo)
 
     response = client.patch("/api/v1/usuarios/user-x/rol", json={"rol": "superadmin"})
 
@@ -274,7 +274,7 @@ def test_admin_no_asigna_superadmin_con_cambio_de_rol_403():
 def test_admin_no_cambia_rol_de_un_superadmin_403():
     repo = MagicMock()
     repo.obtener_por_id.return_value = _usuario_existente("superadmin")
-    client = _app_con_repo({"sub": "admin-1", "rol": "admin", "org": "org-1"}, repo)
+    client = _app_con_repo({"sub": "admin-1", "rol": "operador", "org": "org-1"}, repo)
 
     response = client.patch("/api/v1/usuarios/user-x/rol", json={"rol": "operador"})
 
@@ -284,7 +284,7 @@ def test_admin_no_cambia_rol_de_un_superadmin_403():
 
 def test_crear_usuario_rol_invalido_retorna_422():
     repo = _repo_sin_usuario_previo()
-    client = _app_con_repo({"sub": "admin-1", "rol": "admin", "org": "org-1"}, repo)
+    client = _app_con_repo({"sub": "admin-1", "rol": "superadmin", "org": "org-1"}, repo)
 
     response = client.post("/api/v1/usuarios", json={"usuario": "tecnico_invalido", "rol": "hacker"})
 
@@ -295,7 +295,7 @@ def test_crear_usuario_rol_invalido_retorna_422():
 def test_cambiar_rol_invalido_retorna_422():
     repo = MagicMock()
     repo.obtener_por_id.return_value = _usuario_existente("operador")
-    client = _app_con_repo({"sub": "admin-1", "rol": "admin", "org": "org-1"}, repo)
+    client = _app_con_repo({"sub": "admin-1", "rol": "superadmin", "org": "org-1"}, repo)
 
     response = client.patch("/api/v1/usuarios/user-x/rol", json={"rol": "hacker"})
 
@@ -306,7 +306,7 @@ def test_cambiar_rol_invalido_retorna_422():
 def test_admin_sin_organizacion_administrando_usuario_sin_organizacion_retorna_403():
     repo = MagicMock()
     repo.obtener_por_id.return_value = _usuario_existente("operador", organizacion_id=None)
-    client = _app_con_repo({"sub": "admin-sin-org", "rol": "admin", "org": None}, repo)
+    client = _app_con_repo({"sub": "admin-sin-org", "rol": "operador", "org": None}, repo)
 
     response = client.delete("/api/v1/usuarios/user-x")
 
@@ -316,7 +316,7 @@ def test_admin_sin_organizacion_administrando_usuario_sin_organizacion_retorna_4
 
 def test_admin_sin_organizacion_alta_retorna_403():
     repo = _repo_sin_usuario_previo()
-    client = _app_con_repo({"sub": "admin-sin-org", "rol": "admin", "org": None}, repo)
+    client = _app_con_repo({"sub": "admin-sin-org", "rol": "operador", "org": None}, repo)
 
     response = client.post("/api/v1/usuarios", json={"usuario": "tecnico_4", "rol": "operador"})
 
@@ -326,8 +326,8 @@ def test_admin_sin_organizacion_alta_retorna_403():
 
 def test_admin_reasignandose_sus_propias_plantas_retorna_403():
     repo = MagicMock()
-    repo.obtener_por_id.return_value = _usuario_existente("admin", organizacion_id="org-1")
-    client = _app_con_repo({"sub": "admin-1", "rol": "admin", "org": "org-1"}, repo)
+    repo.obtener_por_id.return_value = _usuario_existente("operador", organizacion_id="org-1")
+    client = _app_con_repo({"sub": "admin-1", "rol": "operador", "org": "org-1"}, repo)
 
     response = client.put(
         "/api/v1/usuarios/admin-1/plantas",
@@ -335,14 +335,14 @@ def test_admin_reasignandose_sus_propias_plantas_retorna_403():
     )
 
     assert response.status_code == 403
-    assert response.json()["detail"] == "admin_no_puede_modificar_sus_propias_plantas"
+    assert response.json()["detail"] == "forbidden"
 
 
 def test_admin_con_plantas_restringidas_asignando_planta_ajena_retorna_403():
     repo = MagicMock()
     repo.obtener_por_id.return_value = _usuario_existente("operador", organizacion_id="org-1")
     client = _app_con_repo(
-        {"sub": "admin-1", "rol": "admin", "org": "org-1", "plantas": ["planta-1"]},
+        {"sub": "admin-1", "rol": "operador", "org": "org-1", "plantas": ["planta-1"]},
         repo,
     )
 
@@ -365,7 +365,7 @@ def test_fallo_auditoria_en_crear_usuario_emite_warning():
     mock_audit = MagicMock()
     mock_audit.ejecutar.side_effect = RuntimeError("db auditoria caida")
 
-    app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "admin-1", "rol": "admin", "org": "org-1"}
+    app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "admin-1", "rol": "superadmin", "org": "org-1"}
     app.dependency_overrides[get_usuarios_repository] = lambda: mock_repo
     app.dependency_overrides[get_registrar_auditoria_use_case] = lambda: mock_audit
 

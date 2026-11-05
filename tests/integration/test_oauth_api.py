@@ -37,7 +37,7 @@ def _crear_app_test() -> tuple[Any, str]:
             id=user_id,
             username=f"oauth_test_{user_id[:8]}@datamaq.com",
             password_hash="hash",
-            role="ingeniero",
+            role="operador",
             organization_id=None,
             is_active=True,
         )
@@ -131,7 +131,7 @@ def test_oauth_flujo_completo_pkce_y_rotacion_refresh():
     app.dependency_overrides[get_usuario_actual] = lambda: {
         "sub": user_id,
         "org": "org_durax_1",
-        "rol": "ingeniero",
+        "rol": "operador",
     }
 
     verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
@@ -225,7 +225,7 @@ def test_oauth_token_verifier_invalido():
     app.dependency_overrides[get_usuario_actual] = lambda: {
         "sub": user_id,
         "org": "org_durax_1",
-        "rol": "ingeniero",
+        "rol": "operador",
     }
 
     verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
@@ -263,7 +263,7 @@ def test_oauth_revocar_integracion_por_cliente():
     app.dependency_overrides[get_usuario_actual] = lambda: {
         "sub": user_id,
         "org": "org_durax_1",
-        "rol": "ingeniero",
+        "rol": "operador",
     }
 
     verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
@@ -316,7 +316,7 @@ def _token_login(user_id: str) -> str:
         usuario_id=user_id,
         usuario="oauth_test@datamaq.com",
         expira_en=datetime.now(timezone.utc) + timedelta(hours=1),
-        rol="ingeniero",
+        rol="operador",
         organizacion_id="org_durax_1",
     )
 
@@ -387,7 +387,7 @@ def _crear_usuario(app: Any) -> str:
             id=user_id,
             username=f"otro_{user_id[:8]}@datamaq.com",
             password_hash="hash",
-            role="ingeniero",
+            role="operador",
             organization_id=None,
             is_active=True,
         )
@@ -596,7 +596,7 @@ def test_oauth_consent_info_y_consent_flow():
     app.dependency_overrides[get_usuario_actual] = lambda: {
         "sub": user_id,
         "org": "org-durax",
-        "rol": "ingeniero",
+        "rol": "operador",
     }
 
     verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
@@ -660,7 +660,7 @@ def test_oauth_consent_con_state_largo_mcp():
     app.dependency_overrides[get_usuario_actual] = lambda: {
         "sub": user_id,
         "org": "org-durax",
-        "rol": "ingeniero",
+        "rol": "operador",
     }
 
     verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"

@@ -44,7 +44,7 @@ def _alerta_response_dto(**kwargs) -> AlertaResponseDTO:
 
 
 def _cliente(
-    rol: str = "admin", autenticado: bool = True, claims_extra: dict | None = None
+    rol: str = "operador", autenticado: bool = True, claims_extra: dict | None = None
 ) -> tuple[TestClient, dict[str, MagicMock]]:
     app = create_app()
     mocks = {

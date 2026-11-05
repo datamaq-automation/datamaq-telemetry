@@ -100,7 +100,7 @@ def _use_case(repo_suscripciones=None, repo_planes=None, repo_organizaciones=Non
 
 
 def test_sin_repos_de_suscripcion_devuelve_defaults_free():
-    dto = _use_case().me({"usuario": "u1", "rol": "admin", "org": "org-1"})
+    dto = _use_case().me({"usuario": "u1", "rol": "operador", "org": "org-1"})
 
     assert dto.modo_free is True
     assert dto.retention_days == 7
@@ -109,14 +109,16 @@ def test_sin_repos_de_suscripcion_devuelve_defaults_free():
 
 
 def test_sin_organizacion_devuelve_defaults_free():
-    dto = _use_case(FakeRepoSuscripciones({}), FakeRepoPlanes({})).me({"usuario": "u1", "rol": "admin"})
+    dto = _use_case(FakeRepoSuscripciones({}), FakeRepoPlanes({})).me({"usuario": "u1", "rol": "operador"})
 
     assert dto.modo_free is True
     assert dto.retention_days == 7
 
 
 def test_organizacion_sin_fila_de_suscripcion_es_free():
-    dto = _use_case(FakeRepoSuscripciones({}), FakeRepoPlanes({})).me({"usuario": "u1", "rol": "admin", "org": "org-1"})
+    dto = _use_case(FakeRepoSuscripciones({}), FakeRepoPlanes({})).me(
+        {"usuario": "u1", "rol": "operador", "org": "org-1"}
+    )
 
     assert dto.modo_free is True
     assert dto.plan_nombre is None
@@ -129,7 +131,7 @@ def test_organizacion_con_pro_vigente_refleja_el_plan():
         organizacion_id="org-1", plan_id=plan.id, pro_vence_en=datetime.now(timezone.utc) + timedelta(days=10)
     )
     dto = _use_case(FakeRepoSuscripciones({"org-1": sus}), FakeRepoPlanes({plan.id: plan})).me(
-        {"usuario": "u1", "rol": "admin", "org": "org-1"}
+        {"usuario": "u1", "rol": "operador", "org": "org-1"}
     )
 
     assert dto.modo_free is False
@@ -144,7 +146,7 @@ def test_organizacion_con_pro_vencido_es_free_aunque_tenga_plan_id():
         organizacion_id="org-1", plan_id=plan.id, pro_vence_en=datetime.now(timezone.utc) - timedelta(days=1)
     )
     dto = _use_case(FakeRepoSuscripciones({"org-1": sus}), FakeRepoPlanes({plan.id: plan})).me(
-        {"usuario": "u1", "rol": "admin", "org": "org-1"}
+        {"usuario": "u1", "rol": "operador", "org": "org-1"}
     )
 
     assert dto.modo_free is True
@@ -159,7 +161,7 @@ def test_cooperativa_sin_suscripcion_tiene_retencion_ilimitada():
         FakeRepoSuscripciones({}),
         FakeRepoPlanes({}),
         FakeRepoOrganizaciones({"coop-1": org}),
-    ).me({"usuario": "u1", "rol": "admin", "org": "coop-1"})
+    ).me({"usuario": "u1", "rol": "operador", "org": "coop-1"})
 
     assert dto.es_cooperativa is True
     assert dto.modo_free is False
@@ -178,7 +180,7 @@ def test_cooperativa_con_suscripcion_pro_ignora_plan_y_usa_retencion_ilimitada()
         FakeRepoSuscripciones({"coop-2": sus}),
         FakeRepoPlanes({plan.id: plan}),
         FakeRepoOrganizaciones({"coop-2": org}),
-    ).me({"usuario": "u1", "rol": "admin", "org": "coop-2"})
+    ).me({"usuario": "u1", "rol": "operador", "org": "coop-2"})
 
     assert dto.es_cooperativa is True
     assert dto.modo_free is False
@@ -193,7 +195,7 @@ def test_organizacion_no_cooperativa_devuelve_es_cooperativa_false():
         FakeRepoSuscripciones({}),
         FakeRepoPlanes({}),
         FakeRepoOrganizaciones({"org-nocoopver": org}),
-    ).me({"usuario": "u1", "rol": "admin", "org": "org-nocoopver"})
+    ).me({"usuario": "u1", "rol": "operador", "org": "org-nocoopver"})
 
     assert dto.es_cooperativa is False
     assert dto.modo_free is True

@@ -56,7 +56,7 @@ def _cliente() -> tuple[TestClient, dict[str, MagicMock]]:
     app.dependency_overrides[get_exportar_disponibilidad_use_case] = lambda: mocks["exportar"]
     app.dependency_overrides[get_usuario_actual] = lambda: {
         "sub": "u1",
-        "rol": "admin",
+        "rol": "operador",
         "org": "org-1",
     }
     app.dependency_overrides[verificar_propiedad_maquina] = lambda: None

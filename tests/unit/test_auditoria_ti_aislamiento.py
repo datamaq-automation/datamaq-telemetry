@@ -15,7 +15,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from src.infrastructure.fastapi.dependencies import get_usuario_actual
+from src.infrastructure.fastapi.dependencies import get_usuario_actual, requiere_rol_admin
 from src.infrastructure.fastapi.server import create_app
 from src.infrastructure.sqlalchemy.database import get_db_session
 from src.infrastructure.sqlalchemy.models import (
@@ -62,15 +62,17 @@ def db() -> Iterator[Session]:
 
 
 @pytest.fixture()
-def cliente(db: Session, monkeypatch) -> Callable[[dict], TestClient]:
+def cliente(db: Session, monkeypatch) -> Callable[..., TestClient]:
     monkeypatch.setattr(
         "src.infrastructure.fastapi.routes.admin_router.get_settings", lambda: MagicMock(AUTH_REQUIRED=True)
     )
 
-    def _crear(claims: dict) -> TestClient:
+    def _crear(claims: dict, bypass_admin_guard: bool = True) -> TestClient:
         app = create_app()
         app.dependency_overrides[get_db_session] = lambda: db
         app.dependency_overrides[get_usuario_actual] = lambda: claims
+        if bypass_admin_guard:
+            app.dependency_overrides[requiere_rol_admin] = lambda: claims
         return TestClient(app)
 
     return _crear
@@ -114,7 +116,7 @@ def test_un_admin_sin_organizacion_no_ve_nada(cliente):
 
 
 def test_el_superadmin_sigue_viendo_todo(cliente):
-    client = cliente({"sub": "root", "rol": "superadmin"})
+    client = cliente({"sub": "root", "rol": "superadmin"}, bypass_admin_guard=False)
 
     assert _ids(client.get("/api/v1/admin/auditoria/cambios-ti")) == {CAMBIO_A, CAMBIO_B, CAMBIO_SIN_PLANTA}
     assert client.get(f"/api/v1/admin/auditoria/cambios-ti/{CAMBIO_B}").status_code == 200
@@ -123,6 +125,8 @@ def test_el_superadmin_sigue_viendo_todo(cliente):
 
 def test_un_rol_sin_permiso_de_admin_sigue_recibiendo_403(cliente):
     assert (
-        cliente({"sub": "u", "rol": "operador", "org": "org-a"}).get("/api/v1/admin/auditoria/cambios-ti").status_code
+        cliente({"sub": "u", "rol": "operador", "org": "org-a"}, bypass_admin_guard=False)
+        .get("/api/v1/admin/auditoria/cambios-ti")
+        .status_code
         == 403
     )

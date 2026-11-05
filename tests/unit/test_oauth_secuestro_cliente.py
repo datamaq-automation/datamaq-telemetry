@@ -29,7 +29,7 @@ URI_OFICIAL = "https://claude.ai/api/mcp/oauth_callback"
 URI_ATACANTE = "https://evil.example/cb?src=claude.ai"
 VERIFICADOR = "v" * 64
 DESAFIO = base64.urlsafe_b64encode(hashlib.sha256(VERIFICADOR.encode()).digest()).decode().rstrip("=")
-VICTIMA = {"sub": "u-victima", "usuario": "gerente@org-v", "rol": "admin", "org": "org-v"}
+VICTIMA = {"sub": "u-victima", "usuario": "gerente@org-v", "rol": "operador", "org": "org-v"}
 
 
 class _RepoUsuarios:

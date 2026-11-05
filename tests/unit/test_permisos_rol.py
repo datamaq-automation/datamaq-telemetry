@@ -33,9 +33,9 @@ def test_requiere_rol_escritura_rechaza_invitado():
     assert e.value.detail == "forbidden"
 
 
-# P2 — requiere_rol_escritura acepta admin y operador
-def test_requiere_rol_escritura_acepta_admin_y_operador():
-    assert deps.requiere_rol_escritura({"rol": "admin"}) == {"rol": "admin"}
+# P2 — requiere_rol_escritura acepta superadmin y operador
+def test_requiere_rol_escritura_acepta_superadmin_y_operador():
+    assert deps.requiere_rol_escritura({"rol": "superadmin"}) == {"rol": "superadmin"}
     assert deps.requiere_rol_escritura({"rol": "operador"}) == {"rol": "operador"}
 
 

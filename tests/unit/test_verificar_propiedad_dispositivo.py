@@ -54,7 +54,7 @@ class TestVerificarPropiedadDispositivo:
             "src.infrastructure.fastapi.device_ownership.get_settings",
             return_value=_FakeSettings(auth_required=False),
         ):
-            verificar_propiedad_dispositivo(claims={"rol": "admin"}, db=MagicMock(), device_id="cualquier-id")
+            verificar_propiedad_dispositivo(claims={"rol": "superadmin"}, db=MagicMock(), device_id="cualquier-id")
         repo_dispositivos.obtener_por_id.assert_not_called()
 
     def test_sin_device_id_ni_dispositivo_id_pasa(self, monkeypatch):

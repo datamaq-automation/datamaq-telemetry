@@ -32,7 +32,7 @@ MEDIDOR_TEST = "dev-casa-test-endpoints"
 AHORA = datetime(2026, 9, 6, 12, 0, tzinfo=timezone.utc)
 
 
-def _cliente(use_case: MagicMock, rol: str = "admin") -> TestClient:
+def _cliente(use_case: MagicMock, rol: str = "operador") -> TestClient:
     app = create_app()
     # La propiedad del medidor (#41) tiene sus propios tests; acá se prueba el comportamiento de cargas.
     app.dependency_overrides[verificar_propiedad_dispositivo] = lambda: None
@@ -76,8 +76,8 @@ def test_inicializar_presets_requiere_escritura_y_delega_a_caso_de_uso():
     res_viewer = cliente_viewer.post(f"/api/v1/cargas/presets/inicializar?device_id={MEDIDOR_TEST}")
     assert res_viewer.status_code == 403
 
-    # Con rol admin debe autorizar y delegar
-    cliente_admin = _cliente(mock_uc, rol="admin")
+    # Con rol operador debe autorizar y delegar
+    cliente_admin = _cliente(mock_uc, rol="operador")
     res_admin = cliente_admin.post(f"/api/v1/cargas/presets/inicializar?device_id={MEDIDOR_TEST}")
     assert res_admin.status_code == 200
     mock_uc.inicializar_presets_catalogo.assert_called_once_with(MEDIDOR_TEST)

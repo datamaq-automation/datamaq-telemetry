@@ -35,7 +35,7 @@ logger = get_logger("usuarios")
 
 class CrearUsuarioRequestDTO(BaseModel):
     usuario: str = Field(..., min_length=3, max_length=50)
-    rol: RolUsuario = Field("operador", description="operador, admin, mantenimiento, ingeniero, etc.")
+    rol: RolUsuario = Field("operador", description="superadmin u operador")
     organizacion_id: str | None = None
 
 

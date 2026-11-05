@@ -48,7 +48,7 @@ def _dispositivo_dto(**kwargs) -> DispositivoResponseDTO:
 
 
 def _cliente(
-    rol: str = "admin",
+    rol: str = "operador",
     org: str | None = "org-1",
     sub: str = "u1",
     mock_propiedad: bool = True,
@@ -80,7 +80,7 @@ def _cliente(
 
 
 def test_listar_dispositivos_usuario_con_org():
-    client, mocks = _cliente(rol="admin", org="org-1")
+    client, mocks = _cliente(rol="operador", org="org-1")
     mocks["dispositivos"].listar_dispositivos.return_value = [
         _dispositivo_dto(id="dev-1", device_uid="00:11:22:33:44:55"),
         _dispositivo_dto(id="dev-2", device_uid="00:11:22:33:44:56"),
@@ -122,7 +122,7 @@ def test_listar_dispositivos_superadmin_sin_filtro_org():
 
 
 def test_listar_dispositivos_sin_org_fail_closed():
-    client, mocks = _cliente(rol="admin", org=None)
+    client, mocks = _cliente(rol="operador", org=None)
 
     response = client.get("/api/v1/dispositivos")
 
@@ -179,7 +179,7 @@ def test_obtener_dispositivo_error_inesperado_500():
 
 
 def test_registrar_dispositivo_exitoso():
-    client, mocks = _cliente(rol="admin")
+    client, mocks = _cliente(rol="operador")
     # La planta destino se valida con la política de plantas (datamaq#132): acá la permite.
     acceso = MagicMock()
     acceso.resolver_planta_permitida.return_value = "planta-1"
@@ -204,7 +204,7 @@ def test_registrar_dispositivo_exitoso():
     response = client.post("/api/v1/dispositivos", json=payload)
 
     assert response.status_code == 200
-    acceso.resolver_planta_permitida.assert_called_once_with("u1", "admin", "org-1", "planta-1")
+    acceso.resolver_planta_permitida.assert_called_once_with("u1", "operador", "org-1", "planta-1")
     data = response.json()
     assert data["id"] == "dev-nuevo"
     assert data["device_uid"] == "00:11:22:33:44:55"
@@ -242,7 +242,7 @@ def test_registrar_dispositivo_rol_invitado_global_403():
 
 
 def test_registrar_dispositivo_payload_invalido_422():
-    client, _ = _cliente(rol="admin")
+    client, _ = _cliente(rol="operador")
 
     # Falta el campo requerido device_uid
     payload = {
@@ -254,7 +254,7 @@ def test_registrar_dispositivo_payload_invalido_422():
 
 
 def test_registrar_dispositivo_limite_excedido_422():
-    client, mocks = _cliente(rol="admin")
+    client, mocks = _cliente(rol="operador")
     mocks["dispositivos"].registrar_dispositivo.side_effect = LimiteDispositivosExcedidoError(
         "La organización alcanzó el límite de dispositivos."
     )
@@ -270,7 +270,7 @@ def test_registrar_dispositivo_limite_excedido_422():
 
 
 def test_registrar_dispositivo_error_inesperado_500():
-    client, mocks = _cliente(rol="admin")
+    client, mocks = _cliente(rol="operador")
     mocks["dispositivos"].registrar_dispositivo.side_effect = RuntimeError("Error interno al registrar")
 
     payload = {
@@ -287,7 +287,7 @@ def test_registrar_dispositivo_error_inesperado_500():
 
 
 def test_actualizar_dispositivo_put_exitoso():
-    client, mocks = _cliente(rol="admin")
+    client, mocks = _cliente(rol="operador")
     mocks["dispositivos"].actualizar_dispositivo_de_organizacion.return_value = _dispositivo_dto(
         id="dev-1", nombre="Nombre Modificado PUT"
     )
@@ -318,7 +318,7 @@ def test_actualizar_dispositivo_put_rol_invitado_403():
 
 
 def test_actualizar_dispositivo_put_no_encontrado_404():
-    client, mocks = _cliente(rol="admin")
+    client, mocks = _cliente(rol="operador")
     mocks["dispositivos"].actualizar_dispositivo_de_organizacion.side_effect = DispositivoNoEncontradoError(
         "Dispositivo 'dev-404' no encontrado."
     )
@@ -330,7 +330,7 @@ def test_actualizar_dispositivo_put_no_encontrado_404():
 
 
 def test_actualizar_dispositivo_put_limite_excedido_422():
-    client, mocks = _cliente(rol="admin")
+    client, mocks = _cliente(rol="operador")
     mocks["dispositivos"].actualizar_dispositivo_de_organizacion.side_effect = LimiteDispositivosExcedidoError(
         "Cupo máximo alcanzado al cambiar de planta."
     )
@@ -342,7 +342,7 @@ def test_actualizar_dispositivo_put_limite_excedido_422():
 
 
 def test_actualizar_dispositivo_put_error_inesperado_500():
-    client, mocks = _cliente(rol="admin")
+    client, mocks = _cliente(rol="operador")
     mocks["dispositivos"].actualizar_dispositivo_de_organizacion.side_effect = RuntimeError("Falla no controlada")
 
     response = client.put("/api/v1/dispositivos/dev-1", json={"nombre": "Nuevo"})
@@ -351,7 +351,7 @@ def test_actualizar_dispositivo_put_error_inesperado_500():
 
 
 def test_actualizar_dispositivo_patch_exitoso():
-    client, mocks = _cliente(rol="admin")
+    client, mocks = _cliente(rol="operador")
     mocks["dispositivos"].actualizar_dispositivo_de_organizacion.return_value = _dispositivo_dto(
         id="dev-1", esta_activo=False
     )
@@ -378,7 +378,7 @@ def test_actualizar_dispositivo_patch_rol_invitado_403():
 
 
 def test_actualizar_dispositivo_patch_no_encontrado_404():
-    client, mocks = _cliente(rol="admin")
+    client, mocks = _cliente(rol="operador")
     mocks["dispositivos"].actualizar_dispositivo_de_organizacion.side_effect = DispositivoNoEncontradoError(
         "Dispositivo no encontrado."
     )

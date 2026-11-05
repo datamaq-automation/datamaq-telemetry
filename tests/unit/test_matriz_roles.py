@@ -28,11 +28,7 @@ def test_roles_validos_salen_de_la_fuente_de_autenticacion():
     assert ROLES_FUENTE.exists()
     assert set(roles) == {
         "superadmin",
-        "admin",
         "operador",
-        "mantenimiento",
-        "ingeniero",
-        "solo_lectura",
     }
 
 
@@ -41,11 +37,10 @@ def test_guards_dejan_pasar_exactamente_los_roles_que_su_codigo_dice():
     guards = guards_de_rol(roles)
 
     assert guards["requiere_rol_superadmin"] == {"superadmin"}
-    assert guards["requiere_rol_admin"] == {"admin", "superadmin"}
+    assert guards["requiere_rol_admin"] == {"superadmin"}
     # auditor se retiró (datamaq#122): el registro de auditoría es solo del superadmin.
     assert guards["requiere_rol_auditor_o_superadmin"] == {"superadmin"}
-    # solo_lectura (decisión 2026-10-29) es el rol de la réplica: no pasa ningún guard de escritura.
-    assert guards["requiere_rol_escritura"] == set(roles) - {"solo_lectura"}
+    assert guards["requiere_rol_escritura"] == {"superadmin", "operador"}
 
 
 def test_cada_endpoint_tiene_su_guard_o_una_razon_para_no_tenerlo():
