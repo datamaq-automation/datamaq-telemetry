@@ -45,6 +45,7 @@ class ClasificadorIntencionReglasAdapter(ClasificadorIntencionPort):
             (r"\bestamos consumiendo\b", 3),
             (r"\bcuanto\b.*\bconsum", 3),
             (r"\bcual\b.*\bconsumo\b", 3),
+            (r"\bcuanta\b.*\benergia\b", 3),
             (r"\bkw\b", 2),
             (r"\bkwh\b", 2),
             (r"\btelemetria\b", 3),

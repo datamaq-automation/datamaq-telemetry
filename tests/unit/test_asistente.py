@@ -2,6 +2,8 @@
 from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
+import pytest
+
 from src.application.dtos.alerta_dto import AlertaResponseDTO
 from src.application.dtos.dispositivo_dto import DispositivoResponseDTO
 from src.application.use_cases.asistente.procesar_pregunta_asistente import (
@@ -167,6 +169,27 @@ def test_asistente_incluye_telemetria_en_contexto():
     consultar_telemetria.obtener_ultima_telemetria.assert_called_once_with("dev-1")
     prompt_enviado = generador.generar.call_args.args[1]
     assert '"potencia_activa_kw": 12.5' in prompt_enviado
+
+
+@pytest.mark.parametrize(
+    ("pregunta", "intencion_esperada"),
+    [
+        ("¿Cuánta energía consumimos?", "RESUMEN_TELEMETRIA"),
+        ("¿Cuanta energia consumimos?", "RESUMEN_TELEMETRIA"),
+        ("¿Cuál es la tensión actual?", "RESUMEN_TELEMETRIA"),
+        ("¿Cual es la tension actual?", "RESUMEN_TELEMETRIA"),
+        ("¿Qué pasó con la alerta?", "EXPLICAR_ALERTAS"),
+        ("¿Que paso con la alerta?", "EXPLICAR_ALERTAS"),
+        ("¿Cuál es el estado del medidor?", "SALUD_DISPOSITIVOS"),
+        ("¿Cual es el estado del medidor?", "SALUD_DISPOSITIVOS"),
+    ],
+)
+def test_clasificador_equivalencia_con_y_sin_acentos(pregunta, intencion_esperada):
+    clasificador = ClasificadorIntencionReglasAdapter()
+
+    resultado = clasificador.clasificar(pregunta)
+
+    assert resultado.nombre == intencion_esperada
 
 
 def test_clasificador_maneja_preguntas_vacias_y_ambiguas():
