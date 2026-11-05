@@ -24,7 +24,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 RUTAS_DIR = ROOT_DIR / "src" / "infrastructure" / "fastapi" / "routes"
 FASTAPI_DIR = ROOT_DIR / "src" / "infrastructure" / "fastapi"
 DEPENDENCIAS = FASTAPI_DIR / "dependencies.py"
-ROLES_FUENTE = ROOT_DIR / "src" / "application" / "use_cases" / "autenticar_usuario.py"
+ROLES_FUENTE = ROOT_DIR / "src" / "application" / "dtos" / "auth_dto.py"
 SALIDA = ROOT_DIR / "docs" / "matriz-roles-permisos.md"
 
 METODOS_HTTP = {"get", "post", "put", "patch", "delete"}
@@ -49,13 +49,11 @@ NOMBRES_DE_ROL_EN_CODIGO = {
 def leer_roles_validos() -> list[str]:
     arbol = ast.parse(ROLES_FUENTE.read_text(encoding="utf-8"))
     for nodo in ast.walk(arbol):
-        if isinstance(nodo, ast.Assign) and any(
-            isinstance(t, ast.Name) and t.id == "ROLES_VALIDOS" for t in nodo.targets
-        ):
+        if isinstance(nodo, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "RolUsuario" for t in nodo.targets):
             return sorted(
                 c.value for c in ast.walk(nodo.value) if isinstance(c, ast.Constant) and isinstance(c.value, str)
             )
-    raise RuntimeError("No se encontró ROLES_VALIDOS en autenticar_usuario.py")
+    raise RuntimeError("No se encontró RolUsuario en auth_dto.py")
 
 
 def roles_que_pasan(funcion: ast.FunctionDef, roles: list[str]) -> set[str]:

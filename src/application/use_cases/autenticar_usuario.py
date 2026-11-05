@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from src.application.dtos.auth_dto import LoginRequestDTO, LoginResponseDTO, MeResponseDTO
+from src.application.dtos.auth_dto import ROLES_VALIDOS, LoginRequestDTO, LoginResponseDTO, MeResponseDTO
 from src.application.use_cases.gestionar_acceso_plantas import GestionarAccesoPlantasUseCase
 from src.domain.auth.entities import ahora_utc
 from src.domain.auth.exceptions import CredencialesInvalidasError, DemasiadosIntentosError, UsuarioInactivoError
@@ -25,18 +25,6 @@ from src.domain.telemetria.ports import (
     RepositorioSuscripcionesPort,
 )
 from src.domain.telemetria.servicios.politicas_suscripcion import PoliticaSuscripcionService
-
-ROLES_VALIDOS = frozenset(
-    {
-        "superadmin",
-        "admin",
-        "operador",
-        "mantenimiento",
-        "ingeniero",
-        "auditor",
-        "solo_lectura",
-    }
-)
 
 
 class AutenticarUsuarioUseCase:
