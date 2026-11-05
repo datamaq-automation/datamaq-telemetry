@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.domain.telemetria.ports import RepositorioAuditoriaCambiosTIPort
-from src.infrastructure.sqlalchemy.models import AuditoriaChangesTIModel
+from src.infrastructure.sqlalchemy.models import AuditoriaChangesTIModel, DeviceModel, FacilityModel
 
 
 def _a_registro(cambio: AuditoriaChangesTIModel) -> dict[str, Any]:
@@ -24,6 +24,17 @@ def _a_registro(cambio: AuditoriaChangesTIModel) -> dict[str, Any]:
     }
 
 
+def _de_la_organizacion(query, organizacion_id: str | None):
+    """Restringe a los cambios de medidores de plantas de la organización; ``None`` no restringe."""
+    if organizacion_id is None:
+        return query
+    return (
+        query.join(DeviceModel, AuditoriaChangesTIModel.device_id == DeviceModel.id)
+        .join(FacilityModel, DeviceModel.facility_id == FacilityModel.id)
+        .where(FacilityModel.organization_id == organizacion_id)
+    )
+
+
 class AuditoriaCambiosTIRepository(RepositorioAuditoriaCambiosTIPort):
     """Implementación SQLAlchemy de la auditoría de cambios de TI."""
 
@@ -36,8 +47,9 @@ class AuditoriaCambiosTIRepository(RepositorioAuditoriaCambiosTIPort):
         tipo_cambio: str | None,
         desde: datetime | None,
         hasta: datetime | None,
+        organizacion_id: str | None = None,
     ) -> list[dict[str, Any]]:
-        query = select(AuditoriaChangesTIModel)
+        query = _de_la_organizacion(select(AuditoriaChangesTIModel), organizacion_id)
         if dispositivo_id:
             query = query.where(AuditoriaChangesTIModel.device_id == dispositivo_id)
         if tipo_cambio:
@@ -49,10 +61,9 @@ class AuditoriaCambiosTIRepository(RepositorioAuditoriaCambiosTIPort):
         query = query.order_by(AuditoriaChangesTIModel.timestamp.desc())
         return [_a_registro(c) for c in self._db.scalars(query).all()]
 
-    def obtener(self, cambio_id: int) -> dict[str, Any] | None:
-        cambio = self._db.scalars(
-            select(AuditoriaChangesTIModel).where(AuditoriaChangesTIModel.id == cambio_id)
-        ).first()
+    def obtener(self, cambio_id: int, organizacion_id: str | None = None) -> dict[str, Any] | None:
+        consulta = _de_la_organizacion(select(AuditoriaChangesTIModel), organizacion_id)
+        cambio = self._db.scalars(consulta.where(AuditoriaChangesTIModel.id == cambio_id)).first()
         if cambio is None:
             return None
         registro = _a_registro(cambio)
