@@ -19,6 +19,7 @@ from src.adapters.gateways.mqtt_comando_rafaga import MqttComandoRafagaGateway
 from src.application.use_cases.caracterizar_carga import CaracterizarCargaUseCase
 from src.application.use_cases.ingesta.registro_campanas import registro_campanas_activas
 from src.application.use_cases.ingesta.resolvedor_dispositivo import ResolvedorDispositivoIngesta
+from src.domain.telemetria.exceptions import EstructuraUnifilarInvalidaError
 from src.domain.telemetria.services import debe_recibir_evento
 from src.domain.telemetria.servicios.alcance_tiempo_real import alcance_de_clientes
 from src.domain.telemetria.value_objects import MacAddress
@@ -33,7 +34,7 @@ from src.infrastructure.fastapi.dependencies import (
     registrar_mqtt_listener,
 )
 from src.infrastructure.fastapi.duracion_requests import DuracionRequestMiddleware
-from src.infrastructure.fastapi.error_handler import manejar_404
+from src.infrastructure.fastapi.error_handler import manejar_404, manejar_estructura_unifilar_invalida
 from src.infrastructure.fastapi.headers_historico import HEADER_DATOS_DESDE, HEADER_POTENCIA_REFERENCIA
 from src.infrastructure.fastapi.middleware import RequestIdMiddleware, registrar_guard_solo_lectura
 from src.infrastructure.fastapi.renovacion_tiempo_real import marca_renovacion, renovar_modo_tiempo_real_medidores
@@ -516,6 +517,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(RateLimit404Middleware, settings=settings)
     app.add_middleware(RechazoPathInseguroMiddleware)
     app.add_middleware(RequestIdMiddleware)
+    app.add_exception_handler(EstructuraUnifilarInvalidaError, manejar_estructura_unifilar_invalida)
     app.add_exception_handler(Exception, manejar_excepcion_no_mapeada)
     app.add_exception_handler(StarletteHTTPException, manejar_404)
 
