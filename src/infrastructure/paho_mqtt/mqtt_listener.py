@@ -51,9 +51,7 @@ def _configurar_notificador_alertas(
     factory = notificadores_factory or ProduccionNotificadoresFactory(settings)
     notificador = factory.notificador_alertas()
     dests = [d.strip() for d in settings.ALERTAS_EMAIL_DESTINATARIOS.split(",") if d.strip()]
-    verificador_plan = construir_verificador_notificaciones(
-        session_factory, billing_habilitado=settings.BILLING_HABILITADO
-    )
+    verificador_plan = construir_verificador_notificaciones(session_factory, billing_habilitado=False)
     ProcesadorAlertasIngesta.configurar_notificador(notificador, dests, verificador_plan=verificador_plan)
 
 

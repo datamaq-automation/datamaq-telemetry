@@ -146,7 +146,7 @@ def get_telemetria_use_case(
         repo_planes,
         buffer_en_vivo=global_telemetria_buffer,
         repo_suscripciones=MySQLSuscripcionesRepository(db),
-        billing_habilitado=settings.BILLING_HABILITADO,
+        billing_habilitado=False,
     )
 
 
