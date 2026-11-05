@@ -10,6 +10,7 @@ from src.domain.telemetria.exceptions import AlertaNoEncontradaError
 from src.infrastructure.fastapi.auth_dependencies import get_acceso_plantas_use_case
 from src.infrastructure.fastapi.dependencies import (
     get_alertas_use_case,
+    get_dispositivos_repository,
     get_usuario_actual,
 )
 from src.infrastructure.fastapi.device_ownership import verificar_propiedad_alerta
@@ -42,23 +43,30 @@ def _alerta_response_dto(**kwargs) -> AlertaResponseDTO:
     return AlertaResponseDTO(**base)
 
 
-def _cliente(rol: str = "admin", autenticado: bool = True) -> tuple[TestClient, dict[str, MagicMock]]:
+def _cliente(
+    rol: str = "admin", autenticado: bool = True, claims_extra: dict | None = None
+) -> tuple[TestClient, dict[str, MagicMock]]:
     app = create_app()
     mocks = {
         "alertas": MagicMock(),
         "acceso_plantas": MagicMock(),
+        "dispositivos": MagicMock(),
     }
     mocks["acceso_plantas"].resolver_planta_permitida.side_effect = lambda uid, rol, org, pid: pid
     app.dependency_overrides[get_alertas_use_case] = lambda: mocks["alertas"]
     app.dependency_overrides[get_acceso_plantas_use_case] = lambda: mocks["acceso_plantas"]
+    app.dependency_overrides[get_dispositivos_repository] = lambda: mocks["dispositivos"]
     # La propiedad de la alerta se prueba en test_aislamiento_alertas.py.
     app.dependency_overrides[verificar_propiedad_alerta] = lambda: None
     if autenticado:
-        app.dependency_overrides[get_usuario_actual] = lambda: {
+        claims = {
             "sub": "user-test-1",
             "rol": rol,
             "org": "org-test-1",
         }
+        if claims_extra:
+            claims.update(claims_extra)
+        app.dependency_overrides[get_usuario_actual] = lambda: claims
     return TestClient(app), mocks
 
 
@@ -535,3 +543,41 @@ def test_resolver_alerta_patch_rol_operador_permitido():
 
     assert response.status_code == 200
     mocks["alertas"].resolver_alerta.assert_called_once_with(2, observaciones=None)
+
+
+def test_listar_alertas_usuario_con_plantas_asignadas_sin_planta_id_filtra_plantas_ajenas():
+    """C4-7 (Issue #137): Usuario con plantas asignadas sin planta_id filtra alertas de plantas ajenas."""
+    client, mocks = _cliente(claims_extra={"plantas": ["planta-a1"]})
+
+    alerta_permitida = _alerta_response_dto(id=1, dispositivo_id="dev-planta-a1")
+    alerta_ajena = _alerta_response_dto(id=2, dispositivo_id="dev-planta-a2")
+    mocks["alertas"].listar_alertas.return_value = [alerta_permitida, alerta_ajena]
+
+    dev1 = MagicMock(id="dev-planta-a1", planta_id="planta-a1")
+    dev2 = MagicMock(id="dev-planta-a2", planta_id="planta-a2")
+    mocks["dispositivos"].obtener_por_id.side_effect = lambda dev_id: {
+        "dev-planta-a1": dev1,
+        "dev-planta-a2": dev2,
+    }.get(dev_id)
+
+    response = client.get("/api/v1/alertas")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["id"] == 1
+    assert data[0]["dispositivo_id"] == "dev-planta-a1"
+
+
+def test_listar_alertas_con_device_id_de_planta_ajena_retorna_vacio():
+    """C4-7 (Issue #137): Consulta de alertas con device_id de planta no permitida retorna lista vacía."""
+    client, mocks = _cliente(claims_extra={"plantas": ["planta-a1"]})
+
+    dev_ajeno = MagicMock(id="dev-planta-a2", planta_id="planta-a2")
+    mocks["dispositivos"].obtener_por_id.return_value = dev_ajeno
+
+    response = client.get("/api/v1/alertas?device_id=dev-planta-a2")
+
+    assert response.status_code == 200
+    assert response.json() == []
+    mocks["alertas"].listar_alertas.assert_not_called()

@@ -186,6 +186,7 @@ def verificar_propiedad_maquina(
 def verificar_propiedad_alerta(
     claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
     db: Annotated[Session, Depends(get_db_session)],
+    acceso_plantas: Annotated[GestionarAccesoPlantasUseCase | None, Depends(get_acceso_plantas_use_case)] = None,
     alerta_id: int | None = None,
 ) -> None:
     """Rechaza con 404 si la alerta pedida no pertenece a la organización del usuario
@@ -206,6 +207,20 @@ def verificar_propiedad_alerta(
     organizacion_alerta = _organizacion_de_dispositivo(db, alerta.dispositivo_id)
     if not debe_recibir_evento(False, claims.get("org"), organizacion_alerta):
         raise HTTPException(status_code=404, detail="alerta_no_encontrada")
+
+    if acceso_plantas is not None and alerta.dispositivo_id:
+        repo_dispositivos = repo_dispositivos_resuelto(db)
+        dispositivo = repo_dispositivos.obtener_por_id(alerta.dispositivo_id)
+        if dispositivo is not None and dispositivo.planta_id:
+            try:
+                acceso_plantas.resolver_planta_permitida(
+                    usuario_id=str(claims.get("sub") or "") or None,
+                    rol=str(claims.get("rol") or ""),
+                    organizacion_id=claims.get("org"),
+                    planta_id=dispositivo.planta_id,
+                )
+            except PlantaNoEncontradaError as err:
+                raise HTTPException(status_code=404, detail="alerta_no_encontrada") from err
 
 
 def verificar_propiedad_evento_disponibilidad(
