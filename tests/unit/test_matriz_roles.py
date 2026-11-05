@@ -32,7 +32,6 @@ def test_roles_validos_salen_de_la_fuente_de_autenticacion():
         "operador",
         "mantenimiento",
         "ingeniero",
-        "auditor",
         "solo_lectura",
     }
 
@@ -43,7 +42,8 @@ def test_guards_dejan_pasar_exactamente_los_roles_que_su_codigo_dice():
 
     assert guards["requiere_rol_superadmin"] == {"superadmin"}
     assert guards["requiere_rol_admin"] == {"admin", "superadmin"}
-    assert guards["requiere_rol_auditor_o_superadmin"] == {"auditor", "superadmin"}
+    # auditor se retiró (datamaq#122): el registro de auditoría es solo del superadmin.
+    assert guards["requiere_rol_auditor_o_superadmin"] == {"superadmin"}
     # solo_lectura (decisión 2026-10-29) es el rol de la réplica: no pasa ningún guard de escritura.
     assert guards["requiere_rol_escritura"] == set(roles) - {"solo_lectura"}
 

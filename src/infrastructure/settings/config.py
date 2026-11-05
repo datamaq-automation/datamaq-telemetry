@@ -9,6 +9,8 @@ from typing import Literal
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from src.domain.oauth.services import URIS_REDIRECT_CLAUDE_POR_DEFECTO
+
 
 class Settings(BaseSettings):
     # Database
@@ -76,6 +78,8 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str | None = None
     CSP_HEADER: str = ""
     DEFAULT_USER_PASSWORD: str = "Contraseña123"
+    # Lista cerrada de redirect_uris del cliente OAuth de Claude (separadas por coma). Vacía: nadie puede conectar Claude.
+    OAUTH_CLAUDE_REDIRECT_URIS: str = ",".join(URIS_REDIRECT_CLAUDE_POR_DEFECTO)
 
     # Rate limiting de login
     LOGIN_MAX_INTENTOS: int = 5
@@ -193,6 +197,10 @@ class Settings(BaseSettings):
     def database_url(self) -> str:
         pwd = f":{self.DB_PASSWORD}" if self.DB_PASSWORD else ""
         return f"mysql+pymysql://{self.DB_USER}{pwd}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}?charset=utf8mb4"
+
+    @property
+    def oauth_claude_redirect_uris(self) -> tuple[str, ...]:
+        return tuple(u.strip() for u in self.OAUTH_CLAUDE_REDIRECT_URIS.split(",") if u.strip())
 
     @property
     def otp_hmac_configurada(self) -> bool:

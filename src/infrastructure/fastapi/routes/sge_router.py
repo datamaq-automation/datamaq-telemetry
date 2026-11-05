@@ -193,7 +193,7 @@ def obtener_documentacion_sge(
     claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
     rol: str | None = Query(
         None,
-        description="Previsualizar documentación como otro rol (permitido para administradores y auditores)",
+        description="Previsualizar documentación como otro rol (permitido para administradores)",
     ),
 ) -> list[SgeDocArticleDTO]:
     """Retorna los procedimientos, instructivos y políticas del SGE ISO 50001 correspondientes."""

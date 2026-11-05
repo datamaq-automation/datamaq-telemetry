@@ -486,6 +486,10 @@ def get_usuario_actual(
     # Verificación de revocación global persistida en base de datos (ISO 27001 A.5.15)
     if repo_usuarios is not None and sub:
         usuario = repo_usuarios.obtener_por_id(sub)
+        # Una cuenta dada de baja no autentica aunque su token siga vigente (datamaq#127). `esta_activo` solo se
+        # comprobaba al iniciar sesión: la baja no cortaba las sesiones abiertas hasta que vencía el token.
+        if usuario is not None and not usuario.esta_activo:
+            raise HTTPException(status_code=401, detail="credenciales_invalidas")
         if usuario is not None and usuario.sesiones_revocadas_antes_de is not None:
             rev_dt = usuario.sesiones_revocadas_antes_de
             if rev_dt.tzinfo is None:
@@ -502,7 +506,9 @@ def get_usuario_actual(
 
 
 def requiere_rol_auditor_o_superadmin(claims: Annotated[dict[str, Any], Depends(get_usuario_actual)]) -> dict[str, Any]:
-    if claims.get("rol") not in ("superadmin", "auditor"):
+    # El rol auditor se retiró (decisión 2026-10-31, datamaq#122): el registro de auditoría es solo del superadmin.
+    # El nombre se conserva por compatibilidad con la matriz de roles y los tests que lo importan.
+    if claims.get("rol") != "superadmin":
         raise HTTPException(status_code=403, detail="forbidden")
     return claims
 
@@ -531,7 +537,7 @@ def no_permitido_para_invitados_2fa(claims: Annotated[dict[str, Any], Depends(ge
 
 def requiere_rol_escritura(claims: Annotated[dict[str, Any], Depends(get_usuario_actual)]) -> dict[str, Any]:
     # Allowlist: un rol retirado (p. ej. invitado en un token viejo) no escribe.
-    if claims.get("rol") not in ("superadmin", "admin", "operador", "mantenimiento", "ingeniero", "auditor"):
+    if claims.get("rol") not in ("superadmin", "admin", "operador", "mantenimiento", "ingeniero"):
         raise HTTPException(status_code=403, detail="forbidden")
     return claims
 
