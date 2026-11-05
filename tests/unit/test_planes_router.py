@@ -52,7 +52,7 @@ def _payload_crear_plan(**kwargs) -> dict:
     return base
 
 
-def _cliente(rol: str = "admin") -> tuple[TestClient, dict[str, MagicMock]]:
+def _cliente(rol: str = "superadmin") -> tuple[TestClient, dict[str, MagicMock]]:
     app = create_app()
     mocks = {
         "planes": MagicMock(),
@@ -144,7 +144,7 @@ def test_listar_planes_no_autenticado_rechazado_401():
 
 
 def test_crear_plan_exitoso():
-    client, mocks = _cliente(rol="admin")
+    client, mocks = _cliente(rol="superadmin")
     mocks["planes"].crear_plan.return_value = _plan_response_dto()
 
     payload = _payload_crear_plan()
@@ -166,6 +166,17 @@ def test_crear_plan_exitoso():
     assert data["id"] == "plan-001"
     assert data["nombre"] == "Plan Industrial"
     assert data["retencion_dias"] == 30
+
+
+def test_crear_plan_rol_admin_rechazado_403():
+    client, mocks = _cliente(rol="admin")
+
+    payload = _payload_crear_plan()
+    response = client.post("/api/v1/planes", json=payload)
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "forbidden"
+    mocks["planes"].crear_plan.assert_not_called()
 
 
 def test_crear_plan_rol_invitado_rechazado_403():

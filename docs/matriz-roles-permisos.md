@@ -94,7 +94,7 @@ Con `AUTH_REQUIRED` apagado, `get_usuario_actual` devuelve `{"sub": "anon", "rol
 | POST | `/api/v1/oauth/token` | — | todos (sin guard) | sin dependencia de auth detectada | no | `src/infrastructure/fastapi/routes/oauth_router.py:canjear_token_oauth` |
 | GET | `/api/v1/organizaciones` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/organizaciones_router.py:list_organizaciones` |
 | GET | `/api/v1/planes` | — | todos (sin guard) | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/planes_router.py:list_planes` |
-| POST | `/api/v1/planes` | `requiere_rol_escritura` | `admin`, `auditor`, `ingeniero`, `mantenimiento`, `operador`, `superadmin` | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/planes_router.py:create_plan` |
+| POST | `/api/v1/planes` | `requiere_rol_superadmin` | `superadmin` | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/planes_router.py:create_plan` |
 | GET | `/api/v1/planta/areas` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/planta_estructura_router.py:get_areas_estadisticas_default` |
 | GET | `/api/v1/planta/layout` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/planta_estructura_router.py:get_layout_default` |
 | GET | `/api/v1/planta/unifilar` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/planta_estructura_router.py:get_unifilar_default` |
