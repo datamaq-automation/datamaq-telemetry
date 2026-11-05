@@ -68,6 +68,10 @@ class NodoUnifilarNoEncontradoError(DominioTelemetriaException):
 class EstructuraUnifilarInvalidaError(DominioTelemetriaException):
     """Lanzada cuando el árbol del unifilar tiene ids duplicados, padres colgantes o ciclos."""
 
+    def __init__(self, mensaje: str, planta_id: str | None = None) -> None:
+        super().__init__(mensaje)
+        self.planta_id = planta_id
+
 
 class CampoGestionadoPorYamlError(DominioTelemetriaException):
     """Lanzada cuando se intenta escribir por API un campo que el YAML declara para ese medidor."""

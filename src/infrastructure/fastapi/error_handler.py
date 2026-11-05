@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from src.adapters.presenters.error_presenter import ErrorPresenter
+from src.domain.telemetria.exceptions import EstructuraUnifilarInvalidaError
 from src.infrastructure.fastapi.ip_cliente import extraer_ip_cliente
 
 PATRONES_SONDA_SOSPECHOSA: tuple[re.Pattern[str], ...] = (
@@ -54,6 +55,9 @@ def _usuario_del_error(exc: Exception) -> Any:
 
 def manejar_error_http(exc: Exception) -> NoReturn:
     """Mapea una excepción vía ErrorPresenter, loguea el evento y eleva HTTPException."""
+    if isinstance(exc, EstructuraUnifilarInvalidaError):
+        # Lo atiende el manejador de la app (cuerpo estructurado y código estable, datamaq#148).
+        raise exc
     code, err = ErrorPresenter.presentar_excepcion(exc)
     request_id = _request_id()
     logger = structlog.get_logger("http_errors")
@@ -109,3 +113,31 @@ def manejar_404(request: Request, exc: Exception) -> JSONResponse:
         else:
             logger.info(evento, **extra)
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail}, headers=exc.headers)
+
+
+async def manejar_estructura_unifilar_invalida(request: Request, exc: Exception) -> JSONResponse:
+    """Maneja EstructuraUnifilarInvalidaError respondiendo 500 estructurado sin filtrar detalles internos."""
+    if not isinstance(exc, EstructuraUnifilarInvalidaError):
+        raise exc
+    request_id = getattr(request.state, "request_id", None) or _request_id() or request.headers.get("x-request-id")
+    planta_id = (
+        getattr(exc, "planta_id", None) or request.path_params.get("planta_id") or request.query_params.get("planta_id")
+    )
+    logger = structlog.get_logger("unifilar")
+    logger.error(
+        "estructura_unifilar_invalida",
+        ruta=request.url.path,
+        metodo=request.method,
+        planta_id=planta_id,
+        motivo=str(exc),
+        request_id=request_id,
+    )
+    headers = {"X-Request-ID": str(request_id)} if request_id else None
+    return JSONResponse(
+        status_code=500,
+        content={
+            "codigo": "unifilar_invalido",
+            "mensaje": "La estructura del unifilar de la planta no es válida.",
+        },
+        headers=headers,
+    )
