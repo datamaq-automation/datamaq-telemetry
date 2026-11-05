@@ -1,14 +1,23 @@
 """src/application/use_cases/oauth/autorizar_consentimiento.py — Genera código temporal de autorización con PKCE."""
 
+from collections.abc import Sequence
 from datetime import datetime, timedelta, timezone
 
 import structlog
 
 from src.application.dtos.oauth_dtos import OAuthAuthorizeRequestDTO, OAuthAuthorizeResponseDTO
-from src.domain.oauth.entities import OAuthCode
+from src.domain.oauth.entities import OAuthClient, OAuthCode
 from src.domain.oauth.exceptions import InvalidClientError, InvalidRequestError
 from src.domain.oauth.ports import OAuthRepositoryPort
-from src.domain.oauth.services import generar_token_aleatorio, hash_token, resolver_scopes
+from src.domain.oauth.services import (
+    CLIENT_ID_CLAUDE,
+    URIS_REDIRECT_CLAUDE_POR_DEFECTO,
+    construir_url_retorno,
+    generar_token_aleatorio,
+    hash_token,
+    redirect_uri_autorizada,
+    resolver_scopes,
+)
 
 _log = structlog.get_logger(__name__)
 
@@ -16,8 +25,34 @@ _log = structlog.get_logger(__name__)
 class AutorizarConsentimientoUseCase:
     """Caso de uso para registrar el consentimiento del usuario y emitir un authorization code PKCE."""
 
-    def __init__(self, oauth_repo: OAuthRepositoryPort) -> None:
+    def __init__(
+        self,
+        oauth_repo: OAuthRepositoryPort,
+        claude_redirect_uris: Sequence[str] = URIS_REDIRECT_CLAUDE_POR_DEFECTO,
+    ) -> None:
         self.oauth_repo = oauth_repo
+        self.claude_redirect_uris = tuple(claude_redirect_uris)
+
+    def _cliente_con_redirect_uri_valida(self, client_id: str, redirect_uri: str) -> OAuthClient:
+        """El cliente, si existe y la redirect_uri coincide EXACTAMENTE con una de las suyas (datamaq#131).
+
+        Para el cliente de Claude manda la lista cerrada configurada, no lo que haya guardado en su fila.
+        """
+        cliente = self.oauth_repo.obtener_cliente(client_id)
+        if cliente is None:
+            raise InvalidClientError(f"Cliente '{client_id}' no registrado")
+        autorizadas = self.claude_redirect_uris if client_id == CLIENT_ID_CLAUDE else cliente.redirect_uris
+        if not redirect_uri_autorizada(redirect_uri, autorizadas):
+            raise InvalidRequestError("redirect_uri no autorizada para el cliente solicitado")
+        return cliente
+
+    def cancelar(self, client_id: str, redirect_uri: str, state: str | None) -> str:
+        """URL a la que vuelve el usuario que canceló. Solo hacia una redirect_uri autorizada del cliente."""
+        self._cliente_con_redirect_uri_valida(client_id, redirect_uri)
+        parametros = {"error": "access_denied", "error_description": "El usuario cancelo la autorizacion"}
+        if state:
+            parametros["state"] = state
+        return construir_url_retorno(redirect_uri, parametros)
 
     def ejecutar(
         self,
@@ -25,18 +60,7 @@ class AutorizarConsentimientoUseCase:
         usuario_id: str,
         organizacion_id: str | None = None,
     ) -> OAuthAuthorizeResponseDTO:
-        cliente = self.oauth_repo.obtener_cliente(dto.client_id)
-        if cliente is None:
-            raise InvalidClientError(f"Cliente '{dto.client_id}' no registrado")
-
-        # Validar que la redirect_uri esté autorizada para este cliente
-        # Aceptar coincidencia exacta o coincidencia de prefijo seguro
-        uri_valida = any(
-            dto.redirect_uri == autorizada or dto.redirect_uri.startswith(autorizada.rstrip("*"))
-            for autorizada in cliente.redirect_uris
-        )
-        if not uri_valida:
-            raise InvalidRequestError("redirect_uri no autorizada para el cliente solicitado")
+        self._cliente_con_redirect_uri_valida(dto.client_id, dto.redirect_uri)
 
         if dto.code_challenge_method != "S256":
             raise InvalidRequestError("code_challenge_method debe ser 'S256'")
@@ -72,11 +96,10 @@ class AutorizarConsentimientoUseCase:
         )
         self.oauth_repo.guardar_codigo(oauth_code)
 
-        sep = "&" if "?" in dto.redirect_uri else "?"
-        query_params = f"code={code}"
+        parametros = {"code": code}
         if dto.state:
-            query_params += f"&state={dto.state}"
-        url_retorno = f"{dto.redirect_uri}{sep}{query_params}"
+            parametros["state"] = dto.state
+        url_retorno = construir_url_retorno(dto.redirect_uri, parametros)
 
         return OAuthAuthorizeResponseDTO(
             code=code,

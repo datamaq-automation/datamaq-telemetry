@@ -5,6 +5,8 @@ import hashlib
 import hmac
 import re
 import secrets
+from collections.abc import Iterable
+from urllib.parse import urlencode, urlsplit
 
 # RFC 7636 §4.1: [A-Z] / [a-z] / [0-9] / "-" / "." / "_" / "~", longitud de 43 a 128
 REGEX_CODE_VERIFIER = re.compile(r"^[A-Za-z0-9\-._~]{43,128}$")
@@ -49,6 +51,70 @@ def verificar_code_verifier(code_verifier: str, code_challenge: str, method: str
     # Normalizar eliminando posible padding trailing
     desafio_esperado = code_challenge.rstrip("=")
     return hmac.compare_digest(desafio_calculado, desafio_esperado)
+
+
+# Cliente OAuth de Claude: su client_id es fijo y sus redirect_uris son una lista cerrada (datamaq#131). Estas cuatro son
+# las que siembra `CLIENTES_PREDETERMINADOS`; la lista efectiva es configurable (OAUTH_CLAUDE_REDIRECT_URIS).
+CLIENT_ID_CLAUDE = "claude-ai"
+URIS_REDIRECT_CLAUDE_POR_DEFECTO: tuple[str, ...] = (
+    "https://claude.ai/api/mcp/oauth/callback",
+    "https://claude.ai/api/mcp/oauth_callback",
+    "https://claude.com/api/mcp/oauth/callback",
+    "https://claude.com/api/mcp/oauth_callback",
+)
+PREFIJO_CLIENTE_EXTERNO = "Externo: "
+_HOSTS_LOOPBACK = frozenset({"127.0.0.1", "::1", "localhost"})
+
+
+def _coincide_loopback(solicitada: str, registrada: str) -> bool:
+    """RFC 8252 §7.3: una URI de loopback registrada admite cualquier puerto; esquema, host, ruta y consulta deben coincidir."""
+    try:
+        a, b = urlsplit(solicitada), urlsplit(registrada)
+    except ValueError:
+        return False
+    return (
+        a.scheme == b.scheme == "http"
+        and a.hostname is not None
+        and a.hostname == b.hostname
+        and a.hostname in _HOSTS_LOOPBACK
+        and a.path == b.path
+        and a.query == b.query
+        and not a.fragment
+        and not b.fragment
+    )
+
+
+def redirect_uri_autorizada(solicitada: str, registradas: Iterable[str]) -> bool:
+    """Coincidencia EXACTA con alguna URI registrada (RFC 6749 §3.1.2.3). Sin prefijos ni comodines.
+
+    Única excepción: la URI de loopback (RFC 8252 §7.3), que admite cualquier puerto.
+    """
+    return any(solicitada == r or _coincide_loopback(solicitada, r) for r in registradas)
+
+
+def es_cliente_oficial_de_claude(redirect_uris: Iterable[str], oficiales: Iterable[str]) -> bool:
+    """True solo si TODAS las redirect_uris pedidas están, tal cual, en la lista cerrada de Claude."""
+    pedidas = [u.strip() for u in redirect_uris if u and u.strip()]
+    lista = frozenset(oficiales)
+    return bool(pedidas) and all(u in lista for u in pedidas)
+
+
+def nombre_visible_de_cliente(nombre: str | None, oficial: bool) -> str:
+    """Nombre que se guarda y se muestra. Un cliente externo no puede presentarse como Claude o Anthropic."""
+    base = (nombre or "").strip()
+    if oficial:
+        return base or "Claude (Anthropic)"
+    if not base:
+        return "Cliente Dinámico"
+    if "claude" in base.lower() or "anthropic" in base.lower():
+        return (PREFIJO_CLIENTE_EXTERNO + base)[:128]
+    return base[:128]
+
+
+def construir_url_retorno(redirect_uri: str, parametros: dict[str, str]) -> str:
+    """Agrega los parámetros a la redirect_uri codificándolos (un `state` no puede inyectar otros parámetros)."""
+    separador = "&" if "?" in redirect_uri else "?"
+    return f"{redirect_uri}{separador}{urlencode(parametros)}"
 
 
 def generar_token_aleatorio(nbytes: int = 32) -> str:
