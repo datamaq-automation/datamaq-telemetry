@@ -44,9 +44,6 @@ from src.infrastructure.sqlalchemy.repositories.telemetria_repository import (
 from src.infrastructure.sqlalchemy.repositories.usuarios_repository import (
     MySQLUsuariosRepository,
 )
-from src.infrastructure.sqlalchemy.repositories.webhook_events_repository import (
-    MySQLRegistroEventosWebhook,
-)
 
 __all__ = [
     "MySQLAccesosPlantaRepository",
@@ -60,7 +57,6 @@ __all__ = [
     "MySQLMaquinasRepository",
     "MySQLParadasProgramadasRepository",
     "MySQLPlanesRepository",
-    "MySQLRegistroEventosWebhook",
     "MySQLSeriePotenciaRepository",
     "MySQLSuscripcionesRepository",
     "MySQLTelemetriaRepository",

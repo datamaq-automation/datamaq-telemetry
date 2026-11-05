@@ -16,7 +16,6 @@ from src.domain.auth.exceptions import (
     UsuarioInactivoError,
     UsuarioNoEncontradoError,
 )
-from src.domain.billing.exceptions import DominioBillingException
 from src.domain.cargas.exceptions import (
     CampanaNoEncontradaError,
     CargaNoEncontradaError,
@@ -105,7 +104,6 @@ class ErrorPresenter:
                 DominioDisponibilidadException,
                 DominioCargasException,
                 DominioSgeException,
-                DominioBillingException,
             ),
         ):
             return 422, {"error": "DomainError", "mensaje": exc.mensaje}

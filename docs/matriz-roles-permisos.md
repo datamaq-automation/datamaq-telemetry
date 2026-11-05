@@ -1,7 +1,7 @@
 <!-- Generado por scripts/generate_matriz_roles.py. No editar a mano: regenerar. -->
 # Matriz de roles y permisos (generada desde el código)
 
-Endpoints analizados: **119**. Roles válidos (`ROLES_VALIDOS`): `admin`, `ingeniero`, `mantenimiento`, `operador`, `solo_lectura`, `superadmin`.
+Endpoints analizados: **117**. Roles válidos (`ROLES_VALIDOS`): `admin`, `ingeniero`, `mantenimiento`, `operador`, `solo_lectura`, `superadmin`.
 
 Cómo se lee: "Roles que pasan" es lo que deja el guard de rol que la ruta declara (evaluado con la condición real del guard). Si la columna "Chequeo manual" dice `sí`, el cuerpo de la ruta o de una dependencia propia compara el rol o usa `ROLES_ACCESO_GLOBAL`: ese recorte no está en la columna y hay que leer la ruta para saberlo.
 
@@ -94,7 +94,7 @@ Con `AUTH_REQUIRED` apagado, `get_usuario_actual` devuelve `{"sub": "anon", "rol
 | POST | `/api/v1/oauth/token` | — | todos (sin guard) | sin dependencia de auth detectada | no | `src/infrastructure/fastapi/routes/oauth_router.py:canjear_token_oauth` |
 | GET | `/api/v1/organizaciones` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/organizaciones_router.py:list_organizaciones` |
 | GET | `/api/v1/planes` | — | todos (sin guard) | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/planes_router.py:list_planes` |
-| POST | `/api/v1/planes` | `requiere_rol_escritura` | `admin`, `ingeniero`, `mantenimiento`, `operador`, `superadmin` | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/planes_router.py:create_plan` |
+| POST | `/api/v1/planes` | `requiere_rol_superadmin` | `superadmin` | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/planes_router.py:create_plan` |
 | GET | `/api/v1/planta/areas` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/planta_estructura_router.py:get_areas_estadisticas_default` |
 | GET | `/api/v1/planta/layout` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/planta_estructura_router.py:get_layout_default` |
 | GET | `/api/v1/planta/unifilar` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/planta_estructura_router.py:get_unifilar_default` |
@@ -114,7 +114,6 @@ Con `AUTH_REQUIRED` apagado, `get_usuario_actual` devuelve `{"sub": "anon", "rol
 | GET | `/api/v1/sge/plantas/{planta_id}/costo-estimado` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/sge_router.py:obtener_costo_estimado` |
 | GET | `/api/v1/sge/plantas/{planta_id}/facturas-distribuidora` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/sge_router.py:obtener_facturas_distribuidora` |
 | GET | `/api/v1/sge/plantas/{planta_id}/linea-base` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/sge_router.py:obtener_lineas_base` |
-| POST | `/api/v1/suscripciones/checkout` | `requiere_rol_admin` | `admin`, `superadmin` | — | no | `src/infrastructure/fastapi/routes/billing_router.py:crear_checkout_suscripcion` |
 | POST | `/api/v1/system/purge` | `requiere_rol_superadmin` | `superadmin` | — | no | `src/infrastructure/fastapi/routes/system_router.py:trigger_purge` |
 | GET | `/api/v1/system/ws-status` | — | todos (sin guard) | sin dependencia de auth detectada | no | `src/infrastructure/fastapi/routes/system_router.py:websocket_status` |
 | GET | `/api/v1/telemetria/alerts/{device_id}` | — | todos (sin guard) | autenticado (cualquier rol) | sí | `src/infrastructure/fastapi/routes/telemetria_router.py:get_alerts_history` |
@@ -131,7 +130,6 @@ Con `AUTH_REQUIRED` apagado, `get_usuario_actual` devuelve `{"sub": "anon", "rol
 | GET | `/api/v1/usuarios/{usuario_id}/plantas` | `requiere_rol_admin` | `admin`, `superadmin` | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/usuarios_router.py:listar_plantas_usuario` |
 | PUT | `/api/v1/usuarios/{usuario_id}/plantas` | `requiere_rol_admin` | `admin`, `superadmin` | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/usuarios_router.py:asignar_plantas_usuario` |
 | PATCH | `/api/v1/usuarios/{usuario_id}/rol` | `requiere_rol_admin` | `admin`, `superadmin` | autenticado (cualquier rol) | no | `src/infrastructure/fastapi/routes/usuarios_router.py:cambiar_rol_usuario` |
-| POST | `/api/v1/webhooks/mercadopago` | — | todos (sin guard) | sin dependencia de auth detectada | no | `src/infrastructure/fastapi/routes/billing_router.py:webhook_mercadopago` |
 | GET | `/favicon.ico` | — | todos (sin guard) | sin dependencia de auth detectada | no | `src/infrastructure/fastapi/routes/system_router.py:favicon` |
 | GET | `/health` | — | todos (sin guard) | sin dependencia de auth detectada | no | `src/infrastructure/fastapi/routes/system_router.py:health_check` |
 | GET | `/health/build` | — | todos (sin guard) | sin dependencia de auth detectada | no | `src/infrastructure/fastapi/routes/system_router.py:health_build` |

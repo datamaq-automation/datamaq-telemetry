@@ -9,7 +9,7 @@ from src.application.use_cases.gestionar_planes import GestionarPlanesUseCase
 from src.infrastructure.fastapi.dependencies import (
     get_planes_use_case,
     get_usuario_actual,
-    requiere_rol_escritura,
+    requiere_rol_superadmin,
 )
 from src.infrastructure.fastapi.error_handler import manejar_error_http
 
@@ -28,7 +28,7 @@ def list_planes(
     return use_case.listar_catalogo(solo_publicos=solo_publicos)
 
 
-@router.post("/planes", response_model=PlanResponseDTO, dependencies=[Depends(requiere_rol_escritura)])
+@router.post("/planes", response_model=PlanResponseDTO, dependencies=[Depends(requiere_rol_superadmin)])
 def create_plan(
     dto: PlanCreateDTO,
     use_case: Annotated[GestionarPlanesUseCase, Depends(get_planes_use_case)],

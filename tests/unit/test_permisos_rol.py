@@ -45,7 +45,6 @@ def test_endpoints_escritura_exigen_rol_escritura():
         (dispositivos_router.router, "POST", "/api/v1/dispositivos"),
         (dispositivos_router.router, "PUT", "/api/v1/dispositivos/{device_id}"),
         (dispositivos_router.router, "PATCH", "/api/v1/dispositivos/{device_id}"),
-        (planes_router.router, "POST", "/api/v1/planes"),
         (alertas_router.router, "POST", "/api/v1/alertas/{alerta_id}/resolver"),
         (disponibilidad_router.router, "POST", "/api/v1/disponibilidad/maquinas"),
         (disponibilidad_router.router, "PATCH", "/api/v1/disponibilidad/maquinas/{maquina_id}"),
@@ -81,3 +80,9 @@ def test_requiere_rol_admin_rechaza_invitado():
 
     assert e.value.status_code == 403
     assert e.value.detail == "forbidden"
+
+
+# P6 — POST /planes exige rol superadmin (datamaq#129, datamaq#167)
+def test_post_planes_exige_rol_superadmin():
+    ruta = _ruta(planes_router.router, "POST", "/api/v1/planes")
+    assert deps.requiere_rol_superadmin in _dependencias(ruta)
