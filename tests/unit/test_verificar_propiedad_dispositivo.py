@@ -147,3 +147,24 @@ class TestVerificarPropiedadDispositivo:
             verificar_propiedad_dispositivo(
                 claims={"rol": "operador", "org": "org-a"}, db=MagicMock(), dispositivo_id="dev-1"
             )
+
+
+def test_verificar_propiedad_dispositivo_identificador_formato_invalido_lanza_404(monkeypatch):
+    """C4-20: Un formato de identificador inválido no propaga excepción no controlada sino 404."""
+    repo_dispositivos = MagicMock()
+    repo_dispositivos.obtener_por_id.return_value = None
+    repo_organizaciones = MagicMock()
+    _mock_mysql_repos(monkeypatch, repo_dispositivos, repo_organizaciones)
+
+    with patch(
+        "src.infrastructure.fastapi.device_ownership.get_settings",
+        return_value=_FakeSettings(auth_required=True),
+    ):
+        with pytest.raises(HTTPException) as exc_info:
+            verificar_propiedad_dispositivo(
+                claims={"rol": "operador", "org": "org-a"},
+                db=MagicMock(),
+                device_id="formato_invalido_con_muchos_guiones_bajos_1_2_3",
+            )
+        assert exc_info.value.status_code == 404
+        assert exc_info.value.detail == "dispositivo_no_encontrado"

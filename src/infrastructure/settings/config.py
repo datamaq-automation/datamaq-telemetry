@@ -98,6 +98,8 @@ class Settings(BaseSettings):
     SMTP_FROM: str = "no-reply@datamaq.com.ar"
 
     FRONTEND_URL: str = "https://app.datamaq.com.ar"
+    API_BASE_URL: str = ""
+    APP_BASE_URL: str = ""
     RECUPERACION_TOKEN_EXPIRA_MINUTOS: int = 15
 
     # Notificaciones de Alertas Críticas por Email

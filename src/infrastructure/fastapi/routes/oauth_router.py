@@ -2,6 +2,7 @@
 
 from typing import Annotated, Any
 
+import structlog
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
@@ -43,6 +44,7 @@ from src.infrastructure.fastapi.dependencies import (
 from src.infrastructure.settings.config import Settings, get_settings
 
 router = APIRouter(tags=["OAuth 2.0 PKCE"])
+logger = structlog.get_logger()
 
 
 @router.get("/.well-known/oauth-authorization-server", response_model=OAuthDiscoveryMetadataDTO)
@@ -51,9 +53,12 @@ def metadata_oauth_authorization_server(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> OAuthDiscoveryMetadataDTO:
     """Descubrimiento de metadatos del Servidor de Autorización OAuth 2.0 según RFC 8414."""
-    es_prod = settings.APP_ENV == "production"
-    issuer = "https://api.datamaq.com.ar" if es_prod else str(request.base_url).rstrip("/")
-    app_base = "https://app.datamaq.com.ar" if es_prod else "http://localhost:5173"
+    issuer = settings.API_BASE_URL.rstrip("/") if settings.API_BASE_URL else str(request.base_url).rstrip("/")
+    app_base = (
+        settings.APP_BASE_URL.rstrip("/")
+        if settings.APP_BASE_URL
+        else ("https://app.datamaq.com.ar" if settings.APP_ENV == "production" else "http://localhost:5173")
+    )
 
     return OAuthDiscoveryMetadataDTO(
         issuer=issuer,
@@ -78,8 +83,7 @@ def metadata_oauth_protected_resource(
     resource_path: str = "",
 ) -> dict[str, Any]:
     """Descubrimiento de metadatos de Recurso Protegido OAuth 2.0 según RFC 9728 para clientes MCP."""
-    es_prod = settings.APP_ENV == "production"
-    issuer = "https://api.datamaq.com.ar" if es_prod else str(request.base_url).rstrip("/")
+    issuer = settings.API_BASE_URL.rstrip("/") if settings.API_BASE_URL else str(request.base_url).rstrip("/")
     return {
         "resource": f"{issuer}/mcp",
         "authorization_servers": [issuer],
@@ -253,10 +257,14 @@ async def canjear_token_oauth(
             status_code=exc.status_code,
             content={"error": exc.error, "error_description": exc.description},
         )
-    except Exception as exc:
+    except Exception:
+        logger.error("error_canje_token_oauth", exc_info=True)
         return JSONResponse(
             status_code=400,
-            content={"error": "invalid_request", "error_description": str(exc)},
+            content={
+                "error": "invalid_request",
+                "error_description": "Solicitud de token inválida o corrupta.",
+            },
         )
 
 
@@ -283,6 +291,7 @@ async def revocar_token_oauth(
             )
         return JSONResponse(status_code=200, content={"status": "revoked"})
     except Exception:
+        logger.warning("error_revocacion_token_oauth", exc_info=True)
         # RFC 7009: siempre responde 200 aunque el token no exista
         return JSONResponse(status_code=200, content={"status": "revoked"})
 
