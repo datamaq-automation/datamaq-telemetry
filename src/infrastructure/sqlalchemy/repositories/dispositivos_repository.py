@@ -18,6 +18,7 @@ class MySQLDispositivosRepository(RepositorioDispositivosPort):
         return Dispositivo(
             id=model.id,
             device_uid=MacAddress(model.device_uid),
+            medidor_id=int(model.medidor_id) if getattr(model, "medidor_id", None) is not None else 0,
             nombre=model.name,
             modelo=model.model,
             planta_id=model.facility_id,
@@ -44,8 +45,13 @@ class MySQLDispositivosRepository(RepositorioDispositivosPort):
         model = self.db.query(DeviceModel).filter(DeviceModel.id == dispositivo_id).first()
         return self._to_entity(model) if model else None
 
-    def obtener_por_uid(self, uid: MacAddress) -> Dispositivo | None:
-        model = self.db.query(DeviceModel).filter(DeviceModel.device_uid == uid.valor).first()
+    def obtener_por_uid(self, uid: MacAddress, medidor_id: int = 0) -> Dispositivo | None:
+        # (device_uid, medidor_id) es único por restricción: no hace falta .first() ni elegir una fila.
+        model = (
+            self.db.query(DeviceModel)
+            .filter(DeviceModel.device_uid == uid.valor, DeviceModel.medidor_id == medidor_id)
+            .one_or_none()
+        )
         return self._to_entity(model) if model else None
 
     def listar(self, planta_id: str | None = None, organizacion_id: str | None = None) -> list[Dispositivo]:
@@ -73,6 +79,7 @@ class MySQLDispositivosRepository(RepositorioDispositivosPort):
                 id=dispositivo.id,
                 facility_id=dispositivo.planta_id,
                 device_uid=dispositivo.device_uid.valor,
+                medidor_id=dispositivo.medidor_id,
                 serial_number=dispositivo.numero_serie,
                 name=dispositivo.nombre,
                 model=dispositivo.modelo,

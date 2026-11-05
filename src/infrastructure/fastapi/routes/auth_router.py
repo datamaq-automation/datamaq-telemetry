@@ -81,6 +81,7 @@ from src.infrastructure.fastapi.dependencies_cambio_contrasena import (
     get_solicitar_cambio_contrasena_use_case,
 )
 from src.infrastructure.fastapi.error_handler import manejar_error_http
+from src.infrastructure.fastapi.ip_cliente import extraer_ip_cliente
 from src.infrastructure.settings.config import Settings
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Autenticación"])
@@ -89,11 +90,7 @@ logger = structlog.get_logger("auth")
 
 
 def _obtener_ip_cliente(request: Request | None) -> str:
-    if request is None:
-        return "desconocida"
-    return request.headers.get("X-Forwarded-For", "").split(",")[0].strip() or (
-        request.client.host if request.client else "desconocida"
-    )
+    return extraer_ip_cliente(request)
 
 
 @router.post("/login", response_model=LoginResponseDTO)
@@ -441,11 +438,7 @@ def solicitar_recuperacion(
     request: Request = None,  # type: ignore[assignment]
 ) -> Operacion2FAResponseDTO:
     try:
-        ip = "desconocida"
-        if request is not None:
-            ip = request.headers.get("X-Forwarded-For", "").split(",")[0].strip() or (
-                request.client.host if request.client else "desconocida"
-            )
+        ip = extraer_ip_cliente(request)
         return use_case.ejecutar(dto, clave_ip=ip)
     except Exception as e:
         manejar_error_http(e)

@@ -19,6 +19,7 @@ from src.domain.telemetria.entities import Dispositivo, Suscripcion
 from src.domain.telemetria.exceptions import (
     DispositivoNoEncontradoError,
     LimiteDispositivosExcedidoError,
+    PlantaNoEncontradaError,
 )
 from src.domain.telemetria.ports import (
     RepositorioDispositivosPort,
@@ -27,7 +28,7 @@ from src.domain.telemetria.ports import (
     RepositorioSuscripcionesPort,
 )
 from src.domain.telemetria.servicios.datos_maestros_medidor import DatosMaestrosMedidorService
-from src.domain.telemetria.value_objects import MacAddress
+from src.domain.telemetria.servicios.identificador_medidor import parsear_identificador_medidor
 
 
 class GestionarDispositivosUseCase:
@@ -37,7 +38,7 @@ class GestionarDispositivosUseCase:
         repo_organizaciones: RepositorioOrganizacionesPort,
         repo_planes: RepositorioPlanesPort | None = None,
         repo_suscripciones: RepositorioSuscripcionesPort | None = None,
-    ):
+    ) -> None:
         self.repo_dispositivos = repo_dispositivos
         self.repo_organizaciones = repo_organizaciones
         self.repo_planes = repo_planes
@@ -106,13 +107,26 @@ class GestionarDispositivosUseCase:
         dev = self.repo_dispositivos.obtener_por_id(id_o_uid)
         if not dev:
             try:
-                mac_vo = MacAddress(id_o_uid)
-                dev = self.repo_dispositivos.obtener_por_uid(mac_vo)
+                ident = parsear_identificador_medidor(id_o_uid)
+                dev = self.repo_dispositivos.obtener_por_uid(ident.mac, ident.medidor_id)
             except Exception:
                 pass
         if not dev:
             raise DispositivoNoEncontradoError(f"Dispositivo '{id_o_uid}' no encontrado.")
         return self._enriquecer_dispositivo(dev)
+
+    def obtener_dispositivo_de_organizacion(self, id_o_uid: str, organizacion_id: str | None) -> DispositivoResponseDTO:
+        """Como `obtener_dispositivo`, pero solo si el dispositivo está en la organización (misma regla que el listado).
+
+        Si es de otra organización, o no hay organización en el claim, responde como inexistente: no revela que existe.
+        La búsqueda por id y por UID pasan por la misma comprobación.
+        """
+        dispositivo = self.obtener_dispositivo(id_o_uid)
+        if organizacion_id is None or not any(
+            d.id == dispositivo.id for d in self.repo_dispositivos.listar(None, organizacion_id=organizacion_id)
+        ):
+            raise DispositivoNoEncontradoError(f"Dispositivo '{id_o_uid}' no encontrado.")
+        return dispositivo
 
     def registrar_dispositivo(self, dto: DispositivoCreateDTO) -> DispositivoResponseDTO:
         if dto.planta_id:
@@ -121,12 +135,32 @@ class GestionarDispositivosUseCase:
         saved = self.repo_dispositivos.guardar(entity)
         return self._enriquecer_dispositivo(saved)
 
+    def actualizar_dispositivo_de_organizacion(
+        self,
+        id_o_uid: str,
+        dto: DispositivoUpdateDTO,
+        organizacion_id: str | None,
+        es_superadmin: bool = False,
+    ) -> DispositivoResponseDTO:
+        """Actualiza solo si el dispositivo es de la organización de quien llama (datamaq#118).
+
+        Un dispositivo ajeno responde como inexistente, igual que la lectura. La planta de destino tiene que
+        pertenecer a la misma organización. El superadmin no tiene filtro.
+        """
+        if not es_superadmin:
+            self.obtener_dispositivo_de_organizacion(id_o_uid, organizacion_id)
+            if dto.planta_id is not None:
+                planta = self.repo_organizaciones.obtener_planta_por_id(dto.planta_id)
+                if planta is None or planta.organizacion_id != organizacion_id:
+                    raise PlantaNoEncontradaError(f"Planta {dto.planta_id} no encontrada.")
+        return self.actualizar_dispositivo(id_o_uid, dto)
+
     def actualizar_dispositivo(self, id_o_uid: str, dto: DispositivoUpdateDTO) -> DispositivoResponseDTO:
         dev = self.repo_dispositivos.obtener_por_id(id_o_uid)
         if not dev:
             try:
-                mac_vo = MacAddress(id_o_uid)
-                dev = self.repo_dispositivos.obtener_por_uid(mac_vo)
+                ident = parsear_identificador_medidor(id_o_uid)
+                dev = self.repo_dispositivos.obtener_por_uid(ident.mac, ident.medidor_id)
             except Exception:
                 pass
         if not dev:

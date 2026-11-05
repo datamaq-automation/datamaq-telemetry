@@ -17,7 +17,7 @@ from src.domain.auditoria.services import SanitizadorAuditoriaService
 class RegistrarEventoAuditoriaUseCase:
     """Registra de forma inmutable un evento en el log de auditoría (append-only)."""
 
-    def __init__(self, repo_auditoria: RepositorioAuditoriaPort):
+    def __init__(self, repo_auditoria: RepositorioAuditoriaPort) -> None:
         self.repo_auditoria = repo_auditoria
 
     def ejecutar(self, dto: RegistrarAuditLogDTO) -> AuditLogDTO:
@@ -46,7 +46,7 @@ class RegistrarEventoAuditoriaUseCase:
 class ConsultarAuditLogsUseCase:
     """Consulta los registros de auditoría filtrados y paginados."""
 
-    def __init__(self, repo_auditoria: RepositorioAuditoriaPort):
+    def __init__(self, repo_auditoria: RepositorioAuditoriaPort) -> None:
         self.repo_auditoria = repo_auditoria
 
     def ejecutar(self, query: ConsultarAuditLogsQueryDTO) -> list[AuditLogDTO]:

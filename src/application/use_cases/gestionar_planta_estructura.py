@@ -23,7 +23,7 @@ class GestionarPlantaEstructuraUseCase:
         self,
         repo_organizaciones: RepositorioOrganizacionesPort,
         repo_maquinas: RepositorioMaquinasPort | None = None,
-    ):
+    ) -> None:
         self.repo_organizaciones = repo_organizaciones
         self.repo_maquinas = repo_maquinas
 

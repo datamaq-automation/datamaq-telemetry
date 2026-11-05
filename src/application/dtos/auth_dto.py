@@ -1,10 +1,21 @@
 """src/application/dtos/auth_dto.py."""
 
-from typing import Literal
+from typing import Literal, get_args
 
 from pydantic import BaseModel, Field
 
 from src.application.dtos.tipos import FechaHoraUTC
+
+# Fuente única de los roles de usuario: MeResponseDTO.rol y ROLES_VALIDOS se derivan de aquí (Issue #121).
+RolUsuario = Literal[
+    "superadmin",
+    "admin",
+    "operador",
+    "mantenimiento",
+    "ingeniero",
+    "solo_lectura",
+]
+ROLES_VALIDOS: frozenset[str] = frozenset(get_args(RolUsuario))
 
 
 class LoginRequestDTO(BaseModel):
@@ -46,14 +57,7 @@ class AsignarPlantasRequestDTO(BaseModel):
 
 class MeResponseDTO(BaseModel):
     usuario: str
-    rol: Literal[
-        "superadmin",
-        "admin",
-        "operador",
-        "mantenimiento",
-        "ingeniero",
-        "auditor",
-    ]
+    rol: RolUsuario
     totp_enabled: bool = False
     organizacion_id: str | None = None
     organizacion_nombre: str | None = None

@@ -62,7 +62,7 @@ class AtribuirConsumoUseCase:
         repo_cargas: RepositorioCargasPort,
         repo_intervalos: RepositorioIntervalosActividadPort,
         repo_organizaciones: RepositorioOrganizacionesPort | None = None,
-    ):
+    ) -> None:
         self.repo_serie = repo_serie
         self.repo_cargas = repo_cargas
         self.repo_intervalos = repo_intervalos

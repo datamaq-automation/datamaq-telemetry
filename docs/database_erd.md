@@ -145,7 +145,8 @@ erDiagram
     DEVICES {
         string id PK
         string facility_id FK
-        string device_uid UK
+        string device_uid
+        int medidor_id
         string serial_number
         string name
         string model
@@ -602,7 +603,8 @@ erDiagram
 | :--- | :--- | :--- | :--- |
 | `id` | `VARCHAR(36)` | **PRIMARY KEY** | No |
 | `facility_id` | `VARCHAR(36)` | FK -> `facilities.id` | Sí |
-| `device_uid` | `VARCHAR(64)` | UNIQUE | No |
+| `device_uid` | `VARCHAR(64)` | - | No |
+| `medidor_id` | `INTEGER` | - | No |
 | `serial_number` | `VARCHAR(64)` | - | Sí |
 | `name` | `VARCHAR(100)` | - | No |
 | `model` | `VARCHAR(50)` | - | No |
@@ -622,7 +624,7 @@ erDiagram
 | `updated_at` | `DATETIME` | - | No |
 
 **Índices:**
-- `ix_devices_device_uid` (UNIQUE): (`device_uid`)
+- `ix_devices_device_uid`: (`device_uid`)
 
 ### Tabla `dispositivo_diagnosticos`
 

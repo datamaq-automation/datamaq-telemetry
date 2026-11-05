@@ -57,6 +57,8 @@ class DimensionadorCompensacionService:
             Qc = P_activa * (tan(arccos(FP_actual)) - tan(arccos(FP_objetivo)))
             donde tan(arccos(fp)) = sqrt(1 - fp^2) / fp
 
+        Si q_reactiva_kvar es pasado, tan(φ_actual) = Q/P (FP de desplazamiento) y
+        Qc = Q - P*tan(arccos(FP_objetivo)); el fp_actual solo se usa sin Q.
         Si q_reactiva_kvar es pasado y es <= 0 (capacitivo/sobrecompensado), retorna 0.0
         indicando que no se requiere compensación adicional.
         """
@@ -72,7 +74,12 @@ class DimensionadorCompensacionService:
         if fp_actual >= fp_objetivo:
             return 0.0
 
-        tan_phi_actual = math.sqrt(1.0 - fp_actual**2) / fp_actual
+        # Un capacitor corrige reactiva, no distorsión: con Q medido, tan(φ) de desplazamiento = Q/P.
+        # El fp_actual verdadero (P/S, con potencia de distorsión) subdimensiona la tan(φ) real.
+        if q_reactiva_kvar is not None:
+            tan_phi_actual = q_reactiva_kvar / potencia_activa_kw
+        else:
+            tan_phi_actual = math.sqrt(1.0 - fp_actual**2) / fp_actual
         tan_phi_objetivo = math.sqrt(1.0 - fp_objetivo**2) / fp_objetivo
 
         qc = potencia_activa_kw * (tan_phi_actual - tan_phi_objetivo)

@@ -1,9 +1,9 @@
 name: CI
 
 on:
-  push:
-    branches: [develop, main]
+  # Decisión 2026-10-27: CI en la nube solo en el PR hacia main. develop se valida en local.
   pull_request:
+    branches: [main]
 
 jobs:
   gauntlet:
@@ -112,6 +112,10 @@ jobs:
       - name: Integridad (__init__.py de 0 bytes)
         if: steps.changes.outputs.is_config_only != 'true'
         run: pytest tests/test_empty_inits.py -q
+
+      - name: "Arquitectura (test_architecture: capas, routers delgados, tipado)"
+        if: steps.changes.outputs.is_config_only != 'true'
+        run: pytest tests/test_architecture.py -q
 
       - name: Estilo (ruff check)
         if: steps.changes.outputs.is_config_only != 'true'

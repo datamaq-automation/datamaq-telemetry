@@ -15,7 +15,7 @@ from src.domain.produccion.servicios.calculador_enpi_hibrido import (
 class CalcularSecHibridoUseCase:
     """Caso de uso para orquestar el cálculo de Consumo Específico según topología de medición."""
 
-    def __init__(self, repo_proceso: RepositorioVariablesProcesoPort):
+    def __init__(self, repo_proceso: RepositorioVariablesProcesoPort) -> None:
         self._repo_proceso = repo_proceso
 
     def ejecutar(

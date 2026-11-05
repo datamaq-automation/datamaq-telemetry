@@ -67,7 +67,7 @@ Por directiva de arquitectura del ecosistema DataMaq:
 | Consulta de Alertas (`GET /api/v1/alertas`) | ✅ Lectura | ✅ Lectura | ✅ Lectura |
 | Resolución de Alertas (`PATCH /api/v1/alertas/{id}/resolver`) | ❌ 403 Forbidden | ✅ Escritura | ✅ Escritura |
 | Modificación de Diagrama Unifilar y Layout | — | — | **No existe por API** (los `PUT` respondían 200 sin persistir; eliminados el 2026-09-13). Responden `405`. |
-| Purga de Telemetría (`POST /api/v1/system/purge`) | ❌ 403 Forbidden | ❌ 403 Forbidden | ✅ Admin |
+| Purga de Telemetría (`POST /api/v1/system/purge`) | ❌ 403 Forbidden | ❌ 403 Forbidden | ❌ 403 Forbidden (solo `superadmin`; sin `confirmar` simula y no borra) |
 
 ---
 

@@ -3,6 +3,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from datetime import datetime
+from typing import Any
 
 from src.domain.sge.entities import FacturaDistribuidora
 from src.domain.telemetria.entities import (
@@ -34,7 +35,8 @@ class RepositorioDispositivosPort(ABC):
         pass
 
     @abstractmethod
-    def obtener_por_uid(self, uid: MacAddress) -> Dispositivo | None:
+    def obtener_por_uid(self, uid: MacAddress, medidor_id: int = 0) -> Dispositivo | None:
+        """Medidor `medidor_id` dentro de la MAC. Con (uid, medidor_id) la fila es única: nunca devuelve otra."""
         pass
 
     @abstractmethod
@@ -162,6 +164,20 @@ class RepositorioTelemetriaPort(ABC):
         limite: int | None = None,
     ) -> list[LecturaPotenciaTemporal]:
         pass
+
+    # Conteos de la simulación de purga (datamaq#119). No abstractos: los fakes que no simulan
+    # no los implementan. Quien los llame sin implementarlos recibe NotImplementedError.
+    def contar_instantaneas_anteriores_a(self, fecha_limite: datetime) -> int:
+        raise NotImplementedError("contar_instantaneas_anteriores_a no implementado en este repositorio")
+
+    def contar_energias_anteriores_a(self, fecha_limite: datetime) -> int:
+        raise NotImplementedError("contar_energias_anteriores_a no implementado en este repositorio")
+
+    def contar_status_logs_anteriores_a(self, fecha_limite: datetime) -> int:
+        raise NotImplementedError("contar_status_logs_anteriores_a no implementado en este repositorio")
+
+    def contar_alertas_resueltas_anteriores_a(self, fecha_limite: datetime) -> int:
+        raise NotImplementedError("contar_alertas_resueltas_anteriores_a no implementado en este repositorio")
 
     @abstractmethod
     def purgar_instantaneas_anteriores_a(self, fecha_limite: datetime, batch_size: int = 1000) -> int:
@@ -351,4 +367,71 @@ class NotificadorAlertasPort(ABC):
         dispositivo: Dispositivo,
         destinatarios: list[str],
     ) -> bool:
+        pass
+
+
+class RepositorioAuditoriaCambiosTIPort(ABC):
+    """Lectura de la auditoría de cambios de configuración de TI (TC/TI).
+
+    Devuelve diccionarios planos, no entidades ni modelos ORM, para que la capa de aplicación
+    no dependa de la persistencia. Claves de cada registro: id, device_id, tipo_cambio,
+    valor_anterior, valor_nuevo, motivo, commit_git, usuario, timestamp.
+    """
+
+    @abstractmethod
+    def listar(
+        self,
+        dispositivo_id: str | None,
+        tipo_cambio: str | None,
+        desde: datetime | None,
+        hasta: datetime | None,
+        organizacion_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Cambios más recientes primero. Con ``organizacion_id`` solo los de medidores de plantas de esa organización
+        (un medidor sin planta no pertenece a ninguna); ``None`` es SIN filtro y solo lo pide el caso de uso."""
+        pass
+
+    @abstractmethod
+    def obtener(self, cambio_id: int, organizacion_id: str | None = None) -> dict[str, Any] | None:
+        """Registro completo, con la clave ``dispositivo`` (dict con alias, ubicación y config) o None.
+
+        Con ``organizacion_id``, None también si el medidor no es de esa organización. ``None`` es SIN filtro."""
+        pass
+
+
+class RepositorioFactoryPort(ABC):
+    """Abstract Factory para la familia de repositorios nucleares de telemetría y suscripciones."""
+
+    @abstractmethod
+    def dispositivos(self) -> RepositorioDispositivosPort:
+        """Crea o provee el repositorio de dispositivos."""
+        pass
+
+    @abstractmethod
+    def telemetria(self) -> RepositorioTelemetriaPort:
+        """Crea o provee el repositorio de lecturas y eventos de telemetría."""
+        pass
+
+    @abstractmethod
+    def suscripciones(self) -> RepositorioSuscripcionesPort:
+        """Crea o provee el repositorio de suscripciones comerciales."""
+        pass
+
+    @abstractmethod
+    def planes(self) -> RepositorioPlanesPort:
+        """Crea o provee el repositorio de planes de telemetría."""
+        pass
+
+
+class NotificadoresFactoryPort(ABC):
+    """Abstract Factory para la familia de salida de eventos y notificaciones."""
+
+    @abstractmethod
+    def notificador_alertas(self) -> NotificadorAlertasPort:
+        """Crea o provee el notificador de alertas (email/notificaciones externas)."""
+        pass
+
+    @abstractmethod
+    def publicador_eventos(self) -> PublicadorEventosPort:
+        """Crea o provee el publicador de eventos y telemetría en tiempo real."""
         pass

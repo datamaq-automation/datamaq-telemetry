@@ -1,4 +1,6 @@
-"""Endpoints reales de cambio de contraseña autenticado (reemplazan los stubs 501).
+"""tests/unit/test_cambio_contrasena_endpoints.py.
+
+Endpoints reales de cambio de contraseña autenticado (reemplazan los stubs 501).
 
 App completa con SQLite en memoria, email simulado y clave OTP fija. Cubre 200, 400, 401, 422 y 429.
 """

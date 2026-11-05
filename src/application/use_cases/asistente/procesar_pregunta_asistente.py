@@ -1,3 +1,5 @@
+"""src/application/use_cases/asistente/procesar_pregunta_asistente.py."""
+
 import json
 import logging
 import uuid
@@ -52,7 +54,7 @@ class ProcesarPreguntaAsistenteUseCase:
         gestor_alertas: GestionarAlertasUseCase,
         gestor_dispositivos: GestionarDispositivosUseCase,
         consultar_telemetria: ConsultarTelemetriaUseCase | None = None,
-    ):
+    ) -> None:
         self._clasificador = clasificador
         self._generador = generador
         self._repo_conversaciones = repo_conversaciones

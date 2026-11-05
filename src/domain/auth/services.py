@@ -71,6 +71,14 @@ class HashContrasenaService:
 ROLES_ACCESO_GLOBAL: frozenset[str] = frozenset({"superadmin"})
 
 
+def roles_de_acceso_global(extra: str) -> frozenset[str]:
+    """Roles con visibilidad de todas las organizaciones: los del código más los que agrega la configuración.
+
+    `extra` viene de ROLES_ACCESO_GLOBAL_EXTRA, que es vacío salvo en api-dev (decisión 2026-10-29).
+    """
+    return ROLES_ACCESO_GLOBAL | frozenset(r.strip() for r in extra.split(",") if r.strip())
+
+
 class PoliticaAccesoPlantasService:
     """Decide a qué plantas accede un usuario y si puede cambiar la activa.
 
@@ -80,7 +88,8 @@ class PoliticaAccesoPlantasService:
        no aplica para ellos.
     2. Usuario con filas explícitas en `user_facility_access`: solo esas plantas,
        acotadas a su organización (una fila que apunte a otra org se ignora), con
-       el `puede_cambiar` de cada fila.
+       el `puede_cambiar` de cada fila. Si ninguna fila coincide con una planta válida,
+       se devuelve lista vacía (fail-close, Issue #85).
     3. Usuario sin filas: comportamiento histórico, todas las plantas de su
        organización con permiso de cambio.
 
@@ -94,8 +103,9 @@ class PoliticaAccesoPlantasService:
         organizacion_id: str | None,
         plantas: list[Planta],
         accesos: list[AccesoPlantaUsuario],
+        roles_globales: frozenset[str] = ROLES_ACCESO_GLOBAL,
     ) -> list[tuple[Planta, bool]]:
-        if rol in ROLES_ACCESO_GLOBAL:
+        if rol in roles_globales:
             return [(p, True) for p in plantas]
         propias = [p for p in plantas if organizacion_id is not None and p.organizacion_id == organizacion_id]
         if not accesos:
@@ -109,8 +119,7 @@ class PoliticaAccesoPlantasService:
                 continue
             vistas.add(planta.id)
             resultado.append((planta, acceso.puede_cambiar))
-        # Si las filas de asignaciones no coinciden con ninguna planta válida, fallback a todas las propias
-        return resultado if resultado else [(p, True) for p in propias]
+        return resultado
 
 
 class PoliticaExpiracionService:
@@ -124,7 +133,7 @@ class RateLimiterService:
 
     MAX_CLAVES: int = 10000
 
-    def __init__(self, max_intentos: int, ventana_segundos: int):
+    def __init__(self, max_intentos: int, ventana_segundos: int) -> None:
         self.max_intentos = max_intentos
         self.ventana_segundos = ventana_segundos
         self._intentos: dict[str, list[datetime]] = {}
@@ -172,7 +181,7 @@ class RateLimiterService:
 class TokenRevocationService:
     """Mantiene en memoria el registro de timestamps de revocación de sesiones por usuario."""
 
-    def __init__(self, ventana_retencion_segundos: int = 7200):
+    def __init__(self, ventana_retencion_segundos: int = 7200) -> None:
         self.ventana_retencion_segundos = ventana_retencion_segundos
         self._revocaciones: dict[str, int] = {}
 

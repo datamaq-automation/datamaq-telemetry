@@ -1,4 +1,6 @@
-"""CORS y cookie de sesión para app-dev.datamaq.com.ar (T1 a T6 de spec-cors-app-dev.md).
+"""tests/unit/test_cors_app_dev.py.
+
+CORS y cookie de sesión para app-dev.datamaq.com.ar (T1 a T6 de spec-cors-app-dev.md).
 
 Patrón igual a tests/unit/test_cors_cybersyn.py. Los tests de WebSocket (T7 a T9) quedan
 pendientes hasta que el dueño decida C4 (validación de Origin en /ws/live).

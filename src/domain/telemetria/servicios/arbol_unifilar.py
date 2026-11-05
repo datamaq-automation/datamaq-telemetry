@@ -16,7 +16,7 @@ class ArbolUnifilarService:
     obtiene sumando los medidores frontera aguas abajo.
     """
 
-    def __init__(self, nodos: list[NodoUnifilar]):
+    def __init__(self, nodos: list[NodoUnifilar]) -> None:
         self._nodos = list(nodos)
         self._por_id: dict[str, NodoUnifilar] = {}
         self._hijos: dict[str | None, list[NodoUnifilar]] = defaultdict(list)

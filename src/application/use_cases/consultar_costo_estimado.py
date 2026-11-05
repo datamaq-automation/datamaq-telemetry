@@ -41,7 +41,7 @@ class ConsultarCostoEstimadoUseCase:
         repo_organizaciones: RepositorioOrganizacionesPort,
         repo_telemetria: RepositorioTelemetriaPort,
         consultar_telemetria: ConsultarTelemetriaUseCase,
-    ):
+    ) -> None:
         self._repo_org = repo_organizaciones
         self._repo_telemetria = repo_telemetria
         self._consultar_telemetria = consultar_telemetria

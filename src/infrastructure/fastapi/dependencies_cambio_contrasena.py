@@ -1,4 +1,6 @@
-"""Dependencias FastAPI del cambio de contraseña autenticado.
+"""src/infrastructure/fastapi/dependencies_cambio_contrasena.py.
+
+Dependencias FastAPI del cambio de contraseña autenticado.
 
 Viven fuera de dependencies.py para no superar el límite de tamaño de archivo de ese módulo.
 """

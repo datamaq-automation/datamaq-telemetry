@@ -5,6 +5,8 @@ import json
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
+from typing import Any
 
 import paho.mqtt.client as mqtt
 from paho.mqtt.enums import CallbackAPIVersion
@@ -12,9 +14,12 @@ from paho.mqtt.enums import CallbackAPIVersion
 from src.adapters.gateways.dispositivos_datos_maestros_gateway import DispositivosConDatosMaestrosGateway
 from src.application.use_cases.gestionar_disponibilidad import GestionarDisponibilidadUseCase
 from src.application.use_cases.ingestar_telemetria import IngestarTelemetriaUseCase
-from src.domain.telemetria.ports import PublicadorEventosPort
+from src.domain.telemetria.ports import NotificadoresFactoryPort, PublicadorEventosPort
 from src.domain.telemetria.services import FiltroDeduplicacionService
+from src.domain.telemetria.servicios.consumo_mqtt import AcumuladorConsumoHorario, uid_desde_topico
+from src.infrastructure.paho_mqtt.ingesta_sin_escritura import sin_escritura_si
 from src.infrastructure.paho_mqtt.mqtt_buffer import BufferMensajesMQTT, MensajeBuffer
+from src.infrastructure.paho_mqtt.volcador_consumo_mqtt import VolcadorConsumoMqtt
 from src.infrastructure.settings.config import get_settings
 from src.infrastructure.settings.logger import get_logger
 from src.infrastructure.sqlalchemy.database import get_session_factory
@@ -30,29 +35,75 @@ from src.infrastructure.yaml.repositories.organizaciones_repository import YamlO
 logger = get_logger("mqtt_listener")
 
 
-def _configurar_notificador_alertas(settings, session_factory) -> None:
+def _configurar_notificador_alertas(
+    settings,
+    session_factory,
+    notificadores_factory: NotificadoresFactoryPort | None = None,
+) -> None:
     from src.application.use_cases.ingesta.procesador_alertas_ingesta import (
         ProcesadorAlertasIngesta,
     )
-    from src.infrastructure.auth.email_service import SmtpEmailService
     from src.infrastructure.paho_mqtt.verificador_notificaciones import (
         construir_verificador_notificaciones,
     )
+    from src.infrastructure.settings.notificadores_factory import ProduccionNotificadoresFactory
 
-    notificador = SmtpEmailService(
-        host=settings.SMTP_HOST,
-        port=settings.SMTP_PORT,
-        user=settings.SMTP_USER,
-        password=settings.SMTP_PASSWORD,
-        use_tls=settings.SMTP_TLS,
-        from_email=settings.SMTP_FROM,
-        app_env=settings.APP_ENV,
-    )
+    factory = notificadores_factory or ProduccionNotificadoresFactory(settings)
+    notificador = factory.notificador_alertas()
     dests = [d.strip() for d in settings.ALERTAS_EMAIL_DESTINATARIOS.split(",") if d.strip()]
-    verificador_plan = construir_verificador_notificaciones(
-        session_factory, billing_habilitado=settings.BILLING_HABILITADO
-    )
+    verificador_plan = construir_verificador_notificaciones(session_factory, billing_habilitado=False)
     ProcesadorAlertasIngesta.configurar_notificador(notificador, dests, verificador_plan=verificador_plan)
+
+
+def _despachar_mensaje_mqtt(
+    topic: str,
+    payload: dict | list,
+    repo_disp: Any,
+    repo_telem: Any,
+    disponibilidad_use_case: Any,
+    publicador: PublicadorEventosPort | None,
+    permitir_auto_registro: bool,
+) -> None:
+    if topic.startswith("auto24v4m/"):
+        from src.application.use_cases.ingesta.ingestar_automate import IngestarAutomateUseCase
+
+        automate_use_case = IngestarAutomateUseCase(
+            repo_dispositivos=repo_disp,
+            disponibilidad_use_case=disponibilidad_use_case,
+            logger=logger,
+            permitir_auto_registro=permitir_auto_registro,
+        )
+        automate_use_case.ejecutar(topic, payload)
+    elif topic.startswith("pro15/"):
+        # Pro15: un topic con varios medidores (lista por medidor). Su despacho resuelve (MAC, medidor_id).
+        from src.application.use_cases.ingesta.ingestar_pro15 import IngestarPro15UseCase
+
+        telemetria = IngestarTelemetriaUseCase(
+            repo_dispositivos=repo_disp,
+            repo_telemetria=repo_telem,
+            publicador=publicador,
+            logger=logger,
+            permitir_auto_registro=permitir_auto_registro,
+            disponibilidad_use_case=disponibilidad_use_case,
+        )
+        IngestarPro15UseCase(
+            repo_dispositivos=repo_disp,
+            repo_telemetria=repo_telem,
+            telemetria=telemetria,
+            publicador=publicador,
+            logger=logger,
+            permitir_auto_registro=permitir_auto_registro,
+        ).ejecutar(topic, payload)
+    elif isinstance(payload, dict):
+        use_case = IngestarTelemetriaUseCase(
+            repo_dispositivos=repo_disp,
+            repo_telemetria=repo_telem,
+            publicador=publicador,
+            logger=logger,
+            permitir_auto_registro=permitir_auto_registro,
+            disponibilidad_use_case=disponibilidad_use_case,
+        )
+        use_case.ejecutar(topic, payload)
 
 
 class MQTTListener:
@@ -103,6 +154,8 @@ class MQTTListener:
             backoff_max_s=self.settings.MQTT_RETRY_BACKOFF_MAX_S,
             on_descarte=self._on_buffer_descarte,
         )
+        self._consumo = AcumuladorConsumoHorario()
+        self._volcador_consumo = VolcadorConsumoMqtt(self._consumo, self.session_factory)
 
         if self.settings.ALERTAS_EMAIL_HABILITADAS:
             _configurar_notificador_alertas(self.settings, self.session_factory)
@@ -169,6 +222,9 @@ class MQTTListener:
             return
 
         logger.info("mqtt_mensaje_recibido", topico=topic, tamano_bytes=len(payload_bytes))
+        uid = uid_desde_topico(topic)
+        if uid:
+            self._consumo.registrar(uid, len(payload_bytes), datetime.now(timezone.utc))
 
         clave_dedup = f"{topic}:{hashlib.sha256(payload_bytes).hexdigest()}"
         if self._dedup.es_duplicado(clave_dedup):
@@ -204,36 +260,28 @@ class MQTTListener:
         """Abre sesión de BD y ejecuta la ingesta correspondiente."""
         db = self.session_factory()
         try:
-            repo_disp = DispositivosConDatosMaestrosGateway(
-                MySQLDispositivosRepository(db), YamlOrganizacionesRepository()
+            # Réplica de solo lectura (decisión 2026-10-29): con la persistencia apagada, ningún repositorio escribe.
+            sin_escritura = not self.settings.INGESTA_PERSISTENCIA_HABILITADA
+            repo_disp = sin_escritura_si(
+                sin_escritura,
+                DispositivosConDatosMaestrosGateway(MySQLDispositivosRepository(db), YamlOrganizacionesRepository()),
             )
-            repo_telem = MySQLTelemetriaRepository(db)
+            repo_telem = sin_escritura_si(sin_escritura, MySQLTelemetriaRepository(db))
             disponibilidad_use_case = GestionarDisponibilidadUseCase(
                 repo_maquinas=MySQLMaquinasRepository(db),
-                repo_eventos=MySQLEventosDisponibilidadRepository(db),
+                repo_eventos=sin_escritura_si(sin_escritura, MySQLEventosDisponibilidadRepository(db)),
                 repo_paradas=MySQLParadasProgramadasRepository(db),
             )
 
-            if topic.startswith("auto24v4m/"):
-                from src.application.use_cases.ingesta.ingestar_automate import IngestarAutomateUseCase
-
-                automate_use_case = IngestarAutomateUseCase(
-                    repo_dispositivos=repo_disp,
-                    disponibilidad_use_case=disponibilidad_use_case,
-                    logger=logger,
-                    permitir_auto_registro=self.settings.MQTT_AUTO_REGISTER_DEVICES,
-                )
-                automate_use_case.ejecutar(topic, payload)
-            elif isinstance(payload, dict):
-                use_case = IngestarTelemetriaUseCase(
-                    repo_dispositivos=repo_disp,
-                    repo_telemetria=repo_telem,
-                    publicador=self.publicador,
-                    logger=logger,
-                    permitir_auto_registro=self.settings.MQTT_AUTO_REGISTER_DEVICES,
-                    disponibilidad_use_case=disponibilidad_use_case,
-                )
-                use_case.ejecutar(topic, payload)
+            _despachar_mensaje_mqtt(
+                topic=topic,
+                payload=payload,
+                repo_disp=repo_disp,
+                repo_telem=repo_telem,
+                disponibilidad_use_case=disponibilidad_use_case,
+                publicador=self.publicador,
+                permitir_auto_registro=self.settings.MQTT_AUTO_REGISTER_DEVICES,
+            )
         finally:
             db.close()
 
@@ -274,6 +322,10 @@ class MQTTListener:
         return self._esta_conectado
 
     def publicar_comando(self, topico: str, payload: dict) -> bool:
+        if not self.settings.MQTT_COMANDOS_HABILITADOS:
+            # Réplica de solo lectura: no se escribe hacia los medidores. Cubre también la renovación de ráfaga.
+            logger.info("mqtt_comando_bloqueado_solo_lectura", topico=topico)
+            return False
         if not self._esta_conectado:
             logger.warning("mqtt_comando_no_enviado_desconectado", topico=topico)
             return False
@@ -309,6 +361,7 @@ class MQTTListener:
                 daemon=True,
             )
             self._hilo_reintentos.start()
+            self._volcador_consumo.iniciar()
 
         try:
             self.client.connect_async(
@@ -334,3 +387,4 @@ class MQTTListener:
         except Exception:
             pass
         self._executor.shutdown(wait=True)
+        self._volcador_consumo.detener()

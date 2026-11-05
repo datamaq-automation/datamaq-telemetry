@@ -1,3 +1,5 @@
+"""tests/unit/test_oauth_dtos.py."""
+
 import pytest
 from pydantic import ValidationError
 

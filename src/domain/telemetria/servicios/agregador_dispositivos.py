@@ -1,7 +1,8 @@
 """src/domain/telemetria/servicios/agregador_dispositivos.py."""
 
+import bisect
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 
 from src.domain.telemetria.entities import EnergiaAgregada, LecturaInstantanea, MedicionFase
@@ -86,6 +87,58 @@ class PuntoPotencia:
     potencia_reactiva_total_var: float | None = None
     potencia_aparente_total_va: float | None = None
     factor_desplazamiento_total: float | None = None
+    dispositivos_interpolados: list[str] = field(default_factory=list)
+    """Medidores cuyo dato de este bucket es una interpolación lineal entre lecturas vecinas (#94).
+
+    Aditivo: ``dispositivos_sin_dato`` sigue listando a todos los medidores sin lectura en el bucket.
+    """
+
+
+# Un medidor sin lectura en un bucket se interpola solo si la lectura anterior y la posterior
+# están a no más de este tiempo del bucket. Más lejos, el hueco queda como suma parcial (#94).
+MAX_DISTANCIA_INTERPOLACION_S = 900
+
+
+def _interpolar_huecos(
+    promedio_p: dict[tuple[int, str], float],
+    promedio_q: dict[tuple[int, str], float],
+    buckets: list[int],
+    dispositivos: list[str],
+    q_completa_por_bucket: dict[int, bool],
+) -> dict[int, list[str]]:
+    """Completa en sitio los promedios de P y Q de los huecos de cada medidor (#94).
+
+    Un medidor sin lectura en un bucket, con lectura anterior y posterior a no más de 15 min del
+    bucket, aporta su P (y Q) interpolada linealmente. Las vecinas son lecturas reales, no buckets
+    interpolados. Si falta Q en un vecino, la Q del bucket queda en None. Devuelve los medidores
+    interpolados por bucket.
+    """
+    interpolados_por_bucket: dict[int, list[str]] = {}
+    for dispositivo_id in dispositivos:
+        serie = sorted(b for (b, d) in promedio_p if d == dispositivo_id)
+        if len(serie) < 2:
+            continue
+        for bucket_ts in buckets:
+            if (bucket_ts, dispositivo_id) in promedio_p:
+                continue
+            i = bisect.bisect_left(serie, bucket_ts)
+            if i == 0 or i == len(serie):
+                continue  # borde de la ventana: no hay vecino a un lado
+            b_ant, b_sig = serie[i - 1], serie[i]
+            if bucket_ts - b_ant > MAX_DISTANCIA_INTERPOLACION_S or b_sig - bucket_ts > MAX_DISTANCIA_INTERPOLACION_S:
+                continue
+            peso = (bucket_ts - b_ant) / (b_sig - b_ant)
+            p_ant = promedio_p[(b_ant, dispositivo_id)]
+            p_sig = promedio_p[(b_sig, dispositivo_id)]
+            promedio_p[(bucket_ts, dispositivo_id)] = p_ant + peso * (p_sig - p_ant)
+            if (b_ant, dispositivo_id) in promedio_q and (b_sig, dispositivo_id) in promedio_q:
+                q_ant = promedio_q[(b_ant, dispositivo_id)]
+                q_sig = promedio_q[(b_sig, dispositivo_id)]
+                promedio_q[(bucket_ts, dispositivo_id)] = q_ant + peso * (q_sig - q_ant)
+            else:
+                q_completa_por_bucket[bucket_ts] = False
+            interpolados_por_bucket.setdefault(bucket_ts, []).append(dispositivo_id)
+    return interpolados_por_bucket
 
 
 def _recomponer_s_y_cos_fi(p_w: float | None, q_var: float | None) -> tuple[float | None, float | None]:
@@ -221,8 +274,14 @@ class AgregadorDispositivosService:
                     q_completa_por_bucket.setdefault(bucket_ts, True)
                     muestras_q.setdefault((bucket_ts, dispositivo_id), []).append(reactiva_var)
 
-        totales_p_por_bucket = _sumar_promedios_por_bucket(muestras_p)
-        totales_q_por_bucket = _sumar_promedios_por_bucket(muestras_q)
+        promedio_p = {clave: sum(v) / len(v) for clave, v in muestras_p.items()}
+        promedio_q = {clave: sum(v) / len(v) for clave, v in muestras_q.items()}
+        interpolados_por_bucket = _interpolar_huecos(
+            promedio_p, promedio_q, sorted(todos_los_buckets), sorted(lecturas_por_dispositivo), q_completa_por_bucket
+        )
+
+        totales_p_por_bucket = _sumar_promedios_por_bucket({c: [v] for c, v in promedio_p.items()})
+        totales_q_por_bucket = _sumar_promedios_por_bucket({c: [v] for c, v in promedio_q.items()})
 
         todos_los_dispositivos = set(lecturas_por_dispositivo.keys())
         resultado = []
@@ -244,6 +303,7 @@ class AgregadorDispositivosService:
                     potencia_reactiva_total_var=q,
                     potencia_aparente_total_va=s,
                     factor_desplazamiento_total=fp,
+                    dispositivos_interpolados=sorted(interpolados_por_bucket.get(bucket_ts, [])),
                 )
             )
         return resultado

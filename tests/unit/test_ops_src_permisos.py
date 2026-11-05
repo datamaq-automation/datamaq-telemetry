@@ -1,4 +1,6 @@
-"""Verificación local de #23: chequeo de permisos de src/ y monitor de reinicios.
+"""tests/unit/test_ops_src_permisos.py.
+
+Verificación local de #23: chequeo de permisos de src/ y monitor de reinicios.
 
 El bloque ExecStartPre se lee del propio doc versionado (docs/ops/src-permisos-drop-in.md),
 para probar exactamente lo que el dueño copia al VPS, no una copia en el test.

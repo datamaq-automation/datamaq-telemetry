@@ -1,11 +1,9 @@
 name: CI Nightly
 
-# Job semanal que detecta breaking changes de dependencias antes de que lleguen a producción.
-# Frecuencia semanal (no diaria) para ahorrar minutos de GitHub Actions: repos privados.
+# Job manual que detecta breaking changes de dependencias antes de que lleguen a producción.
+# Sin schedule (decisión 2026-10-27: CI en la nube solo en PR a main; el resto se corre a mano).
 # Instala desde requirements.txt (no .lock) para testear versiones más nuevas.
 on:
-  schedule:
-    - cron: '0 2 * * 1'  # lunes 2 AM UTC = domingo 11 PM ARG (UTC-3, horario estándar)
   # Correr a mano antes de actualizar dependencias: Actions → CI Nightly → Run workflow.
   workflow_dispatch:
 

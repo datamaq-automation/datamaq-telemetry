@@ -34,12 +34,12 @@ class SolicitarRecuperacionContrasenaUseCase:
         repositorio_usuarios: RepositorioUsuariosPort,
         generador_token: GeneradorTokenPort,
         servicio_email: ServicioEmailPort,
-        frontend_url: str = "https://www.datamaq.com.ar",
+        frontend_url: str = "https://app.datamaq.com.ar",
         minutos_expiracion: int = 15,
         rate_limiter: RateLimiterService | None = None,
         max_solicitudes_usuario: int = 3,
         max_solicitudes_ip: int = 10,
-    ):
+    ) -> None:
         self.repositorio_usuarios = repositorio_usuarios
         self.generador_token = generador_token
         self.servicio_email = servicio_email
@@ -113,7 +113,7 @@ class RestablecerContrasenaUseCase:
         generador_token: GeneradorTokenPort,
         hash_service: HashContrasenaService,
         revocation_service: TokenRevocationService | None = None,
-    ):
+    ) -> None:
         self.repositorio_usuarios = repositorio_usuarios
         self.generador_token = generador_token
         self.hash_service = hash_service

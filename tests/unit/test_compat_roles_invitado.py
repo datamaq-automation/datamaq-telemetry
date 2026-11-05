@@ -1,4 +1,6 @@
-"""Compatibilidad temporal de los roles invitado e invitado_global (TODO #65).
+"""tests/unit/test_compat_roles_invitado.py.
+
+Compatibilidad temporal de los roles invitado e invitado_global (TODO #65).
 
 Un token legacy en /me no obtiene ningún permiso. Estos tests fijan la regla por permiso
 (escritura, admin, superadmin, 2FA, acceso global, plantas, organización) y que el módulo de

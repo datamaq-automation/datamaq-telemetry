@@ -9,13 +9,11 @@ from fastapi.testclient import TestClient
 from src.adapters.gateways.in_memory_variables_proceso_repository import (
     InMemoryVariablesProcesoRepository,
 )
-from src.application.use_cases.calcular_sec_hibrido import CalcularSecHibridoUseCase
 from src.application.use_cases.registrar_lectura_proceso import RegistrarLecturaProcesoUseCase
 from src.domain.produccion.entities import ConfiguracionMedicionMaquina
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
 from src.infrastructure.fastapi.dependencies import get_usuarios_repository
 from src.infrastructure.fastapi.routes.produccion_router import (
-    get_calcular_sec_use_case,
     get_registrar_lectura_use_case,
     get_variables_proceso_repository,
 )
@@ -48,7 +46,6 @@ def client_proceso(repo_proceso):
 
     app.dependency_overrides[get_variables_proceso_repository] = lambda: repo_proceso
     app.dependency_overrides[get_registrar_lectura_use_case] = lambda: RegistrarLecturaProcesoUseCase(repo_proceso)
-    app.dependency_overrides[get_calcular_sec_use_case] = lambda: CalcularSecHibridoUseCase(repo_proceso)
 
     return TestClient(app)
 
@@ -99,55 +96,3 @@ def test_registrar_lectura_con_auth_retorna_201(client_proceso):
     assert data["maquinaId"] == "prensa-01"
     assert data["variableTipo"] == "LONGITUD_METROS"
     assert data["deltaValor"] == 12.5
-
-
-def test_calcular_sec_maquina_dedicada(client_proceso):
-    token = _crear_token()
-    client_proceso.cookies.set("datamaq_token", token)
-
-    t0 = datetime(2026, 9, 19, 8, 0, tzinfo=timezone.utc).isoformat()
-    t1 = datetime(2026, 9, 19, 12, 0, tzinfo=timezone.utc).isoformat()
-
-    res = client_proceso.post(
-        "/api/v1/produccion/enpi/calcular-sec",
-        json={
-            "maquinaId": "prensa-01",
-            "periodoInicio": t0,
-            "periodoFin": t1,
-            "energiaKwh": 60.0,
-            "unidadesProduccion": 300.0,
-            "horasActivasProceso": 3.0,
-            "potenciaMediaKw": 18.0,
-        },
-    )
-    assert res.status_code == 200
-    data = res.json()
-    assert data["modoMedicion"] == "DEDICADA_SECCIONAL"
-    assert data["secKwhPorUnidad"] == 0.2
-    assert data["energiaProductivaKwh"] == 54.0
-    assert data["energiaNoProductivaKwh"] == 6.0
-
-
-def test_calcular_sec_maquina_tgbt_fallback(client_proceso):
-    token = _crear_token()
-    client_proceso.cookies.set("datamaq_token", token)
-
-    t0 = datetime(2026, 9, 19, 8, 0, tzinfo=timezone.utc).isoformat()
-    t1 = datetime(2026, 9, 19, 16, 0, tzinfo=timezone.utc).isoformat()
-
-    # cortadora-desconocida no está configurada, usa fallback en TGBT
-    res = client_proceso.post(
-        "/api/v1/produccion/enpi/calcular-sec",
-        json={
-            "maquinaId": "cortadora-desconocida",
-            "periodoInicio": t0,
-            "periodoFin": t1,
-            "energiaKwh": 200.0,
-            "unidadesProduccion": 500.0,
-            "horasActivasProceso": 4.0,
-        },
-    )
-    assert res.status_code == 200
-    data = res.json()
-    assert data["modoMedicion"] == "AGREGADA_TGBT"
-    assert "Desagregación asistida en TGBT" in data["detalleEstimacion"]

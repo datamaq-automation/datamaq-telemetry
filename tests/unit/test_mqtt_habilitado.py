@@ -1,4 +1,6 @@
-"""MQTT_HABILITADO (#api-dev, D2): con false el listener no se crea, registra ni conecta."""
+"""tests/unit/test_mqtt_habilitado.py.
+
+MQTT_HABILITADO (#api-dev, D2): con false el listener no se crea, registra ni conecta."""
 
 from unittest.mock import MagicMock, patch
 

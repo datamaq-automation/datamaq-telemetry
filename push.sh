@@ -44,8 +44,15 @@ else
     exit 1
 fi
 
-echo -e "${BOLD}${CYAN}==> [2/2] Monitoreo en Vivo de CI/CD Deploy a VPS${RESET}"
-python3 scripts/watch_deploy.py
+# Solo `main` dispara el CD de producción (deploy.yml). Un push a develop no registra
+# workflows: watch_deploy.py esperaría 20 s y saldría con error, y con `set -e` push.sh fallaría
+# tras un push correcto. Staging se despliega a mano (deploy-staging.yml, workflow_dispatch).
+if [ "$BRANCH" = "main" ]; then
+    echo -e "${BOLD}${CYAN}==> [2/2] Monitoreo en Vivo de CI/CD Deploy a VPS${RESET}"
+    python3 scripts/watch_deploy.py
+else
+    echo -e "${BOLD}${CYAN}==> [2/2] Monitoreo omitido: solo main dispara el deploy de producción (rama: ${BRANCH})${RESET}"
+fi
 
 END_PUSH=$(_time_now)
 TOTAL_PUSH_DUR=$(_calc_duration "$START_PUSH" "$END_PUSH")

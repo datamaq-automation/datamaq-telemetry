@@ -139,9 +139,11 @@ def test_obtener_ip_cliente_none():
     assert _obtener_ip_cliente(None) == "desconocida"
 
 
-def test_obtener_ip_cliente_x_forwarded_for():
+def test_obtener_ip_cliente_ignora_x_forwarded_for_y_usa_client_host():
+    """#66: El backend no lee X-Forwarded-For directamente para evitar IP spoofing."""
     request = MagicMock()
-    request.headers = {"X-Forwarded-For": "203.0.113.195, 70.41.3.18, 150.172.238.178"}
+    request.headers = {"X-Forwarded-For": "1.2.3.4, 70.41.3.18"}
+    request.client.host = "203.0.113.195"
     assert _obtener_ip_cliente(request) == "203.0.113.195"
 
 
@@ -204,8 +206,8 @@ def test_login_con_device_trust_cookie_y_x_forwarded_for():
     assert isinstance(call_args[0], LoginRequestDTO)
     assert call_args[0].usuario == "admin"
     assert call_kwargs["device_token"] == "device-trust-token-abc"
-    assert call_kwargs["clave_ip"] == "203.0.113.50"
-    assert call_kwargs["ip_origen"] == "203.0.113.50"
+    assert call_kwargs["clave_ip"] == "testclient"
+    assert call_kwargs["ip_origen"] == "testclient"
 
 
 def test_login_requiere_2fa_no_fija_cookie():
@@ -358,7 +360,7 @@ def test_verificar_2fa_con_device_trust():
     call_args, call_kwargs = mocks["verificar_2fa"].verificar.call_args
     assert isinstance(call_args[0], Verificar2FARequestDTO)
     assert call_args[0].codigo == "123456"
-    assert call_kwargs["ip_origen"] == "198.51.100.12"
+    assert call_kwargs["ip_origen"] == "testclient"
     assert call_kwargs["user_agent"] == "DatamaqMobile/1.0"
 
 
@@ -607,7 +609,7 @@ def test_solicitar_recuperacion_con_x_forwarded_for():
     call_args, call_kwargs = mocks["solicitar_recuperacion"].ejecutar.call_args
     assert isinstance(call_args[0], SolicitarRecuperacionDTO)
     assert call_args[0].usuario == "admin@planta.local"
-    assert call_kwargs["clave_ip"] == "203.0.113.88"
+    assert call_kwargs["clave_ip"] == "testclient"
 
 
 def test_solicitar_recuperacion_sin_x_forwarded_for():

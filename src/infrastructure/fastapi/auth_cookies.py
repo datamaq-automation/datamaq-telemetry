@@ -1,4 +1,6 @@
-"""Módulo de configuración y resolución de cookies de autenticación (ISO 27001 / Clean Architecture).
+"""src/infrastructure/fastapi/auth_cookies.py.
+
+Módulo de configuración y resolución de cookies de autenticación (ISO 27001 / Clean Architecture).
 
 Gestiona la fijación y eliminación de cookies HttpOnly, adaptando dinámicamente
 la directiva SameSite (SameSite=None; Secure para orígenes cross-site Cybersyn,

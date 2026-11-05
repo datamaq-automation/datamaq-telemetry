@@ -10,8 +10,11 @@ from src.application.dtos.dispositivo_dto import (
     DispositivoResponseDTO,
     DispositivoUpdateDTO,
 )
+from src.application.use_cases.gestionar_acceso_plantas import GestionarAccesoPlantasUseCase
 from src.application.use_cases.gestionar_auditoria import RegistrarEventoAuditoriaUseCase
 from src.application.use_cases.gestionar_dispositivos import GestionarDispositivosUseCase
+from src.domain.auth.services import roles_de_acceso_global
+from src.infrastructure.fastapi.auth_dependencies import get_acceso_plantas_use_case
 from src.infrastructure.fastapi.dependencies import (
     get_dispositivos_use_case,
     get_mqtt_listener,
@@ -22,6 +25,7 @@ from src.infrastructure.fastapi.dependencies import (
 from src.infrastructure.fastapi.device_ownership import verificar_propiedad_dispositivo
 from src.infrastructure.fastapi.error_handler import manejar_error_http
 from src.infrastructure.fastapi.planta_ownership import resolver_planta_permitida
+from src.infrastructure.settings.config import get_settings
 
 router = APIRouter(
     prefix="/api/v1/dispositivos",
@@ -39,7 +43,7 @@ def list_dispositivos(
     planta_id: PlantaPermitida,
 ):
     rol = claims.get("rol")
-    if rol == "superadmin":
+    if rol in roles_de_acceso_global(get_settings().ROLES_ACCESO_GLOBAL_EXTRA):
         organizacion_id = None
     else:
         organizacion_id = claims.get("org")
@@ -68,7 +72,14 @@ def get_dispositivo(
 def register_dispositivo(
     dto: DispositivoCreateDTO,
     use_case: Annotated[GestionarDispositivosUseCase, Depends(get_dispositivos_use_case)],
+    claims: Annotated[dict, Depends(get_usuario_actual)],
+    acceso_plantas: Annotated[GestionarAccesoPlantasUseCase, Depends(get_acceso_plantas_use_case)],
 ):
+    # La planta destino tiene que ser una que el usuario puede ver: de su organización y de sus plantas asignadas.
+    # Una ajena o inexistente responde 404. El superadmin no tiene filtro (datamaq#132). Sin planta_id el alta sigue
+    # permitida, como antes: queda como pregunta para el dueño.
+    if dto.planta_id is not None and not _es_superadmin_o_sin_auth(claims):
+        resolver_planta_permitida(claims=claims, acceso_plantas=acceso_plantas, planta_id=dto.planta_id)
     try:
         return use_case.registrar_dispositivo(dto)
     except Exception as e:
@@ -148,6 +159,11 @@ def _auditar_cambios_dispositivo(
             pass
 
 
+def _es_superadmin_o_sin_auth(claims: dict | None) -> bool:
+    """Sin filtro: superadmin, o modo sin autenticación (desarrollo), igual que device_ownership."""
+    return (claims or {}).get("rol") == "superadmin" or not get_settings().AUTH_REQUIRED
+
+
 @router.put("/{device_id}", response_model=DispositivoResponseDTO, dependencies=[Depends(requiere_rol_escritura)])
 @router.patch("/{device_id}", response_model=DispositivoResponseDTO, dependencies=[Depends(requiere_rol_escritura)])
 def update_dispositivo(
@@ -166,21 +182,31 @@ def update_dispositivo(
             except Exception:
                 dev_previo = None
 
-        resultado = use_case.actualizar_dispositivo(device_id, dto)
+        resultado = use_case.actualizar_dispositivo_de_organizacion(
+            device_id,
+            dto,
+            organizacion_id=(claims or {}).get("org"),
+            es_superadmin=_es_superadmin_o_sin_auth(claims),
+        )
         _auditar_cambios_dispositivo(audit_use_case, dev_previo, dto, device_id, claims, request)
         return resultado
     except Exception as e:
         manejar_error_http(e)
 
 
-@router.post("/{device_id}/realtime")
+@router.post("/{device_id}/realtime", dependencies=[Depends(requiere_rol_escritura)])
 def activate_realtime_mode(
     device_id: str,
     use_case: Annotated[GestionarDispositivosUseCase, Depends(get_dispositivos_use_case)],
+    claims: Annotated[dict, Depends(get_usuario_actual)],
     segundos: int = Query(120, ge=10, le=600),
 ):
     try:
-        disp = use_case.obtener_dispositivo(device_id)
+        # Misma regla que el listado: superadmin sin filtro; el resto, solo dispositivos de su organización (#99).
+        if claims.get("rol") == "superadmin":
+            disp = use_case.obtener_dispositivo(device_id)
+        else:
+            disp = use_case.obtener_dispositivo_de_organizacion(device_id, claims.get("org"))
         listener = get_mqtt_listener()
         enviado = False
         if listener:

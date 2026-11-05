@@ -60,9 +60,9 @@ def test_middleware_rechaza_path_traversal_con_400():
     def catch_all(resto: str):
         return {"ok": True}
 
-    client = TestClient(app)
+    client = TestClient(app, client=("203.0.113.5", 50000))
     with capture_logs() as logs:
-        resp = client.get("/api/..;/.env", headers={"X-Forwarded-For": "203.0.113.5"})
+        resp = client.get("/api/..;/.env")
 
     assert resp.status_code == 400
     assert resp.json() == {"detail": "Bad Request"}
@@ -107,16 +107,16 @@ def test_rate_limit_404_bloquea_tras_superar_umbral():
 
     client = TestClient(app)
     ip_maliciosa = "198.51.100.10"
-    headers = {"X-Forwarded-For": ip_maliciosa}
+    client = TestClient(app, client=(ip_maliciosa, 50000))
 
     # Primeras 3 peticiones 404 son permitidas y registradas
     for _ in range(3):
-        r = client.get("/no-existe", headers=headers)
+        r = client.get("/no-existe")
         assert r.status_code == 404
 
     # La 4ta petición de la misma IP debe ser bloqueada inmediatamente con 429
     with capture_logs() as logs:
-        r_bloqueada = client.get("/no-existe", headers=headers)
+        r_bloqueada = client.get("/no-existe")
 
     assert r_bloqueada.status_code == 429
     assert r_bloqueada.json() == {"detail": "Demasiadas solicitudes no encontradas"}
@@ -127,8 +127,13 @@ def test_rate_limit_404_bloquea_tras_superar_umbral():
     assert bloqueos, "Se debió emitir el log rate_limit_404_bloqueado"
     assert bloqueos[0]["ip"] == ip_maliciosa
 
-    # Otra IP no está bloqueada
-    r_otra_ip = client.get("/no-existe", headers={"X-Forwarded-For": "198.51.100.99"})
+    # Intentar falsear X-Forwarded-For no evade el rate limit porque el backend usa la IP real
+    r_spoofed = client.get("/no-existe", headers={"X-Forwarded-For": "198.51.100.99"})
+    assert r_spoofed.status_code == 429
+
+    # Otra IP real diferente no está bloqueada
+    client_otra_ip = TestClient(app, client=("198.51.100.99", 50000))
+    r_otra_ip = client_otra_ip.get("/no-existe")
     assert r_otra_ip.status_code == 404
 
 
@@ -148,22 +153,21 @@ def test_rate_limit_404_resetea_con_peticion_exitosa():
     def no_existe():
         return JSONResponse(status_code=404, content={"detail": "Not Found"})
 
-    client = TestClient(app)
     ip = "198.51.100.20"
-    headers = {"X-Forwarded-For": ip}
+    client = TestClient(app, client=(ip, 50000))
 
     # 2 peticiones 404
-    client.get("/no-existe", headers=headers)
-    client.get("/no-existe", headers=headers)
+    client.get("/no-existe")
+    client.get("/no-existe")
 
     # 1 petición 200 exitosa -> resetea contador
-    r_ok = client.get("/ok", headers=headers)
+    r_ok = client.get("/ok")
     assert r_ok.status_code == 200
 
     # Puede hacer 2 peticiones 404 más sin ser bloqueado
-    r1 = client.get("/no-existe", headers=headers)
+    r1 = client.get("/no-existe")
     assert r1.status_code == 404
-    r2 = client.get("/no-existe", headers=headers)
+    r2 = client.get("/no-existe")
     assert r2.status_code == 404
 
 
@@ -179,9 +183,8 @@ def test_rate_limit_404_ignora_peticiones_autenticadas():
     def no_existe():
         return JSONResponse(status_code=404, content={"detail": "Not Found"})
 
-    client = TestClient(app)
+    client = TestClient(app, client=("198.51.100.30", 50000))
     headers_auth = {
-        "X-Forwarded-For": "198.51.100.30",
         "Authorization": "Bearer token_valido",
     }
 

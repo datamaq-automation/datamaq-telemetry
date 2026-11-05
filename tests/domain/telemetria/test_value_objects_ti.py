@@ -1,4 +1,6 @@
-"""Tests para Value Objects de diagnóstico de TI."""
+"""tests/domain/telemetria/test_value_objects_ti.py.
+
+Tests para Value Objects de diagnóstico de TI."""
 
 from __future__ import annotations
 

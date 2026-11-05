@@ -9,7 +9,7 @@ from src.domain.produccion.value_objects import LecturaVariableProceso, TipoVari
 class RegistrarLecturaProcesoUseCase:
     """Registra eventos e incrementos de variables de proceso industrial (sensores inductivos)."""
 
-    def __init__(self, repo_proceso: RepositorioVariablesProcesoPort):
+    def __init__(self, repo_proceso: RepositorioVariablesProcesoPort) -> None:
         self._repo_proceso = repo_proceso
 
     def ejecutar(

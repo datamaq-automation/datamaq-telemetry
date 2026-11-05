@@ -1,4 +1,6 @@
-"""Servicios de dominio para cambio de contraseña autenticado."""
+"""src/domain/usuarios/servicios_contrasena.py.
+
+Servicios de dominio para cambio de contraseña autenticado."""
 
 import hashlib
 import hmac

@@ -47,7 +47,12 @@ from src.domain.auth.ports import (
 )
 from src.domain.auth.services import HashContrasenaService, RateLimiterService, TokenRevocationService
 from src.domain.oauth.ports import OAuthRepositoryPort
-from src.domain.telemetria.ports import RepositorioDispositivosPort
+from src.domain.telemetria.parametros_regulatorios import RepositorioParametrosRegulatoriosPort
+from src.domain.telemetria.ports import (
+    RepositorioDispositivosPort,
+    RepositorioFactoryPort,
+    RepositorioTelemetriaPort,
+)
 from src.infrastructure.auth.email_service import SmtpEmailService
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
 from src.infrastructure.fastapi.acceso_oauth import integracion_oauth_vigente
@@ -70,6 +75,10 @@ from src.infrastructure.sqlalchemy.mysql_repositories import (
     MySQLTelemetriaRepository,
     MySQLUsuariosRepository,
 )
+from src.infrastructure.sqlalchemy.repositories.parametros_regulatorios_repository import (
+    RepositorioParametrosRegulatoriosSqlAlchemy,
+)
+from src.infrastructure.sqlalchemy.repository_factory import SQLAlchemyRepositorioFactory
 from src.infrastructure.yaml.repositories.organizaciones_repository import (
     YamlOrganizacionesRepository,
 )
@@ -124,29 +133,31 @@ def get_rate_limiter() -> RateLimiterService:
 
 def get_telemetria_use_case(
     db: Annotated[Session, Depends(get_db_session)],
-    settings: Annotated[Settings, Depends(get_settings_dep)],
+    settings: Annotated[Settings, Depends(get_settings_dep)] | None = None,
 ) -> ConsultarTelemetriaUseCase:
-    repo_disp = repo_dispositivos_resuelto(db)
-    repo_telem = MySQLTelemetriaRepository(db)
-    repo_org = YamlOrganizacionesRepository()
-    repo_planes = MySQLPlanesRepository(db)
     return ConsultarTelemetriaUseCase(
-        repo_telem,
-        repo_disp,
-        repo_org,
-        repo_planes,
+        MySQLTelemetriaRepository(db),
+        repo_dispositivos_resuelto(db),
+        YamlOrganizacionesRepository(),
+        MySQLPlanesRepository(db),
         buffer_en_vivo=global_telemetria_buffer,
         repo_suscripciones=MySQLSuscripcionesRepository(db),
-        billing_habilitado=settings.BILLING_HABILITADO,
+        billing_habilitado=False,
     )
+
+
+def get_repositorio_telemetria(
+    db: Annotated[Session, Depends(get_db_session)],
+) -> RepositorioTelemetriaPort:
+    """Repositorio de telemetría sobre la Session de la request (cacheada por get_db_session)."""
+    return MySQLTelemetriaRepository(db)
 
 
 def get_exportar_telemetria_use_case(
     db: Annotated[Session, Depends(get_db_session)],
 ) -> ExportarTelemetriaUseCase:
     return ExportarTelemetriaUseCase(
-        repo_telemetria=MySQLTelemetriaRepository(db),
-        repo_dispositivos=repo_dispositivos_resuelto(db),
+        repo_telemetria=MySQLTelemetriaRepository(db), repo_dispositivos=repo_dispositivos_resuelto(db)
     )
 
 
@@ -154,8 +165,7 @@ def get_exportar_disponibilidad_use_case(
     db: Annotated[Session, Depends(get_db_session)],
 ) -> ExportarDisponibilidadUseCase:
     return ExportarDisponibilidadUseCase(
-        repo_maquinas=MySQLMaquinasRepository(db),
-        repo_eventos=MySQLEventosDisponibilidadRepository(db),
+        repo_maquinas=MySQLMaquinasRepository(db), repo_eventos=MySQLEventosDisponibilidadRepository(db)
     )
 
 
@@ -163,8 +173,7 @@ def get_exportar_cargas_use_case(
     db: Annotated[Session, Depends(get_db_session)],
 ) -> ExportarCargasUseCase:
     return ExportarCargasUseCase(
-        repo_cargas=MySQLCargasRepository(db),
-        repo_intervalos=MySQLIntervalosActividadRepository(db),
+        repo_cargas=MySQLCargasRepository(db), repo_intervalos=MySQLIntervalosActividadRepository(db)
     )
 
 
@@ -179,16 +188,22 @@ def get_dispositivos_use_case(
     )
 
 
-def get_planes_use_case(
+def get_repositorio_factory(
     db: Annotated[Session, Depends(get_db_session)],
+) -> RepositorioFactoryPort:
+    return SQLAlchemyRepositorioFactory(db)
+
+
+def get_planes_use_case(
+    repo_factory: Annotated[RepositorioFactoryPort, Depends(get_repositorio_factory)],
 ) -> GestionarPlanesUseCase:
-    return GestionarPlanesUseCase(MySQLPlanesRepository(db))
+    return GestionarPlanesUseCase(repo_factory.planes())
 
 
 def get_purga_use_case(
-    db: Annotated[Session, Depends(get_db_session)],
+    repo_factory: Annotated[RepositorioFactoryPort, Depends(get_repositorio_factory)],
 ) -> PurgarTelemetriaExpiradaUseCase:
-    repo_telem = MySQLTelemetriaRepository(db)
+    repo_telem = repo_factory.telemetria()
     logger = get_logger("purga_telemetria")
     return PurgarTelemetriaExpiradaUseCase(repo_telem, logger=logger)
 
@@ -225,9 +240,17 @@ def get_procesar_pregunta_asistente_use_case(
     )
 
 
+def get_parametros_regulatorios_repository(
+    db: Annotated[Session, Depends(get_db_session)],
+) -> RepositorioParametrosRegulatoriosPort:
+    """Tarifas, facturas verificadas y parámetros regulatorios desde la base (datamaq#111)."""
+    return RepositorioParametrosRegulatoriosSqlAlchemy(db)
+
+
 def get_consultar_analitica_planta_use_case(
     db: Annotated[Session, Depends(get_db_session)],
     settings: Annotated[Settings, Depends(get_settings_dep)],
+    repo_parametros: Annotated[RepositorioParametrosRegulatoriosPort, Depends(get_parametros_regulatorios_repository)],
 ) -> Any:
     from src.application.use_cases.consultar_analitica_planta import (
         ConsultarAnaliticaPlantaUseCase,
@@ -238,6 +261,7 @@ def get_consultar_analitica_planta_use_case(
     return ConsultarAnaliticaPlantaUseCase(
         consultar_telemetria=consultar_telemetria,
         repo_organizaciones=YamlOrganizacionesRepository(),
+        repo_parametros=repo_parametros,
     )
 
 
@@ -455,6 +479,10 @@ def get_usuario_actual(
     # Verificación de revocación global persistida en base de datos (ISO 27001 A.5.15)
     if repo_usuarios is not None and sub:
         usuario = repo_usuarios.obtener_por_id(sub)
+        # Una cuenta dada de baja no autentica aunque su token siga vigente (datamaq#127). `esta_activo` solo se
+        # comprobaba al iniciar sesión: la baja no cortaba las sesiones abiertas hasta que vencía el token.
+        if usuario is not None and not usuario.esta_activo:
+            raise HTTPException(status_code=401, detail="credenciales_invalidas")
         if usuario is not None and usuario.sesiones_revocadas_antes_de is not None:
             rev_dt = usuario.sesiones_revocadas_antes_de
             if rev_dt.tzinfo is None:
@@ -471,7 +499,9 @@ def get_usuario_actual(
 
 
 def requiere_rol_auditor_o_superadmin(claims: Annotated[dict[str, Any], Depends(get_usuario_actual)]) -> dict[str, Any]:
-    if claims.get("rol") not in ("superadmin", "auditor"):
+    # El rol auditor se retiró (decisión 2026-10-31, datamaq#122): el registro de auditoría es solo del superadmin.
+    # El nombre se conserva por compatibilidad con la matriz de roles y los tests que lo importan.
+    if claims.get("rol") != "superadmin":
         raise HTTPException(status_code=403, detail="forbidden")
     return claims
 
@@ -492,14 +522,15 @@ def requiere_rol_admin(claims: Annotated[dict[str, Any], Depends(get_usuario_act
 def no_permitido_para_invitados_2fa(claims: Annotated[dict[str, Any], Depends(get_usuario_actual)]) -> dict[str, Any]:
     # TODO(#65): quitar con los roles de compatibilidad.
     # Inline: el generador de la matriz evalúa esta condición sin constantes de módulo.
-    if claims.get("rol") in ("invitado", "invitado_global"):
+    # solo_lectura (decisión 2026-10-29, D3): la cuenta de la copia tampoco activa 2FA.
+    if claims.get("rol") in ("invitado", "invitado_global", "solo_lectura"):
         raise HTTPException(status_code=403, detail="2fa_no_disponible_para_invitado")
     return claims
 
 
 def requiere_rol_escritura(claims: Annotated[dict[str, Any], Depends(get_usuario_actual)]) -> dict[str, Any]:
     # Allowlist: un rol retirado (p. ej. invitado en un token viejo) no escribe.
-    if claims.get("rol") not in ("superadmin", "admin", "operador", "mantenimiento", "ingeniero", "auditor"):
+    if claims.get("rol") not in ("superadmin", "admin", "operador", "mantenimiento", "ingeniero"):
         raise HTTPException(status_code=403, detail="forbidden")
     return claims
 
@@ -510,20 +541,6 @@ def get_monitorear_potencia_use_case(
     from src.application.use_cases.monitorear_potencia_y_alarma import (
         MonitorearPotenciaYAlarmaUseCase,
     )
-    from src.infrastructure.tuya.tuya_publisher import TuyaPublisher
 
-    repo_org = YamlOrganizacionesRepository()
-    buffer = global_telemetria_buffer
-    publisher = TuyaPublisher()
-    return MonitorearPotenciaYAlarmaUseCase(repo_org, buffer, publisher)
-
-
-def get_consultar_maquinas_inferidas_use_case(
-    db: Annotated[Session, Depends(get_db_session)],
-) -> Any:
-    from src.application.use_cases.consultar_maquinas_inferidas import (
-        ConsultarMaquinasInferidaUseCase,
-    )
-
-    repo_cargas = MySQLCargasRepository(db)
-    return ConsultarMaquinasInferidaUseCase(repo_cargas)
+    # Lectura pura: sin publisher, el GET no publica ni instancia TuyaPublisher (Issue #98).
+    return MonitorearPotenciaYAlarmaUseCase(YamlOrganizacionesRepository(), global_telemetria_buffer)

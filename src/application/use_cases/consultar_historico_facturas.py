@@ -7,7 +7,7 @@ from src.domain.telemetria.ports import RepositorioOrganizacionesPort
 
 
 class ConsultarHistoricoFacturasUseCase:
-    def __init__(self, repo_organizaciones: RepositorioOrganizacionesPort):
+    def __init__(self, repo_organizaciones: RepositorioOrganizacionesPort) -> None:
         self._repo_org = repo_organizaciones
 
     def ejecutar(self, planta_id: str) -> list[FacturaDistribuidoraResponseDTO]:

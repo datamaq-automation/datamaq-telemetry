@@ -45,7 +45,7 @@ class Verificar2FAUseCase:
         minutos_validez: int,
         rate_limiter: RateLimiterService | None = None,
         repo_dispositivos: RepositorioDispositivosConfiablesPort | None = None,
-    ):
+    ) -> None:
         self.repo_usuarios = repo_usuarios
         self.token_service = token_service
         self.totp_service = totp_service
@@ -140,7 +140,7 @@ class Setup2FAUseCase:
         self,
         repo_usuarios: RepositorioUsuariosPort,
         totp_service: ServicioTOTPPort,
-    ):
+    ) -> None:
         self.repo_usuarios = repo_usuarios
         self.totp_service = totp_service
 
@@ -168,7 +168,7 @@ class Activar2FAUseCase:
         repo_usuarios: RepositorioUsuariosPort,
         totp_service: ServicioTOTPPort,
         cifrador_service: CifradorSecreto2FAPort,
-    ):
+    ) -> None:
         self.repo_usuarios = repo_usuarios
         self.totp_service = totp_service
         self.cifrador_service = cifrador_service
@@ -199,7 +199,7 @@ class Desactivar2FAUseCase:
         hash_service: HashContrasenaService,
         totp_service: ServicioTOTPPort,
         cifrador_service: CifradorSecreto2FAPort,
-    ):
+    ) -> None:
         self.repo_usuarios = repo_usuarios
         self.hash_service = hash_service
         self.totp_service = totp_service

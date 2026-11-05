@@ -102,6 +102,20 @@ def test_politica_ignora_filas_de_otra_organizacion_e_inexistentes():
     assert [(p.id, puede) for p, puede in resultado] == [("planta-garin", False)]
 
 
+def test_politica_con_filas_y_ninguna_planta_valida_devuelve_lista_vacia():
+    """Issue #85: usuario con filas en user_facility_access pero ninguna planta válida
+    (todas borradas, inexistentes o de otra organización) no debe hacer fail-open
+    a todas las plantas de su organización: debe devolver lista vacía (fail-close).
+    """
+    accesos = [
+        AccesoPlantaUsuario("u-1", "planta-ajena", puede_cambiar=True),
+        AccesoPlantaUsuario("u-1", "planta-borrada", puede_cambiar=True),
+        AccesoPlantaUsuario("u-1", "planta-inexistente", puede_cambiar=False),
+    ]
+    resultado = PoliticaAccesoPlantasService.resolver("operador", "org-a", PLANTAS, accesos)
+    assert resultado == []
+
+
 # --- 2. Caso de uso ---
 
 
@@ -129,6 +143,18 @@ def test_planta_permitida_con_asignaciones_rechaza_la_no_asignada_de_su_org():
         use_case.resolver_planta_permitida("u-1", "operador", "org-a", "planta-garin")
     # Sin id pedido: la activa es la asignada, igual que planta_activa_id de /auth/me.
     assert use_case.resolver_planta_permitida("u-1", "operador", "org-a", None) == "planta-pilar"
+
+
+def test_planta_permitida_con_asignaciones_invalidas_falla_cerrado():
+    """Issue #85: si las asignaciones apuntan a plantas inexistentes o ajenas, no hay
+    planta activa (None) y pedir cualquier planta de la org lanza PlantaNoEncontradaError.
+    """
+    accesos = RepoAccesosEnMemoria([AccesoPlantaUsuario("u-1", "planta-ajena", puede_cambiar=True)])
+    use_case = GestionarAccesoPlantasUseCase(accesos, _repo_org())
+    assert use_case.resolver("u-1", "operador", "org-a") == []
+    assert use_case.resolver_planta_permitida("u-1", "operador", "org-a", None) is None
+    with pytest.raises(PlantaNoEncontradaError):
+        use_case.resolver_planta_permitida("u-1", "operador", "org-a", "planta-garin")
 
 
 @pytest.mark.parametrize("rol", ["superadmin"])
@@ -192,6 +218,21 @@ def test_me_incluye_plantas_y_planta_activa():
     dto = auth.me({"sub": "u-1", "usuario": usuario.usuario, "rol": "operador", "org": "org-a"})
     assert dto.planta_activa_id == "planta-pilar"
     assert [(p.id, p.puede_cambiar) for p in dto.plantas] == [("planta-pilar", False)]
+
+
+def test_me_con_asignaciones_invalidas_devuelve_plantas_vacias_y_sin_planta_activa():
+    """Issue #85: usuario con filas en user_facility_access a plantas inexistentes o ajenas
+    ve plantas=[] y planta_activa_id=None en /auth/me.
+    """
+    usuario = _usuario()
+    accesos = RepoAccesosEnMemoria([AccesoPlantaUsuario("u-1", "planta-ajena", puede_cambiar=False)])
+    acceso_plantas = GestionarAccesoPlantasUseCase(accesos, _repo_org())
+    auth = AutenticarUsuarioUseCase(
+        RepoUsuariosEnMemoria([usuario]), HashContrasenaService(), MagicMock(), 480, acceso_plantas=acceso_plantas
+    )
+    dto = auth.me({"sub": "u-1", "usuario": usuario.usuario, "rol": "operador", "org": "org-a"})
+    assert dto.plantas == []
+    assert dto.planta_activa_id is None
 
 
 def test_me_sin_colaborador_de_plantas_mantiene_contrato_anterior():

@@ -1,4 +1,6 @@
-"""Tests unitarios para servicios de cambio de contraseña."""
+"""tests/unit/test_servicios_cambio_contrasena.py.
+
+Tests unitarios para servicios de cambio de contraseña."""
 
 from src.domain.usuarios.servicios_contrasena import (
     GeneradorCodigoOTP,

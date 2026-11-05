@@ -266,6 +266,10 @@ class PuntoPotenciaNodoUnifilarDTO(BaseModel):
     potencia_aparente_total_va: float | None = None
     factor_desplazamiento_total: float | None = None
     dispositivos_sin_dato: list[str] = Field(default_factory=list)
+    dispositivos_interpolados: list[str] = Field(
+        default_factory=list,
+        description="Medidores cuyo valor de este bucket es una interpolación lineal entre lecturas vecinas (#94). Aditivo.",
+    )
 
 
 class HistoricoNodoUnifilarDTO(BaseModel):

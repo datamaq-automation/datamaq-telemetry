@@ -11,6 +11,7 @@ from src.domain.telemetria.exceptions import (
     DispositivoNoEncontradoError,
     LimiteDispositivosExcedidoError,
 )
+from src.infrastructure.fastapi.auth_dependencies import get_acceso_plantas_use_case
 from src.infrastructure.fastapi.dependencies import (
     get_dispositivos_use_case,
     get_usuario_actual,
@@ -179,6 +180,10 @@ def test_obtener_dispositivo_error_inesperado_500():
 
 def test_registrar_dispositivo_exitoso():
     client, mocks = _cliente(rol="admin")
+    # La planta destino se valida con la política de plantas (datamaq#132): acá la permite.
+    acceso = MagicMock()
+    acceso.resolver_planta_permitida.return_value = "planta-1"
+    client.app.dependency_overrides[get_acceso_plantas_use_case] = lambda: acceso
     mocks["dispositivos"].registrar_dispositivo.return_value = _dispositivo_dto(
         id="dev-nuevo",
         device_uid="00:11:22:33:44:55",
@@ -199,6 +204,7 @@ def test_registrar_dispositivo_exitoso():
     response = client.post("/api/v1/dispositivos", json=payload)
 
     assert response.status_code == 200
+    acceso.resolver_planta_permitida.assert_called_once_with("u1", "admin", "org-1", "planta-1")
     data = response.json()
     assert data["id"] == "dev-nuevo"
     assert data["device_uid"] == "00:11:22:33:44:55"
@@ -282,7 +288,7 @@ def test_registrar_dispositivo_error_inesperado_500():
 
 def test_actualizar_dispositivo_put_exitoso():
     client, mocks = _cliente(rol="admin")
-    mocks["dispositivos"].actualizar_dispositivo.return_value = _dispositivo_dto(
+    mocks["dispositivos"].actualizar_dispositivo_de_organizacion.return_value = _dispositivo_dto(
         id="dev-1", nombre="Nombre Modificado PUT"
     )
 
@@ -296,8 +302,8 @@ def test_actualizar_dispositivo_put_exitoso():
     assert response.status_code == 200
     data = response.json()
     assert data["nombre"] == "Nombre Modificado PUT"
-    mocks["dispositivos"].actualizar_dispositivo.assert_called_once()
-    device_id_llamado, dto_llamado = mocks["dispositivos"].actualizar_dispositivo.call_args[0]
+    mocks["dispositivos"].actualizar_dispositivo_de_organizacion.assert_called_once()
+    device_id_llamado, dto_llamado = mocks["dispositivos"].actualizar_dispositivo_de_organizacion.call_args[0]
     assert device_id_llamado == "dev-1"
     assert dto_llamado.nombre == "Nombre Modificado PUT"
 
@@ -308,12 +314,12 @@ def test_actualizar_dispositivo_put_rol_invitado_403():
     response = client.put("/api/v1/dispositivos/dev-1", json={"nombre": "Nuevo"})
 
     assert response.status_code == 403
-    mocks["dispositivos"].actualizar_dispositivo.assert_not_called()
+    mocks["dispositivos"].actualizar_dispositivo_de_organizacion.assert_not_called()
 
 
 def test_actualizar_dispositivo_put_no_encontrado_404():
     client, mocks = _cliente(rol="admin")
-    mocks["dispositivos"].actualizar_dispositivo.side_effect = DispositivoNoEncontradoError(
+    mocks["dispositivos"].actualizar_dispositivo_de_organizacion.side_effect = DispositivoNoEncontradoError(
         "Dispositivo 'dev-404' no encontrado."
     )
 
@@ -325,7 +331,7 @@ def test_actualizar_dispositivo_put_no_encontrado_404():
 
 def test_actualizar_dispositivo_put_limite_excedido_422():
     client, mocks = _cliente(rol="admin")
-    mocks["dispositivos"].actualizar_dispositivo.side_effect = LimiteDispositivosExcedidoError(
+    mocks["dispositivos"].actualizar_dispositivo_de_organizacion.side_effect = LimiteDispositivosExcedidoError(
         "Cupo máximo alcanzado al cambiar de planta."
     )
 
@@ -337,7 +343,7 @@ def test_actualizar_dispositivo_put_limite_excedido_422():
 
 def test_actualizar_dispositivo_put_error_inesperado_500():
     client, mocks = _cliente(rol="admin")
-    mocks["dispositivos"].actualizar_dispositivo.side_effect = RuntimeError("Falla no controlada")
+    mocks["dispositivos"].actualizar_dispositivo_de_organizacion.side_effect = RuntimeError("Falla no controlada")
 
     response = client.put("/api/v1/dispositivos/dev-1", json={"nombre": "Nuevo"})
 
@@ -346,7 +352,9 @@ def test_actualizar_dispositivo_put_error_inesperado_500():
 
 def test_actualizar_dispositivo_patch_exitoso():
     client, mocks = _cliente(rol="admin")
-    mocks["dispositivos"].actualizar_dispositivo.return_value = _dispositivo_dto(id="dev-1", esta_activo=False)
+    mocks["dispositivos"].actualizar_dispositivo_de_organizacion.return_value = _dispositivo_dto(
+        id="dev-1", esta_activo=False
+    )
 
     payload = {"esta_activo": False}
     response = client.patch("/api/v1/dispositivos/dev-1", json=payload)
@@ -354,8 +362,8 @@ def test_actualizar_dispositivo_patch_exitoso():
     assert response.status_code == 200
     data = response.json()
     assert data["esta_activo"] is False
-    mocks["dispositivos"].actualizar_dispositivo.assert_called_once()
-    device_id_llamado, dto_llamado = mocks["dispositivos"].actualizar_dispositivo.call_args[0]
+    mocks["dispositivos"].actualizar_dispositivo_de_organizacion.assert_called_once()
+    device_id_llamado, dto_llamado = mocks["dispositivos"].actualizar_dispositivo_de_organizacion.call_args[0]
     assert device_id_llamado == "dev-1"
     assert dto_llamado.esta_activo is False
 
@@ -366,12 +374,12 @@ def test_actualizar_dispositivo_patch_rol_invitado_403():
     response = client.patch("/api/v1/dispositivos/dev-1", json={"esta_activo": False})
 
     assert response.status_code == 403
-    mocks["dispositivos"].actualizar_dispositivo.assert_not_called()
+    mocks["dispositivos"].actualizar_dispositivo_de_organizacion.assert_not_called()
 
 
 def test_actualizar_dispositivo_patch_no_encontrado_404():
     client, mocks = _cliente(rol="admin")
-    mocks["dispositivos"].actualizar_dispositivo.side_effect = DispositivoNoEncontradoError(
+    mocks["dispositivos"].actualizar_dispositivo_de_organizacion.side_effect = DispositivoNoEncontradoError(
         "Dispositivo no encontrado."
     )
 
@@ -389,7 +397,7 @@ def test_actualizar_dispositivo_patch_no_encontrado_404():
 @patch("src.infrastructure.fastapi.routes.dispositivos_router.get_mqtt_listener")
 def test_activar_realtime_modo_exitoso_default_segundos(mock_get_listener):
     client, mocks = _cliente()
-    mocks["dispositivos"].obtener_dispositivo.return_value = _dispositivo_dto(
+    mocks["dispositivos"].obtener_dispositivo_de_organizacion.return_value = _dispositivo_dto(
         id="dev-1", device_uid="00:11:22:33:44:55"
     )
 
@@ -406,14 +414,14 @@ def test_activar_realtime_modo_exitoso_default_segundos(mock_get_listener):
     assert data["device_uid"] == "00:11:22:33:44:55"
     assert data["tiempo_real_activado"] is True
     assert data["segundos"] == 120
-    mocks["dispositivos"].obtener_dispositivo.assert_called_once_with("dev-1")
+    mocks["dispositivos"].obtener_dispositivo_de_organizacion.assert_called_once_with("dev-1", "org-1")
     mock_listener.activar_tiempo_real_dispositivo.assert_called_once_with("00:11:22:33:44:55", segundos=120)
 
 
 @patch("src.infrastructure.fastapi.routes.dispositivos_router.get_mqtt_listener")
 def test_activar_realtime_con_segundos_personalizado(mock_get_listener):
     client, mocks = _cliente()
-    mocks["dispositivos"].obtener_dispositivo.return_value = _dispositivo_dto(
+    mocks["dispositivos"].obtener_dispositivo_de_organizacion.return_value = _dispositivo_dto(
         id="dev-1", device_uid="00:11:22:33:44:55"
     )
 
@@ -434,7 +442,7 @@ def test_activar_realtime_con_segundos_personalizado(mock_get_listener):
 @patch("src.infrastructure.fastapi.routes.dispositivos_router.get_mqtt_listener")
 def test_activar_realtime_listener_none_mqtt_offline(mock_get_listener):
     client, mocks = _cliente()
-    mocks["dispositivos"].obtener_dispositivo.return_value = _dispositivo_dto(
+    mocks["dispositivos"].obtener_dispositivo_de_organizacion.return_value = _dispositivo_dto(
         id="dev-1", device_uid="00:11:22:33:44:55"
     )
     mock_get_listener.return_value = None
@@ -453,7 +461,7 @@ def test_activar_realtime_listener_none_mqtt_offline(mock_get_listener):
 @patch("src.infrastructure.fastapi.routes.dispositivos_router.get_mqtt_listener")
 def test_activar_realtime_listener_envio_fallido(mock_get_listener):
     client, mocks = _cliente()
-    mocks["dispositivos"].obtener_dispositivo.return_value = _dispositivo_dto(
+    mocks["dispositivos"].obtener_dispositivo_de_organizacion.return_value = _dispositivo_dto(
         id="dev-1", device_uid="00:11:22:33:44:55"
     )
 
@@ -489,7 +497,9 @@ def test_activar_realtime_segundos_mayor_que_maximo_422():
 
 def test_activar_realtime_dispositivo_no_encontrado_404():
     client, mocks = _cliente()
-    mocks["dispositivos"].obtener_dispositivo.side_effect = DispositivoNoEncontradoError("Dispositivo no encontrado.")
+    mocks["dispositivos"].obtener_dispositivo_de_organizacion.side_effect = DispositivoNoEncontradoError(
+        "Dispositivo no encontrado."
+    )
 
     response = client.post("/api/v1/dispositivos/dev-inexistente/realtime")
 
@@ -499,7 +509,7 @@ def test_activar_realtime_dispositivo_no_encontrado_404():
 
 def test_activar_realtime_error_inesperado_500():
     client, mocks = _cliente()
-    mocks["dispositivos"].obtener_dispositivo.side_effect = RuntimeError("Fallo inesperado")
+    mocks["dispositivos"].obtener_dispositivo_de_organizacion.side_effect = RuntimeError("Fallo inesperado")
 
     response = client.post("/api/v1/dispositivos/dev-1/realtime")
 

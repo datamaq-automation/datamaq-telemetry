@@ -15,7 +15,7 @@ from src.domain.telemetria.value_objects import EstadoDispositivo, MacAddress
 class CalculadorCadenciaProduccionService:
     """Calcula impulsos por minuto (PPM) en ventana deslizante de 60 segundos."""
 
-    def __init__(self, umbral_marcha_ppm: float = 30.0, ventana_segundos: int = 60):
+    def __init__(self, umbral_marcha_ppm: float = 30.0, ventana_segundos: int = 60) -> None:
         self.umbral_marcha_ppm = umbral_marcha_ppm
         self.ventana_segundos = ventana_segundos
         self._historial_impulsos: dict[str, list[datetime]] = {}
@@ -55,7 +55,7 @@ class IngestarAutomateUseCase:
         logger: LoggerPort | None = None,
         permitir_auto_registro: bool = True,
         calculador_cadencia: CalculadorCadenciaProduccionService | None = None,
-    ):
+    ) -> None:
         self.repo_dispositivos = repo_dispositivos
         self.disponibilidad_use_case = disponibilidad_use_case
         self.logger = logger
@@ -82,7 +82,9 @@ class IngestarAutomateUseCase:
                 disp.marcar_online(ahora)
                 return disp
 
-            disp = self.repo_dispositivos.obtener_por_uid(mac_vo)
+            disp = self.repo_dispositivos.obtener_por_uid(
+                mac_vo
+            )  # Automate: un solo medidor por MAC (default del puerto)
             if not disp:
                 if not self.permitir_auto_registro:
                     return None

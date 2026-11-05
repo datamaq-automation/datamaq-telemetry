@@ -2,17 +2,23 @@
 """scripts/gestionar_usuario_organizacion.py — Script CLI para inspeccionar y asociar usuarios a organizaciones y plantas en producción."""
 
 import argparse
+import dataclasses
 import sys
 from pathlib import Path
 
 # Garantizar import de src
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.domain.auth.entities import AccesoPlantaUsuario
+from src.domain.auth.entities import AccesoPlantaUsuario, UsuarioAuth
 from src.infrastructure.sqlalchemy.database import get_session_factory
 from src.infrastructure.sqlalchemy.repositories.accesos_planta_repository import MySQLAccesosPlantaRepository
 from src.infrastructure.sqlalchemy.repositories.usuarios_repository import MySQLUsuariosRepository
 from src.infrastructure.yaml.repositories.organizaciones_repository import YamlOrganizacionesRepository
+
+
+def aplicar_vinculacion(usr: UsuarioAuth, organizacion_id: str, rol: str) -> UsuarioAuth:
+    """Devuelve el usuario con su organización y rol nuevos. UsuarioAuth es un dataclass: no tiene copy_with."""
+    return dataclasses.replace(usr, organizacion_id=organizacion_id, rol=rol)
 
 
 def main():
@@ -76,7 +82,7 @@ def main():
             cambios = True
 
         if cambios:
-            usr_actualizado = usr.copy_with(organizacion_id=nuevo_org_id, rol=nuevo_rol)
+            usr_actualizado = aplicar_vinculacion(usr, nuevo_org_id, nuevo_rol)
             repo_usuarios.guardar(usr_actualizado)
             print(f"✅ Usuario actualizado: organizacion_id={nuevo_org_id}, rol={nuevo_rol}")
 

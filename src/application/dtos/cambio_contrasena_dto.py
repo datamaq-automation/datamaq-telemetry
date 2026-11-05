@@ -1,4 +1,6 @@
-"""DTOs para cambio de contraseña autenticado."""
+"""src/application/dtos/cambio_contrasena_dto.py.
+
+DTOs para cambio de contraseña autenticado."""
 
 from pydantic import BaseModel, Field, model_validator
 

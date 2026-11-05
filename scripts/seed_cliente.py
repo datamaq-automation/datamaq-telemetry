@@ -86,6 +86,18 @@ def _obtener_password(password_env: str | None) -> str:
     sys.exit(1)
 
 
+# Roles que el alta puede asignar al usuario. "superadmin" queda fuera a propósito; "solo_lectura" no es parte del alcance.
+ROLES_ALTA: tuple[str, ...] = ("operador", "admin", "mantenimiento", "ingeniero", "auditor")
+
+
+def construir_fila_espejo_organizacion(org_id: str, es_cooperativa: bool) -> OrganizationModel:
+    """Ancla de FK para users y devices. La identidad (nombre, CUIT, contacto) vive en el YAML, no en la tabla.
+
+    `OrganizationModel` no tiene columna `name`: pasarla hacía fallar el alta con TypeError.
+    """
+    return OrganizationModel(id=org_id, es_cooperativa=bool(es_cooperativa))
+
+
 def alta_cliente(
     org_nombre: str,
     planta_nombre: str,
@@ -97,6 +109,7 @@ def alta_cliente(
     org_cuit: str | None,
     org_email_contacto: str | None,
     dry_run: bool,
+    rol: str = "operador",
 ) -> None:
     session_factory = get_session_factory()
     db = session_factory()
@@ -140,7 +153,7 @@ def alta_cliente(
             if dry_run:
                 print(f"[DRY] Crearía fila espejo en organizations para {org_id[:8]}...")
             else:
-                db.add(OrganizationModel(id=org_id, name=org.nombre))
+                db.add(construir_fila_espejo_organizacion(org_id, org.es_cooperativa))
                 db.commit()
                 print(f"[+] Fila espejo creada en organizations ({org_id[:8]}...)")
         if db.query(FacilityModel).filter(FacilityModel.id == planta_id).first() is None:
@@ -157,13 +170,13 @@ def alta_cliente(
             if usuario_existente:
                 print(f"[=] Usuario ya existe: '{usuario_email}' (rol={usuario_existente.rol})")
             elif dry_run:
-                print(f"[DRY] Crearía usuario: '{usuario_email}' (rol=operador)")
+                print(f"[DRY] Crearía usuario: '{usuario_email}' (rol={rol})")
             else:
                 usuario_creado = use_case_users.crear_usuario(
                     usuario=usuario_email,
                     contrasena=password,
                     esta_activo=True,
-                    rol="operador",
+                    rol=rol,
                     organizacion_id=org_id,
                 )
                 print(
@@ -240,7 +253,7 @@ def _parse_dispositivo(valor: str) -> DispositivoArg:
     return DispositivoArg(mac=mac.strip(), nombre=nombre.strip())
 
 
-def main() -> None:
+def construir_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Alta idempotente de cliente en Datamaq Telemetry",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -251,7 +264,7 @@ def main() -> None:
     parser.add_argument("--org-email", help="Email de contacto de la organización (opcional)")
     parser.add_argument("--planta-nombre", required=True, help="Nombre de la planta")
     parser.add_argument("--planta-direccion", help="Dirección física de la planta (opcional)")
-    parser.add_argument("--usuario", help="Email del usuario operador a crear")
+    parser.add_argument("--usuario", help="Email del usuario a crear")
     parser.add_argument(
         "--password-env",
         help="Nombre de la variable de entorno con la contraseña del usuario",
@@ -271,10 +284,21 @@ def main() -> None:
         help="MAC de un dispositivo ya registrado a asignar a esta planta",
     )
     parser.add_argument(
+        "--rol",
+        choices=ROLES_ALTA,
+        default="operador",
+        help="Rol del usuario que se crea con --usuario (por defecto: operador)",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Simula las operaciones sin escribir en la BD",
     )
+    return parser
+
+
+def main() -> None:
+    parser = construir_parser()
     args = parser.parse_args()
 
     # Contraseña
@@ -305,6 +329,7 @@ def main() -> None:
         org_cuit=args.org_cuit,
         org_email_contacto=args.org_email,
         dry_run=args.dry_run,
+        rol=args.rol,
     )
 
     print("\n[✓] Alta completada.")

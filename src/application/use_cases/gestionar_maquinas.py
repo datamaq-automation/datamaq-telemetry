@@ -37,7 +37,7 @@ class GestionarMaquinasUseCase:
         repo_telemetria: RepositorioTelemetriaPort,
         repo_dispositivos: RepositorioDispositivosPort | None = None,
         repo_organizaciones: RepositorioOrganizacionesPort | None = None,
-    ):
+    ) -> None:
         self.repo_maquinas = repo_maquinas
         self.repo_telemetria = repo_telemetria
         self.repo_dispositivos = repo_dispositivos

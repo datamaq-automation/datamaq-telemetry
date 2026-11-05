@@ -15,8 +15,7 @@ from tests.test_architecture import verify_architecture_layers  # noqa: E402
 
 
 def verify_architecture() -> None:
-    # Los routers con ORM directo quedan fuera de este gate hasta refactorizarlos (ver tests/test_architecture.py).
-    errors = verify_architecture_layers(Path(ROOT_DIR), incluir_controladores=False)
+    errors = verify_architecture_layers(Path(ROOT_DIR))
     if errors:
         print("\n".join(errors))
         print(f"\n[FAIL] Se encontraron {len(errors)} violaciones de arquitectura.")

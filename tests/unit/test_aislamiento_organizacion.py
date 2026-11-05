@@ -120,7 +120,7 @@ def _make_use_case(dispositivos_por_org: dict) -> GestionarDispositivosUseCase:
         def obtener_por_id(self, _):
             return None
 
-        def obtener_por_uid(self, _):
+        def obtener_por_uid(self, _, medidor_id=0):
             return None
 
         def guardar(self, d):

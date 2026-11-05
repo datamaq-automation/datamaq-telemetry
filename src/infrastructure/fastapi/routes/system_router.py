@@ -1,19 +1,28 @@
 """src/infrastructure/fastapi/routes/system_router.py."""
 
+import json
 import os
 from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
-from src.application.dtos.purga_dto import PurgaRequestDTO, PurgaResultadoDTO
-from src.application.use_cases.purgar_telemetria import PurgarTelemetriaExpiradaUseCase
+from src.application.dtos.build_info_dto import BuildInfoResponseDTO
+from src.application.dtos.purga_dto import PurgaResultadoDTO, PurgaSolicitudDTO
+from src.application.use_cases.gestionar_auditoria import RegistrarEventoAuditoriaUseCase
+from src.application.use_cases.purgar_telemetria import (
+    PurgarTelemetriaExpiradaUseCase,
+    construir_auditoria_purga,
+    validar_cotas_purga,
+)
 from src.infrastructure.fastapi.dependencies import (
     get_mqtt_listener,
     get_purga_use_case,
-    requiere_rol_admin,
+    get_registrar_auditoria_use_case,
+    requiere_rol_superadmin,
 )
 from src.infrastructure.fastapi.error_handler import manejar_error_http
+from src.infrastructure.settings.config import Settings, get_settings
 from src.infrastructure.sqlalchemy.database import (
     verificar_conexion_db,
     verificar_estado_migraciones,
@@ -94,6 +103,46 @@ def health_check(response: Response):
     return readiness_check(response)
 
 
+VALOR_BUILD_DESCONOCIDO = "desconocido"
+
+
+def _leer_build_info(ruta_archivo: str) -> dict[str, str]:
+    """Lee build_info.json de forma segura sin excepciones no controladas."""
+    try:
+        if not os.path.isfile(ruta_archivo):
+            return {"commit": VALOR_BUILD_DESCONOCIDO, "rama": VALOR_BUILD_DESCONOCIDO}
+        with open(ruta_archivo, encoding="utf-8") as f:
+            datos = json.load(f)
+        if not isinstance(datos, dict):
+            return {"commit": VALOR_BUILD_DESCONOCIDO, "rama": VALOR_BUILD_DESCONOCIDO}
+
+        commit = datos.get("commit")
+        rama = datos.get("rama")
+
+        if not isinstance(commit, str) or not commit.strip():
+            commit_str = VALOR_BUILD_DESCONOCIDO
+        elif commit.strip() == VALOR_BUILD_DESCONOCIDO:
+            commit_str = VALOR_BUILD_DESCONOCIDO
+        else:
+            commit_str = commit.strip()[:7]
+
+        if not isinstance(rama, str) or not rama.strip():
+            rama_str = VALOR_BUILD_DESCONOCIDO
+        else:
+            rama_str = rama.strip()
+
+        return {"commit": commit_str, "rama": rama_str}
+    except Exception:
+        return {"commit": VALOR_BUILD_DESCONOCIDO, "rama": VALOR_BUILD_DESCONOCIDO}
+
+
+@router.get("/health/build", response_model=BuildInfoResponseDTO)
+def health_build(settings: Annotated[Settings, Depends(get_settings)]) -> BuildInfoResponseDTO:
+    """Retorna información de la versión construida (commit y rama)."""
+    info = _leer_build_info(settings.ruta_build_info)
+    return BuildInfoResponseDTO(commit=info["commit"], rama=info["rama"])
+
+
 @router.get("/api/v1/system/ws-status")
 def websocket_status():
     """Estado y métricas de observabilidad de los WebSockets en vivo."""
@@ -107,12 +156,61 @@ def websocket_status():
 
 @router.post("/api/v1/system/purge", response_model=PurgaResultadoDTO)
 def trigger_purge(
-    claims: Annotated[dict, Depends(requiere_rol_admin)],
+    claims: Annotated[dict, Depends(requiere_rol_superadmin)],
     use_case: Annotated[PurgarTelemetriaExpiradaUseCase, Depends(get_purga_use_case)],
-    dto: PurgaRequestDTO | None = None,
+    audit_use_case: Annotated[RegistrarEventoAuditoriaUseCase | None, Depends(get_registrar_auditoria_use_case)],
+    dto: PurgaSolicitudDTO | None = None,
+    request: Request = None,  # type: ignore[assignment]
 ):
+    """Purga de telemetría (datamaq#119). Solo superadmin. Sin `confirmar` simula: cuenta y no borra.
+    Cada llamada queda en auditoría con quién, parámetros y cantidades."""
+    solicitud = dto or PurgaSolicitudDTO()
+    # Fail-closed: un borrado sin auditoría no se ejecuta (datamaq#119).
+    if solicitud.confirmar and audit_use_case is None:
+        raise HTTPException(status_code=503, detail="auditoria_no_disponible_purga_no_ejecutada")
     try:
-        req = dto or PurgaRequestDTO()
-        return use_case.ejecutar(req)
+        validar_cotas_purga(solicitud, datetime.now(timezone.utc))
+        actor = dict(
+            actor_usuario_id=str(claims.get("sub") or "") or None,
+            actor_email=claims.get("usuario"),
+            actor_ip=request.client.host if request is not None and request.client is not None else None,
+        )
+        parametros = {
+            "dias_retencion_override": solicitud.dias_retencion_override,
+            "dias_retencion_instantaneas": solicitud.dias_retencion_instantaneas,
+            "dias_retencion_energia": solicitud.dias_retencion_energia,
+            "corte_hasta": solicitud.corte_hasta,
+            "batch_size": solicitud.batch_size,
+            "confirmar_retencion_menor": solicitud.confirmar_retencion_menor,
+        }
+        if not solicitud.confirmar:
+            resultado = use_case.simular(solicitud)
+            if audit_use_case is not None:
+                audit_use_case.ejecutar(
+                    construir_auditoria_purga(
+                        **actor,
+                        parametros=parametros,
+                        total_registros=resultado.total_registros_eliminados,
+                        simulado=True,
+                    )
+                )
+            return resultado
+        # Confirmado: la intención queda registrada ANTES del borrado; si falla, no se borra.
+        audit_use_case.ejecutar(  # type: ignore[union-attr]
+            construir_auditoria_purga(
+                **actor, parametros=parametros, total_registros=None, simulado=False, accion="PURGA_SOLICITADA"
+            )
+        )
+        resultado = use_case.ejecutar(solicitud)
+        audit_use_case.ejecutar(  # type: ignore[union-attr]
+            construir_auditoria_purga(
+                **actor,
+                parametros=parametros,
+                total_registros=resultado.total_registros_eliminados,
+                simulado=False,
+                accion="PURGA_EJECUTADA",
+            )
+        )
+        return resultado
     except Exception as e:
         manejar_error_http(e)

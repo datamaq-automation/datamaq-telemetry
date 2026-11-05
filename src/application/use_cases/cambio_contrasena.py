@@ -1,4 +1,6 @@
-"""Casos de uso del cambio de contraseña autenticado con código OTP por email."""
+"""src/application/use_cases/cambio_contrasena.py.
+
+Casos de uso del cambio de contraseña autenticado con código OTP por email."""
 
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -43,7 +45,7 @@ class SolicitarCambioContrasenaUseCase:
         clave_otp: str,
         codigo_service: type[GeneradorCodigoOTP] = GeneradorCodigoOTP,
         ahora: Callable[[], datetime] = _ahora_utc,
-    ):
+    ) -> None:
         self.repo = repo
         self.usuarios = usuarios
         self.hash_service = hash_service
@@ -109,7 +111,7 @@ class ConfirmarCambioContrasenaUseCase:
         clave_otp: str,
         codigo_service: type[GeneradorCodigoOTP] = GeneradorCodigoOTP,
         ahora: Callable[[], datetime] = _ahora_utc,
-    ):
+    ) -> None:
         self.repo = repo
         self.usuarios = usuarios
         self.hash_service = hash_service

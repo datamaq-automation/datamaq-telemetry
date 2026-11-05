@@ -59,7 +59,7 @@ class _RepoDisp:
             )
         }
 
-    def obtener_por_uid(self, uid: MacAddress) -> Dispositivo | None:
+    def obtener_por_uid(self, uid: MacAddress, medidor_id: int = 0) -> Dispositivo | None:
         return next((d for d in self.dispositivos.values() if d.device_uid.valor == uid.valor), None)
 
     def obtener_por_id(self, dispositivo_id: str) -> Dispositivo | None:

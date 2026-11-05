@@ -29,7 +29,7 @@ class CapturadorCampanaIngesta:
         repo_campanas: RepositorioCampanasPort,
         registro: RegistroCampanasActivas,
         logger: LoggerPort | None = None,
-    ):
+    ) -> None:
         self.repo_campanas = repo_campanas
         self.registro = registro
         self.logger = logger

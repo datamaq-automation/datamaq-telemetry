@@ -1,4 +1,5 @@
-import uuid
+"""src/infrastructure/fastapi/routes/oauth_router.py."""
+
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Request
@@ -24,11 +25,12 @@ from src.application.use_cases.oauth.canjear_token_oauth import CanjearTokenOAut
 from src.application.use_cases.oauth.gestionar_integraciones_usuario import (
     GestionarIntegracionesUsuarioUseCase,
 )
+from src.application.use_cases.oauth.registrar_cliente_oauth import RegistrarClienteOAuthUseCase
 from src.application.use_cases.oauth.revocar_token_oauth import RevocarTokenOAuthUseCase
 from src.domain.auth.ports import RepositorioUsuariosPort
 from src.domain.oauth.exceptions import OAuthError
 from src.domain.oauth.ports import OAuthRepositoryPort
-from src.domain.oauth.services import resolver_scopes
+from src.domain.oauth.services import CLIENT_ID_CLAUDE, resolver_scopes
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
 from src.infrastructure.fastapi.auth_dependencies import get_acceso_plantas_use_case
 from src.infrastructure.fastapi.dependencies import (
@@ -36,6 +38,7 @@ from src.infrastructure.fastapi.dependencies import (
     get_oauth_repository,
     get_usuario_actual,
     get_usuarios_repository,
+    requiere_rol_escritura,
 )
 from src.infrastructure.settings.config import Settings, get_settings
 
@@ -98,19 +101,14 @@ def metadata_oauth_protected_resource(
 def registrar_cliente_dinamico_oauth(
     dto: OAuthClientRegistrationRequestDTO,
     repo_oauth: Annotated[OAuthRepositoryPort, Depends(get_oauth_repository)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> Any:
-    """Registro dinámico de clientes OAuth 2.0 según RFC 7591."""
-    es_claude = any(
-        "claude.ai" in uri.lower() or "claude.com" in uri.lower() or "anthropic" in uri.lower()
-        for uri in dto.redirect_uris
-    )
-    client_id = "claude-ai" if es_claude else f"dyn-{uuid.uuid4().hex[:12]}"
-    client_name = dto.client_name or ("Claude (Anthropic)" if es_claude else "Cliente Dinámico")
+    """Registro dinámico de clientes OAuth 2.0 según RFC 7591.
 
-    cliente = repo_oauth.registrar_o_actualizar_cliente(
-        client_id=client_id,
-        client_name=client_name,
-        redirect_uris=dto.redirect_uris,
+    El client_id fijo de Claude solo se asigna si TODAS las redirect_uris están en la lista cerrada (datamaq#131).
+    """
+    cliente = RegistrarClienteOAuthUseCase(repo_oauth, settings.oauth_claude_redirect_uris).ejecutar(
+        dto.client_name, dto.redirect_uris
     )
 
     return OAuthClientRegistrationResponseDTO(
@@ -149,7 +147,7 @@ def obtener_consent_info_oauth(
             content={"error": "invalid_client", "error_description": f"Cliente '{client_id}' no registrado"},
         )
 
-    icon = "anthropic" if ("claude" in client_id.lower() or "anthropic" in cliente.client_name.lower()) else "datamaq"
+    icon = "anthropic" if cliente.client_id == CLIENT_ID_CLAUDE else "datamaq"
     scope_otorgado, _ = resolver_scopes(scope.replace(",", " "))
     lista_scopes = [OAuthScopeDetalleDTO(scope=s, descripcion=DESCRIPCIONES_SCOPES[s]) for s in scope_otorgado.split()]
 
@@ -168,22 +166,22 @@ def obtener_consent_info_oauth(
     )
 
 
-@router.post("/api/v1/oauth/consent", response_model=OAuthConsentProcessResponseDTO)
+@router.post(
+    "/api/v1/oauth/consent",
+    response_model=OAuthConsentProcessResponseDTO,
+    dependencies=[Depends(requiere_rol_escritura)],
+)
 def procesar_consentimiento_oauth(
     dto: OAuthConsentProcessRequestDTO,
     claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
     repo_oauth: Annotated[OAuthRepositoryPort, Depends(get_oauth_repository)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> Any:
     """Procesa la aprobación o cancelación del usuario en la pantalla de consentimiento."""
-    if not dto.aprobado:
-        sep = "&" if "?" in dto.redirect_uri else "?"
-        params = "error=access_denied&error_description=El+usuario+cancelo+la+autorizacion"
-        if dto.state:
-            params += f"&state={dto.state}"
-        return OAuthConsentProcessResponseDTO(redirect_url=f"{dto.redirect_uri}{sep}{params}")
-
     try:
-        uc = AutorizarConsentimientoUseCase(repo_oauth)
+        uc = AutorizarConsentimientoUseCase(repo_oauth, settings.oauth_claude_redirect_uris)
+        if not dto.aprobado:
+            return OAuthConsentProcessResponseDTO(redirect_url=uc.cancelar(dto.client_id, dto.redirect_uri, dto.state))
         res = uc.ejecutar(
             dto=OAuthAuthorizeRequestDTO(
                 client_id=dto.client_id,
@@ -204,15 +202,20 @@ def procesar_consentimiento_oauth(
         )
 
 
-@router.post("/api/v1/oauth/authorize", response_model=OAuthAuthorizeResponseDTO)
+@router.post(
+    "/api/v1/oauth/authorize",
+    response_model=OAuthAuthorizeResponseDTO,
+    dependencies=[Depends(requiere_rol_escritura)],
+)
 def autorizar_consentimiento_oauth(
     dto: OAuthAuthorizeRequestDTO,
     claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
     repo_oauth: Annotated[OAuthRepositoryPort, Depends(get_oauth_repository)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> Any:
     """Registra el consentimiento del usuario autenticado y genera el código de autorización PKCE."""
     try:
-        uc = AutorizarConsentimientoUseCase(repo_oauth)
+        uc = AutorizarConsentimientoUseCase(repo_oauth, settings.oauth_claude_redirect_uris)
         return uc.ejecutar(
             dto=dto,
             usuario_id=str(claims["sub"]),
@@ -294,7 +297,7 @@ def listar_integraciones_usuario(
     return uc.listar(str(claims["sub"]))
 
 
-@router.delete("/api/v1/usuarios/integraciones/{client_id}")
+@router.delete("/api/v1/usuarios/integraciones/{client_id}", dependencies=[Depends(requiere_rol_escritura)])
 def revocar_integracion_usuario(
     client_id: str,
     claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],

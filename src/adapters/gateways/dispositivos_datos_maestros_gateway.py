@@ -36,8 +36,8 @@ class DispositivosConDatosMaestrosGateway(RepositorioDispositivosPort):
     def obtener_por_id(self, dispositivo_id: str) -> Dispositivo | None:
         return self._resolver(self._base.obtener_por_id(dispositivo_id))
 
-    def obtener_por_uid(self, uid: MacAddress) -> Dispositivo | None:
-        return self._resolver(self._base.obtener_por_uid(uid))
+    def obtener_por_uid(self, uid: MacAddress, medidor_id: int = 0) -> Dispositivo | None:
+        return self._resolver(self._base.obtener_por_uid(uid, medidor_id))
 
     def listar(self, planta_id: str | None = None, organizacion_id: str | None = None) -> list[Dispositivo]:
         return [d for d in (self._resolver(x) for x in self._base.listar(planta_id, organizacion_id)) if d]

@@ -5,8 +5,11 @@ from typing import Annotated, Any
 from fastapi import Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from src.application.use_cases.gestionar_acceso_plantas import GestionarAccesoPlantasUseCase
+from src.domain.telemetria.exceptions import PlantaNoEncontradaError
 from src.domain.telemetria.services import debe_recibir_evento
-from src.domain.telemetria.value_objects import MacAddress
+from src.domain.telemetria.servicios.identificador_medidor import parsear_identificador_medidor
+from src.infrastructure.fastapi.auth_dependencies import get_acceso_plantas_use_case
 from src.infrastructure.fastapi.dependencies import get_usuario_actual, repo_dispositivos_resuelto
 from src.infrastructure.settings.config import get_settings
 from src.infrastructure.sqlalchemy.database import get_db_session
@@ -46,11 +49,12 @@ def _organizacion_de_dispositivo(db: Session, dispositivo_id: str | None) -> str
 def verificar_propiedad_dispositivo(
     claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
     db: Annotated[Session, Depends(get_db_session)],
+    acceso_plantas: Annotated[GestionarAccesoPlantasUseCase | None, Depends(get_acceso_plantas_use_case)] = None,
     device_id: str | None = None,
     dispositivo_id: str | None = None,
 ) -> None:
     """Rechaza con 404 si el dispositivo pedido (UUID o MAC) no pertenece a la organización
-    del usuario autenticado. Superadmin y modo sin auth (AUTH_REQUIRED=False) pasan sin chequeo.
+    o planta asignada del usuario autenticado. Superadmin y modo sin auth pasan sin chequeo.
 
     404 en vez de 403 para no confirmar la existencia del dispositivo a un usuario ajeno.
     """
@@ -66,7 +70,8 @@ def verificar_propiedad_dispositivo(
     dispositivo = repo_dispositivos.obtener_por_id(id_dispositivo)
     if dispositivo is None:
         try:
-            dispositivo = repo_dispositivos.obtener_por_uid(MacAddress(id_dispositivo))
+            ident = parsear_identificador_medidor(id_dispositivo)
+            dispositivo = repo_dispositivos.obtener_por_uid(ident.mac, ident.medidor_id)
         except Exception:
             dispositivo = None
     if dispositivo is None:
@@ -76,6 +81,58 @@ def verificar_propiedad_dispositivo(
 
     if not debe_recibir_evento(False, claims.get("org"), organizacion_dispositivo):
         raise HTTPException(status_code=404, detail="dispositivo_no_encontrado")
+
+    if acceso_plantas is not None and dispositivo.planta_id:
+        try:
+            acceso_plantas.resolver_planta_permitida(
+                usuario_id=str(claims.get("sub") or "") or None,
+                rol=str(claims.get("rol") or ""),
+                organizacion_id=claims.get("org"),
+                planta_id=dispositivo.planta_id,
+            )
+        except PlantaNoEncontradaError as err:
+            raise HTTPException(status_code=404, detail="dispositivo_no_encontrado") from err
+
+
+class VerificadorPropiedadDispositivo:
+    """Verificación de propiedad de dispositivo para llamadas imperativas desde un router.
+
+    Aplica el mismo chequeo que el Depends de router de `verificar_propiedad_dispositivo`, incluida la
+    asignación por planta (user_facility_access, #110). Sin acceso_plantas solo aplica el filtro de organización.
+    """
+
+    def __init__(
+        self,
+        claims: dict[str, Any],
+        db: Session,
+        acceso_plantas: GestionarAccesoPlantasUseCase | None = None,
+    ) -> None:
+        self._claims = claims
+        self._db = db
+        self._acceso_plantas = acceso_plantas
+
+    def exigir(self, dispositivo_id: str | None) -> None:
+        verificar_propiedad_dispositivo(
+            claims=self._claims,
+            db=self._db,
+            acceso_plantas=self._acceso_plantas,
+            dispositivo_id=dispositivo_id,
+        )
+
+    def pertenece(self, dispositivo_id: str | None) -> bool:
+        try:
+            self.exigir(dispositivo_id)
+        except HTTPException:
+            return False
+        return True
+
+
+def get_verificador_propiedad_dispositivo(
+    claims: Annotated[dict[str, Any], Depends(get_usuario_actual)],
+    db: Annotated[Session, Depends(get_db_session)],
+    acceso_plantas: Annotated[GestionarAccesoPlantasUseCase, Depends(get_acceso_plantas_use_case)],
+) -> VerificadorPropiedadDispositivo:
+    return VerificadorPropiedadDispositivo(claims, db, acceso_plantas)
 
 
 def verificar_propiedad_maquina(

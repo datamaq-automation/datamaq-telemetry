@@ -6,7 +6,9 @@ from typing import Annotated
 from fastapi import APIRouter, Body, Depends, Query
 
 from src.application.dtos.alerta_dto import AlertaResolverRequestDTO, AlertaResponseDTO
+from src.application.use_cases.gestionar_acceso_plantas import GestionarAccesoPlantasUseCase
 from src.application.use_cases.gestionar_alertas import GestionarAlertasUseCase
+from src.infrastructure.fastapi.auth_dependencies import get_acceso_plantas_use_case
 from src.infrastructure.fastapi.dependencies import (
     get_alertas_use_case,
     get_usuario_actual,
@@ -14,6 +16,7 @@ from src.infrastructure.fastapi.dependencies import (
 )
 from src.infrastructure.fastapi.device_ownership import verificar_propiedad_alerta
 from src.infrastructure.fastapi.error_handler import manejar_error_http
+from src.infrastructure.fastapi.planta_ownership import resolver_planta_permitida
 
 router = APIRouter(
     prefix="/api/v1/alertas",
@@ -26,6 +29,7 @@ router = APIRouter(
 def list_alertas(
     use_case: Annotated[GestionarAlertasUseCase, Depends(get_alertas_use_case)],
     claims: Annotated[dict, Depends(get_usuario_actual)],
+    acceso_plantas: Annotated[GestionarAccesoPlantasUseCase, Depends(get_acceso_plantas_use_case)],
     device_id: str | None = Query(None, description="Filtrar por UUID de dispositivo"),
     solo_abiertas: bool = Query(False, description="Filtrar solo alertas no resueltas"),
     severidad: str | None = Query(None, description="Filtrar por severidad (INFO, WARNING, CRITICAL)"),
@@ -34,6 +38,9 @@ def list_alertas(
     hasta: datetime | None = Query(None, description="Fecha de fin ISO8601"),
     planta_id: str | None = Query(None, description="Filtrar alertas por ID de planta"),
 ):
+    if planta_id is not None:
+        resolver_planta_permitida(claims=claims, acceso_plantas=acceso_plantas, planta_id=planta_id)
+
     # Roles globales ven todas; el resto, solo las de su organización (un device_id ajeno da []).
     organizacion_id = None
     if claims.get("rol") != "superadmin":

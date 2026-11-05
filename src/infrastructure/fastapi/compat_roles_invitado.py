@@ -1,4 +1,6 @@
-"""Compatibilidad temporal de los roles invitado e invitado_global (TODO #65).
+"""src/infrastructure/fastapi/compat_roles_invitado.py.
+
+Compatibilidad temporal de los roles invitado e invitado_global (TODO #65).
 
 Un token emitido con un rol retirado no se trata como un usuario vigente: no pasa por el
 caso de uso de /me y su respuesta no le concede ningún permiso (ni plantas, ni organización,

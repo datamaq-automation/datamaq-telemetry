@@ -9,7 +9,7 @@ from src.domain.telemetria.value_objects import VisibilidadPlan
 
 
 class GestionarPlanesUseCase:
-    def __init__(self, repo_planes: RepositorioPlanesPort):
+    def __init__(self, repo_planes: RepositorioPlanesPort) -> None:
         self.repo_planes = repo_planes
 
     def listar_catalogo(self, solo_publicos: bool = False) -> list[PlanResponseDTO]:

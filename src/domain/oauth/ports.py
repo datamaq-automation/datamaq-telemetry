@@ -72,5 +72,8 @@ class OAuthRepositoryPort(ABC):
 
     @abstractmethod
     def registrar_o_actualizar_cliente(self, client_id: str, client_name: str, redirect_uris: list[str]) -> OAuthClient:
-        """Registra un nuevo cliente o sincroniza sus redirect_uris (RFC 7591 Dynamic Client Registration)."""
+        """Registra un cliente nuevo (RFC 7591). Si el client_id ya existe lo devuelve sin modificarlo.
+
+        El nombre es histórico: ya no actualiza ni amplía las redirect_uris de un cliente existente (datamaq#131).
+        """
         pass

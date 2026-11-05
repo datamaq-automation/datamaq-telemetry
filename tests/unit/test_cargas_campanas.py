@@ -82,7 +82,7 @@ class MockDispositivosRepo(RepositorioDispositivosPort):
     def obtener_por_id(self, dispositivo_id):
         return self.dispositivos.get(dispositivo_id)
 
-    def obtener_por_uid(self, uid):
+    def obtener_por_uid(self, uid, medidor_id=0):
         return next((d for d in self.dispositivos.values() if d.device_uid.valor == uid.valor), None)
 
     def listar(self, planta_id=None):

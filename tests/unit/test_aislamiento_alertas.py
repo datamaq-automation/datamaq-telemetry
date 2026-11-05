@@ -13,6 +13,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from src.application.use_cases.gestionar_acceso_plantas import GestionarAccesoPlantasUseCase
+from src.domain.telemetria.entities import Planta
+from src.infrastructure.fastapi.auth_dependencies import get_acceso_plantas_use_case
 from src.infrastructure.fastapi.dependencies import get_usuario_actual
 from src.infrastructure.fastapi.server import create_app
 from src.infrastructure.sqlalchemy.database import get_db_session
@@ -63,10 +66,24 @@ def cliente(db: Session, monkeypatch) -> Callable[[dict], TestClient]:
         lambda planta_id: {"planta-a": "org-a", "planta-b": "org-b"}.get(planta_id or ""),
     )
 
+    plantas_fixture = [
+        Planta(id="planta-a", organizacion_id="org-a", nombre="Planta A"),
+        Planta(id="planta-b", organizacion_id="org-b", nombre="Planta B"),
+    ]
+    repo_org_mock = MagicMock()
+    repo_org_mock.listar_plantas.side_effect = lambda org=None: [
+        p for p in plantas_fixture if org is None or p.organizacion_id == org
+    ]
+    repo_org_mock.obtener_planta_por_id.side_effect = lambda pid: next(
+        (p for p in plantas_fixture if p.id == pid), None
+    )
+    acceso_mock = GestionarAccesoPlantasUseCase(MagicMock(listar_por_usuario=lambda uid: []), repo_org_mock)
+
     def _crear(claims: dict) -> TestClient:
         app = create_app()
         app.dependency_overrides[get_db_session] = lambda: db
         app.dependency_overrides[get_usuario_actual] = lambda: claims
+        app.dependency_overrides[get_acceso_plantas_use_case] = lambda: acceso_mock
         return TestClient(app)
 
     return _crear

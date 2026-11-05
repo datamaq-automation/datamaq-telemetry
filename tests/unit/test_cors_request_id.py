@@ -1,4 +1,6 @@
-"""X-Request-ID debe poder leerse desde JavaScript en peticiones cross-origin.
+"""tests/unit/test_cors_request_id.py.
+
+X-Request-ID debe poder leerse desde JavaScript en peticiones cross-origin.
 
 El middleware ya emite el header en todas las respuestas; CORS solo lo expone si está
 en expose_headers. El frontend lo necesita para mostrar el id en los errores (app-datamaq#29).
@@ -57,3 +59,17 @@ def test_request_id_se_expone_a_cors(client):
     )
     expuestos = response.headers.get("access-control-expose-headers", "")
     assert "X-Request-ID" in expuestos
+
+
+def test_request_id_se_expone_en_get_con_origin_permitido(client):
+    """Issue datamaq-automation/datamaq#64: una respuesta GET con Origin permitido
+    debe incluir X-Request-ID en Access-Control-Expose-Headers.
+    """
+    response = client.get(
+        "/health/build",
+        headers={"Origin": "http://localhost:5173"},
+    )
+    assert response.status_code == 200
+    expuestos = response.headers.get("access-control-expose-headers", "")
+    assert "X-Request-ID" in expuestos
+    assert response.headers.get("x-request-id")

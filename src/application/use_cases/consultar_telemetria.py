@@ -34,7 +34,8 @@ from src.domain.telemetria.services import (
     PoliticaRetencionService,
     PoliticaSuscripcionService,
 )
-from src.domain.telemetria.value_objects import GranularidadEnergia, MacAddress, ModoFreeTier
+from src.domain.telemetria.servicios.identificador_medidor import parsear_identificador_medidor
+from src.domain.telemetria.value_objects import GranularidadEnergia, ModoFreeTier
 
 # Throttle de persistencia de `IngestarTelemetriaUseCase` (granularidad_segundos por defecto).
 _THROTTLE_PERSISTENCIA_SEGUNDOS = 300
@@ -56,7 +57,7 @@ class ConsultarTelemetriaUseCase:
         buffer_en_vivo: BufferTelemetriaEnVivoPort | None = None,
         repo_suscripciones: RepositorioSuscripcionesPort | None = None,
         billing_habilitado: bool = True,
-    ):
+    ) -> None:
         self.repo_telemetria = repo_telemetria
         self.repo_dispositivos = repo_dispositivos
         self.repo_organizaciones = repo_organizaciones
@@ -97,8 +98,8 @@ class ConsultarTelemetriaUseCase:
             return dev
         # Try checking by MAC
         try:
-            mac_vo = MacAddress(id_o_uid)
-            dev = self.repo_dispositivos.obtener_por_uid(mac_vo)
+            ident = parsear_identificador_medidor(id_o_uid)
+            dev = self.repo_dispositivos.obtener_por_uid(ident.mac, ident.medidor_id)
             if dev:
                 return dev
         except Exception:

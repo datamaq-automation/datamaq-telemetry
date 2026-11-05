@@ -180,7 +180,7 @@ run_stage "4" "Tests Unitarios & Cobertura (>=85%)" "run_unit_tests_with_coverag
 run_stage "5" "Tests de Integración" "$PYTEST tests/integration -n auto -q --no-header --tb=short"
 
 # Stage 6: Reglas de Arquitectura y Tamaño
-run_stage "6" "Clean Architecture & Tamaño de Código" "python3 scripts/verify_architecture.py && python3 scripts/verify_code_size.py"
+run_stage "6" "Clean Architecture & Tamaño de Código" "$PYTEST tests/test_architecture.py -q --no-header && python3 scripts/verify_architecture.py && python3 scripts/verify_code_size.py"
 
 END_ALL=$(_time_now)
 TOTAL_DUR=$(_calc_duration "$START_ALL" "$END_ALL")

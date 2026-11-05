@@ -37,6 +37,7 @@ HEALTH_URL="${DEPLOY_HEALTH_URL:-http://127.0.0.1:8885/health}"
 # Rama a desplegar. Producción usa main (valor por defecto); staging usa develop. Va sin comillas en el comando ssh,
 # así que se valida: solo nombres de rama seguros.
 DEPLOY_BRANCH="${DEPLOY_BRANCH:-main}"
+DEPLOY_COMMIT="${DEPLOY_COMMIT:-}"
 if ! [[ "$DEPLOY_BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]]; then
     echo "Error: DEPLOY_BRANCH inválido: '$DEPLOY_BRANCH'."
     exit 1
@@ -50,6 +51,7 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
     DEPLOY_REMOTE_DIR="$DEPLOY_REMOTE_DIR" \
     DEPLOY_SERVICE_NAME="$DEPLOY_SERVICE_NAME" \
     DEPLOY_BRANCH="$DEPLOY_BRANCH" \
+    DEPLOY_COMMIT="$DEPLOY_COMMIT" \
     DEPLOY_BACKUP_DIR="${DEPLOY_BACKUP_DIR:-}" \
     DEPLOY_DEPS_FILE="${DEPLOY_DEPS_FILE:-}" \
     HEALTH_URL="$HEALTH_URL" \
@@ -63,6 +65,7 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
     set -Eeuo pipefail
     umask 022
     DEPLOY_BRANCH="${DEPLOY_BRANCH:-main}"
+    DEPLOY_COMMIT="${DEPLOY_COMMIT:-}"
 
     echo "==> Cambiando a $DEPLOY_REMOTE_DIR"
     cd "$DEPLOY_REMOTE_DIR" || { echo "Error: no se pudo entrar a $DEPLOY_REMOTE_DIR"; exit 1; }
@@ -96,6 +99,27 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
         return 1
     }
 
+    esperar_health_build() {
+        local i build_commit
+        local health_build_url="${DEPLOY_HEALTH_BUILD_URL:-${HEALTH_URL%/health*}/health/build}"
+        local commit_esperado="${COMMIT_CORTO:-${DEPLOY_COMMIT:0:7}}"
+        if [ -z "$commit_esperado" ]; then
+            local c_hex
+            c_hex=$(git rev-parse HEAD 2>/dev/null || echo "")
+            commit_esperado="${c_hex:0:7}"
+        fi
+        for i in $(seq 1 "$ATTEMPTS"); do
+            sleep "$INTERVAL"
+            build_commit=$(./.venv/bin/python3 -c "import urllib.request, json; print(json.loads(urllib.request.urlopen('$health_build_url', timeout=5).read().decode('utf-8')).get('commit', ''))" 2>/dev/null || echo "")
+            if [ -n "$commit_esperado" ] && [ "$build_commit" = "$commit_esperado" ]; then
+                echo "Health-check /health/build OK: commit '$build_commit' verificado en el intento $i."
+                return 0
+            fi
+            echo "Intento $i/$ATTEMPTS: /health/build devolvió commit '$build_commit' (esperado: '$commit_esperado'). Reintentando..."
+        done
+        return 1
+    }
+
     # Rollback común (#17). Sale SIEMPRE con exit 1: un deploy revertido nunca puede dejar el CD en verde. Si una
     # parte del propio rollback falla, no re-entra ni corta a mitad: hace el resto y avisa "ROLLBACK INCOMPLETO".
     # Si la base ya se detuvo (con_base), después del rollback reinicia el servicio y repite el health-check: un
@@ -119,6 +143,10 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
         fi
         git reset --hard "$PREVIOUS_COMMIT" || completo=false
         ./.venv/bin/pip install -r "$DEPS_ANTERIORES" || completo=false
+        if [ -n "$PREVIOUS_COMMIT" ]; then
+            printf '{"commit": "%s", "rama": "%s"}\n' "${PREVIOUS_COMMIT:0:7}" "${PREVIOUS_BRANCH:-desconocido}" > "$DEPLOY_REMOTE_DIR/build_info.json" 2>/dev/null || true
+            chmod 644 "$DEPLOY_REMOTE_DIR/build_info.json" 2>/dev/null || true
+        fi
         if [ "${2:-}" = con_base ]; then
             echo "==> Reiniciando servicio $DEPLOY_SERVICE_NAME tras el rollback..."
             sudo systemctl restart "$DEPLOY_SERVICE_NAME" || completo=false
@@ -217,6 +245,29 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
         abortar_con_rollback "hay archivos o directorios trackeados sin lectura para el usuario del servicio (listados arriba)."
     fi
 
+    echo "==> Escribiendo metadatos de build (build_info.json)..."
+    COMMIT_HEX="${DEPLOY_COMMIT:-$(git rev-parse HEAD)}"
+    COMMIT_CORTO="${COMMIT_HEX:0:7}"
+    RAMA_BUILD="${DEPLOY_BRANCH:-main}"
+    BUILD_INFO_FILE="$DEPLOY_REMOTE_DIR/build_info.json"
+    BUILD_INFO_TMP=$(mktemp "$DEPLOY_REMOTE_DIR/.build_info.json.tmp.XXXXXX")
+
+    printf '{"commit": "%s", "rama": "%s"}\n' "$COMMIT_CORTO" "$RAMA_BUILD" > "$BUILD_INFO_TMP"
+    chmod 644 "$BUILD_INFO_TMP"
+    if id "datamaq" &>/dev/null; then
+        chown datamaq "$BUILD_INFO_TMP" 2>/dev/null || sudo chown datamaq "$BUILD_INFO_TMP" 2>/dev/null || true
+    fi
+    mv -f "$BUILD_INFO_TMP" "$BUILD_INFO_FILE"
+
+    # Verificar que el archivo quedó escrito y que el JSON es válido
+    if [ ! -s "$BUILD_INFO_FILE" ]; then
+        abortar_con_rollback "el archivo $BUILD_INFO_FILE no se escribió o está vacío."
+    fi
+    if ! python3 -c "import json; d = json.load(open('$BUILD_INFO_FILE')); assert d.get('commit') and d.get('rama')" 2>/dev/null; then
+        abortar_con_rollback "el archivo $BUILD_INFO_FILE contiene JSON inválido o incompleto."
+    fi
+    echo "Build info registrado: $(cat "$BUILD_INFO_FILE")"
+
     echo "==> Backup de la base antes de migrar (D-5)..."
     set +u  # .env es de terceros: no exigirle que no use variables sin definir.
     # shellcheck disable=SC1091
@@ -277,6 +328,12 @@ ssh -A -o ForwardAgent=yes -T -p "$DEPLOY_SSH_PORT" "$DEPLOY_SSH_USER@$DEPLOY_SS
     echo "==> Verificando salud del servicio vía HTTP ($HEALTH_URL)..."
     if ! esperar_health; then
         abortar_con_rollback "el health-check falló después de ${MAX_WAIT}s." con_base
+    fi
+
+    HEALTH_BUILD_URL="${DEPLOY_HEALTH_BUILD_URL:-${HEALTH_URL%/health*}/health/build}"
+    echo "==> Verificando versión construida vía HTTP ($HEALTH_BUILD_URL)..."
+    if ! esperar_health_build; then
+        abortar_con_rollback "la verificación de /health/build falló: el endpoint no devolvió el commit desplegado '$COMMIT_CORTO' tras ${MAX_WAIT}s." con_base
     fi
 
     echo "==> Verificando estado del servicio..."

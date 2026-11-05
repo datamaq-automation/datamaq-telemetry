@@ -4,7 +4,7 @@
 class DominioDisponibilidadException(Exception):
     """Excepción base del dominio de disponibilidad de máquina."""
 
-    def __init__(self, mensaje: str):
+    def __init__(self, mensaje: str) -> None:
         super().__init__(mensaje)
         self.mensaje = mensaje
 

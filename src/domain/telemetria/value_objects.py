@@ -64,7 +64,7 @@ class CoordenadasZona:
     ancho_porcentaje: float
     alto_porcentaje: float
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         for nombre, val in (
             ("x_porcentaje", self.x_porcentaje),
             ("y_porcentaje", self.y_porcentaje),
@@ -80,7 +80,7 @@ class PosicionLayout:
     x_porcentaje: float
     y_porcentaje: float
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         for nombre, val in (
             ("x_porcentaje", self.x_porcentaje),
             ("y_porcentaje", self.y_porcentaje),
@@ -93,11 +93,17 @@ class PosicionLayout:
 class MacAddress:
     valor: str
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         limpio = self.valor.replace(":", "").replace("-", "").upper()
         if not re.fullmatch(r"^[0-9A-F]{12}$", limpio):
             raise MacAddressInvalidaError(f"MAC address inválida: {self.valor}")
         object.__setattr__(self, "valor", limpio)
+
+    @classmethod
+    def desde_texto(cls, texto: str) -> "MacAddress":
+        """Factory method semántico: normaliza mayúsculas, espacios y separadores comunes."""
+        limpio = texto.strip().replace(":", "").replace("-", "").replace(".", "").upper()
+        return cls(valor=limpio)
 
     def formateada(self) -> str:
         return ":".join(self.valor[i : i + 2] for i in range(0, 12, 2))
@@ -107,9 +113,14 @@ class MacAddress:
 class Tension:
     voltios: float
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.voltios < 0.0 or self.voltios > 1000.0:
             raise TensionInvalidaError(f"Tensión fuera de rango (0-1000V): {self.voltios}")
+
+    @classmethod
+    def desde_kv(cls, kilovoltios: float) -> "Tension":
+        """Factory method: construye a partir de kilovoltios (kV -> V)."""
+        return cls(voltios=round(kilovoltios * 1000.0, 3))
 
 
 @dataclass(frozen=True)
@@ -121,34 +132,67 @@ class Corriente:
 class PotenciaActiva:
     vatios: float
 
+    @classmethod
+    def desde_kw(cls, kilovatios: float) -> "PotenciaActiva":
+        """Factory method: construye a partir de kilovatios (kW -> W)."""
+        return cls(vatios=round(kilovatios * 1000.0, 3))
+
 
 @dataclass(frozen=True)
 class PotenciaReactiva:
     var: float
+
+    @classmethod
+    def desde_kvar(cls, kilovar: float) -> "PotenciaReactiva":
+        """Factory method: construye a partir de kilovar (kvar -> var)."""
+        return cls(var=round(kilovar * 1000.0, 3))
 
 
 @dataclass(frozen=True)
 class PotenciaAparente:
     va: float
 
+    @classmethod
+    def desde_kva(cls, kilova: float) -> "PotenciaAparente":
+        """Factory method: construye a partir de kilovoltamperios (kVA -> VA)."""
+        return cls(va=round(kilova * 1000.0, 3))
+
 
 @dataclass(frozen=True)
 class FactorPotencia:
     valor: float
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.valor < -1.0 or self.valor > 1.0:
             raise FactorPotenciaInvalidoError(f"Factor de potencia fuera de [-1.0, 1.0]: {self.valor}")
+
+    @classmethod
+    def desde_potencias(cls, activa_w: float, aparente_va: float) -> "FactorPotencia":
+        """Factory method: deriva el factor de potencia P/S acotado al rango [-1.0, 1.0]."""
+        if aparente_va <= 0.0:
+            return cls(valor=1.0)
+        fp = round(activa_w / aparente_va, 4)
+        return cls(valor=min(1.0, max(-1.0, fp)))
 
 
 @dataclass(frozen=True)
 class EnergiaActiva:
     kwh: float
 
+    @classmethod
+    def desde_mwh(cls, megavatios_hora: float) -> "EnergiaActiva":
+        """Factory method: construye a partir de megavatios-hora (MWh -> kWh)."""
+        return cls(kwh=round(megavatios_hora * 1000.0, 3))
+
 
 @dataclass(frozen=True)
 class EnergiaReactiva:
     kvarh: float
+
+    @classmethod
+    def desde_mvarh(cls, megavar_hora: float) -> "EnergiaReactiva":
+        """Factory method: construye a partir de megavar-hora (Mvarh -> kvarh)."""
+        return cls(kvarh=round(megavar_hora * 1000.0, 3))
 
 
 class EstadoFactorPotencia(str, Enum):

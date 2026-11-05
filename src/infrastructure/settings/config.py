@@ -9,6 +9,8 @@ from typing import Literal
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from src.domain.oauth.services import URIS_REDIRECT_CLAUDE_POR_DEFECTO
+
 
 class Settings(BaseSettings):
     # Database
@@ -40,6 +42,13 @@ class Settings(BaseSettings):
     DISPOSITIVO_OFFLINE_ALERTA_HABILITADA: bool = False
     # Ingesta MQTT. En dev se apaga con false: el listener no se crea ni se conecta.
     MQTT_HABILITADO: bool = True
+    # Réplica de solo lectura (develop/api-dev, decisión 2026-10-29): sin persistir ni publicar comandos.
+    MQTT_COMANDOS_HABILITADOS: bool = True
+    INGESTA_PERSISTENCIA_HABILITADA: bool = True
+    API_SOLO_LECTURA: bool = False
+    API_SOLO_LECTURA_EXCEPCIONES: str = ""
+    # Roles con visibilidad de todas las organizaciones, además de superadmin. Solo api-dev (decisión 2026-10-29).
+    ROLES_ACCESO_GLOBAL_EXTRA: str = ""
     MQTT_CLEAN_SESSION: bool = False
     MQTT_RECONNECT_MIN_DELAY_SEG: int = 1
     MQTT_RECONNECT_MAX_DELAY_SEG: int = 60
@@ -69,6 +78,8 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str | None = None
     CSP_HEADER: str = ""
     DEFAULT_USER_PASSWORD: str = "Contraseña123"
+    # Lista cerrada de redirect_uris del cliente OAuth de Claude (separadas por coma). Vacía: nadie puede conectar Claude.
+    OAUTH_CLAUDE_REDIRECT_URIS: str = ",".join(URIS_REDIRECT_CLAUDE_POR_DEFECTO)
 
     # Rate limiting de login
     LOGIN_MAX_INTENTOS: int = 5
@@ -86,7 +97,7 @@ class Settings(BaseSettings):
     SMTP_TLS: bool = False
     SMTP_FROM: str = "no-reply@datamaq.com.ar"
 
-    FRONTEND_URL: str = "https://www.datamaq.com.ar"
+    FRONTEND_URL: str = "https://app.datamaq.com.ar"
     RECUPERACION_TOKEN_EXPIRA_MINUTOS: int = 15
 
     # Notificaciones de Alertas Críticas por Email
@@ -98,18 +109,15 @@ class Settings(BaseSettings):
     LOG_FORMAT: str | None = None  # "console" (clean CLI) o "json" (VPS production)
     LOG_LEVEL: str | None = None
 
-    # Mercado Pago (suscripciones recurrentes / preapproval)
-    MP_ACCESS_TOKEN: str = ""
-    MP_WEBHOOK_SECRET: str = ""
-    MP_BASE_URL: str = "https://api.mercadopago.com"
-    MP_BACK_URL_EXITO: str = "https://app.datamaq.com.ar/facturacion?estado=ok"
-
-    # Billing habilitado (D1-D5: 2026-09-24)
-    BILLING_HABILITADO: bool = True
-
     # Energy-ML (descubrimiento de cargas)
     ENERGY_ML_URL: str = "http://127.0.0.1:8100"
     ENERGY_ML_TIMEOUT_S: int = 120
+
+    # Build info (#79)
+    BUILD_INFO_PATH: str = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
+        "build_info.json",
+    )
 
     model_config = SettingsConfigDict(
         env_file=os.path.join(
@@ -147,6 +155,8 @@ class Settings(BaseSettings):
         if self.DEBUG and self.APP_ENV == "production":
             object.__setattr__(self, "APP_ENV", "development")
         es_produccion = self.APP_ENV == "production"
+        if es_produccion and self.ROLES_ACCESO_GLOBAL_EXTRA.strip():
+            raise ValueError("ROLES_ACCESO_GLOBAL_EXTRA no puede usarse en producción")
 
         if self.API_EXPOSE_DOCS is None:
             object.__setattr__(self, "API_EXPOSE_DOCS", not es_produccion)
@@ -181,13 +191,6 @@ class Settings(BaseSettings):
         # valor distinto en cada reinicio). Los OTP con clave efímera no sobreviven a un reinicio.
         if self.DEBUG and not self.OTP_HMAC_KEY:
             object.__setattr__(self, "OTP_HMAC_KEY", secrets.token_urlsafe(32))
-        # Mismo criterio que OTP: no aborta (un deploy sin el secreto tiraría producción), pero el webhook
-        # de MP responde 503 hasta cargarlo. Solo importa si billing está encendido.
-        if self.BILLING_HABILITADO and not self.mp_webhook_secret_configurado:
-            logging.getLogger("settings").critical(
-                "MP_WEBHOOK_SECRET ausente con BILLING_HABILITADO activo: el webhook de Mercado Pago "
-                "responde 503 hasta cargar el secreto de la aplicación en MP"
-            )
         return self
 
     @property
@@ -196,14 +199,13 @@ class Settings(BaseSettings):
         return f"mysql+pymysql://{self.DB_USER}{pwd}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}?charset=utf8mb4"
 
     @property
+    def oauth_claude_redirect_uris(self) -> tuple[str, ...]:
+        return tuple(u.strip() for u in self.OAUTH_CLAUDE_REDIRECT_URIS.split(",") if u.strip())
+
+    @property
     def otp_hmac_configurada(self) -> bool:
         """True si la clave OTP es usable: >=16 caracteres y distinta de API_SECRET_KEY."""
         return len(self.OTP_HMAC_KEY) >= 16 and self.OTP_HMAC_KEY != self.API_SECRET_KEY
-
-    @property
-    def mp_webhook_secret_configurado(self) -> bool:
-        """True si el secreto HMAC del webhook de Mercado Pago es usable (no vacío ni solo espacios)."""
-        return bool(self.MP_WEBHOOK_SECRET.strip())
 
     @property
     def auth_cookie_secure(self) -> bool:
@@ -216,6 +218,13 @@ class Settings(BaseSettings):
     @property
     def topic_prefixes(self) -> list[str]:
         return [p.strip() for p in self.MQTT_TOPIC_PREFIX.split(",") if p.strip()]
+
+    @property
+    def ruta_build_info(self) -> str:
+        if os.path.isabs(self.BUILD_INFO_PATH):
+            return self.BUILD_INFO_PATH
+        raiz = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        return os.path.join(raiz, self.BUILD_INFO_PATH)
 
 
 @lru_cache(maxsize=1)

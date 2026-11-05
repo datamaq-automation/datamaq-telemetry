@@ -18,7 +18,7 @@ class _RepoDisp:
         if dispositivo is not None:
             self.dispositivos[dispositivo.id] = dispositivo
 
-    def obtener_por_uid(self, uid: MacAddress) -> Dispositivo | None:
+    def obtener_por_uid(self, uid: MacAddress, medidor_id: int = 0) -> Dispositivo | None:
         for d in self.dispositivos.values():
             if d.device_uid.valor == uid.valor:
                 return d
@@ -118,6 +118,7 @@ def _listener_falso() -> MQTTListener:
     listener = MQTTListener.__new__(MQTTListener)
     listener.settings = MagicMock(MQTT_MAX_PAYLOAD_BYTES=65536)
     listener._dedup = MagicMock()
+    listener._consumo = MagicMock()
     listener._dedup.es_duplicado.return_value = False
     listener._executor = MagicMock()
     return listener

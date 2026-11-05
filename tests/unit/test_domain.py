@@ -1,5 +1,6 @@
 """tests/unit/test_domain.py."""
 
+import math
 from datetime import datetime, timezone
 
 import pytest
@@ -754,13 +755,29 @@ def test_dimensionador_calculo_potencia_compensacion_con_q_reactiva_capacitiva()
     # Q=0 (límite): también retorna 0.0
     assert DimensionadorCompensacionService.calcular_potencia_compensacion(100.0, 0.80, q_reactiva_kvar=0.0) == 0.0
 
-    # Q inductivo (>0): comportamiento sin cambios, sigue calculando Qc
+    # Q inductivo (>0) con Q medido: Qc = Q - P*tan(arccos(0.96)) = 40 - 29.17 = 10.83.
+    # (Antes daba 45.83 usando fp=0.80, combinación inconsistente con Q=40: P=100 y FP=0.80 implican Q=75.)
     qc_inductivo = DimensionadorCompensacionService.calcular_potencia_compensacion(100.0, 0.80, q_reactiva_kvar=40.0)
-    assert qc_inductivo == 45.83
+    assert qc_inductivo == 10.83
 
     # Sin pasar Q: comportamiento sin cambios (compatibilidad hacia atrás)
     qc_sin_q = DimensionadorCompensacionService.calcular_potencia_compensacion(100.0, 0.80)
     assert qc_sin_q == 45.83
+
+
+def test_dimensionador_usa_fp_desplazamiento_no_fp_verdadero_con_distorsion():
+    """Issue #114: el dimensionamiento de un capacitor corrige reactiva (desplazamiento), no distorsión.
+
+    P=100 kW, Q=30 kvar, potencia de distorsión=40 kVA -> S=sqrt(100²+30²+40²)=111.80 kVA.
+    FP verdadero = P/S = 0.894 (incluye distorsión); FP de desplazamiento = P/sqrt(P²+Q²) = 0.958.
+    Qc correcto = Q - P*tan(arccos(0.96)) = 30 - 29.1667 = 0.83 kVAr.
+    Con el FP verdadero se sobredimensionaba a ~20.8 kVAr (banco 25 en vez de 2.5).
+    """
+    fp_verdadero = 100.0 / math.sqrt(100.0**2 + 30.0**2 + 40.0**2)
+    qc = DimensionadorCompensacionService.calcular_potencia_compensacion(
+        100.0, fp_verdadero, fp_objetivo=0.96, q_reactiva_kvar=30.0
+    )
+    assert qc == 0.83
 
 
 def test_dimensionador_sugerencia_banco_comercial():
