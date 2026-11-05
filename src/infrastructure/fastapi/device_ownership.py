@@ -2,11 +2,12 @@
 
 from typing import Annotated, Any
 
+import structlog
 from fastapi import Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from src.application.use_cases.gestionar_acceso_plantas import GestionarAccesoPlantasUseCase
-from src.domain.telemetria.exceptions import PlantaNoEncontradaError
+from src.domain.telemetria.exceptions import MacAddressInvalidaError, PlantaNoEncontradaError
 from src.domain.telemetria.services import debe_recibir_evento
 from src.domain.telemetria.servicios.identificador_medidor import parsear_identificador_medidor
 from src.infrastructure.fastapi.auth_dependencies import get_acceso_plantas_use_case
@@ -21,6 +22,8 @@ from src.infrastructure.sqlalchemy.mysql_repositories import (
 from src.infrastructure.yaml.repositories.organizaciones_repository import (
     YamlOrganizacionesRepository,
 )
+
+logger = structlog.get_logger()
 
 
 def _resolver_organizacion_planta(planta_id: str | None) -> str | None:
@@ -72,7 +75,12 @@ def verificar_propiedad_dispositivo(
         try:
             ident = parsear_identificador_medidor(id_dispositivo)
             dispositivo = repo_dispositivos.obtener_por_uid(ident.mac, ident.medidor_id)
-        except Exception:
+        except (MacAddressInvalidaError, ValueError) as err:
+            logger.debug(
+                "fallo_parseo_identificador_medidor",
+                identificador=id_dispositivo,
+                error=str(err),
+            )
             dispositivo = None
     if dispositivo is None:
         raise HTTPException(status_code=404, detail="dispositivo_no_encontrado")
