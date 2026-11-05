@@ -308,7 +308,7 @@ class ConsultarNodoUnifilarUseCase:
 
         relacion = derivar_relacion_transformacion(nodo, nodos_frontera)
         if relacion.advertencia is not None:
-            _log.warning(
+            _log.info(
                 "unifilar_relacion_transformacion_degradada",
                 planta_id=planta_id,
                 nodo_id=nodo.id,
