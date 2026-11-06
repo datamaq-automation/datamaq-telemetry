@@ -240,6 +240,35 @@ class TestResolverContextoEvento:
         assert org is None
         assert planta is None
 
+    def test_pro15_inst_extrae_la_mac_del_segmento_1(self):
+        # Pro15 publica pro15/{MAC}/{sub}/v1: la MAC es el segmento 1, no el subtópico (segmento 2).
+        ResolvedorDispositivoIngesta._device_cache["8C8C291C3FB4"] = _FakeDispositivoConPlanta(planta_id="planta-p")
+        ResolvedorDispositivoIngesta._organizacion_cache["planta-p"] = "org-p"
+
+        assert _resolver_contexto_evento("pro15/8C8C291C3FB4/inst/v1") == ("org-p", "planta-p")
+
+    def test_pro15_ka_extrae_la_mac_del_segmento_1(self):
+        ResolvedorDispositivoIngesta._device_cache["8C8C291C3FB4"] = _FakeDispositivoConPlanta(planta_id="planta-p")
+        ResolvedorDispositivoIngesta._organizacion_cache["planta-p"] = "org-p"
+
+        assert _resolver_contexto_evento("pro15/8C8C291C3FB4/ka") == ("org-p", "planta-p")
+
+    def test_pro15_con_mac_con_separadores_se_normaliza(self):
+        ResolvedorDispositivoIngesta._device_cache["8C8C291C3FB4"] = _FakeDispositivoConPlanta(planta_id="planta-p")
+        ResolvedorDispositivoIngesta._organizacion_cache["planta-p"] = "org-p"
+
+        assert _resolver_contexto_evento("pro15/8C:8C:29:1C:3F:B4/inst/v1") == ("org-p", "planta-p")
+
+    def test_pro15_sin_mac_valida_falla_cerrado(self):
+        # Un subtópico no debe pasar como MAC: "inst" no es MAC y el resultado es (None, None).
+        assert _resolver_contexto_evento("pro15/inst/v1") == (None, None)
+
+    def test_pow_sigue_usando_el_segmento_2_como_mac(self):
+        ResolvedorDispositivoIngesta._device_cache["001122334455"] = _FakeDispositivoConPlanta(planta_id="planta-1")
+        ResolvedorDispositivoIngesta._organizacion_cache["planta-1"] = "org-1"
+
+        assert _resolver_contexto_evento("pow/datamaq/00:11:22:33:44:55/telemetria") == ("org-1", "planta-1")
+
 
 # ---------------------------------------------------------------------------
 # 4. websocket_broadcast_callback(): aislamiento en vivo por planta

@@ -19,6 +19,7 @@ from src.application.use_cases.ingesta.resolvedor_dispositivo import ResolvedorD
 from src.domain.telemetria.exceptions import EstructuraUnifilarInvalidaError
 from src.domain.telemetria.services import debe_recibir_evento
 from src.domain.telemetria.servicios.alcance_tiempo_real import alcance_de_clientes
+from src.domain.telemetria.servicios.pro15_payload import PREFIJO_PRO15
 from src.domain.telemetria.value_objects import MacAddress
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
 from src.infrastructure.fastapi.acceso_oauth import integracion_oauth_vigente_ws
@@ -157,6 +158,20 @@ def obtener_metricas_ws() -> dict[str, Any]:
     return ws_metrics.to_dict(len(active_websockets))
 
 
+def _segmento_mac_del_topico(partes: list[str]) -> str | None:
+    """Segmento de la MAC según la familia del tópico.
+
+    Pro15 publica `pro15/{MAC}/{sub}/v1` y `pro15/{MAC}/ka`: la MAC es el segmento 1. El resto de
+    familias (`pow/.../{MAC}/{sub}`, `m/wifi/{MAC}/...`) la tienen en el segmento 2. Tomar el 2 para
+    Pro15 devolvía el subtópico (`inst`) como MAC y dejaba el evento solo para superadmin.
+    """
+    if len(partes) < 3:
+        return None
+    if partes[0] == PREFIJO_PRO15:
+        return partes[1]
+    return partes[2]
+
+
 def _resolver_contexto_evento(topico: str) -> tuple[str | None, str | None]:
     """Resuelve (organizacion_id, planta_id) del dispositivo que originó `topico` (formato `.../{mac}/{subtopico}`).
 
@@ -165,10 +180,9 @@ def _resolver_contexto_evento(topico: str) -> tuple[str | None, str | None]:
     Cualquier fallo se trata como (None, None) (fail-closed: solo superadmin la ve).
     """
     try:
-        partes = topico.split("/")
-        if len(partes) < 3:
+        mac_raw = _segmento_mac_del_topico(topico.split("/"))
+        if mac_raw is None:
             return None, None
-        mac_raw = partes[2]
         mac_vo = MacAddress(mac_raw)
         dispositivo = ResolvedorDispositivoIngesta._device_cache.get(mac_vo.valor)
         if dispositivo is None or not dispositivo.planta_id:
