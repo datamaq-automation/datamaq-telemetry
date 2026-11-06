@@ -143,6 +143,7 @@ class FiltroDeduplicacionService:
         self._ventana_segundos = ventana_segundos
         self._vistos: dict[str, datetime] = {}
         self._lock = threading.Lock()
+        self._contador_duplicados: int = 0
 
     def es_duplicado(self, clave: str, ahora: datetime | None = None) -> bool:
         """Retorna ``True`` si ``clave`` ya fue vista dentro de la ventana.
@@ -155,9 +156,16 @@ class FiltroDeduplicacionService:
         with self._lock:
             self._podar(ahora)
             if clave in self._vistos:
+                self._contador_duplicados += 1
                 return True
             self._vistos[clave] = ahora
             return False
+
+    @property
+    def contador_duplicados(self) -> int:
+        """Total acumulado de mensajes identificados como duplicados."""
+        with self._lock:
+            return self._contador_duplicados
 
     def limpiar(self) -> None:
         """Vacía el registro de claves vistas."""

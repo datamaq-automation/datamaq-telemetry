@@ -23,18 +23,26 @@ class _Msg:
 class _LoggerFake:
     def __init__(self):
         self.eventos: list[tuple[str, dict]] = []
+        self.infos: list[tuple[str, dict]] = []
+        self.warnings: list[tuple[str, dict]] = []
+        self.errors: list[tuple[str, dict]] = []
+        self.debugs: list[tuple[str, dict]] = []
 
     def info(self, evento: str, **kwargs: object) -> None:
         self.eventos.append((evento, dict(kwargs)))
+        self.infos.append((evento, dict(kwargs)))
 
     def warning(self, evento: str, **kwargs: object) -> None:
         self.eventos.append((evento, dict(kwargs)))
+        self.warnings.append((evento, dict(kwargs)))
 
     def error(self, evento: str, **kwargs: object) -> None:
         self.eventos.append((evento, dict(kwargs)))
+        self.errors.append((evento, dict(kwargs)))
 
     def debug(self, evento: str, **kwargs: object) -> None:
         self.eventos.append((evento, dict(kwargs)))
+        self.debugs.append((evento, dict(kwargs)))
 
 
 class _FakeClient:
@@ -502,7 +510,87 @@ def test_on_message_duplicado_descartado(monkeypatch):
     listener._on_message(None, None, msg)
 
     assert len(listener._executor.tareas) == 1
-    assert any(e[0] == "mqtt_mensaje_duplicado" for e in logger_fake.eventos)
+    # Issue #145: descarte registrado a nivel info, nunca warning
+    assert any(e[0] == "mqtt_mensaje_duplicado" for e in logger_fake.infos)
+    assert not any(e[0] == "mqtt_mensaje_duplicado" for e in logger_fake.warnings)
+    # Contador de duplicados accesible
+    assert listener.contador_duplicados == 1
+    assert listener.obtener_contador_duplicados("m/wifi/AABBCCDDEEFF/inst") == 1
+    assert listener.obtener_contador_duplicados("m/wifi/OTRO/inst") == 0
+    assert listener.duplicados_por_topico() == {"m/wifi/AABBCCDDEEFF/inst": 1}
+
+
+def test_metricas_duplicados_acumuladas_por_topico(monkeypatch):
+    settings = Settings(_env_file=None, DEBUG=True, MQTT_MAX_PAYLOAD_BYTES=10000)
+    logger_fake = _LoggerFake()
+    listener = _listener(monkeypatch, settings, logger_fake)
+
+    msg_a = _Msg("m/wifi/AAA/inst", b'{"v": 1}')
+    msg_b = _Msg("m/wifi/BBB/inst", b'{"v": 2}')
+
+    # Primer envío de cada uno (no duplicado)
+    listener._on_message(None, None, msg_a)
+    listener._on_message(None, None, msg_b)
+    assert listener.contador_duplicados == 0
+
+    # 3 duplicados para A, 2 duplicados para B
+    for _ in range(3):
+        listener._on_message(None, None, msg_a)
+    for _ in range(2):
+        listener._on_message(None, None, msg_b)
+
+    assert listener.contador_duplicados == 5
+    assert listener.obtener_contador_duplicados("m/wifi/AAA/inst") == 3
+    assert listener.obtener_contador_duplicados("m/wifi/BBB/inst") == 2
+    assert listener.duplicados_por_topico() == {
+        "m/wifi/AAA/inst": 3,
+        "m/wifi/BBB/inst": 2,
+    }
+    assert not any(e[0] == "mqtt_mensaje_duplicado" for e in logger_fake.warnings)
+
+
+def test_contador_duplicados_thread_safe_concurrente(monkeypatch):
+    settings = Settings(_env_file=None, DEBUG=True, MQTT_MAX_PAYLOAD_BYTES=10000)
+    logger_fake = _LoggerFake()
+    listener = _listener(monkeypatch, settings, logger_fake)
+
+    msg = _Msg("m/wifi/CONCURRENTE/inst", b'{"x": 42}')
+    # Registro inicial
+    listener._on_message(None, None, msg)
+
+    def enviar_duplicados():
+        for _ in range(50):
+            listener._on_message(None, None, msg)
+
+    hilos = [threading.Thread(target=enviar_duplicados) for _ in range(4)]
+    for h in hilos:
+        h.start()
+    for h in hilos:
+        h.join()
+
+    # 4 hilos * 50 duplicados = 200 duplicados
+    assert listener.contador_duplicados == 200
+    assert listener.obtener_contador_duplicados("m/wifi/CONCURRENTE/inst") == 200
+
+
+def test_filtro_deduplicacion_contador_duplicados():
+    filtro = FiltroDeduplicacionService(ventana_segundos=120)
+    assert filtro.contador_duplicados == 0
+
+    assert filtro.es_duplicado("clave-1") is False
+    assert filtro.contador_duplicados == 0
+
+    assert filtro.es_duplicado("clave-1") is True
+    assert filtro.contador_duplicados == 1
+
+    assert filtro.es_duplicado("clave-1") is True
+    assert filtro.contador_duplicados == 2
+
+    assert filtro.es_duplicado("clave-2") is False
+    assert filtro.contador_duplicados == 2
+
+    assert filtro.es_duplicado("clave-2") is True
+    assert filtro.contador_duplicados == 3
 
 
 def test_on_message_oversize_descartado(monkeypatch):

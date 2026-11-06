@@ -18,6 +18,7 @@ from src.domain.telemetria.ports import NotificadoresFactoryPort, PublicadorEven
 from src.domain.telemetria.services import FiltroDeduplicacionService
 from src.domain.telemetria.servicios.consumo_mqtt import AcumuladorConsumoHorario, uid_desde_topico
 from src.infrastructure.paho_mqtt.ingesta_sin_escritura import sin_escritura_si
+from src.infrastructure.paho_mqtt.metricas_deduplicacion import ContadorDuplicadosMqtt
 from src.infrastructure.paho_mqtt.mqtt_buffer import BufferMensajesMQTT, MensajeBuffer
 from src.infrastructure.paho_mqtt.volcador_consumo_mqtt import VolcadorConsumoMqtt
 from src.infrastructure.settings.config import get_settings
@@ -121,8 +122,7 @@ class MQTTListener:
             self.client.username_pw_set(self.settings.MQTT_USERNAME, self.settings.MQTT_PASSWORD)
 
         self.client.reconnect_delay_set(
-            min_delay=self.settings.MQTT_RECONNECT_MIN_DELAY_SEG,
-            max_delay=self.settings.MQTT_RECONNECT_MAX_DELAY_SEG,
+            self.settings.MQTT_RECONNECT_MIN_DELAY_SEG, self.settings.MQTT_RECONNECT_MAX_DELAY_SEG
         )
 
         if self.settings.MQTT_TLS_ENABLED:
@@ -143,6 +143,7 @@ class MQTTListener:
 
         self._executor = ThreadPoolExecutor(max_workers=self.settings.MQTT_WORKER_MAX_THREADS)
         self._dedup = FiltroDeduplicacionService(self.settings.MQTT_DEDUP_VENTANA_SEGUNDOS)
+        self._contador_duplicados = ContadorDuplicadosMqtt()
         self._esta_conectado = False
         self.is_running = False
 
@@ -231,7 +232,8 @@ class MQTTListener:
 
         clave_dedup = f"{topic}:{hashlib.sha256(payload_bytes).hexdigest()}"
         if self._dedup.es_duplicado(clave_dedup):
-            logger.warning("mqtt_mensaje_duplicado", topico=topic)
+            self.metricas_duplicados.registrar(topic)
+            logger.info("mqtt_mensaje_duplicado", topico=topic)
             return
 
         self._executor.submit(self._procesar_mensaje, topic, payload)
@@ -258,6 +260,26 @@ class MQTTListener:
                 on_descarte=self._on_buffer_descarte,
             )
         return self._buffer
+
+    @property
+    def metricas_duplicados(self) -> ContadorDuplicadosMqtt:
+        """Instancia del contador thread-safe de duplicados."""
+        if not hasattr(self, "_contador_duplicados"):
+            self._contador_duplicados = ContadorDuplicadosMqtt()
+        return self._contador_duplicados
+
+    @property
+    def contador_duplicados(self) -> int:
+        """Total acumulado de mensajes MQTT duplicados descartados."""
+        return self.metricas_duplicados.total
+
+    def obtener_contador_duplicados(self, topico: str | None = None) -> int:
+        """Retorna el conteo acumulado de duplicados descartados total o por tópico."""
+        return self.metricas_duplicados.obtener(topico)
+
+    def duplicados_por_topico(self) -> dict[str, int]:
+        """Copia del mapa de duplicados descartados agrupados por tópico."""
+        return self.metricas_duplicados.por_topico()
 
     def _ejecutar_ingesta(self, topic: str, payload: dict | list) -> None:
         """Abre sesión de BD y ejecuta la ingesta correspondiente."""
@@ -344,14 +366,8 @@ class MQTTListener:
     def activar_tiempo_real_dispositivo(self, device_uid: str, segundos: int = 120) -> bool:
         """Envía el comando nativo realtime_sync_mode al medidor físico por MQTT."""
         uid_limpio = device_uid.replace(":", "").replace("-", "").upper()
-        topico = f"m/wifi/{uid_limpio}/conf/com"
-        correlator = int(time.time())
-        comando = {
-            "correlatorid": correlator,
-            "set": "realtime_sync_mode",
-            "payload": {"time_s": segundos},
-        }
-        return self.publicar_comando(topico, comando)
+        comando = {"correlatorid": int(time.time()), "set": "realtime_sync_mode", "payload": {"time_s": segundos}}
+        return self.publicar_comando(f"m/wifi/{uid_limpio}/conf/com", comando)
 
     def start(self):
         logger.info("iniciando_mqtt_listener")
