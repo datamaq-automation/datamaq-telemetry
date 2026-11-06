@@ -85,11 +85,12 @@ def test_un_operador_no_registra_un_medidor_en_la_planta_de_otra_organizacion(cl
     assert _en_planta(db, "planta-b") == 0
 
 
-def test_un_operador_registra_un_medidor_en_una_planta_de_su_organizacion(cliente, db):
+def test_operador_sin_plantas_asignadas_no_registra_medidor_en_su_organizacion(cliente, db):
+    # Decisión 2026-11-06 (fail-closed): un operador sin filas no opera ninguna planta, ni la de su organización.
     r = _alta(cliente(OPERADOR_A), "AABBCCDDEE02", "planta-a1")
 
-    assert r.status_code == 200
-    assert _en_planta(db, "planta-a1") == 1
+    assert r.status_code == 404
+    assert _en_planta(db, "planta-a1") == 0
 
 
 def test_un_usuario_restringido_a_una_planta_no_registra_en_otra_de_su_organizacion(cliente, db):

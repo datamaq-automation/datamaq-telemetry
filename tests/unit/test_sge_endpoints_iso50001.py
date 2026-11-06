@@ -115,7 +115,9 @@ def test_endpoint_ahorros_cusum(client):
 
 
 def test_endpoint_lineas_base_gitops(client):
-    token = _crear_token(rol="operador")
+    # Admin sin filas en user_facility_access: conserva el acceso a su organización (los operadores sin plantas
+    # no leen SGE; ver test_operador_sin_plantas_no_lee_endpoints_sge).
+    token = _crear_token(rol="admin")
     resp = client.get(
         f"/api/v1/sge/plantas/{PLANTA_DURAX_ID}/linea-base",
         headers={"Authorization": f"Bearer {token}"},
@@ -135,7 +137,7 @@ def test_endpoint_lineas_base_gitops(client):
 
 
 def test_endpoint_facturas_distribuidora_gitops(client):
-    token = _crear_token(rol="operador", organizacion_id=ORG_UPP_ID)
+    token = _crear_token(rol="admin", organizacion_id=ORG_UPP_ID)
     resp = client.get(
         f"/api/v1/sge/plantas/{PLANTA_UPP_ID}/facturas-distribuidora",
         headers={"Authorization": f"Bearer {token}"},
@@ -206,6 +208,16 @@ def test_endpoint_facturas_distribuidora_planta_inexistente_404(client):
     token = _crear_token(rol="operador")
     resp = client.get(
         "/api/v1/sge/plantas/planta-que-no-existe/facturas-distribuidora",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 404
+
+
+def test_operador_sin_plantas_no_lee_endpoints_sge(client):
+    # Decisión 2026-11-06 (fail-closed): un operador sin filas no ve las plantas, ni sus datos SGE.
+    token = _crear_token(rol="operador")
+    resp = client.get(
+        f"/api/v1/sge/plantas/{PLANTA_DURAX_ID}/linea-base",
         headers={"Authorization": f"Bearer {token}"},
     )
     assert resp.status_code == 404

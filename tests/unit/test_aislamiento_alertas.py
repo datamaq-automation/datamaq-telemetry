@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from src.application.use_cases.gestionar_acceso_plantas import GestionarAccesoPlantasUseCase
+from src.domain.auth.entities import AccesoPlantaUsuario
 from src.domain.telemetria.entities import Planta
 from src.infrastructure.fastapi.auth_dependencies import get_acceso_plantas_use_case
 from src.infrastructure.fastapi.dependencies import get_usuario_actual
@@ -77,9 +78,10 @@ def cliente(db: Session, monkeypatch) -> Callable[[dict], TestClient]:
     repo_org_mock.obtener_planta_por_id.side_effect = lambda pid: next(
         (p for p in plantas_fixture if p.id == pid), None
     )
-    acceso_mock = GestionarAccesoPlantasUseCase(MagicMock(listar_por_usuario=lambda uid: []), repo_org_mock)
 
-    def _crear(claims: dict) -> TestClient:
+    def _crear(claims: dict, accesos: list[AccesoPlantaUsuario] | None = None) -> TestClient:
+        repo_accesos = MagicMock(listar_por_usuario=lambda uid: list(accesos or []))
+        acceso_mock = GestionarAccesoPlantasUseCase(repo_accesos, repo_org_mock)
         app = create_app()
         app.dependency_overrides[get_db_session] = lambda: db
         app.dependency_overrides[get_usuario_actual] = lambda: claims
@@ -128,12 +130,22 @@ def test_no_puede_resolver_alerta_de_otra_organizacion(cliente, db: Session, met
     assert db.get(DeviceAlertModel, ALERTA_B).is_resolved is False
 
 
-def test_resuelve_su_propia_alerta(cliente, db: Session):
-    response = cliente(USUARIO_A).post(f"/api/v1/alertas/{ALERTA_A}/resolver", json={"observaciones": "ok"})
+def test_operador_con_planta_asignada_resuelve_alerta_de_su_planta(cliente, db: Session):
+    asignacion = [AccesoPlantaUsuario("u-a", "planta-a", puede_cambiar=False)]
+    response = cliente(USUARIO_A, asignacion).post(f"/api/v1/alertas/{ALERTA_A}/resolver", json={"observaciones": "ok"})
 
     assert response.status_code == 200
     db.expire_all()
     assert db.get(DeviceAlertModel, ALERTA_A).is_resolved is True
+
+
+def test_operador_sin_plantas_asignadas_no_resuelve_alertas_de_su_organizacion(cliente, db: Session):
+    # Decisión 2026-11-06 (fail-closed): un operador sin filas no opera ninguna planta, ni siquiera la de su org.
+    response = cliente(USUARIO_A).post(f"/api/v1/alertas/{ALERTA_A}/resolver", json={"observaciones": "ok"})
+
+    assert response.status_code == 404
+    db.expire_all()
+    assert db.get(DeviceAlertModel, ALERTA_A).is_resolved is False
 
 
 def test_alerta_inexistente_responde_igual_que_la_ajena(cliente):

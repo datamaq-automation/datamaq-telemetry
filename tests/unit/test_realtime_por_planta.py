@@ -106,11 +106,12 @@ def test_restringido_a_una_planta_si_puede_pedir_rafaga_en_su_planta(cliente):
     listener.activar_tiempo_real_dispositivo.assert_called_once_with(UID["dev-a1"], segundos=300)
 
 
-def test_usuario_sin_restriccion_de_planta_pide_rafaga_en_cualquier_planta_de_su_organizacion(cliente):
+def test_operador_sin_plantas_asignadas_no_pide_rafaga_en_su_organizacion(cliente):
+    # Decisión 2026-11-06 (fail-closed): sin filas, el operador no pide ráfaga en ninguna planta.
     client, listener = cliente(OPERADOR_A, [])
 
-    assert _pedir_rafaga(client, listener, "dev-a2").status_code == 200
-    listener.activar_tiempo_real_dispositivo.assert_called_once_with(UID["dev-a2"], segundos=600)
+    assert _pedir_rafaga(client, listener, "dev-a2").status_code == 404
+    listener.activar_tiempo_real_dispositivo.assert_not_called()
 
 
 def test_superadmin_pide_rafaga_en_cualquier_planta(cliente):

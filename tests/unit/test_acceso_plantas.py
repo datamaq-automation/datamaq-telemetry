@@ -74,8 +74,14 @@ def test_politica_superadmin_ve_todas_las_plantas_y_puede_cambiar():
     assert all(puede for _, puede in resultado)
 
 
-def test_politica_sin_filas_devuelve_toda_la_organizacion_con_cambio():
-    resultado = PoliticaAccesoPlantasService.resolver("operador", "org-a", PLANTAS, [])
+def test_politica_operador_sin_plantas_asignadas_no_ve_ninguna_planta():
+    # Decisión 2026-11-06 (operador-sin-plantas-sin-acceso): un operador sin filas no ve ni opera ninguna planta.
+    assert PoliticaAccesoPlantasService.resolver("operador", "org-a", PLANTAS, []) == []
+
+
+def test_politica_admin_sin_filas_sigue_viendo_toda_la_organizacion_con_cambio():
+    # Regresión: el cambio es solo para operador; otros roles conservan el acceso a su organización.
+    resultado = PoliticaAccesoPlantasService.resolver("admin", "org-a", PLANTAS, [])
     assert [(p.id, puede) for p, puede in resultado] == [("planta-garin", True), ("planta-pilar", True)]
 
 
@@ -129,11 +135,20 @@ def test_use_case_resolver_mapea_a_dto_y_planta_activa_es_la_primera():
 
 
 def test_planta_permitida_propia_se_devuelve_y_la_ajena_o_inexistente_no():
-    use_case = GestionarAccesoPlantasUseCase(RepoAccesosEnMemoria(), _repo_org())
+    accesos = RepoAccesosEnMemoria([AccesoPlantaUsuario("u-1", "planta-pilar", puede_cambiar=False)])
+    use_case = GestionarAccesoPlantasUseCase(accesos, _repo_org())
     assert use_case.resolver_planta_permitida("u-1", "operador", "org-a", "planta-pilar") == "planta-pilar"
     for planta_id in ("planta-ajena", "planta-inexistente"):
         with pytest.raises(PlantaNoEncontradaError):
             use_case.resolver_planta_permitida("u-1", "operador", "org-a", planta_id)
+
+
+def test_operador_sin_plantas_asignadas_no_puede_pedir_ninguna_planta_ni_tiene_activa():
+    # Decisión 2026-11-06: sin filas, ni la planta propia de la org se permite; la activa es None.
+    use_case = GestionarAccesoPlantasUseCase(RepoAccesosEnMemoria(), _repo_org())
+    with pytest.raises(PlantaNoEncontradaError):
+        use_case.resolver_planta_permitida("u-1", "operador", "org-a", "planta-pilar")
+    assert use_case.resolver_planta_permitida("u-1", "operador", "org-a", None) is None
 
 
 def test_planta_permitida_con_asignaciones_rechaza_la_no_asignada_de_su_org():
@@ -182,11 +197,13 @@ def test_use_case_asignar_reemplaza_el_conjunto_y_deduplica():
     assert [a.planta_id for a in accesos.listar_por_usuario("u-1")] == ["planta-pilar"]
 
 
-def test_use_case_asignar_lista_vacia_restaura_acceso_por_defecto():
+def test_use_case_asignar_lista_vacia_deja_al_operador_sin_plantas():
+    # Decisión 2026-11-06: quitar todas las filas a un operador lo deja sin ninguna planta (no restaura acceso
+    # a la organización, que queda solo para roles globales).
     accesos = RepoAccesosEnMemoria([AccesoPlantaUsuario("u-1", "planta-pilar", puede_cambiar=False)])
     use_case = GestionarAccesoPlantasUseCase(accesos, _repo_org(), RepoUsuariosEnMemoria([_usuario()]))
     resultado = use_case.asignar("u-1", AsignarPlantasRequestDTO())
-    assert [p.id for p in resultado] == ["planta-garin", "planta-pilar"]
+    assert resultado == []
     assert accesos.listar_por_usuario("u-1") == []
 
 

@@ -125,8 +125,9 @@ def test_un_usuario_restringido_no_mueve_su_medidor_a_una_planta_que_no_puede_ve
     assert _estado(db, "dev-a1") == (True, "planta-a1")
 
 
-def test_un_usuario_sin_restriccion_edita_cualquier_planta_de_su_organizacion(cliente):
-    assert _editar(cliente(OPERADOR_A), "patch", "dev-a2", nombre="ok").status_code == 200
+def test_operador_sin_plantas_asignadas_no_edita_ningun_medidor_de_su_organizacion(cliente):
+    # Decisión 2026-11-06 (fail-closed): un operador sin filas en user_facility_access no opera ninguna planta.
+    assert _editar(cliente(OPERADOR_A), "patch", "dev-a2", nombre="ok").status_code == 404
 
 
 def test_un_usuario_de_otra_organizacion_recibe_404(cliente, db):

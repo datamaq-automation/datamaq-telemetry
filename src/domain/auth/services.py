@@ -90,8 +90,8 @@ class PoliticaAccesoPlantasService:
        acotadas a su organización (una fila que apunte a otra org se ignora), con
        el `puede_cambiar` de cada fila. Si ninguna fila coincide con una planta válida,
        se devuelve lista vacía (fail-close, Issue #85).
-    3. Usuario sin filas: comportamiento histórico, todas las plantas de su
-       organización con permiso de cambio.
+    3. Usuario sin filas: operador → ninguna planta (decisión 2026-11-06). Otro rol → todas las plantas
+       de su organización con permiso de cambio (comportamiento histórico).
 
     La planta activa es la primera de la lista resultante (orden de asignación
     para el caso 2, orden del YAML para los otros).
@@ -109,6 +109,10 @@ class PoliticaAccesoPlantasService:
             return [(p, True) for p in plantas]
         propias = [p for p in plantas if organizacion_id is not None and p.organizacion_id == organizacion_id]
         if not accesos:
+            # Decisión 2026-11-06 (operador-sin-plantas-sin-acceso): un operador sin filas no ve ninguna planta.
+            # Los demás roles conservan el acceso a todas las plantas de su organización.
+            if rol == "operador":
+                return []
             return [(p, True) for p in propias]
         por_id = {p.id: p for p in propias}
         resultado: list[tuple[Planta, bool]] = []

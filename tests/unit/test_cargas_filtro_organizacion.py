@@ -93,13 +93,24 @@ def _cliente(rol: str, org: str | None, use_case: _UseCaseFalso) -> TestClient:
     return TestClient(app)
 
 
-def test_usuario_de_la_organizacion_a_solo_lista_sus_cargas(dos_organizaciones):
-    client = _cliente("operador", "org-a", dos_organizaciones)
+def test_admin_de_la_organizacion_a_solo_lista_sus_cargas(dos_organizaciones):
+    # Admin sin filas en user_facility_access: ve su organización, no la ajena.
+    client = _cliente("admin", "org-a", dos_organizaciones)
 
     resp = client.get("/api/v1/cargas")
 
     assert resp.status_code == 200
     assert [c["id"] for c in resp.json()] == ["carga-a"]
+
+
+def test_operador_sin_plantas_asignadas_no_lista_cargas(dos_organizaciones):
+    # Decisión 2026-11-06 (fail-closed): un operador sin filas no ve cargas de ninguna planta.
+    client = _cliente("operador", "org-a", dos_organizaciones)
+
+    resp = client.get("/api/v1/cargas")
+
+    assert resp.status_code == 200
+    assert resp.json() == []
 
 
 def test_superadmin_lista_las_cargas_de_todas_las_organizaciones(dos_organizaciones):
@@ -110,10 +121,18 @@ def test_superadmin_lista_las_cargas_de_todas_las_organizaciones(dos_organizacio
     assert sorted(c["id"] for c in resp.json()) == ["carga-a", "carga-b"]
 
 
-def test_usuario_de_a_no_lee_una_carga_de_b_por_id(dos_organizaciones):
-    client = _cliente("operador", "org-a", dos_organizaciones)
+def test_admin_de_a_no_lee_una_carga_de_b_por_id(dos_organizaciones):
+    client = _cliente("admin", "org-a", dos_organizaciones)
 
     assert client.get("/api/v1/cargas/carga-a").status_code == 200
+    assert client.get("/api/v1/cargas/carga-b").status_code == 404
+
+
+def test_operador_sin_plantas_asignadas_no_lee_cargas_por_id(dos_organizaciones):
+    # Decisión 2026-11-06 (fail-closed): ni la carga de su propia organización es visible sin planta asignada.
+    client = _cliente("operador", "org-a", dos_organizaciones)
+
+    assert client.get("/api/v1/cargas/carga-a").status_code == 404
     assert client.get("/api/v1/cargas/carga-b").status_code == 404
 
 

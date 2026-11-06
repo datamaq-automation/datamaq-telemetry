@@ -146,11 +146,19 @@ def test_usuario_sin_organizacion_no_recibe_planta_por_defecto(cliente):
     assert response.json()["planta_id"] == ""
 
 
-def test_usuario_propio_accede_a_su_planta(cliente):
+def test_usuario_con_planta_asignada_accede_a_su_planta(cliente):
     crear, _ = cliente
-    client = crear(USUARIO_A)
+    client = crear(USUARIO_A, [AccesoPlantaUsuario("u-a", "a2", puede_cambiar=False)])
     assert client.get("/api/v1/plantas/a2/unifilar").json()["planta_id"] == "a2"
     assert client.get("/api/v1/planta/unifilar?planta_id=a2").json()["planta_id"] == "a2"
+
+
+def test_operador_sin_plantas_asignadas_recibe_404_en_planta_de_su_organizacion(cliente):
+    # Decisión 2026-11-06 (fail-closed): sin filas en user_facility_access, ninguna planta, ni la de su org.
+    crear, _ = cliente
+    client = crear(USUARIO_A)
+    assert client.get("/api/v1/plantas/a2/unifilar").status_code == 404
+    assert client.get("/api/v1/planta/unifilar?planta_id=a2").status_code == 404
 
 
 @pytest.mark.parametrize("rol", ["superadmin"])
