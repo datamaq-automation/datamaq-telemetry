@@ -44,12 +44,22 @@ def resolver_planta_permitida(
         raise HTTPException(status_code=404, detail="planta_no_encontrada") from e
 
 
+def _sin_filas_ws(rol: str) -> frozenset[str] | None:
+    """Usuario sin filas en user_facility_access.
+
+    Operador: ninguna planta (decisión 2026-11-06, operador-sin-plantas-sin-acceso). Resto de roles: None,
+    que el WS lee como toda la organización (comportamiento histórico, sin cambio en esta corrección).
+    """
+    return frozenset() if rol == "operador" else None
+
+
 def resolver_plantas_permitidas_ws(app: Any, claims: dict[str, Any]) -> frozenset[str] | None:
     """Resuelve el conjunto de plantas permitidas para un cliente WebSocket autenticado.
 
     - superadmin: None (ve todas las plantas de todas las organizaciones).
     - Usuario con filas explícitas en user_facility_access: frozenset con las plantas permitidas.
-    - Usuario sin filas explícitas en user_facility_access (acceso global a su org): None.
+    - Operador sin filas explícitas en user_facility_access: frozenset() (ninguna planta; decisión 2026-11-06).
+    - Otro rol sin filas explícitas (acceso global a su org): None.
     - Claim `sub` ausente o vacío, o error al resolver: frozenset() (fail-closed, nunca None).
     """
     if claims.get("rol") == "superadmin":
@@ -70,7 +80,7 @@ def resolver_plantas_permitidas_ws(app: Any, claims: dict[str, Any]) -> frozense
             if repo_accesos is not None:
                 accesos = repo_accesos.listar_por_usuario(usuario_id)
                 if isinstance(accesos, (list, tuple, set, frozenset)) and not accesos:
-                    return None
+                    return _sin_filas_ws(rol)
             plantas = use_case.resolver(usuario_id, rol, organizacion_id)
             if plantas is None:
                 return None
@@ -80,7 +90,7 @@ def resolver_plantas_permitidas_ws(app: Any, claims: dict[str, Any]) -> frozense
             repo_accesos = app.dependency_overrides[get_accesos_planta_repository]()
             accesos = repo_accesos.listar_por_usuario(usuario_id)
             if not accesos:
-                return None
+                return _sin_filas_ws(rol)
             repo_org = YamlOrganizacionesRepository()
             roles_globales = roles_de_acceso_global(get_settings().ROLES_ACCESO_GLOBAL_EXTRA)
             use_case = GestionarAccesoPlantasUseCase(repo_accesos, repo_org, roles_globales=roles_globales)
@@ -94,7 +104,7 @@ def resolver_plantas_permitidas_ws(app: Any, claims: dict[str, Any]) -> frozense
             repo_accesos = MySQLAccesosPlantaRepository(db)
             accesos = repo_accesos.listar_por_usuario(usuario_id)
             if not accesos:
-                return None
+                return _sin_filas_ws(rol)
             repo_org = YamlOrganizacionesRepository()
             roles_globales = roles_de_acceso_global(get_settings().ROLES_ACCESO_GLOBAL_EXTRA)
             use_case = GestionarAccesoPlantasUseCase(repo_accesos, repo_org, roles_globales=roles_globales)

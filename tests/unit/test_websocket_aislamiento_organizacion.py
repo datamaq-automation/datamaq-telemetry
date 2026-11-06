@@ -367,13 +367,28 @@ class TestResolverPlantasPermitidasWs:
         claims = {"sub": "u-admin", "rol": "superadmin", "org": "org-1"}
         assert _resolver_plantas_permitidas_ws(app, claims) is None
 
-    def test_usuario_sin_filas_accesos_devuelve_none(self):
+    def test_operador_sin_filas_accesos_devuelve_frozenset_vacio(self):
+        # Decisión 2026-11-06: un operador sin plantas asignadas no ve ninguna planta.
         app = MagicMock()
         mock_use_case = MagicMock()
         mock_use_case.repo_accesos.listar_por_usuario.return_value = []
         app.dependency_overrides = {get_acceso_plantas_use_case: lambda: mock_use_case}
 
         claims = {"sub": "u-1", "rol": "operador", "org": "org-1"}
+        assert _resolver_plantas_permitidas_ws(app, claims) == frozenset()
+        assert (
+            debe_recibir_evento(False, "org-1", "org-1", plantas_permitidas=frozenset(), planta_evento="planta-a")
+            is False
+        )
+
+    def test_otro_rol_sin_filas_conserva_acceso_global_de_su_org(self):
+        # Sin cambio en esta corrección: solo se decidió el caso del operador.
+        app = MagicMock()
+        mock_use_case = MagicMock()
+        mock_use_case.repo_accesos.listar_por_usuario.return_value = []
+        app.dependency_overrides = {get_acceso_plantas_use_case: lambda: mock_use_case}
+
+        claims = {"sub": "u-2", "rol": "admin", "org": "org-1"}
         assert _resolver_plantas_permitidas_ws(app, claims) is None
 
     def test_usuario_con_filas_accesos_devuelve_frozenset(self):
