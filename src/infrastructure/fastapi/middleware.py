@@ -48,3 +48,17 @@ def registrar_guard_solo_lectura(app: Any, settings: Any) -> None:
             excepciones_desde_config(settings.API_SOLO_LECTURA_EXCEPCIONES), settings.DB_NAME
         )
         app.add_middleware(SoloLecturaMiddleware, excepciones=excepciones)
+
+
+class NormalizarMcpRutaMiddleware:
+    """Normaliza /mcp a /mcp/ en memoria para responder directamente sin redirección 307."""
+
+    def __init__(self, app: Any) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        if scope.get("type") == "http" and scope.get("path") == "/mcp":
+            scope = dict(scope)
+            scope["path"] = "/mcp/"
+            scope["raw_path"] = b"/mcp/"
+        await self.app(scope, receive, send)

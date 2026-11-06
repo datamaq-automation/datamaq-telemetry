@@ -15,9 +15,6 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from src.adapters.gateways.in_memory_event_broadcaster import InMemoryEventBroadcaster
-from src.adapters.gateways.mqtt_comando_rafaga import MqttComandoRafagaGateway
-from src.application.use_cases.caracterizar_carga import CaracterizarCargaUseCase
-from src.application.use_cases.ingesta.registro_campanas import registro_campanas_activas
 from src.application.use_cases.ingesta.resolvedor_dispositivo import ResolvedorDispositivoIngesta
 from src.domain.telemetria.exceptions import EstructuraUnifilarInvalidaError
 from src.domain.telemetria.services import debe_recibir_evento
@@ -26,6 +23,7 @@ from src.domain.telemetria.value_objects import MacAddress
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
 from src.infrastructure.fastapi.acceso_oauth import integracion_oauth_vigente_ws
 from src.infrastructure.fastapi.auth_cookies import ORIGENES_CORS_CYBERSYN
+from src.infrastructure.fastapi.campanas_sosten import loop_campanas_activas as _loop_campanas_activas
 from src.infrastructure.fastapi.dependencies import (
     extraer_token,
     get_mqtt_listener,
@@ -36,7 +34,14 @@ from src.infrastructure.fastapi.dependencies import (
 from src.infrastructure.fastapi.duracion_requests import DuracionRequestMiddleware
 from src.infrastructure.fastapi.error_handler import manejar_404, manejar_estructura_unifilar_invalida
 from src.infrastructure.fastapi.headers_historico import HEADER_DATOS_DESDE, HEADER_POTENCIA_REFERENCIA
-from src.infrastructure.fastapi.middleware import RequestIdMiddleware, registrar_guard_solo_lectura
+from src.infrastructure.fastapi.middleware import (
+    NormalizarMcpRutaMiddleware,
+    RequestIdMiddleware,
+    registrar_guard_solo_lectura,
+)
+from src.infrastructure.fastapi.planta_ownership import (
+    resolver_plantas_permitidas_ws as _resolver_plantas_permitidas_ws,
+)
 from src.infrastructure.fastapi.renovacion_tiempo_real import marca_renovacion, renovar_modo_tiempo_real_medidores
 from src.infrastructure.fastapi.routes.admin_router import router as admin_router
 from src.infrastructure.fastapi.routes.alertas_router import router as alertas_router
@@ -68,11 +73,6 @@ from src.infrastructure.sqlalchemy.database import (
     get_session_factory,
     verificar_estado_migraciones,
 )
-from src.infrastructure.sqlalchemy.mysql_repositories import (
-    MySQLCampanasRepository,
-    MySQLCargasRepository,
-    MySQLDispositivosRepository,
-)
 from src.infrastructure.yaml.repositories.organizaciones_repository import YamlOrganizacionesRepository
 from tools.mcp.server import mcp as datamaq_mcp
 
@@ -87,12 +87,14 @@ class ConnectedClient:
 
     `organizacion_id` es None para superadmin (ve todo) o cuando el usuario no tiene
     organización asociada (en ese caso, `es_superadmin` decide si ve algo: ver
-    `debe_recibir_evento`).
+    `debe_recibir_evento`). `plantas_permitidas` acota los eventos a un conjunto de plantas;
+    None significa sin restricción dentro de su organización.
     """
 
     websocket: WebSocket
     organizacion_id: str | None
     es_superadmin: bool
+    plantas_permitidas: frozenset[str] | None = None
 
 
 active_websockets: list[ConnectedClient] = []
@@ -155,36 +157,43 @@ def obtener_metricas_ws() -> dict[str, Any]:
     return ws_metrics.to_dict(len(active_websockets))
 
 
-def _resolver_organizacion_evento(topico: str) -> str | None:
-    """Resuelve la organizacion_id del dispositivo que originó `topico` (formato `.../{mac}/{subtopico}`).
+def _resolver_contexto_evento(topico: str) -> tuple[str | None, str | None]:
+    """Resuelve (organizacion_id, planta_id) del dispositivo que originó `topico` (formato `.../{mac}/{subtopico}`).
 
     Usa la caché en memoria de `ResolvedorDispositivoIngesta` (poblada por el worker de ingesta,
     mismo proceso) y solo abre una sesión de DB en el cache-miss de planta->organización.
-    Cualquier fallo se trata como "sin organización resuelta" (fail-closed: solo superadmin la ve).
+    Cualquier fallo se trata como (None, None) (fail-closed: solo superadmin la ve).
     """
     try:
         partes = topico.split("/")
         if len(partes) < 3:
-            return None
+            return None, None
         mac_raw = partes[2]
         mac_vo = MacAddress(mac_raw)
         dispositivo = ResolvedorDispositivoIngesta._device_cache.get(mac_vo.valor)
         if dispositivo is None or not dispositivo.planta_id:
-            return None
+            return None, None
         planta_id = dispositivo.planta_id
         if planta_id in ResolvedorDispositivoIngesta._organizacion_cache:
-            return ResolvedorDispositivoIngesta._organizacion_cache[planta_id]
+            return ResolvedorDispositivoIngesta._organizacion_cache[planta_id], planta_id
 
         session_factory = get_session_factory()
         db = session_factory()
         try:
             repo = YamlOrganizacionesRepository()
-            return ResolvedorDispositivoIngesta.resolver_organizacion_id(mac_raw, repo)
+            org_id = ResolvedorDispositivoIngesta.resolver_organizacion_id(mac_raw, repo)
+            return org_id, planta_id
         finally:
             db.close()
     except Exception as exc:
-        logger.warning("resolver_organizacion_evento_fallido", topico=topico, error=str(exc))
-        return None
+        logger.warning("resolver_contexto_evento_fallido", topico=topico, error=str(exc))
+        return None, None
+
+
+def _resolver_organizacion_evento(topico: str) -> str | None:
+    """Resuelve la organizacion_id del dispositivo que originó `topico`."""
+    org_id, _ = _resolver_contexto_evento(topico)
+    return org_id
 
 
 def websocket_broadcast_callback(topico: str, datos: dict):
@@ -205,13 +214,19 @@ def websocket_broadcast_callback(topico: str, datos: dict):
         logger.warning("ws_broadcast_sin_loop", topico=topico)
         return
 
-    organizacion_evento = _resolver_organizacion_evento(topico)
+    organizacion_evento, planta_evento = _resolver_contexto_evento(topico)
 
     enviados_ok = 0
     fallidos = 0
     omitidos_aislamiento = 0
     for cliente in list(active_websockets):
-        if not debe_recibir_evento(cliente.es_superadmin, cliente.organizacion_id, organizacion_evento):
+        if not debe_recibir_evento(
+            cliente.es_superadmin,
+            cliente.organizacion_id,
+            organizacion_evento,
+            cliente.plantas_permitidas,
+            planta_evento,
+        ):
             omitidos_aislamiento += 1
             continue
         try:
@@ -245,56 +260,6 @@ def _renovar_modo_tiempo_real_medidores(listener: Any, clientes: list[ConnectedC
     renovar_modo_tiempo_real_medidores(
         listener, alcance_de_clientes((c.es_superadmin, c.organizacion_id) for c in clientes)
     )
-
-
-INTERVALO_SOSTEN_CAMPANAS_S = 45.0
-"""Menor que los 120 s de duración de la ráfaga, con margen para un reintento perdido."""
-
-
-def _sostener_campanas() -> tuple[int, int]:
-    """Renueva la ráfaga de las campañas vivas y cierra las vencidas.
-
-    Corre con su propia sesión de base y en un hilo aparte porque `CaracterizarCargaUseCase`
-    es síncrono; el bucle que lo invoca vive en el event loop y no debe bloquearse.
-    """
-    session_factory = get_session_factory()
-    db = session_factory()
-    try:
-        use_case = CaracterizarCargaUseCase(
-            repo_campanas=MySQLCampanasRepository(db),
-            repo_cargas=MySQLCargasRepository(db),
-            repo_dispositivos=MySQLDispositivosRepository(db),
-            registro=registro_campanas_activas,
-            comando_rafaga=MqttComandoRafagaGateway(get_mqtt_listener()),
-        )
-        return use_case.sostener_campanas_activas()
-    finally:
-        db.close()
-
-
-async def _loop_campanas_activas() -> None:
-    """Mantiene vivas las campañas de caracterización.
-
-    Independiente de `_ws_heartbeat_loop`, que solo renueva la ráfaga mientras haya un
-    navegador conectado: una campaña puede correr de madrugada sin nadie mirando, y en
-    ese caso este bucle es lo único que impide que el medidor vuelva a 5 minutos en
-    medio de la medición.
-
-    También cierra las campañas vencidas, para que una olvidada no deje al medidor
-    publicando en ráfaga y escribiendo muestras indefinidamente.
-    """
-    while True:
-        try:
-            await asyncio.sleep(INTERVALO_SOSTEN_CAMPANAS_S)
-            # Se consulta la base aunque el registro en memoria esté vacío: tras un
-            # reinicio del servicio arranca vacío y las campañas siguen vivas en la tabla.
-            renovadas, cerradas = await asyncio.to_thread(_sostener_campanas)
-            if renovadas or cerradas:
-                logger.info("campanas_sostenidas", renovadas=renovadas, cerradas=cerradas)
-        except asyncio.CancelledError:
-            break
-        except Exception as e:
-            logger.warning("campanas_sosten_fallido", error=str(e))
 
 
 async def _ws_heartbeat_loop() -> None:
@@ -405,7 +370,7 @@ async def _autenticar_cliente_ws(websocket: WebSocket, settings: Settings, clien
     Devuelve None (y ya cerró la conexión) si el token es inválido/falta con AUTH_REQUIRED activo.
     """
     if not settings.AUTH_REQUIRED:
-        return ConnectedClient(websocket=websocket, organizacion_id=None, es_superadmin=True)
+        return ConnectedClient(websocket=websocket, organizacion_id=None, es_superadmin=True, plantas_permitidas=None)
 
     cookie_token = websocket.cookies.get(settings.AUTH_COOKIE_NOMBRE)
     auth_header = websocket.headers.get("authorization")
@@ -422,7 +387,16 @@ async def _autenticar_cliente_ws(websocket: WebSocket, settings: Settings, clien
 
     es_superadmin = claims.get("rol") == "superadmin"
     organizacion_id = None if es_superadmin else claims.get("org")
-    return ConnectedClient(websocket=websocket, organizacion_id=organizacion_id, es_superadmin=es_superadmin)
+    plantas_permitidas: frozenset[str] | None = None
+    if not es_superadmin:
+        plantas_permitidas = await asyncio.to_thread(_resolver_plantas_permitidas_ws, websocket.app, claims)
+
+    return ConnectedClient(
+        websocket=websocket,
+        organizacion_id=organizacion_id,
+        es_superadmin=es_superadmin,
+        plantas_permitidas=plantas_permitidas,
+    )
 
 
 def _registrar_cliente_ws(cliente: ConnectedClient, client_host: str) -> None:
@@ -460,20 +434,6 @@ def _desconectar_cliente_ws(cliente: ConnectedClient, client_host: str, evento: 
     ws_metrics.total_desconexiones += 1
     log_fn = logger.info if evento == "ws_cliente_desconectado" else logger.warning
     log_fn(evento, client=client_host, total_activos=len(active_websockets), **detalle)
-
-
-class NormalizarMcpRutaMiddleware:
-    """Normaliza /mcp a /mcp/ en memoria para responder directamente sin redirección 307."""
-
-    def __init__(self, app: Any) -> None:
-        self.app = app
-
-    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
-        if scope.get("type") == "http" and scope.get("path") == "/mcp":
-            scope = dict(scope)
-            scope["path"] = "/mcp/"
-            scope["raw_path"] = b"/mcp/"
-        await self.app(scope, receive, send)
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
