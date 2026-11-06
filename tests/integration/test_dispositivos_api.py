@@ -66,7 +66,8 @@ def test_listar_dispositivos_end_to_end():
     mock_use_case = MagicMock()
     mock_use_case.listar_dispositivos.return_value = [mock_dto]
     mock_acceso = MagicMock()
-    mock_acceso.resolver_planta_permitida.return_value = None
+    # Un usuario con alguna planta permitida recibe una planta efectiva (la activa). None sería "ninguna" (datamaq#125).
+    mock_acceso.resolver_planta_permitida.return_value = "planta-1"
 
     app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "user-test", "rol": "operador", "org": "org-test"}
     app.dependency_overrides[get_dispositivos_use_case] = lambda: mock_use_case
@@ -81,6 +82,7 @@ def test_listar_dispositivos_end_to_end():
     assert len(data) == 1
     assert data[0]["device_uid"] == "PM-001"
     mock_acceso.resolver_planta_permitida.assert_called_once_with("user-test", "operador", "org-test", None)
+    mock_use_case.listar_dispositivos.assert_called_once_with("planta-1", organizacion_id="org-test")
 
 
 def test_listar_dispositivos_rechaza_planta_ajena():
