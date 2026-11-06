@@ -361,3 +361,24 @@ class TestResolverPlantasPermitidasWs:
         claims = {"sub": "u-1", "rol": "operador", "org": "org-1"}
         resultado = _resolver_plantas_permitidas_ws(app, claims)
         assert resultado == frozenset({"planta-a"})
+
+    def test_error_al_resolver_accesos_falla_cerrado_sin_ver_otras_plantas(self):
+        # Fail-closed: un usuario restringido a planta-a que no puede leer sus accesos
+        # no debe quedar con "sin restricción" (None) ni recibir eventos de planta-b.
+        app = MagicMock()
+        mock_use_case = MagicMock()
+        mock_use_case.repo_accesos.listar_por_usuario.side_effect = RuntimeError("db caída")
+        app.dependency_overrides = {get_acceso_plantas_use_case: lambda: mock_use_case}
+
+        claims = {"sub": "u-1", "rol": "operador", "org": "org-1"}
+        resultado = _resolver_plantas_permitidas_ws(app, claims)
+
+        assert resultado == frozenset()
+        assert (
+            debe_recibir_evento(False, "org-1", "org-1", plantas_permitidas=resultado, planta_evento="planta-b")
+            is False
+        )
+        assert (
+            debe_recibir_evento(False, "org-1", "org-1", plantas_permitidas=resultado, planta_evento="planta-a")
+            is False
+        )

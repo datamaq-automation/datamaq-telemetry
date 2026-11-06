@@ -101,5 +101,7 @@ def resolver_plantas_permitidas_ws(app: Any, claims: dict[str, Any]) -> frozense
         finally:
             generador.close()
     except Exception as exc:
+        # Fail-closed: ante un error no se devuelve None (que significa "toda la org"),
+        # sino un conjunto vacío, para que un usuario restringido no vea plantas ajenas.
         logger.warning("ws_resolver_plantas_fallido", usuario_id=str(usuario_id), error=str(exc))
-        return None
+        return frozenset()
