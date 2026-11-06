@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 
 from src.infrastructure.fastapi.dependencies import get_dispositivos_use_case, get_oauth_repository, get_usuario_actual
+from src.infrastructure.fastapi.device_ownership import verificar_propiedad_dispositivo
 from src.infrastructure.fastapi.server import create_app
 
 
@@ -20,6 +21,8 @@ def _cliente(rol: str) -> tuple[TestClient, MagicMock]:
     dispositivos = MagicMock()
     app.dependency_overrides[get_dispositivos_use_case] = lambda: dispositivos
     app.dependency_overrides[get_oauth_repository] = lambda: MagicMock()
+    # Este archivo prueba el guard de rol (#99); la propiedad por planta tiene su batería (datamaq#126).
+    app.dependency_overrides[verificar_propiedad_dispositivo] = lambda: None
     return TestClient(app), dispositivos
 
 

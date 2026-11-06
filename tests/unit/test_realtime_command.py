@@ -9,6 +9,7 @@ from starlette.testclient import TestClient
 
 from src.infrastructure.fastapi import server
 from src.infrastructure.fastapi.dependencies import registrar_mqtt_listener
+from src.infrastructure.fastapi.device_ownership import verificar_propiedad_dispositivo
 from src.infrastructure.fastapi.renovacion_tiempo_real import INTERVALO_RENOVACION_S, marca_renovacion
 from src.infrastructure.fastapi.server import (
     ConnectedClient,
@@ -59,6 +60,8 @@ def test_endpoint_activar_tiempo_real():
 
     app.dependency_overrides[get_usuario_actual] = lambda: {"sub": "user-test", "rol": "operador", "org": "org-1"}
     app.dependency_overrides[get_dispositivos_use_case] = lambda: mock_uc
+    # Acá se prueba el comando MQTT; la propiedad por planta tiene su batería (datamaq#126).
+    app.dependency_overrides[verificar_propiedad_dispositivo] = lambda: None
 
     client = TestClient(app)
     resp = client.post("/api/v1/dispositivos/disp-1/realtime?segundos=120")
