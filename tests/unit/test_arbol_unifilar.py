@@ -110,3 +110,29 @@ class TestValidar:
         arbol = ArbolUnifilarService([_nodo("mt"), _nodo("tgbt", parent_id="mt")])
         with pytest.raises(EstructuraUnifilarInvalidaError, match="tgbt"):
             arbol.validar()
+
+
+ARBOLES_INVALIDOS = {
+    "ciclo": [_nodo("a", parent_id="b"), _nodo("b", parent_id="a")],
+    "padre_colgante": [_nodo("mt"), _nodo("trafo", parent_id="no-existe", device_id="dev-1")],
+    "id_duplicado": [_nodo("mt"), _nodo("mt")],
+    "device_id_duplicado": [
+        _nodo("mt"),
+        _nodo("trafo-a", parent_id="mt", device_id="dev-1"),
+        _nodo("trafo-b", parent_id="mt", device_id="dev-1"),
+    ],
+    "virtual_sin_hijos": [_nodo("mt"), _nodo("tgbt", parent_id="mt")],
+}
+
+
+class TestDesde:
+    """La fábrica construye el árbol solo si pasa validar(): un árbol inválido no llega a usarse (datamaq#146)."""
+
+    @pytest.mark.parametrize("nodos", ARBOLES_INVALIDOS.values(), ids=ARBOLES_INVALIDOS.keys())
+    def test_rechaza_arbol_invalido(self, nodos):
+        with pytest.raises(EstructuraUnifilarInvalidaError):
+            ArbolUnifilarService.desde(nodos)
+
+    def test_construye_arbol_valido(self):
+        arbol = ArbolUnifilarService.desde([_nodo("mt"), _nodo("trafo", parent_id="mt", device_id="dev-1")])
+        assert arbol.medidores_frontera("mt") == ["dev-1"]

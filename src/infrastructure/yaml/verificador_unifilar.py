@@ -25,7 +25,7 @@ def verificar_unifilar_plantas(yaml_repo: YamlOrganizacionesRepository | None = 
     for planta in plantas:
         nodos = yaml_repo.obtener_nodos_unifilar(planta.id)
         try:
-            ArbolUnifilarService(nodos).validar()
+            ArbolUnifilarService.desde(nodos)
         except EstructuraUnifilarInvalidaError as e:
             invalidas += 1
             logger.warning("unifilar_yaml_invalido", planta_id=planta.id, planta=planta.nombre, error=str(e))

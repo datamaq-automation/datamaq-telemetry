@@ -144,6 +144,8 @@ class PlantaEstructuraMapper:
 
     @staticmethod
     def unifilar_to_dto(entity: UnifilarPlanta) -> UnifilarPlantaDTO:
+        # Constructor directo a propósito: esta vista muestra el unifilar aunque sea inválido
+        # (topologia_valida=False). La fábrica lo rechazaría (datamaq#146).
         arbol = ArbolUnifilarService(entity.nodos)
         try:
             arbol.validar()

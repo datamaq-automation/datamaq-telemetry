@@ -47,7 +47,7 @@ class DatosMaestrosMedidorService:
         """Sube por el unifilar desde el nodo medido por `dispositivo_id` hasta la acometida."""
         if not nodos:
             return None
-        arbol = ArbolUnifilarService(nodos)
+        arbol = ArbolUnifilarService.desde(nodos)
         actual = cls.nodo_medido_por(dispositivo_id, nodos)
         visitados: set[str] = set()
         while actual is not None and actual.id not in visitados:

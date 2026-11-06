@@ -164,7 +164,9 @@ def test_resumen_nodo_bt_expone_nivel_y_nominales(use_case):
 def test_resumen_nodo_mt_expone_nivel_y_nominales(use_case):
     nodo_mt = _nodo("mt-13200", TipoNodoUnifilar.ACOMETIDA)
     nodo_mt.tension_nominal_v = 13200.0
-    use_case.repo_organizaciones.obtener_nodos_unifilar.return_value = [nodo_mt]
+    # Un árbol válido necesita medidor aguas abajo: una acometida sola es virtual sin hijos (datamaq#146).
+    medidor = _nodo("tgbt-mt", TipoNodoUnifilar.TGBT, parent_id="mt-13200", device_id=DEV_1)
+    use_case.repo_organizaciones.obtener_nodos_unifilar.return_value = [nodo_mt, medidor]
 
     resumen = use_case.resumen(PLANTA_ID, "mt-13200", organizacion_id=ORG_ID)
 

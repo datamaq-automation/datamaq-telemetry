@@ -148,7 +148,7 @@ class ConsultarCostoEstimadoUseCase:
         nodos = self._repo_org.obtener_nodos_unifilar(planta_id)
         if not nodos:
             return []
-        arbol = ArbolUnifilarService(nodos)
+        arbol = ArbolUnifilarService.desde(nodos)
         if nodo_id:
             nodo = arbol.obtener(nodo_id)
         else:

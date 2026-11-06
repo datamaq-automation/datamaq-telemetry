@@ -26,6 +26,18 @@ class ArbolUnifilarService:
         for hijos in self._hijos.values():
             hijos.sort(key=lambda n: (n.orden, n.id))
 
+    @classmethod
+    def desde(cls, nodos: list[NodoUnifilar]) -> "ArbolUnifilarService":
+        """Construye el árbol y lo valida: un árbol inválido no llega a usarse (datamaq#146).
+
+        Lanza EstructuraUnifilarInvalidaError ante ciclo, padre colgante, id o device_id repetido,
+        o nodo virtual sin hijos. Usar el constructor directo solo si el llamador debe mostrar el
+        árbol aunque sea inválido, y dejarlo escrito en el código.
+        """
+        arbol = cls(nodos)
+        arbol.validar()
+        return arbol
+
     def validar(self) -> None:
         vistos: set[str] = set()
         for nodo in self._nodos:
