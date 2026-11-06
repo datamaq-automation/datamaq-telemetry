@@ -50,13 +50,15 @@ def resolver_plantas_permitidas_ws(app: Any, claims: dict[str, Any]) -> frozense
     - superadmin: None (ve todas las plantas de todas las organizaciones).
     - Usuario con filas explícitas en user_facility_access: frozenset con las plantas permitidas.
     - Usuario sin filas explícitas en user_facility_access (acceso global a su org): None.
+    - Claim `sub` ausente o vacío, o error al resolver: frozenset() (fail-closed, nunca None).
     """
     if claims.get("rol") == "superadmin":
         return None
 
     usuario_id = claims.get("sub")
     if not usuario_id:
-        return None
+        # Fail-closed: sin identidad no hay "acceso global"; None significaría toda la org.
+        return frozenset()
 
     rol = claims.get("rol", "operador")
     organizacion_id = claims.get("org")

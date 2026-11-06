@@ -382,3 +382,32 @@ class TestResolverPlantasPermitidasWs:
             debe_recibir_evento(False, "org-1", "org-1", plantas_permitidas=resultado, planta_evento="planta-a")
             is False
         )
+
+    def test_claim_sin_sub_o_con_sub_vacio_falla_cerrado(self):
+        # Sin identidad no hay "acceso global a la org": debe devolver frozenset(), nunca None.
+        app = MagicMock()
+        for claims in (
+            {"rol": "operador", "org": "org-1"},
+            {"sub": "", "rol": "operador", "org": "org-1"},
+            {"sub": None, "rol": "operador", "org": "org-1"},
+        ):
+            resultado = _resolver_plantas_permitidas_ws(app, claims)
+            assert resultado == frozenset()
+            for planta in ("planta-a", "planta-b"):
+                assert (
+                    debe_recibir_evento(False, "org-1", "org-1", plantas_permitidas=resultado, planta_evento=planta)
+                    is False
+                )
+
+    def test_usuario_id_invalido_falla_cerrado(self):
+        app = MagicMock()
+        mock_use_case = MagicMock()
+        mock_use_case.repo_accesos.listar_por_usuario.side_effect = ValueError("uuid inválido")
+        app.dependency_overrides = {get_acceso_plantas_use_case: lambda: mock_use_case}
+
+        claims = {"sub": "no-es-uuid", "rol": "operador", "org": "org-1"}
+        assert _resolver_plantas_permitidas_ws(app, claims) == frozenset()
+
+    def test_superadmin_sigue_sin_restriccion_aunque_falte_sub(self):
+        app = MagicMock()
+        assert _resolver_plantas_permitidas_ws(app, {"rol": "superadmin", "org": None}) is None
