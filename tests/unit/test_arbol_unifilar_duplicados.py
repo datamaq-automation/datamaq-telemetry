@@ -1,6 +1,9 @@
 """tests/unit/test_arbol_unifilar_duplicados.py — Test para detectar duplicados en frontera."""
 
+import pytest
+
 from src.domain.telemetria.entities import NodoUnifilar
+from src.domain.telemetria.exceptions import EstructuraUnifilarInvalidaError
 from src.domain.telemetria.servicios.arbol_unifilar import ArbolUnifilarService
 from src.domain.telemetria.value_objects import TipoNodoUnifilar
 
@@ -51,21 +54,18 @@ class TestDuplicadosEnFrontera:
         assert len(medidores) == len(set(medidores))
         assert medidores == ["dev-1"]
 
-    def test_dos_nodos_diferentes_mismo_device_id_generan_duplicados(self):
-        """Si hay dos nodos DIFERENTES con el MISMO device_id, medidores_frontera() devuelve duplicados.
+    def test_dos_nodos_diferentes_mismo_device_id_no_se_deduplican_en_silencio(self):
+        """Dos nodos DIFERENTES con el MISMO device_id son error de configuración (datamaq#147).
 
-        Este es el bug real: un árbol con dos ramas que apuntan a medidores físicos diferentes
-        pero con el mismo device_id (error de configuración).
+        medidores_frontera() ya no oculta la repetición: la devuelve tal cual y validar() la rechaza.
+        Deduplicar aquí sumaría dos veces el mismo medidor sin dejar rastro.
         """
         nodo_mt = _nodo("mt")
-        # Dos nodos diferentes con el mismo device_id (error de configuración)
         nodo_trafo_a = _nodo("trafo-a", parent_id="mt", device_id="dev-1", orden=0)
         nodo_trafo_b = _nodo("trafo-b", parent_id="mt", device_id="dev-1", orden=1)
 
         arbol = ArbolUnifilarService([nodo_mt, nodo_trafo_a, nodo_trafo_b])
-        device_ids = arbol.medidores_frontera("mt")
 
-        # Este test debería fallar si el código tiene el bug
-        assert device_ids.count("dev-1") == 1, (
-            f"device_id 'dev-1' aparece {device_ids.count('dev-1')} veces, debería ser 1"
-        )
+        assert arbol.medidores_frontera("mt") == ["dev-1", "dev-1"]
+        with pytest.raises(EstructuraUnifilarInvalidaError):
+            arbol.validar()

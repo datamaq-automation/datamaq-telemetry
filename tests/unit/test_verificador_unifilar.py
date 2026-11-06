@@ -8,9 +8,15 @@ from src.infrastructure.yaml.repositories.organizaciones_repository import YamlO
 from src.infrastructure.yaml.verificador_unifilar import verificar_unifilar_plantas
 
 
-def _nodo(id_: str, parent_id: str | None = None) -> NodoUnifilar:
+def _nodo(id_: str, parent_id: str | None = None, device_id: str | None = None) -> NodoUnifilar:
     return NodoUnifilar(
-        id=id_, planta_id="p", nombre=id_, tipo=TipoNodoUnifilar.CARGA, tension_nominal_v=380.0, parent_id=parent_id
+        id=id_,
+        planta_id="p",
+        nombre=id_,
+        tipo=TipoNodoUnifilar.CARGA,
+        tension_nominal_v=380.0,
+        parent_id=parent_id,
+        device_id=device_id,
     )
 
 
@@ -27,7 +33,7 @@ def test_planta_con_ciclo_se_reporta_sin_bloquear():
         Planta(id="mal", organizacion_id="o", nombre="Mal"),
     ]
     repo.obtener_nodos_unifilar.side_effect = lambda pid: (
-        [_nodo("a"), _nodo("b", "a")] if pid == "ok" else [_nodo("x", "y"), _nodo("y", "x")]
+        [_nodo("a"), _nodo("b", "a", device_id="dev-b")] if pid == "ok" else [_nodo("x", "y"), _nodo("y", "x")]
     )
     resultado = verificar_unifilar_plantas(repo)
     assert resultado == {"plantas": 2, "invalidas": 1}
