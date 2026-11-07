@@ -440,3 +440,21 @@ class TestResolverPlantasPermitidasWs:
     def test_superadmin_sigue_sin_restriccion_aunque_falte_sub(self):
         app = MagicMock()
         assert _resolver_plantas_permitidas_ws(app, {"rol": "superadmin", "org": None}) is None
+
+
+class TestTokenSinSubFailClosed:
+    """#172: un token sin `sub` no recibe eventos de ninguna planta de su organización."""
+
+    def test_claim_sub_ausente_resuelve_frozenset_vacio(self):
+        app = MagicMock()
+        assert _resolver_plantas_permitidas_ws(app, {"rol": "operador", "org": "org-1"}) == frozenset()
+
+    def test_claim_sub_vacio_resuelve_frozenset_vacio(self):
+        app = MagicMock()
+        assert _resolver_plantas_permitidas_ws(app, {"sub": "", "rol": "operador", "org": "org-1"}) == frozenset()
+
+    def test_sub_ausente_no_recibe_eventos_de_ninguna_planta(self):
+        app = MagicMock()
+        plantas = _resolver_plantas_permitidas_ws(app, {"rol": "operador", "org": "org-1"})
+        for planta in ("planta-a1", "planta-a2"):
+            assert debe_recibir_evento(False, "org-1", "org-1", plantas, planta) is False
