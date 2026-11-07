@@ -1,6 +1,5 @@
 """src/infrastructure/fastapi/dependencies.py."""
 
-from datetime import datetime, timezone
 from functools import lru_cache
 from typing import Annotated, Any
 
@@ -56,6 +55,7 @@ from src.domain.telemetria.ports import (
 from src.infrastructure.auth.email_service import SmtpEmailService
 from src.infrastructure.auth.jwt_token_service import JwtTokenService
 from src.infrastructure.fastapi.acceso_oauth import integracion_oauth_vigente
+from src.infrastructure.fastapi.vigencia_sesion import sesion_vigente
 from src.infrastructure.paho_mqtt.mqtt_listener import MQTTListener
 from src.infrastructure.settings.config import Settings, get_settings
 from src.infrastructure.settings.logger import get_logger
@@ -472,28 +472,10 @@ def get_usuario_actual(
     if claims is None:
         raise HTTPException(status_code=401, detail="credenciales_invalidas")
 
-    sub = str(claims.get("sub", ""))
-    iat = int(claims.get("iat", 0))
-
-    # Verificación de revocación de sesión por cambio de contraseña o logout en memoria
-    revocation = get_token_revocation_service()
-    if revocation.esta_revocado(sub, iat):
+    # Revocación en memoria, baja y cambio de contraseña (datamaq#127, ISO 27001 A.5.15). Lo mismo chequea
+    # /ws/live en cada latido (Issue #141).
+    if not sesion_vigente(claims, repo_usuarios, get_token_revocation_service()):
         raise HTTPException(status_code=401, detail="credenciales_invalidas")
-
-    # Verificación de revocación global persistida en base de datos (ISO 27001 A.5.15)
-    if repo_usuarios is not None and sub:
-        usuario = repo_usuarios.obtener_por_id(sub)
-        # Una cuenta dada de baja no autentica aunque su token siga vigente (datamaq#127). `esta_activo` solo se
-        # comprobaba al iniciar sesión: la baja no cortaba las sesiones abiertas hasta que vencía el token.
-        if usuario is not None and not usuario.esta_activo:
-            raise HTTPException(status_code=401, detail="credenciales_invalidas")
-        if usuario is not None and usuario.sesiones_revocadas_antes_de is not None:
-            rev_dt = usuario.sesiones_revocadas_antes_de
-            if rev_dt.tzinfo is None:
-                rev_dt = rev_dt.replace(tzinfo=timezone.utc)
-            token_iat = datetime.fromtimestamp(iat, tz=timezone.utc)
-            if token_iat < rev_dt:
-                raise HTTPException(status_code=401, detail="credenciales_invalidas")
 
     # Access token OAuth (lleva client_id): vale solo mientras la integración siga conectada (Issue #33).
     if not integracion_oauth_vigente(claims, repo_oauth):
