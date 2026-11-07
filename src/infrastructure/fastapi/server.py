@@ -28,6 +28,7 @@ from src.infrastructure.fastapi.campanas_sosten import loop_campanas_activas as 
 from src.infrastructure.fastapi.dependencies import (
     extraer_token,
     get_mqtt_listener,
+    get_token_revocation_service,
     global_event_broadcaster,
     global_telemetria_buffer,
     registrar_mqtt_listener,
@@ -65,6 +66,7 @@ from src.infrastructure.fastapi.routes.telemetria_router import router as teleme
 from src.infrastructure.fastapi.routes.usuarios_router import router as usuarios_router
 from src.infrastructure.fastapi.security_headers import SecurityHeadersMiddleware
 from src.infrastructure.fastapi.seguridad_rutas import RateLimit404Middleware, RechazoPathInseguroMiddleware
+from src.infrastructure.fastapi.vigencia_sesion import sesion_ws_vigente
 from src.infrastructure.fastapi.vigilancia_conectividad import loop_vigilancia_conectividad
 from src.infrastructure.paho_mqtt.mqtt_listener import MQTTListener
 from src.infrastructure.settings.config import Settings, get_settings
@@ -96,6 +98,8 @@ class ConnectedClient:
     organizacion_id: str | None
     es_superadmin: bool
     plantas_permitidas: frozenset[str] | None = None
+    # Claims del token con el que se conectó (None si AUTH_REQUIRED está apagado). El latido los revalida (#141).
+    claims: dict[str, Any] | None = None
 
 
 active_websockets: list[ConnectedClient] = []
@@ -276,7 +280,26 @@ def _renovar_modo_tiempo_real_medidores(listener: Any, clientes: list[ConnectedC
     )
 
 
-async def _ws_heartbeat_loop() -> None:
+async def _revalidar_sesiones_ws(app: FastAPI) -> None:
+    """Cierra las conexiones cuya sesión ya no es vigente: cuenta dada de baja, sesión revocada o token vencido
+    (Issue #141). El cierre usa 4401, igual que un token inválido al conectar."""
+    revocation = get_token_revocation_service()
+    for cliente in list(active_websockets):
+        if cliente.claims is None:
+            continue
+        vigente = await asyncio.to_thread(sesion_ws_vigente, app, cliente.claims, revocation)
+        if vigente:
+            continue
+        if cliente in active_websockets:
+            active_websockets.remove(cliente)
+        logger.warning("ws_sesion_no_vigente_cerrada", organizacion_id=cliente.organizacion_id)
+        try:
+            await cliente.websocket.close(code=WS_CLOSE_TOKEN_INVALIDO, reason="sesion_no_vigente")
+        except Exception:
+            pass
+
+
+async def _ws_heartbeat_loop(app: FastAPI | None = None) -> None:
     """Mantiene activa la conexión a través de Cloudflare o Nginx ante períodos de inactividad
     y renueva el modo de tiempo real en medidores mientras haya clientes WebSocket conectados."""
     while True:
@@ -291,6 +314,9 @@ async def _ws_heartbeat_loop() -> None:
                     except Exception:
                         if cliente in active_websockets:
                             active_websockets.remove(cliente)
+
+                if app is not None:
+                    await _revalidar_sesiones_ws(app)
 
                 # Renovación periódica de sampleo rápido (cada 60 segundos si hay clientes activos)
                 ahora_ts = time.time()
@@ -349,7 +375,7 @@ async def lifespan(app: FastAPI):
     _iniciar_mqtt_si_habilitado(get_settings().MQTT_HABILITADO, global_event_broadcaster)
 
     # Iniciar heartbeat para Cloudflare / proxies
-    heartbeat_task = asyncio.create_task(_ws_heartbeat_loop())
+    heartbeat_task = asyncio.create_task(_ws_heartbeat_loop(app))
     campanas_task = asyncio.create_task(_loop_campanas_activas())
     conectividad_task = asyncio.create_task(loop_vigilancia_conectividad())
 
