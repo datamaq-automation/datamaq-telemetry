@@ -57,7 +57,7 @@ def client():
 
 
 def test_endpoint_balance_energia_normal(client):
-    token = _crear_token(rol="admin")
+    token = _crear_token(rol="superadmin")
     resp = client.get(
         f"/api/v1/sge/plantas/{PLANTA_DURAX_ID}/balance-energia",
         params={
@@ -76,7 +76,7 @@ def test_endpoint_balance_energia_normal(client):
 
 
 def test_endpoint_balance_energia_con_armonicos_thd(client):
-    token = _crear_token(rol="ingeniero")
+    token = _crear_token(rol="superadmin")
     resp = client.get(
         f"/api/v1/sge/plantas/{PLANTA_DURAX_ID}/balance-energia",
         params={
@@ -95,7 +95,7 @@ def test_endpoint_balance_energia_con_armonicos_thd(client):
 
 
 def test_endpoint_ahorros_cusum(client):
-    token = _crear_token(rol="admin")
+    token = _crear_token(rol="superadmin")
     resp = client.get(
         f"/api/v1/sge/plantas/{PLANTA_DURAX_ID}/ahorros-cusum",
         params={

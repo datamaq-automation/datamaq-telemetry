@@ -7,7 +7,6 @@ from src.domain.sge.ports import RepositorioDocumentacionSgePort
 ROLES_PREVIEW_PERMITIDOS: frozenset[str] = frozenset(
     {
         "superadmin",
-        "admin",
     }
 )
 

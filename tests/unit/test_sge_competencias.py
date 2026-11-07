@@ -73,7 +73,7 @@ def repo_documentacion() -> FakeDocumentacionRepo:
             id="it-en-03",
             titulo="Apagado y Modo Espera de Motores en TGBT",
             categoria="operacion",
-            roles_permitidos=("operador", "mantenimiento", "ingeniero", "admin"),
+            roles_permitidos=("operador", "superadmin"),
             resumen="Procedimiento para desconexión en pausas operativas.",
             puntos_clave=("No dejar motores en vacío",),
             acciones_inmediatas=("Desactivar seccionador aguas abajo",),
@@ -83,7 +83,7 @@ def repo_documentacion() -> FakeDocumentacionRepo:
             id="pol-sge-01",
             titulo="Política Energética Corporativa",
             categoria="politica",
-            roles_permitidos=("operador", "mantenimiento", "ingeniero", "admin"),
+            roles_permitidos=("operador", "superadmin"),
             resumen="Compromiso de mejora continua del desempeño energético.",
             puntos_clave=("Reducción del SEC",),
             acciones_inmediatas=("Informar anomalías",),
@@ -93,7 +93,7 @@ def repo_documentacion() -> FakeDocumentacionRepo:
             id="it-mto-04",
             titulo="Mantenimiento Predictivo Motores IE3/IE4",
             categoria="mantenimiento",
-            roles_permitidos=("mantenimiento", "ingeniero", "admin"),
+            roles_permitidos=("superadmin",),
             resumen="Protocolo de inspección de rodamientos y cos phi.",
             puntos_clave=("Medición termográfica",),
             acciones_inmediatas=("Calibrar banco de capacitores",),
@@ -157,7 +157,7 @@ def test_use_case_registrar_acuse_articulo_no_existente_lanza_error(repo_documen
 
 def test_use_case_registrar_acuse_rol_no_autorizado_lanza_error(repo_documentacion, repo_capacitaciones):
     uc = RegistrarAcuseCapacitacionUseCase(repo_documentacion, repo_capacitaciones)
-    # it-mto-04 solo es para mantenimiento/ingeniero/admin, no para operador
+    # it-mto-04 solo es para superadmin, no para operador
     with pytest.raises(CapacitacionNoAutorizadaParaRolError):
         uc.ejecutar(
             usuario_id="usr-123",

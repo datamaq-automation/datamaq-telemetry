@@ -8,7 +8,7 @@ _CATALOGO_INICIAL_SGE: tuple[ArticuloSge, ...] = (
         id="sge-op-01",
         titulo="Procedimiento Operativo: Paradas Operativas y Horario Pico",
         categoria="operacion",
-        roles_permitidos=("operador", "mantenimiento"),
+        roles_permitidos=("operador",),
         resumen="Instrucciones de apagado secuencial para evitar demanda máxima...",
         puntos_clave=(
             "Escalonamiento de arranque de grandes motores",
@@ -22,7 +22,7 @@ _CATALOGO_INICIAL_SGE: tuple[ArticuloSge, ...] = (
         id="sge-pol-01",
         titulo="Política Energética y Compromiso de Desempeño Energético Madygraf",
         categoria="politica",
-        roles_permitidos=("operador", "mantenimiento", "ingeniero", "admin"),
+        roles_permitidos=("operador", "superadmin"),
         resumen=(
             "Declaración formal de la cooperativa Madygraf hacia la mejora continua de "
             "la eficiencia energética y reducción de emisiones."
@@ -40,7 +40,7 @@ _CATALOGO_INICIAL_SGE: tuple[ArticuloSge, ...] = (
         id="sge-mto-01",
         titulo="Mantenimiento Preventivo: Compensación de Reactiva y Banco de Capacitores",
         categoria="mantenimiento",
-        roles_permitidos=("mantenimiento", "ingeniero"),
+        roles_permitidos=("superadmin",),
         resumen=(
             "Protocolo de inspección mensual y mantenimiento térmico del banco automático de capacitores en TGBT."
         ),
@@ -57,7 +57,7 @@ _CATALOGO_INICIAL_SGE: tuple[ArticuloSge, ...] = (
         id="sge-enre-01",
         titulo="Normativa ENRE Res. 85/2024: Régimen Sancionatorio de Factor de Potencia",
         categoria="normativa_enre",
-        roles_permitidos=("ingeniero", "admin"),
+        roles_permitidos=("superadmin",),
         resumen=(
             "Criterios técnicos para mantener factor de potencia inductivo tg φ ≤ 0.426 "
             "(cos φ ≥ 0.92) y evitar penalizaciones de Edenor."
@@ -75,7 +75,7 @@ _CATALOGO_INICIAL_SGE: tuple[ArticuloSge, ...] = (
         id="sge-enpi-01",
         titulo="Indicadores de Desempeño Energético (EnPI): Línea Base Rotativas",
         categoria="metas_enpi",
-        roles_permitidos=("ingeniero", "admin"),
+        roles_permitidos=("superadmin",),
         resumen=(
             "Monitoreo y cálculo del consumo específico de energía eléctrica "
             "(kWh / millar de pliegos impresos) en rotativas de producción."

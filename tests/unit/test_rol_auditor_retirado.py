@@ -53,8 +53,8 @@ def test_guard_de_auditoria_solo_deja_pasar_superadmin():
         assert exc.value.status_code == 403, rol
 
 
-def test_previsualizacion_sge_solo_para_superadmin_y_admin():
-    assert ROLES_PREVIEW_PERMITIDOS == {"superadmin", "admin"}
+def test_previsualizacion_sge_solo_para_superadmin():
+    assert ROLES_PREVIEW_PERMITIDOS == {"superadmin"}
 
 
 def test_ruta_de_auditoria_rechaza_auditor():
